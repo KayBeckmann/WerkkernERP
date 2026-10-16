@@ -30,7 +30,7 @@ class _ArticleGroupsScreenState extends State<ArticleGroupsScreen> {
     return context.read<ArticleGroupRepository>().listForCompany(companyId);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() { _future = _load(); });
 
   Future<void> _create() async {
     final result = await showDialog<({String name, double markup})>(
