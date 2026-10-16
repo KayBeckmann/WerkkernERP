@@ -5,6 +5,7 @@ import '../../domain/services/active_company_service.dart';
 import 'articles_screen.dart';
 import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
+import 'invoices_screen.dart';
 import 'suppliers_screen.dart';
 
 /// Navigationsrahmen innerhalb einer gewählten Firma — Bottom-Navigation
@@ -21,14 +22,20 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
 
   static const _destinations = [
+    NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Rechnungen'),
     NavigationDestination(icon: Icon(Icons.group_outlined), label: 'Kunden'),
     NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Artikel'),
     NavigationDestination(icon: Icon(Icons.local_shipping_outlined), label: 'Lieferanten'),
   ];
 
-  static const _screens = [CustomersScreen(), ArticlesScreen(), SuppliersScreen()];
+  static const _screens = [
+    InvoicesScreen(),
+    CustomersScreen(),
+    ArticlesScreen(),
+    SuppliersScreen(),
+  ];
 
-  static const _titles = ['Kunden', 'Artikel', 'Lieferanten'];
+  static const _titles = ['Rechnungen', 'Kunden', 'Artikel', 'Lieferanten'];
 
   @override
   Widget build(BuildContext context) {
