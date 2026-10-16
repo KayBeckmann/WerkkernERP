@@ -162,6 +162,7 @@ class _SetSupplierPriceDialogState extends State<_SetSupplierPriceDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _supplierId,
             decoration: const InputDecoration(labelText: 'Lieferant'),
             items: [
