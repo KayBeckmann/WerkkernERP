@@ -25,14 +25,26 @@ class Companies extends Table {
   BoolColumn get deliveryNotesEnabled => boolean().withDefault(const Constant(false))();
 
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
-  /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Gelten
-  /// für alle drei Dokumentarten (Rechnung/Angebot/Auftrag) — anders
-  /// als RechnungsFee (nur als fachliche Anregung angeschaut) bewusst
-  /// EIN gemeinsamer Satz statt separater Texte je Dokumentart, um die
-  /// Einstellungen nicht unnötig aufzublähen; bei Bedarf später pro
-  /// Dokumentart aufteilbar, ohne Bestandsdaten zu verlieren.
+  /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
+  /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
+  /// (2026-10-16): "Einleitungstext und Schlußtext müssen pro Dokument
+  /// abweichend sein!" (Beispiele: Angebot braucht eine Bindefrist,
+  /// Rechnung ein Zahlungsziel). `pdfIntroText`/`pdfClosingText` bleiben
+  /// als Rechnungs-Text erhalten (keine Datenmigration/-verlust nötig,
+  /// analog zu RechnungsFees unpräfigiertem `einleitungstext`/
+  /// `schlusstext` für die Rechnung), die drei neuen Paare kommen für
+  /// Angebot/Auftrag/Lieferschein dazu — exakt RechnungsFees Muster
+  /// (`einleitungstext_angebot` usw., nur fachlich angeschaut, keine
+  /// Code-/Text-Übernahme). Fußzeile bleibt bewusst gemeinsam (enthält
+  /// typischerweise Firma/Anschrift, nicht dokumentartspezifisch).
   TextColumn get pdfIntroText => text().nullable()();
   TextColumn get pdfClosingText => text().nullable()();
+  TextColumn get pdfIntroTextQuote => text().nullable()();
+  TextColumn get pdfClosingTextQuote => text().nullable()();
+  TextColumn get pdfIntroTextOrder => text().nullable()();
+  TextColumn get pdfClosingTextOrder => text().nullable()();
+  TextColumn get pdfIntroTextDeliveryNote => text().nullable()();
+  TextColumn get pdfClosingTextDeliveryNote => text().nullable()();
   TextColumn get pdfFooterText => text().nullable()();
 
   @override

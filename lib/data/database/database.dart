@@ -29,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -75,6 +75,16 @@ class AppDatabase extends _$AppDatabase {
             // Kay-Nachtrag 2026-10-16: Einheit + Rabatt pro Position.
             await migrator.addColumn(invoiceItems, invoiceItems.unit);
             await migrator.addColumn(invoiceItems, invoiceItems.discountPercent);
+          }
+          if (from < 7) {
+            // Kay-Nachtrag 2026-10-16 (zweiter Nachtrag): Einleitungs-/
+            // Schlusstext pro Dokumentart statt eines gemeinsamen Satzes.
+            await migrator.addColumn(companies, companies.pdfIntroTextQuote);
+            await migrator.addColumn(companies, companies.pdfClosingTextQuote);
+            await migrator.addColumn(companies, companies.pdfIntroTextOrder);
+            await migrator.addColumn(companies, companies.pdfClosingTextOrder);
+            await migrator.addColumn(companies, companies.pdfIntroTextDeliveryNote);
+            await migrator.addColumn(companies, companies.pdfClosingTextDeliveryNote);
           }
         },
       );

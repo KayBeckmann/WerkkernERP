@@ -29,16 +29,19 @@ void main() {
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
 
+      // Standardmäßig ist nur die Rechnung aktiv (A0-Prinzip) — nur ihr
+      // Textpaar ist sichtbar (Kay-Nachtrag, zweiter Nachtrag: "pro
+      // Dokument abweichend").
       await tester.enterText(
-        find.widgetWithText(TextField, 'Einleitungstext'),
+        find.widgetWithText(TextField, 'Einleitungstext (Rechnung)'),
         'Vielen Dank für Ihren Auftrag.',
       );
       await tester.enterText(
-        find.widgetWithText(TextField, 'Schlusstext'),
+        find.widgetWithText(TextField, 'Schlusstext (Rechnung)'),
         'Es gelten unsere AGB.',
       );
       await tester.enterText(
-        find.widgetWithText(TextField, 'Fußzeile'),
+        find.widgetWithText(TextField, 'Fußzeile (gemeinsam für alle Dokumentarten)'),
         'Elektro Beckmann — Musterstraße 1',
       );
       await tester.tap(find.text('Speichern'));
