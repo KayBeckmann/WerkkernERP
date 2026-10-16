@@ -117,7 +117,12 @@ void main() {
       final company = await companies.create(name: 'Firma A');
       final customer = await customers.create(companyId: company.id, name: 'Kunde');
 
-      await companies.setModules(companyId: company.id, quotesEnabled: true, ordersEnabled: true);
+      await companies.setModules(
+        companyId: company.id,
+        quotesEnabled: true,
+        ordersEnabled: true,
+        deliveryNotesEnabled: false,
+      );
       final quoteDraft = await draftWithOneItem(company.id, customer.id, kind: DocumentKind.quote);
       await invoices.finalize(companyId: company.id, id: quoteDraft.id);
 
@@ -126,6 +131,7 @@ void main() {
         companyId: company.id,
         quotesEnabled: false,
         ordersEnabled: false,
+        deliveryNotesEnabled: false,
       );
       expect(disabled.quotesEnabled, isFalse);
 

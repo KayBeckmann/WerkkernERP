@@ -53,12 +53,17 @@ class CompanyRepository {
     required String companyId,
     required bool quotesEnabled,
     required bool ordersEnabled,
+    required bool deliveryNotesEnabled,
   }) async {
     final company = await findById(companyId);
     if (company == null) {
       throw ArgumentError('Firma $companyId existiert nicht.');
     }
-    final updated = company.copyWith(quotesEnabled: quotesEnabled, ordersEnabled: ordersEnabled);
+    final updated = company.copyWith(
+      quotesEnabled: quotesEnabled,
+      ordersEnabled: ordersEnabled,
+      deliveryNotesEnabled: deliveryNotesEnabled,
+    );
     await update(updated);
     return updated;
   }

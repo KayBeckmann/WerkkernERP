@@ -1,0 +1,276 @@
+import 'package:decimal/decimal.dart';
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:werkkernerp/data/database/database.dart';
+import 'package:werkkernerp/data/database/tables.dart';
+import 'package:werkkernerp/data/repositories/company_repository.dart';
+import 'package:werkkernerp/data/repositories/customer_repository.dart';
+import 'package:werkkernerp/data/repositories/invoice_repository.dart';
+import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
+
+/// Kay-Nachtrag 2026-10-16: Lieferschein als neue Dokumentart +
+/// Dokumentumwandlung (Angebot→Auftrag/Lieferschein/Rechnung, Auftrag→
+/// Lieferschein/Rechnung). Lieferscheine dürfen keine Stunden-
+/// Positionen enthalten.
+void main() {
+  late AppDatabase db;
+  late CompanyRepository companies;
+  late CustomerRepository customers;
+  late InvoiceRepository invoices;
+
+  setUp(() {
+    db = AppDatabase.forTesting(
+      NativeDatabase.memory(setup: (rawDb) => rawDb.execute('PRAGMA foreign_keys = ON;')),
+    );
+    companies = CompanyRepository(db);
+    customers = CustomerRepository(db);
+    invoices = InvoiceRepository(db, NumberSequenceRepository(db));
+  });
+
+  tearDown(() async => db.close());
+
+  InvoiceItemInput textItem(String description, {int price = 10000}) => InvoiceItemInput(
+        kind: InvoiceItemKind.text,
+        description: description,
+        quantity: Decimal.one,
+        unitPriceCents: price,
+        vatRatePercent: 19,
+      );
+
+  InvoiceItemInput hoursItem(String description) => InvoiceItemInput(
+        kind: InvoiceItemKind.hours,
+        description: description,
+        quantity: Decimal.fromInt(3),
+        unitPriceCents: 5000,
+        vatRatePercent: 19,
+      );
+
+  test('Ein Lieferschein mit Stunden-Position kann nicht angelegt werden', () async {
+    final company = await companies.create(name: 'Firma A');
+    final customer = await customers.create(companyId: company.id, name: 'Kunde');
+
+    expect(
+      () => invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.deliveryNote,
+        items: [hoursItem('Montage')],
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test(
+    'Ein Lieferschein-Entwurf kann nicht nachträglich via update() eine Stunden-Position '
+    'bekommen',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final draft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.deliveryNote,
+        items: [textItem('Material')],
+      );
+
+      expect(
+        () => invoices.update(companyId: company.id, id: draft.id, items: [hoursItem('Montage')]),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test(
+    'A5-Abnahme (Lieferschein): eigener Nummernkreis mit Präfix LS, unabhängig von R/An/A',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final yy = (DateTime.now().year % 100).toString().padLeft(2, '0');
+
+      final draft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.deliveryNote,
+        items: [textItem('Material')],
+      );
+      final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+      expect(finalized!.invoiceNumber, 'LS-$yy' '001');
+    },
+  );
+
+  test(
+    'convertTo(): finalisiertes Angebot wird zu einem neuen Auftrags-Entwurf mit denselben '
+    'Positionen, verknüpft über convertedFromId',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final quoteDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.quote,
+        items: [textItem('Beratung'), textItem('Material')],
+      );
+      final quoteFinal = await invoices.finalize(companyId: company.id, id: quoteDraft.id);
+
+      final order = await invoices.convertTo(
+        companyId: company.id,
+        sourceId: quoteFinal!.id,
+        targetKind: DocumentKind.order,
+      );
+
+      expect(order.kind, DocumentKind.order);
+      expect(order.status, InvoiceStatus.draft);
+      expect(order.invoiceNumber, isNull);
+      expect(order.customerId, customer.id);
+      expect(order.convertedFromId, quoteFinal.id);
+
+      final orderItems = await invoices.itemsFor(order.id);
+      expect(orderItems.map((i) => i.description), ['Beratung', 'Material']);
+
+      final convertedDocs = await invoices.listConvertedFrom(quoteFinal.id);
+      expect(convertedDocs.map((i) => i.id), [order.id]);
+    },
+  );
+
+  test(
+    'convertTo(): Angebot mit Stunden-Position in einen Lieferschein wandelt die '
+    'Stunden-Position NICHT mit — "Lieferscheine sollen KEINE Stunden enthalten"',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final quoteDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.quote,
+        items: [textItem('Material'), hoursItem('Montage')],
+      );
+      final quoteFinal = await invoices.finalize(companyId: company.id, id: quoteDraft.id);
+
+      final deliveryNote = await invoices.convertTo(
+        companyId: company.id,
+        sourceId: quoteFinal!.id,
+        targetKind: DocumentKind.deliveryNote,
+      );
+
+      final items = await invoices.itemsFor(deliveryNote.id);
+      expect(items.map((i) => i.description), ['Material']);
+      expect(items.any((i) => i.kind == InvoiceItemKind.hours), isFalse);
+    },
+  );
+
+  test('convertTo(): Auftrag kann zu Rechnung oder Lieferschein, aber nicht zu Angebot', () async {
+    final company = await companies.create(name: 'Firma A');
+    final customer = await customers.create(companyId: company.id, name: 'Kunde');
+    final orderDraft = await invoices.createDraft(
+      companyId: company.id,
+      customerId: customer.id,
+      issueDate: DateTime.now(),
+      serviceDate: DateTime.now(),
+      kind: DocumentKind.order,
+      items: [textItem('Material')],
+    );
+    final orderFinal = await invoices.finalize(companyId: company.id, id: orderDraft.id);
+
+    final invoiceDraft = await invoices.convertTo(
+      companyId: company.id,
+      sourceId: orderFinal!.id,
+      targetKind: DocumentKind.invoice,
+    );
+    expect(invoiceDraft.kind, DocumentKind.invoice);
+
+    expect(
+      () => invoices.convertTo(
+        companyId: company.id,
+        sourceId: orderFinal.id,
+        targetKind: DocumentKind.quote,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('convertTo(): eine Rechnung kann nicht umgewandelt werden (Ende der Kette)', () async {
+    final company = await companies.create(name: 'Firma A');
+    final customer = await customers.create(companyId: company.id, name: 'Kunde');
+    final draft = await invoices.createDraft(
+      companyId: company.id,
+      customerId: customer.id,
+      issueDate: DateTime.now(),
+      serviceDate: DateTime.now(),
+      items: [textItem('Material')],
+    );
+    final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+
+    expect(
+      () => invoices.convertTo(
+        companyId: company.id,
+        sourceId: finalized!.id,
+        targetKind: DocumentKind.deliveryNote,
+      ),
+      throwsArgumentError,
+    );
+  });
+
+  test('convertTo(): ein noch nicht finalisiertes (Entwurf-)Dokument kann nicht umgewandelt werden', () async {
+    final company = await companies.create(name: 'Firma A');
+    final customer = await customers.create(companyId: company.id, name: 'Kunde');
+    final quoteDraft = await invoices.createDraft(
+      companyId: company.id,
+      customerId: customer.id,
+      issueDate: DateTime.now(),
+      serviceDate: DateTime.now(),
+      kind: DocumentKind.quote,
+      items: [textItem('Material')],
+    );
+
+    expect(
+      () => invoices.convertTo(
+        companyId: company.id,
+        sourceId: quoteDraft.id,
+        targetKind: DocumentKind.order,
+      ),
+      throwsStateError,
+    );
+  });
+
+  test(
+    'convertTo(): ein Angebot kann sowohl in einen Auftrag ALS AUCH separat in einen '
+    'Lieferschein umgewandelt werden — beide zeigen auf dasselbe Quelldokument zurück',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final quoteDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.quote,
+        items: [textItem('Material')],
+      );
+      final quoteFinal = await invoices.finalize(companyId: company.id, id: quoteDraft.id);
+
+      final order = await invoices.convertTo(
+        companyId: company.id,
+        sourceId: quoteFinal!.id,
+        targetKind: DocumentKind.order,
+      );
+      final deliveryNote = await invoices.convertTo(
+        companyId: company.id,
+        sourceId: quoteFinal.id,
+        targetKind: DocumentKind.deliveryNote,
+      );
+
+      final convertedDocs = await invoices.listConvertedFrom(quoteFinal.id);
+      expect(convertedDocs.map((i) => i.id).toSet(), {order.id, deliveryNote.id});
+    },
+  );
+}

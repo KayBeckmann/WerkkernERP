@@ -12,8 +12,9 @@ import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 
 /// Migrationen dieser App (v1→v2 A5: Angebot/Auftrag; v2→v3: erweiterte
-/// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte). Statt das
-/// Spaltentyp-/Datumsspeicherformat von drifts NativeDatabase zu raten,
+/// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte; v4→v5:
+/// Lieferschein + Dokumentumwandlung). Statt das Spaltentyp-/
+/// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
 /// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
 /// v1-Zustand zurückgebaut (nur die seither hinzugekommenen Spalten
@@ -35,8 +36,9 @@ void main() {
   });
 
   test(
-    'Migration v1→v4 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte): Bestandsdaten '
-    'bekommen automatisch die neuen Default-Werte — ohne Datenverlust an bestehenden Spalten',
+    'Migration v1→v5 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein): '
+    'Bestandsdaten bekommen automatisch die neuen Default-Werte — ohne Datenverlust an '
+    'bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -85,6 +87,9 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text;');
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text;');
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_footer_text;');
+      // v4 -> v5 (Lieferschein + Dokumentumwandlung):
+      raw.execute('ALTER TABLE companies DROP COLUMN delivery_notes_enabled;');
+      raw.execute('ALTER TABLE invoices DROP COLUMN converted_from_id;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -102,6 +107,7 @@ void main() {
         expect(migratedCompany.pdfIntroText, isNull);
         expect(migratedCompany.pdfClosingText, isNull);
         expect(migratedCompany.pdfFooterText, isNull);
+        expect(migratedCompany.deliveryNotesEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -109,6 +115,7 @@ void main() {
         expect(migratedInvoice.kind, DocumentKind.invoice);
         expect(migratedInvoice.customerId, customer.id, reason: 'Bestandsdaten dürfen nicht verändert werden');
         expect(migratedInvoice.customerSnapshotVatId, isNull);
+        expect(migratedInvoice.convertedFromId, isNull);
 
         final migratedCustomer =
             await (db.select(db.customers)..where((c) => c.id.equals(customer.id))).getSingle();

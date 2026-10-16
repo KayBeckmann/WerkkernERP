@@ -126,6 +126,20 @@ class $CompaniesTable extends Companies
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _deliveryNotesEnabledMeta =
+      const VerificationMeta('deliveryNotesEnabled');
+  @override
+  late final GeneratedColumn<bool> deliveryNotesEnabled = GeneratedColumn<bool>(
+    'delivery_notes_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("delivery_notes_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _pdfIntroTextMeta = const VerificationMeta(
     'pdfIntroText',
   );
@@ -172,6 +186,7 @@ class $CompaniesTable extends Companies
     createdAt,
     quotesEnabled,
     ordersEnabled,
+    deliveryNotesEnabled,
     pdfIntroText,
     pdfClosingText,
     pdfFooterText,
@@ -263,6 +278,15 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('delivery_notes_enabled')) {
+      context.handle(
+        _deliveryNotesEnabledMeta,
+        deliveryNotesEnabled.isAcceptableOrUnknown(
+          data['delivery_notes_enabled']!,
+          _deliveryNotesEnabledMeta,
+        ),
+      );
+    }
     if (data.containsKey('pdf_intro_text')) {
       context.handle(
         _pdfIntroTextMeta,
@@ -343,6 +367,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}orders_enabled'],
       )!,
+      deliveryNotesEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}delivery_notes_enabled'],
+      )!,
       pdfIntroText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_intro_text'],
@@ -381,6 +409,7 @@ class Company extends DataClass implements Insertable<Company> {
   /// bleibt ohne Zusatzschritt direkt nutzbar (A0-Prinzip).
   final bool quotesEnabled;
   final bool ordersEnabled;
+  final bool deliveryNotesEnabled;
 
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Gelten
@@ -404,6 +433,7 @@ class Company extends DataClass implements Insertable<Company> {
     required this.createdAt,
     required this.quotesEnabled,
     required this.ordersEnabled,
+    required this.deliveryNotesEnabled,
     this.pdfIntroText,
     this.pdfClosingText,
     this.pdfFooterText,
@@ -434,6 +464,7 @@ class Company extends DataClass implements Insertable<Company> {
     map['created_at'] = Variable<DateTime>(createdAt);
     map['quotes_enabled'] = Variable<bool>(quotesEnabled);
     map['orders_enabled'] = Variable<bool>(ordersEnabled);
+    map['delivery_notes_enabled'] = Variable<bool>(deliveryNotesEnabled);
     if (!nullToAbsent || pdfIntroText != null) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText);
     }
@@ -469,6 +500,7 @@ class Company extends DataClass implements Insertable<Company> {
       createdAt: Value(createdAt),
       quotesEnabled: Value(quotesEnabled),
       ordersEnabled: Value(ordersEnabled),
+      deliveryNotesEnabled: Value(deliveryNotesEnabled),
       pdfIntroText: pdfIntroText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfIntroText),
@@ -498,6 +530,9 @@ class Company extends DataClass implements Insertable<Company> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       quotesEnabled: serializer.fromJson<bool>(json['quotesEnabled']),
       ordersEnabled: serializer.fromJson<bool>(json['ordersEnabled']),
+      deliveryNotesEnabled: serializer.fromJson<bool>(
+        json['deliveryNotesEnabled'],
+      ),
       pdfIntroText: serializer.fromJson<String?>(json['pdfIntroText']),
       pdfClosingText: serializer.fromJson<String?>(json['pdfClosingText']),
       pdfFooterText: serializer.fromJson<String?>(json['pdfFooterText']),
@@ -518,6 +553,7 @@ class Company extends DataClass implements Insertable<Company> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'quotesEnabled': serializer.toJson<bool>(quotesEnabled),
       'ordersEnabled': serializer.toJson<bool>(ordersEnabled),
+      'deliveryNotesEnabled': serializer.toJson<bool>(deliveryNotesEnabled),
       'pdfIntroText': serializer.toJson<String?>(pdfIntroText),
       'pdfClosingText': serializer.toJson<String?>(pdfClosingText),
       'pdfFooterText': serializer.toJson<String?>(pdfFooterText),
@@ -536,6 +572,7 @@ class Company extends DataClass implements Insertable<Company> {
     DateTime? createdAt,
     bool? quotesEnabled,
     bool? ordersEnabled,
+    bool? deliveryNotesEnabled,
     Value<String?> pdfIntroText = const Value.absent(),
     Value<String?> pdfClosingText = const Value.absent(),
     Value<String?> pdfFooterText = const Value.absent(),
@@ -551,6 +588,7 @@ class Company extends DataClass implements Insertable<Company> {
     createdAt: createdAt ?? this.createdAt,
     quotesEnabled: quotesEnabled ?? this.quotesEnabled,
     ordersEnabled: ordersEnabled ?? this.ordersEnabled,
+    deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
     pdfIntroText: pdfIntroText.present ? pdfIntroText.value : this.pdfIntroText,
     pdfClosingText: pdfClosingText.present
         ? pdfClosingText.value
@@ -576,6 +614,9 @@ class Company extends DataClass implements Insertable<Company> {
       ordersEnabled: data.ordersEnabled.present
           ? data.ordersEnabled.value
           : this.ordersEnabled,
+      deliveryNotesEnabled: data.deliveryNotesEnabled.present
+          ? data.deliveryNotesEnabled.value
+          : this.deliveryNotesEnabled,
       pdfIntroText: data.pdfIntroText.present
           ? data.pdfIntroText.value
           : this.pdfIntroText,
@@ -602,6 +643,7 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('createdAt: $createdAt, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
+          ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfFooterText: $pdfFooterText')
@@ -622,6 +664,7 @@ class Company extends DataClass implements Insertable<Company> {
     createdAt,
     quotesEnabled,
     ordersEnabled,
+    deliveryNotesEnabled,
     pdfIntroText,
     pdfClosingText,
     pdfFooterText,
@@ -641,6 +684,7 @@ class Company extends DataClass implements Insertable<Company> {
           other.createdAt == this.createdAt &&
           other.quotesEnabled == this.quotesEnabled &&
           other.ordersEnabled == this.ordersEnabled &&
+          other.deliveryNotesEnabled == this.deliveryNotesEnabled &&
           other.pdfIntroText == this.pdfIntroText &&
           other.pdfClosingText == this.pdfClosingText &&
           other.pdfFooterText == this.pdfFooterText);
@@ -658,6 +702,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<DateTime> createdAt;
   final Value<bool> quotesEnabled;
   final Value<bool> ordersEnabled;
+  final Value<bool> deliveryNotesEnabled;
   final Value<String?> pdfIntroText;
   final Value<String?> pdfClosingText;
   final Value<String?> pdfFooterText;
@@ -674,6 +719,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.createdAt = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
+    this.deliveryNotesEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfFooterText = const Value.absent(),
@@ -691,6 +737,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     required DateTime createdAt,
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
+    this.deliveryNotesEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfFooterText = const Value.absent(),
@@ -710,6 +757,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<DateTime>? createdAt,
     Expression<bool>? quotesEnabled,
     Expression<bool>? ordersEnabled,
+    Expression<bool>? deliveryNotesEnabled,
     Expression<String>? pdfIntroText,
     Expression<String>? pdfClosingText,
     Expression<String>? pdfFooterText,
@@ -727,6 +775,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (createdAt != null) 'created_at': createdAt,
       if (quotesEnabled != null) 'quotes_enabled': quotesEnabled,
       if (ordersEnabled != null) 'orders_enabled': ordersEnabled,
+      if (deliveryNotesEnabled != null)
+        'delivery_notes_enabled': deliveryNotesEnabled,
       if (pdfIntroText != null) 'pdf_intro_text': pdfIntroText,
       if (pdfClosingText != null) 'pdf_closing_text': pdfClosingText,
       if (pdfFooterText != null) 'pdf_footer_text': pdfFooterText,
@@ -746,6 +796,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<DateTime>? createdAt,
     Value<bool>? quotesEnabled,
     Value<bool>? ordersEnabled,
+    Value<bool>? deliveryNotesEnabled,
     Value<String?>? pdfIntroText,
     Value<String?>? pdfClosingText,
     Value<String?>? pdfFooterText,
@@ -763,6 +814,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       createdAt: createdAt ?? this.createdAt,
       quotesEnabled: quotesEnabled ?? this.quotesEnabled,
       ordersEnabled: ordersEnabled ?? this.ordersEnabled,
+      deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
       pdfIntroText: pdfIntroText ?? this.pdfIntroText,
       pdfClosingText: pdfClosingText ?? this.pdfClosingText,
       pdfFooterText: pdfFooterText ?? this.pdfFooterText,
@@ -806,6 +858,11 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (ordersEnabled.present) {
       map['orders_enabled'] = Variable<bool>(ordersEnabled.value);
     }
+    if (deliveryNotesEnabled.present) {
+      map['delivery_notes_enabled'] = Variable<bool>(
+        deliveryNotesEnabled.value,
+      );
+    }
     if (pdfIntroText.present) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText.value);
     }
@@ -835,6 +892,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('createdAt: $createdAt, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
+          ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfFooterText: $pdfFooterText, ')
@@ -3631,6 +3689,20 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _convertedFromIdMeta = const VerificationMeta(
+    'convertedFromId',
+  );
+  @override
+  late final GeneratedColumn<String> convertedFromId = GeneratedColumn<String>(
+    'converted_from_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES invoices (id) ON DELETE SET NULL',
+    ),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3655,6 +3727,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     finalizedAt,
     createdAt,
     updatedAt,
+    convertedFromId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3835,6 +3908,15 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('converted_from_id')) {
+      context.handle(
+        _convertedFromIdMeta,
+        convertedFromId.isAcceptableOrUnknown(
+          data['converted_from_id']!,
+          _convertedFromIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3936,6 +4018,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
       )!,
+      convertedFromId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}converted_from_id'],
+      ),
     );
   }
 
@@ -3992,6 +4078,19 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final DateTime? finalizedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  /// Zeigt auf das **Quelldokument**, aus dem diese Zeile per
+  /// `InvoiceRepository.convertTo()` erzeugt wurde (Kay-Nachtrag
+  /// 2026-10-16: "Finalisierte Dokumente muss man wandeln können —
+  /// Angebot in Auftrag, Lieferschein oder Rechnung"). `null` für
+  /// eigenständig angelegte Dokumente. Bewusst ein einziges rückwärts
+  /// zeigendes Feld statt eines eigenen Fremdschlüssels je möglicher
+  /// Zielart (wie bei RechnungsFee) — ein Angebot kann so sowohl in
+  /// einen Auftrag **als auch** separat in einen Lieferschein
+  /// umgewandelt werden, beide neuen Zeilen zeigen einfach auf
+  /// dasselbe Quelldokument zurück; `onDelete: setNull` ist nur
+  /// defensiv, finalisierte Dokumente werden in der UI nie gelöscht.
+  final String? convertedFromId;
   const Invoice({
     required this.id,
     required this.companyId,
@@ -4015,6 +4114,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.finalizedAt,
     required this.createdAt,
     required this.updatedAt,
+    this.convertedFromId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4079,6 +4179,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || convertedFromId != null) {
+      map['converted_from_id'] = Variable<String>(convertedFromId);
+    }
     return map;
   }
 
@@ -4132,6 +4235,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           : Value(finalizedAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      convertedFromId: convertedFromId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(convertedFromId),
     );
   }
 
@@ -4183,6 +4289,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       finalizedAt: serializer.fromJson<DateTime?>(json['finalizedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      convertedFromId: serializer.fromJson<String?>(json['convertedFromId']),
     );
   }
   @override
@@ -4223,6 +4330,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'finalizedAt': serializer.toJson<DateTime?>(finalizedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'convertedFromId': serializer.toJson<String?>(convertedFromId),
     };
   }
 
@@ -4249,6 +4357,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<DateTime?> finalizedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
+    Value<String?> convertedFromId = const Value.absent(),
   }) => Invoice(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -4290,6 +4399,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     finalizedAt: finalizedAt.present ? finalizedAt.value : this.finalizedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    convertedFromId: convertedFromId.present
+        ? convertedFromId.value
+        : this.convertedFromId,
   );
   Invoice copyWithCompanion(InvoicesCompanion data) {
     return Invoice(
@@ -4343,6 +4455,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           : this.finalizedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      convertedFromId: data.convertedFromId.present
+          ? data.convertedFromId.value
+          : this.convertedFromId,
     );
   }
 
@@ -4370,7 +4485,8 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('companySnapshotIban: $companySnapshotIban, ')
           ..write('finalizedAt: $finalizedAt, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('convertedFromId: $convertedFromId')
           ..write(')'))
         .toString();
   }
@@ -4399,6 +4515,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     finalizedAt,
     createdAt,
     updatedAt,
+    convertedFromId,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -4425,7 +4542,8 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.companySnapshotIban == this.companySnapshotIban &&
           other.finalizedAt == this.finalizedAt &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.convertedFromId == this.convertedFromId);
 }
 
 class InvoicesCompanion extends UpdateCompanion<Invoice> {
@@ -4451,6 +4569,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<DateTime?> finalizedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<String?> convertedFromId;
   final Value<int> rowid;
   const InvoicesCompanion({
     this.id = const Value.absent(),
@@ -4475,6 +4594,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.finalizedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.convertedFromId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   InvoicesCompanion.insert({
@@ -4500,6 +4620,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.finalizedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.convertedFromId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -4532,6 +4653,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<DateTime>? finalizedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<String>? convertedFromId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4565,6 +4687,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (finalizedAt != null) 'finalized_at': finalizedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (convertedFromId != null) 'converted_from_id': convertedFromId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4592,6 +4715,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<DateTime?>? finalizedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
+    Value<String?>? convertedFromId,
     Value<int>? rowid,
   }) {
     return InvoicesCompanion(
@@ -4621,6 +4745,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       finalizedAt: finalizedAt ?? this.finalizedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      convertedFromId: convertedFromId ?? this.convertedFromId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4714,6 +4839,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (convertedFromId.present) {
+      map['converted_from_id'] = Variable<String>(convertedFromId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4745,6 +4873,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('finalizedAt: $finalizedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('convertedFromId: $convertedFromId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5536,8 +5665,8 @@ class $NumberSequencesTable extends NumberSequences
 class NumberSequence extends DataClass implements Insertable<NumberSequence> {
   final String companyId;
 
-  /// `DocumentKind.name`, also "invoice"/"quote"/"order" (Präfixe "R"/
-  /// "An"/"A", seit A5). Gutschrift ("G") kommt erst mit Phase C.
+  /// `DocumentKind.name`, also "invoice"/"quote"/"order"/"deliveryNote"
+  /// (Präfixe "R"/"An"/"A"/"LS"). Gutschrift ("G") kommt erst mit Phase C.
   final String documentType;
   final int year;
   final int lastNumber;
@@ -5824,6 +5953,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         'invoices',
         limitUpdateKind: UpdateKind.delete,
       ),
+      result: [TableUpdate('invoices', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'invoices',
+        limitUpdateKind: UpdateKind.delete,
+      ),
       result: [TableUpdate('invoice_items', kind: UpdateKind.delete)],
     ),
     WritePropagation(
@@ -5855,6 +5991,7 @@ typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
   required DateTime createdAt,
   Value<bool> quotesEnabled,
   Value<bool> ordersEnabled,
+  Value<bool> deliveryNotesEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
   Value<String?> pdfFooterText,
@@ -5872,6 +6009,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
   Value<DateTime> createdAt,
   Value<bool> quotesEnabled,
   Value<bool> ordersEnabled,
+  Value<bool> deliveryNotesEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
   Value<String?> pdfFooterText,
@@ -6056,6 +6194,11 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<bool> get ordersEnabled => $composableBuilder(
     column: $table.ordersEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get deliveryNotesEnabled => $composableBuilder(
+    column: $table.deliveryNotesEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6289,6 +6432,11 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get deliveryNotesEnabled => $composableBuilder(
+    column: $table.deliveryNotesEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get pdfIntroText => $composableBuilder(
     column: $table.pdfIntroText,
     builder: (column) => ColumnOrderings(column),
@@ -6348,6 +6496,11 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<bool> get ordersEnabled => $composableBuilder(
     column: $table.ordersEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get deliveryNotesEnabled => $composableBuilder(
+    column: $table.deliveryNotesEnabled,
     builder: (column) => column,
   );
 
@@ -6563,6 +6716,7 @@ class $$CompaniesTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
+                Value<bool> deliveryNotesEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfFooterText = const Value.absent(),
@@ -6579,6 +6733,7 @@ class $$CompaniesTableTableManager
                 createdAt: createdAt,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
+                deliveryNotesEnabled: deliveryNotesEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfFooterText: pdfFooterText,
@@ -6597,6 +6752,7 @@ class $$CompaniesTableTableManager
                 required DateTime createdAt,
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
+                Value<bool> deliveryNotesEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfFooterText = const Value.absent(),
@@ -6613,6 +6769,7 @@ class $$CompaniesTableTableManager
                 createdAt: createdAt,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
+                deliveryNotesEnabled: deliveryNotesEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfFooterText: pdfFooterText,
@@ -9526,6 +9683,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<DateTime?> finalizedAt,
   required DateTime createdAt,
   required DateTime updatedAt,
+  Value<String?> convertedFromId,
   Value<int> rowid,
 });
 typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
@@ -9551,6 +9709,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<DateTime?> finalizedAt,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<String?> convertedFromId,
   Value<int> rowid,
 });
 
@@ -9586,6 +9745,23 @@ final class $$InvoicesTableReferences
       $_db.customers,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_customerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $InvoicesTable _convertedFromIdTable(_$AppDatabase db) =>
+      db.invoices.createAlias('invoices__converted_from_id__invoices__id');
+
+  $$InvoicesTableProcessedTableManager? get convertedFromId {
+    final $_column = $_itemColumn<String>('converted_from_id');
+    if ($_column == null) return null;
+    final manager = $$InvoicesTableTableManager(
+      $_db,
+      $_db.invoices,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_convertedFromIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -9759,6 +9935,29 @@ class $$InvoicesTableFilterComposer
           }) => $$CustomersTableFilterComposer(
             $db: $db,
             $table: $db.customers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$InvoicesTableFilterComposer get convertedFromId {
+    final $$InvoicesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.convertedFromId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableFilterComposer(
+            $db: $db,
+            $table: $db.invoices,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9948,6 +10147,29 @@ class $$InvoicesTableOrderingComposer
     );
     return composer;
   }
+
+  $$InvoicesTableOrderingComposer get convertedFromId {
+    final $$InvoicesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.convertedFromId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableOrderingComposer(
+            $db: $db,
+            $table: $db.invoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$InvoicesTableAnnotationComposer
@@ -10091,6 +10313,29 @@ class $$InvoicesTableAnnotationComposer
     return composer;
   }
 
+  $$InvoicesTableAnnotationComposer get convertedFromId {
+    final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.convertedFromId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.invoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<T> invoiceItemsRefs<T extends Object>(
     Expression<T> Function($$InvoiceItemsTableAnnotationComposer a) f,
   ) {
@@ -10133,6 +10378,7 @@ class $$InvoicesTableTableManager
           PrefetchHooks Function({
             bool companyId,
             bool customerId,
+            bool convertedFromId,
             bool invoiceItemsRefs,
           })
         > {
@@ -10171,6 +10417,7 @@ class $$InvoicesTableTableManager
                 Value<DateTime?> finalizedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
+                Value<String?> convertedFromId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InvoicesCompanion(
                 id: id,
@@ -10195,6 +10442,7 @@ class $$InvoicesTableTableManager
                 finalizedAt: finalizedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                convertedFromId: convertedFromId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -10221,6 +10469,7 @@ class $$InvoicesTableTableManager
                 Value<DateTime?> finalizedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
+                Value<String?> convertedFromId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InvoicesCompanion.insert(
                 id: id,
@@ -10245,6 +10494,7 @@ class $$InvoicesTableTableManager
                 finalizedAt: finalizedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                convertedFromId: convertedFromId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10259,6 +10509,7 @@ class $$InvoicesTableTableManager
               ({
                 companyId = false,
                 customerId = false,
+                convertedFromId = false,
                 invoiceItemsRefs = false,
               }) {
                 return PrefetchHooks(
@@ -10301,6 +10552,17 @@ class $$InvoicesTableTableManager
                                 ._customerIdTable(db),
                             referencedColumn: $$InvoicesTableReferences
                                 ._customerIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (convertedFromId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.convertedFromId,
+                            referencedTable: $$InvoicesTableReferences
+                                ._convertedFromIdTable(db),
+                            referencedColumn: $$InvoicesTableReferences
+                                ._convertedFromIdTable(db)
                                 .id,
                           ) as T;
                         }
@@ -10353,6 +10615,7 @@ typedef $$InvoicesTableProcessedTableManager =
       PrefetchHooks Function({
         bool companyId,
         bool customerId,
+        bool convertedFromId,
         bool invoiceItemsRefs,
       })
     >;
