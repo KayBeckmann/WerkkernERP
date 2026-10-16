@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../data/database/database.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
+import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import 'invoice_editor_screen.dart';
 
@@ -32,7 +33,16 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     final invoices = await invoiceRepo.listDraftsForCompany(companyId);
     final customers = await customerRepo.listForCompany(companyId);
     final customerById = {for (final c in customers) c.id: c};
-    return _InvoicesData(invoices: invoices, customerById: customerById, allCustomers: customers);
+    final totalsById = <String, Money>{};
+    for (final invoice in invoices) {
+      totalsById[invoice.id] = (await invoiceRepo.totalsFor(invoice.id)).totalGross;
+    }
+    return _InvoicesData(
+      invoices: invoices,
+      customerById: customerById,
+      allCustomers: customers,
+      totalsById: totalsById,
+    );
   }
 
   void _reload() => setState(() => _future = _load());
@@ -78,6 +88,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                 leading: const Icon(Icons.receipt_long_outlined),
                 title: Text(customer?.name ?? '(unbekannter Kunde)'),
                 subtitle: Text('Entwurf — ${invoice.issueDate.toLocal().toString().split(' ').first}'),
+                trailing: Text(data.totalsById[invoice.id]?.toString() ?? '–'),
                 onTap: () async {
                   if (customer == null) return;
                   final changed = await Navigator.of(context).push<bool>(
@@ -108,10 +119,16 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
 }
 
 class _InvoicesData {
-  const _InvoicesData({required this.invoices, required this.customerById, required this.allCustomers});
+  const _InvoicesData({
+    required this.invoices,
+    required this.customerById,
+    required this.allCustomers,
+    required this.totalsById,
+  });
   final List<Invoice> invoices;
   final Map<String, Customer> customerById;
   final List<Customer> allCustomers;
+  final Map<String, Money> totalsById;
 }
 
 class _PickCustomerDialog extends StatelessWidget {
