@@ -148,31 +148,43 @@ class _BackupScreenState extends State<BackupScreen> {
     }
 
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Lokales Backup — keine automatische Cloud-Sicherung. '
-              'Die exportierte Datei zusätzlich extern aufzubewahren liegt in deiner '
-              'Verantwortung.',
-              textAlign: TextAlign.center,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Lokales Backup — keine automatische Cloud-Sicherung. '
+                    'Die exportierte Datei zusätzlich extern aufzubewahren liegt in deiner '
+                    'Verantwortung.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _createBackup,
+                    icon: const Icon(Icons.backup_outlined),
+                    label: const Text('Backup erstellen'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _restoreBackup,
+                    icon: const Icon(Icons.restore_outlined),
+                    label: const Text('Backup wiederherstellen'),
+                  ),
+                  if (_busy)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 24),
+                      child: CircularProgressIndicator(),
+                    ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _busy ? null : _createBackup,
-              icon: const Icon(Icons.backup_outlined),
-              label: const Text('Backup erstellen'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _restoreBackup,
-              icon: const Icon(Icons.restore_outlined),
-              label: const Text('Backup wiederherstellen'),
-            ),
-            if (_busy) const Padding(padding: EdgeInsets.only(top: 24), child: CircularProgressIndicator()),
-          ],
+          ),
         ),
       ),
     );
