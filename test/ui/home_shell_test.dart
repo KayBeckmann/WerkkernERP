@@ -71,4 +71,40 @@ void main() {
 
     expect(find.text('Noch keine Kunden angelegt.'), findsOneWidget);
   });
+
+  testWidgets(
+    'Regressionstest (Kay-Feedback 2026-10-16): Sidebar bleibt sichtbar, wenn eine Rechnung '
+    'geöffnet wird — Detailansicht pusht in den Inhaltsbereich, nicht über die ganze App',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await _createCompanyAndEnter(tester);
+      expect(find.byType(SidebarNavItem), findsWidgets);
+
+      // Erst einen Kunden anlegen, sonst verweigert "Neue Rechnung" mit
+      // einem Hinweis-Snackbar statt eine Rechnung zu öffnen.
+      await tester.tap(find.text('Kunden'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kunde anlegen'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Name *'), 'Testkunde GmbH');
+      await tester.tap(find.text('Anlegen'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Rechnungen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Neue Rechnung'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Testkunde GmbH'));
+      await tester.pumpAndSettle();
+
+      // Die Rechnungs-Detailansicht ist jetzt offen ...
+      expect(find.text('Rechnung (Entwurf) — Testkunde GmbH'), findsOneWidget);
+      // ... aber die Sidebar ist weiterhin da — das war der gemeldete Bug.
+      expect(find.byType(SidebarNavItem), findsWidgets);
+      expect(find.text('Firma wechseln'), findsOneWidget);
+    },
+  );
 }
