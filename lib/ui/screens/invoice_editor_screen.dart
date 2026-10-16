@@ -62,6 +62,18 @@ class _EditableItem {
   final String? groupLabel;
   final String? existingId;
 
+  /// Für den Bearbeiten-Dialog (Kay-Nachtrag 2026-10-16) — exakt die
+  /// Felder, die [InvoiceItemInputResult] ohnehin schon trägt.
+  InvoiceItemInputResult toResult() => InvoiceItemInputResult(
+        kind: kind,
+        articleId: articleId,
+        description: description,
+        quantity: quantity,
+        unitPriceCents: unitPriceCents,
+        vatRatePercent: vatRatePercent,
+        groupLabel: groupLabel,
+      );
+
   InvoiceItemInput toInput() => InvoiceItemInput(
         id: existingId,
         kind: kind,
@@ -144,8 +156,29 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           ),
       ]);
 
+  /// Summe nur der übergebenen (einer Gruppe zugehörigen) Positionen —
+  /// derselbe Rechenkern wie [_totals], nur auf eine Teilmenge
+  /// angewendet (Kay-Nachtrag 2026-10-16: "Summen pro Gruppe").
+  InvoiceTotals _groupTotals(List<_EditableItem> items) => calculateInvoiceTotals([
+        for (final item in items)
+          InvoiceLineInput(
+            quantity: item.quantity,
+            unitPriceCents: item.unitPriceCents,
+            vatRatePercent: item.vatRatePercent,
+          ),
+      ]);
+
+  /// Bereits im Dokument verwendete Gruppen, für den Autocomplete-
+  /// Vorschlag im Positions-Dialog (Kay-Nachtrag 2026-10-16).
+  List<String> get _existingGroupLabels =>
+      {for (final item in _items) if (item.groupLabel != null) item.groupLabel!}.toList()..sort();
+
   Future<void> _addItem() async {
-    final result = await showInvoiceItemDialog(context: context, articles: _articles);
+    final result = await showInvoiceItemDialog(
+      context: context,
+      articles: _articles,
+      existingGroupLabels: _existingGroupLabels,
+    );
     if (result == null) return;
     setState(() {
       _items.add(
@@ -158,6 +191,32 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           vatRatePercent: result.vatRatePercent,
           groupLabel: result.groupLabel,
         ),
+      );
+    });
+  }
+
+  /// Bestehende Position bearbeiten statt nur löschen+neu-anlegen zu
+  /// können (Kay-Nachtrag 2026-10-16). `existingId` bleibt erhalten,
+  /// damit `update()` dieselbe Zeile ersetzt statt eine neue anzulegen.
+  Future<void> _editItem(_EditableItem item) async {
+    final result = await showInvoiceItemDialog(
+      context: context,
+      articles: _articles,
+      existingGroupLabels: _existingGroupLabels,
+      existing: item.toResult(),
+    );
+    if (result == null) return;
+    setState(() {
+      final index = _items.indexOf(item);
+      _items[index] = _EditableItem(
+        existingId: item.existingId,
+        kind: result.kind,
+        articleId: result.articleId,
+        description: result.description,
+        quantity: result.quantity,
+        unitPriceCents: result.unitPriceCents,
+        vatRatePercent: result.vatRatePercent,
+        groupLabel: result.groupLabel,
       );
     });
   }
@@ -370,6 +429,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                     '${item.quantity} × ${Money.fromCents(item.unitPriceCents)} '
                     '(${item.vatRatePercent.toStringAsFixed(0)} %)',
                   ),
+                  onTap: isFinalized ? null : () => _editItem(item),
                   trailing: isFinalized
                       ? null
                       : IconButton(
@@ -378,6 +438,20 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                         ),
                 ),
               ),
+            // Summe pro Gruppe (Kay-Nachtrag 2026-10-16) — derselbe
+            // Rechenkern wie die Gesamtsumme, nur auf die Positionen
+            // dieser Gruppe beschränkt statt eine eigene Berechnung
+            // parallel zu pflegen.
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 4, right: 8),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Gruppensumme: ${_groupTotals(groups[key]!).totalGross}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ),
           ],
           const SizedBox(height: 16),
           Card(
