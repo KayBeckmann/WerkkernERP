@@ -49,6 +49,8 @@ class _EditableItem {
     required this.quantity,
     required this.unitPriceCents,
     required this.vatRatePercent,
+    this.unit,
+    this.discountPercent = 0,
     this.groupLabel,
     this.existingId,
   });
@@ -59,8 +61,36 @@ class _EditableItem {
   final Decimal quantity;
   final int unitPriceCents;
   final double vatRatePercent;
+
+  /// Einheit (z. B. "Stk", "h", "m") — Kay-Nachtrag 2026-10-16.
+  final String? unit;
+
+  /// Rabatt in Prozent auf diese Position — Kay-Nachtrag 2026-10-16.
+  final double discountPercent;
   final String? groupLabel;
   final String? existingId;
+
+  Money get grossBeforeDiscount => Money.fromCents(unitPriceCents).multiplyByQuantity(quantity);
+
+  /// Nettobetrag dieser Position **nach** Rabatt (vor Steuer) — derselbe
+  /// Rechenkern wie [InvoiceLineInput.lineNet], hier nur direkt am
+  /// Editier-Modell für die Listenanzeige verfügbar.
+  Money get netAfterDiscount => discountPercent == 0
+      ? grossBeforeDiscount
+      : grossBeforeDiscount - grossBeforeDiscount.applyPercent(discountPercent);
+
+  /// Positionsbetrag **inkl. Steuer, nach Rabatt** — für die
+  /// "Gesamt"-Spalte in der Listendarstellung (Kay-Nachtrag 2026-10-16:
+  /// "Es fehlen Details").
+  Money get lineGrossWithTax => netAfterDiscount + netAfterDiscount.applyPercent(vatRatePercent);
+
+  /// Wie viel der Rabatt in Euro (inkl. Steuer) tatsächlich ausmacht —
+  /// für die Detailzeile "− X % Rabatt: −Y €" unter der Position.
+  Money get discountAmountGross {
+    if (discountPercent == 0) return Money.zero();
+    final grossBeforeTax = grossBeforeDiscount + grossBeforeDiscount.applyPercent(vatRatePercent);
+    return grossBeforeTax - lineGrossWithTax;
+  }
 
   /// Für den Bearbeiten-Dialog (Kay-Nachtrag 2026-10-16) — exakt die
   /// Felder, die [InvoiceItemInputResult] ohnehin schon trägt.
@@ -71,6 +101,8 @@ class _EditableItem {
         quantity: quantity,
         unitPriceCents: unitPriceCents,
         vatRatePercent: vatRatePercent,
+        unit: unit,
+        discountPercent: discountPercent,
         groupLabel: groupLabel,
       );
 
@@ -82,6 +114,8 @@ class _EditableItem {
         quantity: quantity,
         unitPriceCents: unitPriceCents,
         vatRatePercent: vatRatePercent,
+        unit: unit,
+        discountPercent: discountPercent,
         groupLabel: groupLabel,
       );
 }
@@ -133,6 +167,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             quantity: Decimal.parse(item.quantity),
             unitPriceCents: item.unitPriceCents,
             vatRatePercent: item.vatRatePercent,
+            unit: item.unit,
+            discountPercent: item.discountPercent,
             groupLabel: item.groupLabel,
           ),
       ]);
@@ -153,6 +189,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             quantity: item.quantity,
             unitPriceCents: item.unitPriceCents,
             vatRatePercent: item.vatRatePercent,
+            discountPercent: item.discountPercent,
           ),
       ]);
 
@@ -165,6 +202,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             quantity: item.quantity,
             unitPriceCents: item.unitPriceCents,
             vatRatePercent: item.vatRatePercent,
+            discountPercent: item.discountPercent,
           ),
       ]);
 
@@ -190,6 +228,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           quantity: result.quantity,
           unitPriceCents: result.unitPriceCents,
           vatRatePercent: result.vatRatePercent,
+          unit: result.unit,
+          discountPercent: result.discountPercent,
           groupLabel: result.groupLabel,
         ),
       );
@@ -218,6 +258,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         quantity: result.quantity,
         unitPriceCents: result.unitPriceCents,
         vatRatePercent: result.vatRatePercent,
+        unit: result.unit,
+        discountPercent: result.discountPercent,
         groupLabel: result.groupLabel,
       );
     });
@@ -416,6 +458,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           quantity: _items[i].quantity.toString(),
           unitPriceCents: _items[i].unitPriceCents,
           vatRatePercent: _items[i].vatRatePercent,
+          unit: _items[i].unit,
+          discountPercent: _items[i].discountPercent,
           groupLabel: _items[i].groupLabel,
           sortOrder: i,
         ),
@@ -432,6 +476,80 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             canChangePageFormat: false,
             allowSharing: false,
             allowPrinting: false,
+          ),
+        ),
+      ),
+    );
+  }
+
+  static IconData _iconFor(InvoiceItemKind kind) => switch (kind) {
+        InvoiceItemKind.article => Icons.inventory_2_outlined,
+        InvoiceItemKind.hours => Icons.schedule_outlined,
+        InvoiceItemKind.text => Icons.notes_outlined,
+      };
+
+  /// Positionszeile mit mehr Details statt einer einzigen Subtitle-Zeile
+  /// (Kay-Nachtrag 2026-10-16: Vergleich mit RechnungsFee, "Es fehlen
+  /// Details") — Einheit neben der Menge, Steuersatz und Gesamtbetrag
+  /// klar als eigene Zeile, Rabatt als eigene Detailzeile wenn gesetzt.
+  Widget _buildItemCard(_EditableItem item, bool isFinalized) {
+    final quantityLabel = item.unit == null ? '${item.quantity}' : '${item.quantity} ${item.unit}';
+    return Card(
+      child: InkWell(
+        onTap: isFinalized ? null : () => _editItem(item),
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_iconFor(item.kind), size: 18, color: Theme.of(context).colorScheme.outline),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(item.description, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                  if (!isFinalized)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      onPressed: () => setState(() => _items.remove(item)),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Padding(
+                padding: const EdgeInsets.only(left: 26),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
+                        '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    Text(
+                      item.lineGrossWithTax.toString(),
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              if (item.discountPercent > 0)
+                Padding(
+                  padding: const EdgeInsets.only(left: 26, top: 2),
+                  child: Text(
+                    '− ${item.discountPercent.toStringAsFixed(0)} % Rabatt: −${item.discountAmountGross}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Theme.of(context).colorScheme.primary),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -544,23 +662,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
-            for (final item in groups[key]!)
-              Card(
-                child: ListTile(
-                  title: Text(item.description),
-                  subtitle: Text(
-                    '${item.quantity} × ${Money.fromCents(item.unitPriceCents)} '
-                    '(${item.vatRatePercent.toStringAsFixed(0)} %)',
-                  ),
-                  onTap: isFinalized ? null : () => _editItem(item),
-                  trailing: isFinalized
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => setState(() => _items.remove(item)),
-                        ),
-                ),
-              ),
+            for (final item in groups[key]!) _buildItemCard(item, isFinalized),
             // Summe pro Gruppe (Kay-Nachtrag 2026-10-16) — derselbe
             // Rechenkern wie die Gesamtsumme, nur auf die Positionen
             // dieser Gruppe beschränkt statt eine eigene Berechnung
