@@ -1,30 +1,33 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/main.dart';
 
+AppDatabase _inMemoryDb() =>
+    AppDatabase.forTesting(NativeDatabase.memory(setup: (db) => db.execute('PRAGMA foreign_keys = ON;')));
+
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('App startet ohne Server/Login direkt in der Firmenauswahl', (tester) async {
+    await tester.pumpWidget(WerkkernErpApp(database: _inMemoryDb()));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('WerkkernERP — Firmen'), findsOneWidget);
+    expect(find.text('Firma anlegen'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('Firma anlegen führt direkt in den Firmenkontext (kein Login/Server)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(WerkkernErpApp(database: _inMemoryDb()));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.text('Firma anlegen'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Elektro Beckmann');
+    await tester.tap(find.text('Anlegen'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Elektro Beckmann'), findsWidgets);
   });
 }
