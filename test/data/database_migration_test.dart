@@ -12,15 +12,15 @@ import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 
 /// Migrationen dieser App (v1→v2 A5: Angebot/Auftrag; v2→v3: erweiterte
-/// Kunden-/Lieferantenfelder). Statt das Spaltentyp-/Datumsspeicher-
-/// format von drifts NativeDatabase zu raten, wird eine ECHTE
-/// aktuelle Datenbank von drift selbst erzeugt und dann über `ALTER
-/// TABLE ... DROP COLUMN` mechanisch auf den exakten v1-Zustand
-/// zurückgebaut (nur die seither hinzugekommenen Spalten entfernt,
-/// alles andere bleibt drifts eigene, authentische DDL). Erst danach
-/// wird die Datei neu geöffnet — das triggert drifts reguläre
-/// Migrationslogik durch BEIDE Stufen genauso, wie es ein echtes
-/// App-Update auf einem Bestandsgerät täte.
+/// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte). Statt das
+/// Spaltentyp-/Datumsspeicherformat von drifts NativeDatabase zu raten,
+/// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
+/// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
+/// v1-Zustand zurückgebaut (nur die seither hinzugekommenen Spalten
+/// entfernt, alles andere bleibt drifts eigene, authentische DDL).
+/// Erst danach wird die Datei neu geöffnet — das triggert drifts
+/// reguläre Migrationslogik durch ALLE onUpgrade-Stufen genauso, wie
+/// es ein echtes App-Update über mehrere Versionen hinweg täte.
 void main() {
   late Directory tempDir;
   late String dbPath;
@@ -35,8 +35,8 @@ void main() {
   });
 
   test(
-    'Migration v1→v3 (A5 + erweiterte Kunden-/Lieferantenfelder): Bestandsdaten bekommen '
-    'automatisch die neuen Default-Werte — ohne Datenverlust an bestehenden Spalten',
+    'Migration v1→v4 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte): Bestandsdaten '
+    'bekommen automatisch die neuen Default-Werte — ohne Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -81,6 +81,10 @@ void main() {
       raw.execute('ALTER TABLE suppliers DROP COLUMN contact_person;');
       raw.execute('ALTER TABLE suppliers DROP COLUMN notes;');
       raw.execute('ALTER TABLE invoices DROP COLUMN customer_snapshot_vat_id;');
+      // v3 -> v4 (anpassbare PDF-Texte):
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_footer_text;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -95,6 +99,9 @@ void main() {
             .getSingle();
         expect(migratedCompany.quotesEnabled, isFalse);
         expect(migratedCompany.ordersEnabled, isFalse);
+        expect(migratedCompany.pdfIntroText, isNull);
+        expect(migratedCompany.pdfClosingText, isNull);
+        expect(migratedCompany.pdfFooterText, isNull);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =

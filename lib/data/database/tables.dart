@@ -23,6 +23,17 @@ class Companies extends Table {
   BoolColumn get quotesEnabled => boolean().withDefault(const Constant(false))();
   BoolColumn get ordersEnabled => boolean().withDefault(const Constant(false))();
 
+  /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
+  /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Gelten
+  /// für alle drei Dokumentarten (Rechnung/Angebot/Auftrag) — anders
+  /// als RechnungsFee (nur als fachliche Anregung angeschaut) bewusst
+  /// EIN gemeinsamer Satz statt separater Texte je Dokumentart, um die
+  /// Einstellungen nicht unnötig aufzublähen; bei Bedarf später pro
+  /// Dokumentart aufteilbar, ohne Bestandsdaten zu verlieren.
+  TextColumn get pdfIntroText => text().nullable()();
+  TextColumn get pdfClosingText => text().nullable()();
+  TextColumn get pdfFooterText => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

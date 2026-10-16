@@ -24,11 +24,15 @@ import '../domain/services/invoice_totals_service.dart';
 /// Funktioniert seit A5 für alle drei Dokumentarten ([DocumentKind]) —
 /// Layout/Positionsgruppen/Steueraufschlüsselung sind identisch, nur
 /// Titel und Datumsbeschriftung richten sich nach `invoice.kind`.
-Future<Uint8List> buildInvoicePdf({required Invoice invoice, required List<InvoiceItem> items}) async {
+Future<Uint8List> buildInvoicePdf({
+  required Invoice invoice,
+  required List<InvoiceItem> items,
+  required Company company,
+}) async {
   if (invoice.status != InvoiceStatus.finalized || invoice.invoiceNumber == null) {
     throw StateError('PDF kann nur für eine finalisierte Rechnung erzeugt werden.');
   }
-  return _buildPdf(invoice: invoice, items: items, isPreview: false);
+  return _buildPdf(invoice: invoice, items: items, company: company, isPreview: false);
 }
 
 /// Unverbindliche In-App-Vorschau eines **noch nicht finalisierten**
@@ -44,13 +48,18 @@ Future<Uint8List> buildInvoicePdf({required Invoice invoice, required List<Invoi
 /// Teilen-/Druck-Funktion ein, damit kein unfertiges Dokument versendet
 /// werden kann — nur die Vorschau für ein bereits finalisiertes
 /// Dokument darf geteilt werden.
-Future<Uint8List> buildDraftPreviewPdf({required Invoice invoice, required List<InvoiceItem> items}) {
-  return _buildPdf(invoice: invoice, items: items, isPreview: true);
+Future<Uint8List> buildDraftPreviewPdf({
+  required Invoice invoice,
+  required List<InvoiceItem> items,
+  required Company company,
+}) {
+  return _buildPdf(invoice: invoice, items: items, company: company, isPreview: true);
 }
 
 Future<Uint8List> _buildPdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
+  required Company company,
   required bool isPreview,
 }) async {
   final totals = calculateInvoiceTotals([
@@ -87,14 +96,37 @@ Future<Uint8List> _buildPdf({
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(32),
       header: (context) => _buildHeader(invoice, isPreview: isPreview),
-      footer: (context) => pw.Align(
-        alignment: pw.Alignment.centerRight,
-        child: pw.Text(
-          'Seite ${context.pageNumber} von ${context.pagesCount}',
-          style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
-        ),
+      // Fußzeile (Kay-Nachtrag 2026-10-16: "Fußzeile ... in Dokumenten
+      // anpassbar machen") — Firmentext oberhalb, Seitenzahl bleibt
+      // immer zusätzlich sichtbar.
+      footer: (context) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          if (company.pdfFooterText != null) ...[
+            pw.Divider(color: PdfColors.grey400),
+            pw.Text(
+              company.pdfFooterText!,
+              textAlign: pw.TextAlign.center,
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+            ),
+            pw.SizedBox(height: 4),
+          ],
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Seite ${context.pageNumber} von ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+          ),
+        ],
       ),
       build: (context) => [
+        // Einleitungstext (Kay-Nachtrag 2026-10-16) — vor der
+        // Positionstabelle, z.B. ein Rechtstext/freundliche Anrede.
+        if (company.pdfIntroText != null) ...[
+          pw.Text(company.pdfIntroText!, style: const pw.TextStyle(fontSize: 10)),
+          pw.SizedBox(height: 12),
+        ],
         pw.SizedBox(height: 16),
         for (final key in orderedKeys) ..._buildGroup(key, groups[key]!),
         pw.SizedBox(height: 16),
@@ -106,6 +138,12 @@ Future<Uint8List> _buildPdf({
         if (invoice.notes != null) ...[
           pw.SizedBox(height: 8),
           pw.Text(invoice.notes!, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+        ],
+        // Schlusstext (Kay-Nachtrag 2026-10-16) — z.B. Dank, Rechtstext,
+        // Hinweis auf AGB.
+        if (company.pdfClosingText != null) ...[
+          pw.SizedBox(height: 16),
+          pw.Text(company.pdfClosingText!, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
         ],
       ],
     ),
