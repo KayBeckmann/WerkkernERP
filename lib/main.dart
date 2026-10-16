@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'data/database/database.dart';
+import 'data/repositories/article_group_repository.dart';
+import 'data/repositories/article_repository.dart';
 import 'data/repositories/company_repository.dart';
 import 'data/repositories/customer_repository.dart';
+import 'data/repositories/supplier_repository.dart';
 import 'domain/services/active_company_service.dart';
 import 'ui/screens/company_switcher_screen.dart';
 
@@ -33,6 +36,15 @@ class WerkkernErpApp extends StatelessWidget {
         ),
         Provider<CustomerRepository>(
           create: (context) => CustomerRepository(context.read<AppDatabase>()),
+        ),
+        Provider<SupplierRepository>(
+          create: (context) => SupplierRepository(context.read<AppDatabase>()),
+        ),
+        Provider<ArticleGroupRepository>(
+          create: (context) => ArticleGroupRepository(context.read<AppDatabase>()),
+        ),
+        Provider<ArticleRepository>(
+          create: (context) => ArticleRepository(context.read<AppDatabase>()),
         ),
         ChangeNotifierProvider<ActiveCompanyService>(
           create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),

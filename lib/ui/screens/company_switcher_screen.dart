@@ -73,6 +73,7 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
               },
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'company-switcher-fab',
         onPressed: _createCompany,
         icon: const Icon(Icons.add),
         label: const Text('Firma anlegen'),
