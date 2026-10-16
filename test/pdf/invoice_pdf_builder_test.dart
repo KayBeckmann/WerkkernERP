@@ -11,10 +11,11 @@ void main() {
   // (nicht testWidgets()).
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Invoice draftInvoice({String? invoiceNumber}) => Invoice(
+  Invoice draftInvoice({String? invoiceNumber, DocumentKind kind = DocumentKind.invoice}) => Invoice(
         id: 'inv-1',
         companyId: 'company-1',
         customerId: 'customer-1',
+        kind: kind,
         status: invoiceNumber == null ? InvoiceStatus.draft : InvoiceStatus.finalized,
         invoiceNumber: invoiceNumber,
         numberYear: invoiceNumber == null ? null : 2026,
@@ -84,4 +85,19 @@ void main() {
     );
     expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
   });
+
+  for (final kind in [DocumentKind.quote, DocumentKind.order]) {
+    test(
+      'A5-Abnahme: ${kind.name}-PDF wird ohne Fehler erzeugt (gleiches Layout wie Rechnung)',
+      () async {
+        final invoice = draftInvoice(invoiceNumber: 'An-26001', kind: kind);
+        final bytes = await buildInvoicePdf(
+          invoice: invoice,
+          items: [item(description: 'Testposition')],
+        );
+        expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
+        expect(bytes.length, greaterThan(1000));
+      },
+    );
+  }
 }

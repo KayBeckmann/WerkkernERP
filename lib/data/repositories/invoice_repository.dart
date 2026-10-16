@@ -41,18 +41,30 @@ class InvoiceRepository {
   final NumberSequenceRepository _numberSequences;
   static const _uuid = Uuid();
 
-  Future<List<Invoice>> listDraftsForCompany(String companyId) =>
+  Future<List<Invoice>> listDraftsForCompany(
+    String companyId, {
+    DocumentKind kind = DocumentKind.invoice,
+  }) =>
       (_db.select(_db.invoices)
-            ..where((i) => i.companyId.equals(companyId) & i.status.equalsValue(InvoiceStatus.draft))
+            ..where(
+              (i) =>
+                  i.companyId.equals(companyId) &
+                  i.status.equalsValue(InvoiceStatus.draft) &
+                  i.kind.equalsValue(kind),
+            )
             ..orderBy([(i) => OrderingTerm.desc(i.updatedAt)]))
           .get();
 
-  /// Alle Rechnungen (Entwürfe **und** finalisierte) für die Liste — A2/
-  /// A3-Abnahme verlangt ausdrücklich, Status/Kunde/Betrag in einer
-  /// Liste wiederzufinden, nicht nur Entwürfe.
-  Future<List<Invoice>> listAllForCompany(String companyId) =>
+  /// Alle Dokumente einer Art (Entwürfe **und** finalisierte) für die
+  /// Liste — A2/A3-Abnahme verlangt ausdrücklich, Status/Kunde/Betrag in
+  /// einer Liste wiederzufinden, nicht nur Entwürfe. `kind` filtert auf
+  /// Rechnung/Angebot/Auftrag (A5) — die drei Listen vermischen sich nie.
+  Future<List<Invoice>> listAllForCompany(
+    String companyId, {
+    DocumentKind kind = DocumentKind.invoice,
+  }) =>
       (_db.select(_db.invoices)
-            ..where((i) => i.companyId.equals(companyId))
+            ..where((i) => i.companyId.equals(companyId) & i.kind.equalsValue(kind))
             ..orderBy([(i) => OrderingTerm.desc(i.updatedAt)]))
           .get();
 
@@ -67,11 +79,15 @@ class InvoiceRepository {
           .get();
 
   /// Legt einen neuen Entwurf an — **nummernlos**, Status `draft` (F3).
+  /// `kind` legt die Dokumentart fest (A5: Rechnung/Angebot/Auftrag) und
+  /// ist nach dem Anlegen nicht mehr änderbar (kein Umwandeln zwischen
+  /// den Arten in A5 — siehe Doc-Kommentar bei [DocumentKind]).
   Future<Invoice> createDraft({
     required String companyId,
     required String customerId,
     required DateTime issueDate,
     required DateTime serviceDate,
+    DocumentKind kind = DocumentKind.invoice,
     String? paymentTerms,
     String? notes,
     List<InvoiceItemInput> items = const [],
@@ -84,6 +100,7 @@ class InvoiceRepository {
               id: id,
               companyId: companyId,
               customerId: customerId,
+              kind: Value(kind),
               status: InvoiceStatus.draft,
               issueDate: issueDate,
               serviceDate: serviceDate,
@@ -166,10 +183,10 @@ class InvoiceRepository {
       final year = now.year;
       final number = await _numberSequences.allocateNext(
         companyId: companyId,
-        documentType: 'invoice',
+        documentType: invoice.kind.name,
         year: year,
       );
-      final invoiceNumber = formatInvoiceNumber(year: year, number: number);
+      final invoiceNumber = formatDocumentNumber(kind: invoice.kind, year: year, number: number);
 
       await (_db.update(_db.invoices)..where((i) => i.id.equals(id))).write(
         InvoicesCompanion(

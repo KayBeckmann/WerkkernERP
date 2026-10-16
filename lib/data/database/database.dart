@@ -29,16 +29,26 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (migrator) async {
           await migrator.createAll();
         },
-        // onUpgrade: ab Schema-Version 2 hier je Stufe eine `if (from < X)`
-        // Migration ergänzen. Niemals eine bestehende Stufe nachträglich
-        // ändern, nur neue anhängen (A0: "schema-versionierte
-        // Migrationen").
+        // Niemals eine bestehende Stufe nachträglich ändern, nur neue
+        // anhängen (A0: "schema-versionierte Migrationen").
+        onUpgrade: (migrator, from, to) async {
+          if (from < 2) {
+            // A5: Angebot/Auftrag. `addColumn` nutzt den in tables.dart
+            // definierten withDefault()-Wert, Bestandszeilen bekommen
+            // also automatisch quotesEnabled=false/ordersEnabled=false
+            // bzw. kind='invoice' — keine bestehende Rechnung wechselt
+            // dadurch die Dokumentart.
+            await migrator.addColumn(invoices, invoices.kind);
+            await migrator.addColumn(companies, companies.quotesEnabled);
+            await migrator.addColumn(companies, companies.ordersEnabled);
+          }
+        },
       );
 }

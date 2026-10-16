@@ -16,6 +16,13 @@ class Companies extends Table {
   TextColumn get phone => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
+  /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
+  /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
+  /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
+  /// bleibt ohne Zusatzschritt direkt nutzbar (A0-Prinzip).
+  BoolColumn get quotesEnabled => boolean().withDefault(const Constant(false))();
+  BoolColumn get ordersEnabled => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -120,12 +127,26 @@ enum InvoiceItemKind { article, hours, text }
 /// (Roadmap F3).
 enum InvoiceStatus { draft, finalized }
 
+/// Dokumentart (A5). Rechnung ("R") existiert seit A2/A3; Angebot
+/// ("An") und Auftrag ("A") kommen mit A5 dazu — gleiche Tabelle/
+/// Positionslogik/Finalisierung wie die Rechnung (Roadmap: Positions-
+/// gruppen werden dort ebenfalls benötigt), aber eigene Nummernkreise
+/// (nie mit dem Rechnungszähler vermischt) und ein eigenes PDF-Layout
+/// je Dokumentart. Keine Konvertierung Angebot→Auftrag→Rechnung in A5
+/// — das ist explizit erst eine spätere C-Phase-Entscheidung.
+enum DocumentKind { invoice, quote, order }
+
 class Invoices extends Table {
   TextColumn get id => text()();
   TextColumn get companyId =>
       text().references(Companies, #id, onDelete: KeyAction.cascade)();
   TextColumn get customerId =>
       text().references(Customers, #id, onDelete: KeyAction.restrict)();
+
+  /// Default `invoice` für Bestandsdaten vor A5 (Migration, siehe
+  /// `database.dart`).
+  TextColumn get kind =>
+      textEnum<DocumentKind>().withDefault(Constant(DocumentKind.invoice.name))();
 
   TextColumn get status => textEnum<InvoiceStatus>()();
 
@@ -201,8 +222,8 @@ class NumberSequences extends Table {
   TextColumn get companyId =>
       text().references(Companies, #id, onDelete: KeyAction.cascade)();
 
-  /// z. B. "invoice" (Präfix "R"). Weitere Typen (Angebot "An", Auftrag
-  /// "A", Gutschrift "G") kommen mit A5/C.
+  /// `DocumentKind.name`, also "invoice"/"quote"/"order" (Präfixe "R"/
+  /// "An"/"A", seit A5). Gutschrift ("G") kommt erst mit Phase C.
   TextColumn get documentType => text()();
   IntColumn get year => integer()();
   IntColumn get lastNumber => integer().withDefault(const Constant(0))();

@@ -45,6 +45,24 @@ class CompanyRepository {
 
   Future<void> update(Company company) => _db.update(_db.companies).replace(company);
 
+  /// A5: Angebot/Auftrag pro Firma ein-/ausblenden. Schaltet nur die
+  /// Sichtbarkeit in der Navigation — bereits vorhandene Angebots-/
+  /// Auftragsdaten bleiben beim Deaktivieren unverändert in der
+  /// Datenbank (Abnahme A5: "erhält sämtliche Modul-Daten").
+  Future<Company> setModules({
+    required String companyId,
+    required bool quotesEnabled,
+    required bool ordersEnabled,
+  }) async {
+    final company = await findById(companyId);
+    if (company == null) {
+      throw ArgumentError('Firma $companyId existiert nicht.');
+    }
+    final updated = company.copyWith(quotesEnabled: quotesEnabled, ordersEnabled: ordersEnabled);
+    await update(updated);
+    return updated;
+  }
+
   /// Löscht die Firma samt aller abhängigen Daten (Kunden, Artikel,
   /// Rechnungen, ...) per ON DELETE CASCADE.
   Future<void> delete(String id) =>

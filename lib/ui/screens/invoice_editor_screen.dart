@@ -12,16 +12,30 @@ import '../../domain/services/active_company_service.dart';
 import '../../domain/services/invoice_totals_service.dart';
 import '../../pdf/invoice_pdf_builder.dart';
 import '../widgets/invoice_item_dialog.dart';
+import 'invoices_screen.dart' show DocumentLabels;
 
-/// Editiert einen Rechnungsentwurf (A2) und finalisiert ihn (A3) — ab
-/// Finalisierung sind Felder/Positionen nicht mehr änderbar (F3).
+/// Editiert einen Dokument-Entwurf (Rechnung/Angebot/Auftrag, A2/A5)
+/// und finalisiert ihn (A3) — ab Finalisierung sind Felder/Positionen
+/// nicht mehr änderbar (F3). Layout/Logik sind für alle drei
+/// [DocumentKind]s identisch, nur Beschriftungen unterscheiden sich
+/// (siehe [DocumentLabels]).
 class InvoiceEditorScreen extends StatefulWidget {
-  const InvoiceEditorScreen({super.key, required this.customer, this.invoice});
+  const InvoiceEditorScreen({
+    super.key,
+    required this.customer,
+    this.invoice,
+    this.kind = DocumentKind.invoice,
+  });
 
   final Customer customer;
 
-  /// `null` = neue Rechnung.
+  /// `null` = neues Dokument.
   final Invoice? invoice;
+
+  /// Dokumentart für ein **neues** Dokument. Existiert bereits
+  /// [invoice], gilt stattdessen dessen eigene `kind` (eine Dokumentart
+  /// ist nach dem Anlegen nicht mehr wechselbar, siehe [_kind]).
+  final DocumentKind kind;
 
   @override
   State<InvoiceEditorScreen> createState() => _InvoiceEditorScreenState();
@@ -73,6 +87,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   Invoice? _currentInvoice;
 
   bool get _isFinalized => _currentInvoice?.status == InvoiceStatus.finalized;
+  DocumentKind get _kind => _currentInvoice?.kind ?? widget.kind;
 
   @override
   void initState() {
@@ -159,6 +174,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         saved = await repo.createDraft(
           companyId: companyId,
           customerId: widget.customer.id,
+          kind: widget.kind,
           issueDate: _issueDate,
           serviceDate: _serviceDate,
           paymentTerms: _paymentTermsCtrl.text.trim().isEmpty ? null : _paymentTermsCtrl.text.trim(),
@@ -194,10 +210,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rechnung finalisieren?'),
-        content: const Text(
-          'Die Rechnung erhält jetzt eine endgültige Nummer und kann danach '
-          'nicht mehr geändert werden. Diese Aktion ist nicht umkehrbar.',
+        title: Text('${DocumentLabels.title(_kind)} finalisieren?'),
+        content: Text(
+          '${DocumentLabels.finalizeConfirmSentence(_kind)} Diese Aktion ist nicht umkehrbar.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
@@ -285,8 +300,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       appBar: AppBar(
         title: Text(
           isFinalized
-              ? 'Rechnung ${_currentInvoice!.invoiceNumber} — ${widget.customer.name}'
-              : 'Rechnung (Entwurf) — ${widget.customer.name}',
+              ? '${DocumentLabels.title(_kind)} ${_currentInvoice!.invoiceNumber} — ${widget.customer.name}'
+              : '${DocumentLabels.editorDraftTitle(_kind)} — ${widget.customer.name}',
         ),
         actions: [
           if (isFinalized)

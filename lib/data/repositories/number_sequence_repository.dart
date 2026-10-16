@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../database/database.dart';
+import '../database/tables.dart';
 
 /// Nummernkreise je Firma, Dokumenttyp und Jahr (F3/F5). `allocateNext()`
 /// **muss** innerhalb derselben Drift-Transaktion laufen wie die
@@ -59,10 +60,18 @@ class NumberSequenceRepository {
   }
 }
 
-/// `R-JJxxx`, z. B. `R-26054` — mindestens drei Stellen, wächst darüber
-/// hinaus ohne Begrenzung (F5).
-String formatInvoiceNumber({required int year, required int number}) {
+/// Präfix je Dokumentart (Roadmap: "An" Angebot, "A" Auftrag, "R"
+/// Rechnung — nie mit dem Rechnungszähler vermischt, siehe A5).
+String _prefixFor(DocumentKind kind) => switch (kind) {
+      DocumentKind.invoice => 'R',
+      DocumentKind.quote => 'An',
+      DocumentKind.order => 'A',
+    };
+
+/// `R-JJxxx`/`An-JJxxx`/`A-JJxxx`, z. B. `R-26054` — mindestens drei
+/// Stellen, wächst darüber hinaus ohne Begrenzung (F5).
+String formatDocumentNumber({required DocumentKind kind, required int year, required int number}) {
   final shortYear = (year % 100).toString().padLeft(2, '0');
   final paddedNumber = number.toString().padLeft(3, '0');
-  return 'R-$shortYear$paddedNumber';
+  return '${_prefixFor(kind)}-$shortYear$paddedNumber';
 }

@@ -96,6 +96,36 @@ class $CompaniesTable extends Companies
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _quotesEnabledMeta = const VerificationMeta(
+    'quotesEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> quotesEnabled = GeneratedColumn<bool>(
+    'quotes_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("quotes_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _ordersEnabledMeta = const VerificationMeta(
+    'ordersEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> ordersEnabled = GeneratedColumn<bool>(
+    'orders_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("orders_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -107,6 +137,8 @@ class $CompaniesTable extends Companies
     email,
     phone,
     createdAt,
+    quotesEnabled,
+    ordersEnabled,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -177,6 +209,24 @@ class $CompaniesTable extends Companies
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('quotes_enabled')) {
+      context.handle(
+        _quotesEnabledMeta,
+        quotesEnabled.isAcceptableOrUnknown(
+          data['quotes_enabled']!,
+          _quotesEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('orders_enabled')) {
+      context.handle(
+        _ordersEnabledMeta,
+        ordersEnabled.isAcceptableOrUnknown(
+          data['orders_enabled']!,
+          _ordersEnabledMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -222,6 +272,14 @@ class $CompaniesTable extends Companies
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      quotesEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}quotes_enabled'],
+      )!,
+      ordersEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}orders_enabled'],
+      )!,
     );
   }
 
@@ -241,6 +299,13 @@ class Company extends DataClass implements Insertable<Company> {
   final String? email;
   final String? phone;
   final DateTime createdAt;
+
+  /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
+  /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
+  /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
+  /// bleibt ohne Zusatzschritt direkt nutzbar (A0-Prinzip).
+  final bool quotesEnabled;
+  final bool ordersEnabled;
   const Company({
     required this.id,
     required this.name,
@@ -251,6 +316,8 @@ class Company extends DataClass implements Insertable<Company> {
     this.email,
     this.phone,
     required this.createdAt,
+    required this.quotesEnabled,
+    required this.ordersEnabled,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -276,6 +343,8 @@ class Company extends DataClass implements Insertable<Company> {
       map['phone'] = Variable<String>(phone);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['quotes_enabled'] = Variable<bool>(quotesEnabled);
+    map['orders_enabled'] = Variable<bool>(ordersEnabled);
     return map;
   }
 
@@ -300,6 +369,8 @@ class Company extends DataClass implements Insertable<Company> {
           ? const Value.absent()
           : Value(phone),
       createdAt: Value(createdAt),
+      quotesEnabled: Value(quotesEnabled),
+      ordersEnabled: Value(ordersEnabled),
     );
   }
 
@@ -318,6 +389,8 @@ class Company extends DataClass implements Insertable<Company> {
       email: serializer.fromJson<String?>(json['email']),
       phone: serializer.fromJson<String?>(json['phone']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      quotesEnabled: serializer.fromJson<bool>(json['quotesEnabled']),
+      ordersEnabled: serializer.fromJson<bool>(json['ordersEnabled']),
     );
   }
   @override
@@ -333,6 +406,8 @@ class Company extends DataClass implements Insertable<Company> {
       'email': serializer.toJson<String?>(email),
       'phone': serializer.toJson<String?>(phone),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'quotesEnabled': serializer.toJson<bool>(quotesEnabled),
+      'ordersEnabled': serializer.toJson<bool>(ordersEnabled),
     };
   }
 
@@ -346,6 +421,8 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> email = const Value.absent(),
     Value<String?> phone = const Value.absent(),
     DateTime? createdAt,
+    bool? quotesEnabled,
+    bool? ordersEnabled,
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -356,6 +433,8 @@ class Company extends DataClass implements Insertable<Company> {
     email: email.present ? email.value : this.email,
     phone: phone.present ? phone.value : this.phone,
     createdAt: createdAt ?? this.createdAt,
+    quotesEnabled: quotesEnabled ?? this.quotesEnabled,
+    ordersEnabled: ordersEnabled ?? this.ordersEnabled,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -368,6 +447,12 @@ class Company extends DataClass implements Insertable<Company> {
       email: data.email.present ? data.email.value : this.email,
       phone: data.phone.present ? data.phone.value : this.phone,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      quotesEnabled: data.quotesEnabled.present
+          ? data.quotesEnabled.value
+          : this.quotesEnabled,
+      ordersEnabled: data.ordersEnabled.present
+          ? data.ordersEnabled.value
+          : this.ordersEnabled,
     );
   }
 
@@ -382,7 +467,9 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('iban: $iban, ')
           ..write('email: $email, ')
           ..write('phone: $phone, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('quotesEnabled: $quotesEnabled, ')
+          ..write('ordersEnabled: $ordersEnabled')
           ..write(')'))
         .toString();
   }
@@ -398,6 +485,8 @@ class Company extends DataClass implements Insertable<Company> {
     email,
     phone,
     createdAt,
+    quotesEnabled,
+    ordersEnabled,
   );
   @override
   bool operator ==(Object other) =>
@@ -411,7 +500,9 @@ class Company extends DataClass implements Insertable<Company> {
           other.iban == this.iban &&
           other.email == this.email &&
           other.phone == this.phone &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.quotesEnabled == this.quotesEnabled &&
+          other.ordersEnabled == this.ordersEnabled);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -424,6 +515,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> email;
   final Value<String?> phone;
   final Value<DateTime> createdAt;
+  final Value<bool> quotesEnabled;
+  final Value<bool> ordersEnabled;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -435,6 +528,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.email = const Value.absent(),
     this.phone = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.quotesEnabled = const Value.absent(),
+    this.ordersEnabled = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -447,6 +542,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.email = const Value.absent(),
     this.phone = const Value.absent(),
     required DateTime createdAt,
+    this.quotesEnabled = const Value.absent(),
+    this.ordersEnabled = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -461,6 +558,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? email,
     Expression<String>? phone,
     Expression<DateTime>? createdAt,
+    Expression<bool>? quotesEnabled,
+    Expression<bool>? ordersEnabled,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -473,6 +572,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (email != null) 'email': email,
       if (phone != null) 'phone': phone,
       if (createdAt != null) 'created_at': createdAt,
+      if (quotesEnabled != null) 'quotes_enabled': quotesEnabled,
+      if (ordersEnabled != null) 'orders_enabled': ordersEnabled,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -487,6 +588,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? email,
     Value<String?>? phone,
     Value<DateTime>? createdAt,
+    Value<bool>? quotesEnabled,
+    Value<bool>? ordersEnabled,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -499,6 +602,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       createdAt: createdAt ?? this.createdAt,
+      quotesEnabled: quotesEnabled ?? this.quotesEnabled,
+      ordersEnabled: ordersEnabled ?? this.ordersEnabled,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -533,6 +638,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (quotesEnabled.present) {
+      map['quotes_enabled'] = Variable<bool>(quotesEnabled.value);
+    }
+    if (ordersEnabled.present) {
+      map['orders_enabled'] = Variable<bool>(ordersEnabled.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -551,6 +662,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('email: $email, ')
           ..write('phone: $phone, ')
           ..write('createdAt: $createdAt, ')
+          ..write('quotesEnabled: $quotesEnabled, ')
+          ..write('ordersEnabled: $ordersEnabled, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2822,6 +2935,16 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     ),
   );
   @override
+  late final GeneratedColumnWithTypeConverter<DocumentKind, String> kind =
+      GeneratedColumn<String>(
+        'kind',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: Constant(DocumentKind.invoice.name),
+      ).withConverter<DocumentKind>($InvoicesTable.$converterkind);
+  @override
   late final GeneratedColumnWithTypeConverter<InvoiceStatus, String> status =
       GeneratedColumn<String>(
         'status',
@@ -3009,6 +3132,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     id,
     companyId,
     customerId,
+    kind,
     status,
     invoiceNumber,
     numberYear,
@@ -3218,6 +3342,12 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.string,
         data['${effectivePrefix}customer_id'],
       )!,
+      kind: $InvoicesTable.$converterkind.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}kind'],
+        )!,
+      ),
       status: $InvoicesTable.$converterstatus.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
@@ -3296,6 +3426,8 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     return $InvoicesTable(attachedDatabase, alias);
   }
 
+  static JsonTypeConverter2<DocumentKind, String, String> $converterkind =
+      const EnumNameConverter<DocumentKind>(DocumentKind.values);
   static JsonTypeConverter2<InvoiceStatus, String, String> $converterstatus =
       const EnumNameConverter<InvoiceStatus>(InvoiceStatus.values);
 }
@@ -3304,6 +3436,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final String id;
   final String companyId;
   final String customerId;
+
+  /// Default `invoice` für Bestandsdaten vor A5 (Migration, siehe
+  /// `database.dart`).
+  final DocumentKind kind;
   final InvoiceStatus status;
 
   /// Vollständige Dokumentnummer, z. B. "R-26054". `null`, solange die
@@ -3341,6 +3477,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     required this.id,
     required this.companyId,
     required this.customerId,
+    required this.kind,
     required this.status,
     this.invoiceNumber,
     this.numberYear,
@@ -3365,6 +3502,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     map['id'] = Variable<String>(id);
     map['company_id'] = Variable<String>(companyId);
     map['customer_id'] = Variable<String>(customerId);
+    {
+      map['kind'] = Variable<String>($InvoicesTable.$converterkind.toSql(kind));
+    }
     {
       map['status'] = Variable<String>(
         $InvoicesTable.$converterstatus.toSql(status),
@@ -3424,6 +3564,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       id: Value(id),
       companyId: Value(companyId),
       customerId: Value(customerId),
+      kind: Value(kind),
       status: Value(status),
       invoiceNumber: invoiceNumber == null && nullToAbsent
           ? const Value.absent()
@@ -3477,6 +3618,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       id: serializer.fromJson<String>(json['id']),
       companyId: serializer.fromJson<String>(json['companyId']),
       customerId: serializer.fromJson<String>(json['customerId']),
+      kind: $InvoicesTable.$converterkind.fromJson(
+        serializer.fromJson<String>(json['kind']),
+      ),
       status: $InvoicesTable.$converterstatus.fromJson(
         serializer.fromJson<String>(json['status']),
       ),
@@ -3519,6 +3663,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'id': serializer.toJson<String>(id),
       'companyId': serializer.toJson<String>(companyId),
       'customerId': serializer.toJson<String>(customerId),
+      'kind': serializer.toJson<String>(
+        $InvoicesTable.$converterkind.toJson(kind),
+      ),
       'status': serializer.toJson<String>(
         $InvoicesTable.$converterstatus.toJson(status),
       ),
@@ -3551,6 +3698,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     String? id,
     String? companyId,
     String? customerId,
+    DocumentKind? kind,
     InvoiceStatus? status,
     Value<String?> invoiceNumber = const Value.absent(),
     Value<int?> numberYear = const Value.absent(),
@@ -3572,6 +3720,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
     customerId: customerId ?? this.customerId,
+    kind: kind ?? this.kind,
     status: status ?? this.status,
     invoiceNumber: invoiceNumber.present
         ? invoiceNumber.value
@@ -3613,6 +3762,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       customerId: data.customerId.present
           ? data.customerId.value
           : this.customerId,
+      kind: data.kind.present ? data.kind.value : this.kind,
       status: data.status.present ? data.status.value : this.status,
       invoiceNumber: data.invoiceNumber.present
           ? data.invoiceNumber.value
@@ -3663,6 +3813,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('id: $id, ')
           ..write('companyId: $companyId, ')
           ..write('customerId: $customerId, ')
+          ..write('kind: $kind, ')
           ..write('status: $status, ')
           ..write('invoiceNumber: $invoiceNumber, ')
           ..write('numberYear: $numberYear, ')
@@ -3685,10 +3836,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     companyId,
     customerId,
+    kind,
     status,
     invoiceNumber,
     numberYear,
@@ -3706,7 +3858,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     finalizedAt,
     createdAt,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -3714,6 +3866,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.id == this.id &&
           other.companyId == this.companyId &&
           other.customerId == this.customerId &&
+          other.kind == this.kind &&
           other.status == this.status &&
           other.invoiceNumber == this.invoiceNumber &&
           other.numberYear == this.numberYear &&
@@ -3737,6 +3890,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String> id;
   final Value<String> companyId;
   final Value<String> customerId;
+  final Value<DocumentKind> kind;
   final Value<InvoiceStatus> status;
   final Value<String?> invoiceNumber;
   final Value<int?> numberYear;
@@ -3759,6 +3913,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.id = const Value.absent(),
     this.companyId = const Value.absent(),
     this.customerId = const Value.absent(),
+    this.kind = const Value.absent(),
     this.status = const Value.absent(),
     this.invoiceNumber = const Value.absent(),
     this.numberYear = const Value.absent(),
@@ -3782,6 +3937,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     required String id,
     required String companyId,
     required String customerId,
+    this.kind = const Value.absent(),
     required InvoiceStatus status,
     this.invoiceNumber = const Value.absent(),
     this.numberYear = const Value.absent(),
@@ -3812,6 +3968,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? id,
     Expression<String>? companyId,
     Expression<String>? customerId,
+    Expression<String>? kind,
     Expression<String>? status,
     Expression<String>? invoiceNumber,
     Expression<int>? numberYear,
@@ -3835,6 +3992,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (id != null) 'id': id,
       if (companyId != null) 'company_id': companyId,
       if (customerId != null) 'customer_id': customerId,
+      if (kind != null) 'kind': kind,
       if (status != null) 'status': status,
       if (invoiceNumber != null) 'invoice_number': invoiceNumber,
       if (numberYear != null) 'number_year': numberYear,
@@ -3867,6 +4025,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String>? id,
     Value<String>? companyId,
     Value<String>? customerId,
+    Value<DocumentKind>? kind,
     Value<InvoiceStatus>? status,
     Value<String?>? invoiceNumber,
     Value<int?>? numberYear,
@@ -3890,6 +4049,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       id: id ?? this.id,
       companyId: companyId ?? this.companyId,
       customerId: customerId ?? this.customerId,
+      kind: kind ?? this.kind,
       status: status ?? this.status,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       numberYear: numberYear ?? this.numberYear,
@@ -3925,6 +4085,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     }
     if (customerId.present) {
       map['customer_id'] = Variable<String>(customerId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(
+        $InvoicesTable.$converterkind.toSql(kind.value),
+      );
     }
     if (status.present) {
       map['status'] = Variable<String>(
@@ -4005,6 +4170,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('id: $id, ')
           ..write('companyId: $companyId, ')
           ..write('customerId: $customerId, ')
+          ..write('kind: $kind, ')
           ..write('status: $status, ')
           ..write('invoiceNumber: $invoiceNumber, ')
           ..write('numberYear: $numberYear, ')
@@ -4813,8 +4979,8 @@ class $NumberSequencesTable extends NumberSequences
 class NumberSequence extends DataClass implements Insertable<NumberSequence> {
   final String companyId;
 
-  /// z. B. "invoice" (Präfix "R"). Weitere Typen (Angebot "An", Auftrag
-  /// "A", Gutschrift "G") kommen mit A5/C.
+  /// `DocumentKind.name`, also "invoice"/"quote"/"order" (Präfixe "R"/
+  /// "An"/"A", seit A5). Gutschrift ("G") kommt erst mit Phase C.
   final String documentType;
   final int year;
   final int lastNumber;
@@ -5130,6 +5296,8 @@ typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
   Value<String?> email,
   Value<String?> phone,
   required DateTime createdAt,
+  Value<bool> quotesEnabled,
+  Value<bool> ordersEnabled,
   Value<int> rowid,
 });
 typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
@@ -5142,6 +5310,8 @@ typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
   Value<String?> email,
   Value<String?> phone,
   Value<DateTime> createdAt,
+  Value<bool> quotesEnabled,
+  Value<bool> ordersEnabled,
   Value<int> rowid,
 });
 
@@ -5313,6 +5483,16 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get quotesEnabled => $composableBuilder(
+    column: $table.quotesEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get ordersEnabled => $composableBuilder(
+    column: $table.ordersEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5520,6 +5700,16 @@ class $$CompaniesTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get quotesEnabled => $composableBuilder(
+    column: $table.quotesEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get ordersEnabled => $composableBuilder(
+    column: $table.ordersEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -5557,6 +5747,16 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get quotesEnabled => $composableBuilder(
+    column: $table.quotesEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get ordersEnabled => $composableBuilder(
+    column: $table.ordersEnabled,
+    builder: (column) => column,
+  );
 
   Expression<T> customersRefs<T extends Object>(
     Expression<T> Function($$CustomersTableAnnotationComposer a) f,
@@ -5753,6 +5953,8 @@ class $$CompaniesTableTableManager
                 Value<String?> email = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<bool> quotesEnabled = const Value.absent(),
+                Value<bool> ordersEnabled = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -5764,6 +5966,8 @@ class $$CompaniesTableTableManager
                 email: email,
                 phone: phone,
                 createdAt: createdAt,
+                quotesEnabled: quotesEnabled,
+                ordersEnabled: ordersEnabled,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5777,6 +5981,8 @@ class $$CompaniesTableTableManager
                 Value<String?> email = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 required DateTime createdAt,
+                Value<bool> quotesEnabled = const Value.absent(),
+                Value<bool> ordersEnabled = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -5788,6 +5994,8 @@ class $$CompaniesTableTableManager
                 email: email,
                 phone: phone,
                 createdAt: createdAt,
+                quotesEnabled: quotesEnabled,
+                ordersEnabled: ordersEnabled,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -8561,6 +8769,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   required String id,
   required String companyId,
   required String customerId,
+  Value<DocumentKind> kind,
   required InvoiceStatus status,
   Value<String?> invoiceNumber,
   Value<int?> numberYear,
@@ -8584,6 +8793,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String> id,
   Value<String> companyId,
   Value<String> customerId,
+  Value<DocumentKind> kind,
   Value<InvoiceStatus> status,
   Value<String?> invoiceNumber,
   Value<int?> numberYear,
@@ -8674,6 +8884,12 @@ class $$InvoicesTableFilterComposer
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnWithTypeConverterFilters<DocumentKind, DocumentKind, String> get kind =>
+      $composableBuilder(
+        column: $table.kind,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   ColumnWithTypeConverterFilters<InvoiceStatus, InvoiceStatus, String>
   get status => $composableBuilder(
@@ -8847,6 +9063,11 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get status => $composableBuilder(
     column: $table.status,
     builder: (column) => ColumnOrderings(column),
@@ -8990,6 +9211,9 @@ class $$InvoicesTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DocumentKind, String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<InvoiceStatus, String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
@@ -9173,6 +9397,7 @@ class $$InvoicesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> companyId = const Value.absent(),
                 Value<String> customerId = const Value.absent(),
+                Value<DocumentKind> kind = const Value.absent(),
                 Value<InvoiceStatus> status = const Value.absent(),
                 Value<String?> invoiceNumber = const Value.absent(),
                 Value<int?> numberYear = const Value.absent(),
@@ -9195,6 +9420,7 @@ class $$InvoicesTableTableManager
                 id: id,
                 companyId: companyId,
                 customerId: customerId,
+                kind: kind,
                 status: status,
                 invoiceNumber: invoiceNumber,
                 numberYear: numberYear,
@@ -9219,6 +9445,7 @@ class $$InvoicesTableTableManager
                 required String id,
                 required String companyId,
                 required String customerId,
+                Value<DocumentKind> kind = const Value.absent(),
                 required InvoiceStatus status,
                 Value<String?> invoiceNumber = const Value.absent(),
                 Value<int?> numberYear = const Value.absent(),
@@ -9241,6 +9468,7 @@ class $$InvoicesTableTableManager
                 id: id,
                 companyId: companyId,
                 customerId: customerId,
+                kind: kind,
                 status: status,
                 invoiceNumber: invoiceNumber,
                 numberYear: numberYear,
