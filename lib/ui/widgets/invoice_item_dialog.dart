@@ -102,6 +102,7 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
               const SizedBox(height: 12),
               if (_kind == InvoiceItemKind.article)
                 DropdownButtonFormField<Article>(
+                  isExpanded: true,
                   initialValue: _selectedArticle,
                   decoration: const InputDecoration(labelText: 'Artikel'),
                   items: [
@@ -138,6 +139,7 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
                 ],
               ),
               DropdownButtonFormField<double>(
+                isExpanded: true,
                 initialValue: _vatRate,
                 decoration: const InputDecoration(labelText: 'MwSt.'),
                 items: const [
