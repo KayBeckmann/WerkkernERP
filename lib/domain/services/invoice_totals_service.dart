@@ -10,13 +10,26 @@ class InvoiceLineInput {
     required this.quantity,
     required this.unitPriceCents,
     required this.vatRatePercent,
+    this.discountPercent = 0,
   });
 
   final Decimal quantity;
   final int unitPriceCents;
   final double vatRatePercent;
 
-  Money get lineNet => Money.fromCents(unitPriceCents).multiplyByQuantity(quantity);
+  /// Rabatt in Prozent auf diese Position (Kay-Nachtrag 2026-10-16).
+  /// Wird auf den Netto-Betrag **vor** der Steuerberechnung angewendet
+  /// — Steuer wird also auf den bereits rabattierten Betrag berechnet,
+  /// nicht auf den vollen Betrag mit nachträglichem Steuerabzug (das
+  /// wäre bei unterschiedlichen Rabatt-/Steuersätzen nicht äquivalent).
+  final double discountPercent;
+
+  Money get lineGrossBeforeDiscount =>
+      Money.fromCents(unitPriceCents).multiplyByQuantity(quantity);
+
+  Money get lineNet => discountPercent == 0
+      ? lineGrossBeforeDiscount
+      : lineGrossBeforeDiscount - lineGrossBeforeDiscount.applyPercent(discountPercent);
 }
 
 /// Summen einer Rechnung, **je Steuersatz aufgeschlüsselt** (F1-

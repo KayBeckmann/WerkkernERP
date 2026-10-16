@@ -18,6 +18,8 @@ class InvoiceItemInput {
     required this.quantity,
     required this.unitPriceCents,
     required this.vatRatePercent,
+    this.unit,
+    this.discountPercent = 0,
     this.groupLabel,
   });
 
@@ -28,6 +30,12 @@ class InvoiceItemInput {
   final Decimal quantity;
   final int unitPriceCents;
   final double vatRatePercent;
+
+  /// Einheit (z. B. "Stk", "h", "m") — Kay-Nachtrag 2026-10-16.
+  final String? unit;
+
+  /// Rabatt in Prozent auf diese Position — Kay-Nachtrag 2026-10-16.
+  final double discountPercent;
   final String? groupLabel;
 }
 
@@ -279,6 +287,8 @@ class InvoiceRepository {
               quantity: Decimal.parse(item.quantity),
               unitPriceCents: item.unitPriceCents,
               vatRatePercent: item.vatRatePercent,
+              unit: item.unit,
+              discountPercent: item.discountPercent,
               groupLabel: item.groupLabel,
             ),
       ];
@@ -328,6 +338,7 @@ class InvoiceRepository {
           quantity: Decimal.parse(item.quantity),
           unitPriceCents: item.unitPriceCents,
           vatRatePercent: item.vatRatePercent,
+          discountPercent: item.discountPercent,
         ),
     ]);
   }
@@ -346,6 +357,8 @@ class InvoiceRepository {
               quantity: item.quantity.toString(),
               unitPriceCents: item.unitPriceCents,
               vatRatePercent: item.vatRatePercent,
+              unit: Value(item.unit),
+              discountPercent: Value(item.discountPercent),
               groupLabel: Value(item.groupLabel),
               sortOrder: i,
             ),
