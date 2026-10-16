@@ -31,8 +31,6 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   Future<_ArticlesData> _load() async {
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final articleRepo = context.read<ArticleRepository>();
-    final groupRepo = context.read<ArticleGroupRepository>();
-    final supplierRepo = context.read<SupplierRepository>();
 
     final articles = await articleRepo.listForCompany(companyId);
     final prices = <String, Money?>{};
@@ -42,20 +40,29 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
         articleId: article.id,
       );
     }
-    final groups = await groupRepo.listForCompany(companyId);
-    final suppliers = await supplierRepo.listForCompany(companyId);
-    return _ArticlesData(articles: articles, salePrices: prices, groups: groups, suppliers: suppliers);
+    return _ArticlesData(articles: articles, salePrices: prices);
   }
 
   void _reload() => setState(() { _future = _load(); });
 
-  Future<void> _create(List<ArticleGroup> groups, List<Supplier> suppliers) async {
+  Future<void> _create() async {
+    // Frisch laden statt der gecachten Liste aus dem Tab-FutureBuilder:
+    // Dieser Screen wird über IndexedStack nie neu initialisiert, eine
+    // Artikelgruppe oder ein Lieferant, der NACH dem ersten Öffnen dieses
+    // Tabs über den separaten Lieferanten-Tab angelegt wurde, wäre im
+    // Dropdown sonst erst nach einem App-Neustart sichtbar (derselbe
+    // Fehler, der in invoices_screen.dart über einen Widget-Test gefunden
+    // wurde — hier analog ohne erneuten Test repariert, siehe Commit).
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final groups = await context.read<ArticleGroupRepository>().listForCompany(companyId);
+    if (!mounted) return;
+    final suppliers = await context.read<SupplierRepository>().listForCompany(companyId);
+    if (!mounted) return;
     final result = await showDialog<_NewArticleResult>(
       context: context,
       builder: (context) => _NewArticleDialog(groups: groups, suppliers: suppliers),
     );
     if (result == null || !mounted) return;
-    final companyId = context.read<ActiveCompanyService>().active!.id;
     await context.read<ArticleRepository>().create(
           companyId: companyId,
           name: result.name,
@@ -119,33 +126,20 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           );
         },
       ),
-      floatingActionButton: FutureBuilder<_ArticlesData>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const SizedBox.shrink();
-          return FloatingActionButton.extended(
-            heroTag: 'articles-fab',
-            onPressed: () => _create(snapshot.data!.groups, snapshot.data!.suppliers),
-            icon: const Icon(Icons.add),
-            label: const Text('Artikel anlegen'),
-          );
-        },
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'articles-fab',
+        onPressed: _create,
+        icon: const Icon(Icons.add),
+        label: const Text('Artikel anlegen'),
       ),
     );
   }
 }
 
 class _ArticlesData {
-  const _ArticlesData({
-    required this.articles,
-    required this.salePrices,
-    required this.groups,
-    required this.suppliers,
-  });
+  const _ArticlesData({required this.articles, required this.salePrices});
   final List<Article> articles;
   final Map<String, Money?> salePrices;
-  final List<ArticleGroup> groups;
-  final List<Supplier> suppliers;
 }
 
 class _NewArticleResult {
@@ -202,6 +196,7 @@ class _NewArticleDialogState extends State<_NewArticleDialog> {
               decoration: const InputDecoration(labelText: 'Einheit'),
             ),
             DropdownButtonFormField<String?>(
+              isExpanded: true,
               initialValue: _groupId,
               decoration: const InputDecoration(labelText: 'Artikelgruppe (Aufschlag)'),
               items: [
@@ -215,6 +210,7 @@ class _NewArticleDialogState extends State<_NewArticleDialog> {
               onChanged: (value) => setState(() => _groupId = value),
             ),
             DropdownButtonFormField<String?>(
+              isExpanded: true,
               initialValue: _supplierId,
               decoration: const InputDecoration(labelText: 'Standardlieferant'),
               items: [
