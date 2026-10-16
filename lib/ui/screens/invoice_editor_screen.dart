@@ -239,9 +239,24 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final invoice = _currentInvoice;
     if (invoice == null || invoice.status != InvoiceStatus.finalized) return;
     final repo = context.read<InvoiceRepository>();
-    final items = await repo.itemsFor(invoice.id);
-    final bytes = await buildInvoicePdf(invoice: invoice, items: items);
-    await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
+    try {
+      final items = await repo.itemsFor(invoice.id);
+      final bytes = await buildInvoicePdf(invoice: invoice, items: items);
+      await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
+    } catch (_) {
+      // A3 Punkt 4: ein PDF-Fehler darf nie wie ein erfolgreich erstelltes
+      // PDF aussehen — die Rechnung selbst bleibt dabei unverändert
+      // finalisiert, nur die PDF-Erzeugung/der Teilen-Dialog ist
+      // gescheitert. Erneuter Versuch (Button bleibt bedienbar) ist der
+      // "verständliche Wiederanlauf".
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PDF konnte nicht erstellt/geteilt werden. Bitte erneut versuchen.'),
+          ),
+        );
+      }
+    }
   }
 
   @override
