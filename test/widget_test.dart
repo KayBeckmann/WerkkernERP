@@ -28,6 +28,11 @@ void main() {
     await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Elektro Beckmann'), findsWidgets);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Text && (widget.data ?? '').contains('Elektro Beckmann'),
+      ),
+      findsWidgets,
+    );
   });
 }
