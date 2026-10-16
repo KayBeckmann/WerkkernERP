@@ -7,6 +7,7 @@ import 'data/repositories/article_repository.dart';
 import 'data/repositories/company_repository.dart';
 import 'data/repositories/customer_repository.dart';
 import 'data/repositories/invoice_repository.dart';
+import 'data/repositories/number_sequence_repository.dart';
 import 'data/repositories/supplier_repository.dart';
 import 'domain/services/active_company_service.dart';
 import 'ui/screens/company_switcher_screen.dart';
@@ -47,8 +48,12 @@ class WerkkernErpApp extends StatelessWidget {
         Provider<ArticleRepository>(
           create: (context) => ArticleRepository(context.read<AppDatabase>()),
         ),
+        Provider<NumberSequenceRepository>(
+          create: (context) => NumberSequenceRepository(context.read<AppDatabase>()),
+        ),
         Provider<InvoiceRepository>(
-          create: (context) => InvoiceRepository(context.read<AppDatabase>()),
+          create: (context) =>
+              InvoiceRepository(context.read<AppDatabase>(), context.read<NumberSequenceRepository>()),
         ),
         ChangeNotifierProvider<ActiveCompanyService>(
           create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),

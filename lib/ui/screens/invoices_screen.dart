@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
+import '../../data/database/tables.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../domain/models/money.dart';
@@ -30,7 +31,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final invoiceRepo = context.read<InvoiceRepository>();
     final customerRepo = context.read<CustomerRepository>();
-    final invoices = await invoiceRepo.listDraftsForCompany(companyId);
+    final invoices = await invoiceRepo.listAllForCompany(companyId);
     final customers = await customerRepo.listForCompany(companyId);
     final customerById = {for (final c in customers) c.id: c};
     final totalsById = <String, Money>{};
@@ -59,10 +60,10 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
       builder: (context) => _PickCustomerDialog(customers: customers),
     );
     if (customer == null || !mounted) return;
-    final changed = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => InvoiceEditorScreen(customer: customer)),
     );
-    if (changed ?? false) _reload();
+    if (mounted) _reload();
   }
 
   @override
@@ -84,19 +85,26 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             itemBuilder: (context, index) {
               final invoice = data.invoices[index];
               final customer = data.customerById[invoice.customerId];
+              final isFinalized = invoice.status == InvoiceStatus.finalized;
+              final statusLabel = isFinalized ? invoice.invoiceNumber! : 'Entwurf';
               return ListTile(
-                leading: const Icon(Icons.receipt_long_outlined),
+                leading: Icon(
+                  isFinalized ? Icons.receipt_long : Icons.receipt_long_outlined,
+                  color: isFinalized ? Theme.of(context).colorScheme.primary : null,
+                ),
                 title: Text(customer?.name ?? '(unbekannter Kunde)'),
-                subtitle: Text('Entwurf — ${invoice.issueDate.toLocal().toString().split(' ').first}'),
+                subtitle: Text(
+                  '$statusLabel — ${invoice.issueDate.toLocal().toString().split(' ').first}',
+                ),
                 trailing: Text(data.totalsById[invoice.id]?.toString() ?? '–'),
                 onTap: () async {
                   if (customer == null) return;
-                  final changed = await Navigator.of(context).push<bool>(
+                  await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
                       builder: (_) => InvoiceEditorScreen(customer: customer, invoice: invoice),
                     ),
                   );
-                  if (changed ?? false) _reload();
+                  if (mounted) _reload();
                 },
               );
             },

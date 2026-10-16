@@ -6,6 +6,7 @@ import 'package:werkkernerp/data/database/tables.dart';
 import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/data/repositories/customer_repository.dart';
 import 'package:werkkernerp/data/repositories/invoice_repository.dart';
+import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 import 'package:werkkernerp/domain/models/money.dart';
 
 void main() {
@@ -20,7 +21,7 @@ void main() {
     );
     companies = CompanyRepository(db);
     customers = CustomerRepository(db);
-    invoices = InvoiceRepository(db);
+    invoices = InvoiceRepository(db, NumberSequenceRepository(db));
   });
 
   tearDown(() async => db.close());

@@ -1,5 +1,6 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
@@ -9,10 +10,11 @@ import '../../data/repositories/invoice_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/invoice_totals_service.dart';
+import '../../pdf/invoice_pdf_builder.dart';
 import '../widgets/invoice_item_dialog.dart';
 
-/// Editiert einen Rechnungsentwurf (A2) — Entwürfe sind frei bearbeitbar
-/// und nummernlos (F3); Finalisierung kommt mit A3.
+/// Editiert einen Rechnungsentwurf (A2) und finalisiert ihn (A3) — ab
+/// Finalisierung sind Felder/Positionen nicht mehr änderbar (F3).
 class InvoiceEditorScreen extends StatefulWidget {
   const InvoiceEditorScreen({super.key, required this.customer, this.invoice});
 
@@ -66,7 +68,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   final _paymentTermsCtrl = TextEditingController();
   bool _loading = true;
   bool _saving = false;
+  bool _finalizing = false;
   List<Article> _articles = [];
+  Invoice? _currentInvoice;
+
+  bool get _isFinalized => _currentInvoice?.status == InvoiceStatus.finalized;
 
   @override
   void initState() {
@@ -83,6 +89,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _articles = await articleRepo.listForCompany(companyId);
 
     final invoice = widget.invoice;
+    _currentInvoice = invoice;
     if (invoice != null) {
       _issueDate = invoice.issueDate;
       _serviceDate = invoice.serviceDate;
@@ -146,9 +153,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       final companyId = context.read<ActiveCompanyService>().active!.id;
       final repo = context.read<InvoiceRepository>();
       final items = [for (final item in _items) item.toInput()];
-      final invoice = widget.invoice;
-      if (invoice == null) {
-        await repo.createDraft(
+      final existing = _currentInvoice;
+      final Invoice? saved;
+      if (existing == null) {
+        saved = await repo.createDraft(
           companyId: companyId,
           customerId: widget.customer.id,
           issueDate: _issueDate,
@@ -158,9 +166,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           items: items,
         );
       } else {
-        await repo.update(
+        saved = await repo.update(
           companyId: companyId,
-          id: invoice.id,
+          id: existing.id,
           issueDate: _issueDate,
           serviceDate: _serviceDate,
           paymentTerms: _paymentTermsCtrl.text.trim().isEmpty ? null : _paymentTermsCtrl.text.trim(),
@@ -168,10 +176,72 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           items: items,
         );
       }
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        setState(() => _currentInvoice = saved);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Entwurf gespeichert.')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _finalize() async {
+    final invoice = _currentInvoice;
+    if (invoice == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rechnung finalisieren?'),
+        content: const Text(
+          'Die Rechnung erhält jetzt eine endgültige Nummer und kann danach '
+          'nicht mehr geändert werden. Diese Aktion ist nicht umkehrbar.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Finalisieren'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _finalizing = true);
+    try {
+      final companyId = context.read<ActiveCompanyService>().active!.id;
+      final repo = context.read<InvoiceRepository>();
+      final finalized = await repo.finalize(companyId: companyId, id: invoice.id);
+      if (!mounted) return;
+      if (finalized == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Finalisierung nicht möglich (bereits finalisiert?).')),
+        );
+        return;
+      }
+      setState(() => _currentInvoice = finalized);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Finalisiert als ${finalized.invoiceNumber}.')),
+      );
+    } on StateError catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _finalizing = false);
+    }
+  }
+
+  Future<void> _sharePdf() async {
+    final invoice = _currentInvoice;
+    if (invoice == null || invoice.status != InvoiceStatus.finalized) return;
+    final repo = context.read<InvoiceRepository>();
+    final items = await repo.itemsFor(invoice.id);
+    final bytes = await buildInvoicePdf(invoice: invoice, items: items);
+    await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
   }
 
   @override
@@ -194,29 +264,62 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
     final totals = _totals;
 
+    final isFinalized = _isFinalized;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text('Rechnung — ${widget.customer.name}'),
+        title: Text(
+          isFinalized
+              ? 'Rechnung ${_currentInvoice!.invoiceNumber} — ${widget.customer.name}'
+              : 'Rechnung (Entwurf) — ${widget.customer.name}',
+        ),
         actions: [
-          IconButton(
-            icon: _saving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.save_outlined),
-            tooltip: 'Entwurf speichern',
-            onPressed: _saving ? null : _save,
-          ),
+          if (isFinalized)
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'PDF teilen',
+              onPressed: _sharePdf,
+            )
+          else ...[
+            IconButton(
+              icon: _saving
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.save_outlined),
+              tooltip: 'Entwurf speichern',
+              onPressed: _saving ? null : _save,
+            ),
+            if (_currentInvoice != null)
+              IconButton(
+                icon: _finalizing
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.check_circle_outline),
+                tooltip: 'Finalisieren',
+                onPressed: _finalizing ? null : _finalize,
+              ),
+          ],
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (isFinalized)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                'Finalisiert am ${_currentInvoice!.finalizedAt!.toLocal().toString().split('.').first} — '
+                'nicht mehr änderbar.',
+                style: TextStyle(color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
           TextField(
             controller: _paymentTermsCtrl,
+            readOnly: isFinalized,
             decoration: const InputDecoration(labelText: 'Zahlungsbedingungen'),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _notesCtrl,
+            readOnly: isFinalized,
             decoration: const InputDecoration(labelText: 'Notizen'),
             maxLines: 2,
           ),
@@ -237,10 +340,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                     '${item.quantity} × ${Money.fromCents(item.unitPriceCents)} '
                     '(${item.vatRatePercent.toStringAsFixed(0)} %)',
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => setState(() => _items.remove(item)),
-                  ),
+                  trailing: isFinalized
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => setState(() => _items.remove(item)),
+                        ),
                 ),
               ),
           ],
@@ -268,12 +373,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'invoice-editor-fab',
-        onPressed: _addItem,
-        icon: const Icon(Icons.add),
-        label: const Text('Position hinzufügen'),
-      ),
+      floatingActionButton: isFinalized
+          ? null
+          : FloatingActionButton.extended(
+              heroTag: 'invoice-editor-fab',
+              onPressed: _addItem,
+              icon: const Icon(Icons.add),
+              label: const Text('Position hinzufügen'),
+            ),
     );
   }
 }
