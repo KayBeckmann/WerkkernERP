@@ -12,7 +12,16 @@ void main() {
     await tester.pumpWidget(WerkkernErpApp(database: _inMemoryDb()));
     await tester.pumpAndSettle();
 
-    expect(find.text('WerkkernERP — Firmen'), findsOneWidget);
+    // Titel ist seit dem RechnungsFee-Layout-Update ein zweifarbiges RichText
+    // ("Werkkern" + "ERP" + " — Firmen") statt eines einzelnen Text-Widgets.
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is RichText &&
+            widget.text.toPlainText() == 'WerkkernERP — Firmen',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Firma anlegen'), findsOneWidget);
   });
 
