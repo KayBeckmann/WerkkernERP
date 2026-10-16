@@ -11,14 +11,16 @@ import 'package:werkkernerp/data/repositories/customer_repository.dart';
 import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 
-/// Erste echte Schema-Migration dieser App (A5: v1→v2, Angebot/Auftrag).
-/// Statt das Spaltentyp-/Datumsspeicherformat von drifts NativeDatabase
-/// zu raten, wird eine ECHTE v2-Datenbank von drift selbst erzeugt und
-/// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
-/// v1-Zustand zurückgebaut (nur die drei neuen Spalten entfernt, alles
-/// andere bleibt drifts eigene, authentische DDL). Erst danach wird die
-/// Datei neu geöffnet — das triggert drifts reguläre Migrationslogik
-/// genauso, wie es ein echtes App-Update auf einem Bestandsgerät täte.
+/// Migrationen dieser App (v1→v2 A5: Angebot/Auftrag; v2→v3: erweiterte
+/// Kunden-/Lieferantenfelder). Statt das Spaltentyp-/Datumsspeicher-
+/// format von drifts NativeDatabase zu raten, wird eine ECHTE
+/// aktuelle Datenbank von drift selbst erzeugt und dann über `ALTER
+/// TABLE ... DROP COLUMN` mechanisch auf den exakten v1-Zustand
+/// zurückgebaut (nur die seither hinzugekommenen Spalten entfernt,
+/// alles andere bleibt drifts eigene, authentische DDL). Erst danach
+/// wird die Datei neu geöffnet — das triggert drifts reguläre
+/// Migrationslogik durch BEIDE Stufen genauso, wie es ein echtes
+/// App-Update auf einem Bestandsgerät täte.
 void main() {
   late Directory tempDir;
   late String dbPath;
@@ -33,11 +35,11 @@ void main() {
   });
 
   test(
-    'Migration v1→v2 (A5): Bestandsdaten bekommen automatisch kind=invoice, '
-    'quotesEnabled=false, ordersEnabled=false — ohne Datenverlust',
+    'Migration v1→v3 (A5 + erweiterte Kunden-/Lieferantenfelder): Bestandsdaten bekommen '
+    'automatisch die neuen Default-Werte — ohne Datenverlust an bestehenden Spalten',
     () async {
-      // Schritt 1: Eine echte v2-Datenbank mit Nutzdaten anlegen (reales
-      // onCreate, drifts eigene DDL).
+      // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
+      // (reales onCreate, drifts eigene DDL).
       final file = File(dbPath);
       var db = AppDatabase.forTesting(
         NativeDatabase(file, setup: (raw) => raw.execute('PRAGMA foreign_keys = ON;')),
@@ -47,7 +49,11 @@ void main() {
       final invoiceRepo = InvoiceRepository(db, NumberSequenceRepository(db));
 
       final company = await companyRepo.create(name: 'Migrations-Testfirma');
-      final customer = await customerRepo.create(companyId: company.id, name: 'Bestandskunde');
+      final customer = await customerRepo.create(
+        companyId: company.id,
+        name: 'Bestandskunde',
+        address: 'Alte Anschrift 1',
+      );
       final invoice = await invoiceRepo.createDraft(
         companyId: company.id,
         customerId: customer.id,
@@ -57,21 +63,30 @@ void main() {
       );
       await db.close();
 
-      // Schritt 2: Mechanisch auf v1 zurückbauen — nur die drei neuen
-      // Spalten entfernen, PRAGMA user_version auf 1 setzen. Das ist
-      // byte-genau das, was ein echtes v1-Bestandsgerät auf der Platte
-      // hätte (keine Annahme über Spaltenformate nötig, da die restliche
-      // DDL drifts eigene ist).
+      // Schritt 2: Mechanisch auf v1 zurückbauen — alle seit v1
+      // hinzugekommenen Spalten entfernen, PRAGMA user_version auf 1
+      // setzen. Das ist byte-genau das, was ein echtes v1-Bestandsgerät
+      // auf der Platte hätte (keine Annahme über Spaltenformate nötig,
+      // da die restliche DDL drifts eigene ist).
       final raw = sqlite3.open(dbPath);
+      // v1 -> v2 (A5):
       raw.execute('ALTER TABLE invoices DROP COLUMN kind;');
       raw.execute('ALTER TABLE companies DROP COLUMN quotes_enabled;');
       raw.execute('ALTER TABLE companies DROP COLUMN orders_enabled;');
+      // v2 -> v3 (erweiterte Kunden-/Lieferantenfelder):
+      raw.execute('ALTER TABLE customers DROP COLUMN vat_id;');
+      raw.execute('ALTER TABLE customers DROP COLUMN contact_person;');
+      raw.execute('ALTER TABLE customers DROP COLUMN notes;');
+      raw.execute('ALTER TABLE suppliers DROP COLUMN vat_id;');
+      raw.execute('ALTER TABLE suppliers DROP COLUMN contact_person;');
+      raw.execute('ALTER TABLE suppliers DROP COLUMN notes;');
+      raw.execute('ALTER TABLE invoices DROP COLUMN customer_snapshot_vat_id;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
-      // Schritt 3: Neu öffnen — drift erkennt user_version=1 < schemaVersion=2
-      // und muss automatisch die onUpgrade-Stufe durchlaufen, exakt wie
-      // bei einem echten App-Update.
+      // Schritt 3: Neu öffnen — drift erkennt user_version=1 < schemaVersion
+      // und muss automatisch BEIDE onUpgrade-Stufen durchlaufen, exakt wie
+      // bei einem echten App-Update über mehrere Versionen hinweg.
       db = AppDatabase.forTesting(
         NativeDatabase(file, setup: (r) => r.execute('PRAGMA foreign_keys = ON;')),
       );
@@ -86,6 +101,18 @@ void main() {
             await (db.select(db.invoices)..where((i) => i.id.equals(invoice.id))).getSingle();
         expect(migratedInvoice.kind, DocumentKind.invoice);
         expect(migratedInvoice.customerId, customer.id, reason: 'Bestandsdaten dürfen nicht verändert werden');
+        expect(migratedInvoice.customerSnapshotVatId, isNull);
+
+        final migratedCustomer =
+            await (db.select(db.customers)..where((c) => c.id.equals(customer.id))).getSingle();
+        expect(migratedCustomer.vatId, isNull);
+        expect(migratedCustomer.contactPerson, isNull);
+        expect(migratedCustomer.notes, isNull);
+        expect(
+          migratedCustomer.address,
+          'Alte Anschrift 1',
+          reason: 'Bestandsdaten dürfen nicht verändert werden',
+        );
       } finally {
         await db.close();
       }

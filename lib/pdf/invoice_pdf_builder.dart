@@ -139,6 +139,8 @@ pw.Widget _buildHeader(Invoice invoice) {
       pw.Text(invoice.customerSnapshotName ?? '', style: const pw.TextStyle(fontSize: 11)),
       if (invoice.customerSnapshotAddress != null)
         pw.Text(invoice.customerSnapshotAddress!, style: const pw.TextStyle(fontSize: 11)),
+      if (invoice.customerSnapshotVatId != null)
+        pw.Text('USt-IdNr.: ${invoice.customerSnapshotVatId}', style: const pw.TextStyle(fontSize: 11)),
       pw.Divider(),
     ],
   );

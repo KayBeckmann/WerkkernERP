@@ -31,6 +31,9 @@ class CustomerRepository {
     String? address,
     String? email,
     String? phone,
+    String? vatId,
+    String? contactPerson,
+    String? notes,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.customers).insert(
@@ -41,6 +44,9 @@ class CustomerRepository {
             address: Value(address),
             email: Value(email),
             phone: Value(phone),
+            vatId: Value(vatId),
+            contactPerson: Value(contactPerson),
+            notes: Value(notes),
             createdAt: DateTime.now(),
           ),
         );
