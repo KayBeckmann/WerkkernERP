@@ -206,24 +206,61 @@ class _InvoicesData {
   final Map<String, Money> totalsById;
 }
 
-class _PickCustomerDialog extends StatelessWidget {
+/// Kunde-wählen-Dialog mit Live-Suche (Kay-Nachtrag 2026-10-16: "beim
+/// Anlegen eines neuen Dokumentes eine Filter/Suchmaske für Kunden") —
+/// bei vielen Kunden war eine reine Scroll-Liste unpraktisch.
+class _PickCustomerDialog extends StatefulWidget {
   const _PickCustomerDialog({required this.customers});
   final List<Customer> customers;
 
   @override
+  State<_PickCustomerDialog> createState() => _PickCustomerDialogState();
+}
+
+class _PickCustomerDialogState extends State<_PickCustomerDialog> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final query = _query.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? widget.customers
+        : widget.customers.where((c) => c.name.toLowerCase().contains(query)).toList();
+
     return AlertDialog(
       title: const Text('Kunde wählen'),
       content: SizedBox(
         width: 360,
-        height: 320,
-        child: ListView(
+        height: 360,
+        child: Column(
           children: [
-            for (final customer in customers)
-              ListTile(
-                title: Text(customer.name),
-                onTap: () => Navigator.pop(context, customer),
-              ),
+            TextField(
+              controller: _searchCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Suchen', prefixIcon: Icon(Icons.search)),
+              onChanged: (value) => setState(() => _query = value),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(child: Text('Kein Kunde gefunden.'))
+                  : ListView(
+                      children: [
+                        for (final customer in filtered)
+                          ListTile(
+                            title: Text(customer.name),
+                            onTap: () => Navigator.pop(context, customer),
+                          ),
+                      ],
+                    ),
+            ),
           ],
         ),
       ),
