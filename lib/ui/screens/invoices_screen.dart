@@ -41,14 +41,22 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     return _InvoicesData(
       invoices: invoices,
       customerById: customerById,
-      allCustomers: customers,
       totalsById: totalsById,
     );
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() { _future = _load(); });
 
-  Future<void> _createNew(List<Customer> customers) async {
+  Future<void> _createNew() async {
+    // Frisch laden statt der gecachten Liste aus dem Tab-FutureBuilder:
+    // da IndexedStack diesen Screen nie neu initialisiert, wäre ein
+    // Kunde, der NACH dem ersten Öffnen des Rechnungen-Tabs angelegt
+    // wurde, in der gecachten Liste sonst erst nach einem App-Neustart
+    // sichtbar (gefunden über einen Widget-Test, der genau diesen Ablauf
+    // nachstellt — kein theoretischer Fall).
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final customers = await context.read<CustomerRepository>().listForCompany(companyId);
+    if (!mounted) return;
     if (customers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bitte zuerst einen Kunden anlegen.')),
@@ -114,16 +122,11 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
           );
         },
       ),
-      floatingActionButton: FutureBuilder<_InvoicesData>(
-        future: _future,
-        builder: (context, snapshot) {
-          return FloatingActionButton.extended(
-            heroTag: 'invoices-fab',
-            onPressed: () => _createNew(snapshot.data?.allCustomers ?? []),
-            icon: const Icon(Icons.add),
-            label: const Text('Neue Rechnung'),
-          );
-        },
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'invoices-fab',
+        onPressed: _createNew,
+        icon: const Icon(Icons.add),
+        label: const Text('Neue Rechnung'),
       ),
     );
   }
@@ -133,12 +136,10 @@ class _InvoicesData {
   const _InvoicesData({
     required this.invoices,
     required this.customerById,
-    required this.allCustomers,
     required this.totalsById,
   });
   final List<Invoice> invoices;
   final Map<String, Customer> customerById;
-  final List<Customer> allCustomers;
   final Map<String, Money> totalsById;
 }
 

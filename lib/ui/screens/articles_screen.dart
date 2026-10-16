@@ -47,7 +47,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     return _ArticlesData(articles: articles, salePrices: prices, groups: groups, suppliers: suppliers);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() { _future = _load(); });
 
   Future<void> _create(List<ArticleGroup> groups, List<Supplier> suppliers) async {
     final result = await showDialog<_NewArticleResult>(

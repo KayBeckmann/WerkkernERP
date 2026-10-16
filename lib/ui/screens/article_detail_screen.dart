@@ -40,7 +40,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     return _DetailData(prices: prices, suppliers: suppliers, salePrice: salePrice);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() { _future = _load(); });
 
   Future<void> _setPrice(List<Supplier> suppliers, List<ArticleSupplierPrice> existing) async {
     final result = await showDialog<({String supplierId, int cents})>(
@@ -87,19 +87,22 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                 child: data.prices.isEmpty
                     ? const Center(child: Text('Noch keine Lieferantenpreise hinterlegt.'))
                     : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
                         itemCount: data.prices.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final price = data.prices[index];
                           final isDefault = price.supplierId == widget.article.defaultSupplierId;
-                          return ListTile(
-                            leading: Icon(
-                              isDefault ? Icons.star : Icons.local_shipping_outlined,
-                              color: isDefault ? Colors.amber[700] : null,
+                          return Card(
+                            child: ListTile(
+                              leading: Icon(
+                                isDefault ? Icons.star : Icons.local_shipping_outlined,
+                                color: isDefault ? Colors.amber[700] : null,
+                              ),
+                              title: Text(supplierNames[price.supplierId] ?? '(unbekannt)'),
+                              subtitle: isDefault ? const Text('Standardlieferant') : null,
+                              trailing: Text(Money.fromCents(price.purchasePriceCents).toString()),
                             ),
-                            title: Text(supplierNames[price.supplierId] ?? '(unbekannt)'),
-                            subtitle: isDefault ? const Text('Standardlieferant') : null,
-                            trailing: Text(Money.fromCents(price.purchasePriceCents).toString()),
                           );
                         },
                       ),

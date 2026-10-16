@@ -27,7 +27,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     return context.read<SupplierRepository>().listForCompany(companyId);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() { _future = _load(); });
 
   Future<void> _create() async {
     final name = await showDialog<String>(
