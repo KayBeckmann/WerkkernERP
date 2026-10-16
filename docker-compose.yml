@@ -1,0 +1,7 @@
+services:
+  web:
+    build:
+      context: .
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8085:80"

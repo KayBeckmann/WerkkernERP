@@ -1,0 +1,48 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'data/database/database.dart';
+import 'data/repositories/company_repository.dart';
+import 'data/repositories/customer_repository.dart';
+import 'domain/services/active_company_service.dart';
+import 'ui/screens/company_switcher_screen.dart';
+
+void main() {
+  runApp(const WerkkernErpApp());
+}
+
+class WerkkernErpApp extends StatelessWidget {
+  /// [database] erlaubt Widget-Tests, eine In-Memory-Datenbank statt der
+  /// echten, dateibasierten Verbindung einzusetzen (die über
+  /// `path_provider` läuft, das in Tests ohne echte Plattform nicht
+  /// verfügbar ist).
+  const WerkkernErpApp({super.key, this.database});
+
+  final AppDatabase? database;
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        Provider<AppDatabase>(
+          create: (_) => database ?? AppDatabase(),
+          dispose: (_, db) => db.close(),
+        ),
+        Provider<CompanyRepository>(
+          create: (context) => CompanyRepository(context.read<AppDatabase>()),
+        ),
+        Provider<CustomerRepository>(
+          create: (context) => CustomerRepository(context.read<AppDatabase>()),
+        ),
+        ChangeNotifierProvider<ActiveCompanyService>(
+          create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'WerkkernERP',
+        theme: ThemeData(colorSchemeSeed: const Color(0xFF26415C), useMaterial3: true),
+        home: const CompanySwitcherScreen(),
+      ),
+    );
+  }
+}
