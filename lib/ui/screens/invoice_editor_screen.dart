@@ -333,6 +333,75 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
   }
 
+  /// Unverbindliche In-App-Vorschau des aktuellen Entwurfs — direkt aus
+  /// dem Bearbeitungsstand im Speicher, auch für noch nie gespeicherte
+  /// Positionen (Kay-Nachtrag 2026-10-16: "PDF Vorschau, für Dokumente,
+  /// die noch nicht finalisiert sind — Online/in App Vorschau"). Nutzt
+  /// die Live-Stammdaten von Kunde/Firma statt eines Schnappschusses,
+  /// da vor der Finalisierung noch keiner existiert — absichtlich kein
+  /// Teilen/Drucken aus dieser Ansicht heraus (siehe Doc-Kommentar bei
+  /// `buildDraftPreviewPdf`).
+  Future<void> _previewDraft() async {
+    final service = context.read<ActiveCompanyService>();
+    final company = service.active!;
+    final now = DateTime.now();
+    final previewInvoiceId = _currentInvoice?.id ?? 'preview';
+    final previewInvoice = Invoice(
+      id: previewInvoiceId,
+      companyId: company.id,
+      customerId: widget.customer.id,
+      kind: _kind,
+      status: InvoiceStatus.draft,
+      invoiceNumber: null,
+      numberYear: null,
+      issueDate: _issueDate,
+      serviceDate: _serviceDate,
+      paymentTerms: _paymentTermsCtrl.text.trim().isEmpty ? null : _paymentTermsCtrl.text.trim(),
+      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+      customerSnapshotName: widget.customer.name,
+      customerSnapshotAddress: widget.customer.address,
+      customerSnapshotVatId: widget.customer.vatId,
+      companySnapshotName: company.name,
+      companySnapshotAddress: company.address,
+      companySnapshotTaxNumber: company.taxNumber,
+      companySnapshotVatId: company.vatId,
+      companySnapshotIban: company.iban,
+      finalizedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final previewItems = [
+      for (var i = 0; i < _items.length; i++)
+        InvoiceItem(
+          id: _items[i].existingId ?? 'preview-$i',
+          invoiceId: previewInvoiceId,
+          kind: _items[i].kind,
+          articleId: _items[i].articleId,
+          description: _items[i].description,
+          quantity: _items[i].quantity.toString(),
+          unitPriceCents: _items[i].unitPriceCents,
+          vatRatePercent: _items[i].vatRatePercent,
+          groupLabel: _items[i].groupLabel,
+          sortOrder: i,
+        ),
+    ];
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Vorschau (Entwurf, nicht final)')),
+          body: PdfPreview(
+            build: (format) => buildDraftPreviewPdf(invoice: previewInvoice, items: previewItems),
+            canChangeOrientation: false,
+            canChangePageFormat: false,
+            allowSharing: false,
+            allowPrinting: false,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -370,6 +439,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               onPressed: _sharePdf,
             )
           else ...[
+            IconButton(
+              icon: const Icon(Icons.visibility_outlined),
+              tooltip: 'Vorschau (unverbindlich)',
+              onPressed: _items.isEmpty ? null : _previewDraft,
+            ),
             IconButton(
               icon: _saving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))

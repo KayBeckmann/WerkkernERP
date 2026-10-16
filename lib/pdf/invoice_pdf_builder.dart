@@ -28,7 +28,31 @@ Future<Uint8List> buildInvoicePdf({required Invoice invoice, required List<Invoi
   if (invoice.status != InvoiceStatus.finalized || invoice.invoiceNumber == null) {
     throw StateError('PDF kann nur für eine finalisierte Rechnung erzeugt werden.');
   }
+  return _buildPdf(invoice: invoice, items: items, isPreview: false);
+}
 
+/// Unverbindliche In-App-Vorschau eines **noch nicht finalisierten**
+/// Entwurfs (Kay-Nachtrag 2026-10-16: "PDF Vorschau, für Dokumente, die
+/// noch nicht finalisiert sind — Online/in App Vorschau"). Anders als
+/// [buildInvoicePdf] absichtlich **kein** Fehler bei fehlender Nummer —
+/// stattdessen deutlich sichtbares "ENTWURF"-Wasserzeichen statt einer
+/// Dokumentnummer, damit es nie mit einem echten Beleg verwechselt
+/// werden kann (A3 Punkt 4: "PDF-Fehler darf nicht als erfolgreich
+/// erstelltes PDF erscheinen" — hier umgekehrt: eine Vorschau darf nie
+/// wie ein echtes Dokument aussehen). Die aufrufende Stelle
+/// (`InvoiceEditorScreen`) bindet diese Vorschau bewusst **ohne**
+/// Teilen-/Druck-Funktion ein, damit kein unfertiges Dokument versendet
+/// werden kann — nur die Vorschau für ein bereits finalisiertes
+/// Dokument darf geteilt werden.
+Future<Uint8List> buildDraftPreviewPdf({required Invoice invoice, required List<InvoiceItem> items}) {
+  return _buildPdf(invoice: invoice, items: items, isPreview: true);
+}
+
+Future<Uint8List> _buildPdf({
+  required Invoice invoice,
+  required List<InvoiceItem> items,
+  required bool isPreview,
+}) async {
   final totals = calculateInvoiceTotals([
     for (final item in items)
       InvoiceLineInput(
@@ -62,7 +86,7 @@ Future<Uint8List> buildInvoicePdf({required Invoice invoice, required List<Invoi
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(32),
-      header: (context) => _buildHeader(invoice),
+      header: (context) => _buildHeader(invoice, isPreview: isPreview),
       footer: (context) => pw.Align(
         alignment: pw.Alignment.centerRight,
         child: pw.Text(
@@ -99,11 +123,24 @@ String _title(DocumentKind kind) => switch (kind) {
       DocumentKind.order => 'Auftrag',
     };
 
-pw.Widget _buildHeader(Invoice invoice) {
+pw.Widget _buildHeader(Invoice invoice, {required bool isPreview}) {
   final title = _title(invoice.kind);
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
+      if (isPreview)
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.symmetric(vertical: 6),
+          margin: const pw.EdgeInsets.only(bottom: 8),
+          decoration: const pw.BoxDecoration(color: PdfColors.red100),
+          child: pw.Center(
+            child: pw.Text(
+              'ENTWURF — unverbindliche Vorschau, kein gültiges Dokument',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.red900, fontSize: 11),
+            ),
+          ),
+        ),
       pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
@@ -126,7 +163,7 @@ pw.Widget _buildHeader(Invoice invoice) {
             crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: [
               pw.Text(
-                '$title ${invoice.invoiceNumber}',
+                isPreview ? '$title (Entwurf)' : '$title ${invoice.invoiceNumber}',
                 style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
               ),
               pw.Text('${title}sdatum: ${_formatDate(invoice.issueDate)}'),

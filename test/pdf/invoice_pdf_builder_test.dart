@@ -86,6 +86,20 @@ void main() {
     expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
   });
 
+  test(
+    'Kay-Nachtrag 2026-10-16: buildDraftPreviewPdf() funktioniert gerade für einen NICHT '
+    'finalisierten Entwurf (kein Fehler, kein echte Nummer)',
+    () async {
+      final draft = draftInvoice(); // kein invoiceNumber -> Status draft
+      final bytes = await buildDraftPreviewPdf(
+        invoice: draft,
+        items: [item(description: 'Noch nicht gespeicherte Position')],
+      );
+      expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
+      expect(bytes.length, greaterThan(1000));
+    },
+  );
+
   for (final kind in [DocumentKind.quote, DocumentKind.order]) {
     test(
       'A5-Abnahme: ${kind.name}-PDF wird ohne Fehler erzeugt (gleiches Layout wie Rechnung)',
