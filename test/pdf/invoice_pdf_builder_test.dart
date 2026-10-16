@@ -35,6 +35,23 @@ void main() {
         updatedAt: DateTime.now(),
       );
 
+  Company testCompany({String? pdfIntroText, String? pdfClosingText, String? pdfFooterText}) => Company(
+        id: 'company-1',
+        name: 'Elektro Beckmann',
+        address: 'Musterstraße 1, 23966 Wismar',
+        taxNumber: '123/456/78901',
+        vatId: null,
+        iban: 'DE12 3456 7890 1234 5678 90',
+        email: null,
+        phone: null,
+        createdAt: DateTime.now(),
+        quotesEnabled: false,
+        ordersEnabled: false,
+        pdfIntroText: pdfIntroText,
+        pdfClosingText: pdfClosingText,
+        pdfFooterText: pdfFooterText,
+      );
+
   InvoiceItem item({required String description, String quantity = '1', int price = 10000}) =>
       InvoiceItem(
         id: 'item-1',
@@ -51,7 +68,11 @@ void main() {
 
   test('A3-Abnahme: PDF kann nur für eine finalisierte Rechnung erzeugt werden', () {
     expect(
-      () => buildInvoicePdf(invoice: draftInvoice(), items: [item(description: 'Test')]),
+      () => buildInvoicePdf(
+        invoice: draftInvoice(),
+        items: [item(description: 'Test')],
+        company: testCompany(),
+      ),
       throwsStateError,
     );
   });
@@ -61,6 +82,7 @@ void main() {
     final bytes = await buildInvoicePdf(
       invoice: invoice,
       items: [item(description: 'Montagearbeiten')],
+      company: testCompany(),
     );
 
     // Gültiges PDF (Magic Bytes) mit plausibler Mindestgröße — der
@@ -82,6 +104,7 @@ void main() {
         item(description: 'Steckdose', quantity: '10', price: 250),
         item(description: 'Anfahrt', price: 5000),
       ],
+      company: testCompany(),
     );
     expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
   });
@@ -94,6 +117,26 @@ void main() {
       final bytes = await buildDraftPreviewPdf(
         invoice: draft,
         items: [item(description: 'Noch nicht gespeicherte Position')],
+        company: testCompany(),
+      );
+      expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
+      expect(bytes.length, greaterThan(1000));
+    },
+  );
+
+  test(
+    'Kay-Nachtrag 2026-10-16: Einleitungs-, Schluss- und Fußzeilentext der Firma werden ohne '
+    'Fehler ins PDF übernommen',
+    () async {
+      final invoice = draftInvoice(invoiceNumber: 'R-26003');
+      final bytes = await buildInvoicePdf(
+        invoice: invoice,
+        items: [item(description: 'Testposition')],
+        company: testCompany(
+          pdfIntroText: 'Vielen Dank für Ihren Auftrag.',
+          pdfClosingText: 'Es gelten unsere AGB, einsehbar unter example.test/agb.',
+          pdfFooterText: 'Elektro Beckmann — Musterstraße 1 — 23966 Wismar',
+        ),
       );
       expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
       expect(bytes.length, greaterThan(1000));
@@ -108,6 +151,7 @@ void main() {
         final bytes = await buildInvoicePdf(
           invoice: invoice,
           items: [item(description: 'Testposition')],
+          company: testCompany(),
         );
         expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
         expect(bytes.length, greaterThan(1000));

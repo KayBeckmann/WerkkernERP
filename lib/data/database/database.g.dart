@@ -126,6 +126,39 @@ class $CompaniesTable extends Companies
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _pdfIntroTextMeta = const VerificationMeta(
+    'pdfIntroText',
+  );
+  @override
+  late final GeneratedColumn<String> pdfIntroText = GeneratedColumn<String>(
+    'pdf_intro_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pdfClosingTextMeta = const VerificationMeta(
+    'pdfClosingText',
+  );
+  @override
+  late final GeneratedColumn<String> pdfClosingText = GeneratedColumn<String>(
+    'pdf_closing_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pdfFooterTextMeta = const VerificationMeta(
+    'pdfFooterText',
+  );
+  @override
+  late final GeneratedColumn<String> pdfFooterText = GeneratedColumn<String>(
+    'pdf_footer_text',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -139,6 +172,9 @@ class $CompaniesTable extends Companies
     createdAt,
     quotesEnabled,
     ordersEnabled,
+    pdfIntroText,
+    pdfClosingText,
+    pdfFooterText,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -227,6 +263,33 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('pdf_intro_text')) {
+      context.handle(
+        _pdfIntroTextMeta,
+        pdfIntroText.isAcceptableOrUnknown(
+          data['pdf_intro_text']!,
+          _pdfIntroTextMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text')) {
+      context.handle(
+        _pdfClosingTextMeta,
+        pdfClosingText.isAcceptableOrUnknown(
+          data['pdf_closing_text']!,
+          _pdfClosingTextMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_footer_text')) {
+      context.handle(
+        _pdfFooterTextMeta,
+        pdfFooterText.isAcceptableOrUnknown(
+          data['pdf_footer_text']!,
+          _pdfFooterTextMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -280,6 +343,18 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}orders_enabled'],
       )!,
+      pdfIntroText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text'],
+      ),
+      pdfClosingText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text'],
+      ),
+      pdfFooterText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_footer_text'],
+      ),
     );
   }
 
@@ -306,6 +381,17 @@ class Company extends DataClass implements Insertable<Company> {
   /// bleibt ohne Zusatzschritt direkt nutzbar (A0-Prinzip).
   final bool quotesEnabled;
   final bool ordersEnabled;
+
+  /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
+  /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Gelten
+  /// für alle drei Dokumentarten (Rechnung/Angebot/Auftrag) — anders
+  /// als RechnungsFee (nur als fachliche Anregung angeschaut) bewusst
+  /// EIN gemeinsamer Satz statt separater Texte je Dokumentart, um die
+  /// Einstellungen nicht unnötig aufzublähen; bei Bedarf später pro
+  /// Dokumentart aufteilbar, ohne Bestandsdaten zu verlieren.
+  final String? pdfIntroText;
+  final String? pdfClosingText;
+  final String? pdfFooterText;
   const Company({
     required this.id,
     required this.name,
@@ -318,6 +404,9 @@ class Company extends DataClass implements Insertable<Company> {
     required this.createdAt,
     required this.quotesEnabled,
     required this.ordersEnabled,
+    this.pdfIntroText,
+    this.pdfClosingText,
+    this.pdfFooterText,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -345,6 +434,15 @@ class Company extends DataClass implements Insertable<Company> {
     map['created_at'] = Variable<DateTime>(createdAt);
     map['quotes_enabled'] = Variable<bool>(quotesEnabled);
     map['orders_enabled'] = Variable<bool>(ordersEnabled);
+    if (!nullToAbsent || pdfIntroText != null) {
+      map['pdf_intro_text'] = Variable<String>(pdfIntroText);
+    }
+    if (!nullToAbsent || pdfClosingText != null) {
+      map['pdf_closing_text'] = Variable<String>(pdfClosingText);
+    }
+    if (!nullToAbsent || pdfFooterText != null) {
+      map['pdf_footer_text'] = Variable<String>(pdfFooterText);
+    }
     return map;
   }
 
@@ -371,6 +469,15 @@ class Company extends DataClass implements Insertable<Company> {
       createdAt: Value(createdAt),
       quotesEnabled: Value(quotesEnabled),
       ordersEnabled: Value(ordersEnabled),
+      pdfIntroText: pdfIntroText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroText),
+      pdfClosingText: pdfClosingText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingText),
+      pdfFooterText: pdfFooterText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfFooterText),
     );
   }
 
@@ -391,6 +498,9 @@ class Company extends DataClass implements Insertable<Company> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       quotesEnabled: serializer.fromJson<bool>(json['quotesEnabled']),
       ordersEnabled: serializer.fromJson<bool>(json['ordersEnabled']),
+      pdfIntroText: serializer.fromJson<String?>(json['pdfIntroText']),
+      pdfClosingText: serializer.fromJson<String?>(json['pdfClosingText']),
+      pdfFooterText: serializer.fromJson<String?>(json['pdfFooterText']),
     );
   }
   @override
@@ -408,6 +518,9 @@ class Company extends DataClass implements Insertable<Company> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'quotesEnabled': serializer.toJson<bool>(quotesEnabled),
       'ordersEnabled': serializer.toJson<bool>(ordersEnabled),
+      'pdfIntroText': serializer.toJson<String?>(pdfIntroText),
+      'pdfClosingText': serializer.toJson<String?>(pdfClosingText),
+      'pdfFooterText': serializer.toJson<String?>(pdfFooterText),
     };
   }
 
@@ -423,6 +536,9 @@ class Company extends DataClass implements Insertable<Company> {
     DateTime? createdAt,
     bool? quotesEnabled,
     bool? ordersEnabled,
+    Value<String?> pdfIntroText = const Value.absent(),
+    Value<String?> pdfClosingText = const Value.absent(),
+    Value<String?> pdfFooterText = const Value.absent(),
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -435,6 +551,13 @@ class Company extends DataClass implements Insertable<Company> {
     createdAt: createdAt ?? this.createdAt,
     quotesEnabled: quotesEnabled ?? this.quotesEnabled,
     ordersEnabled: ordersEnabled ?? this.ordersEnabled,
+    pdfIntroText: pdfIntroText.present ? pdfIntroText.value : this.pdfIntroText,
+    pdfClosingText: pdfClosingText.present
+        ? pdfClosingText.value
+        : this.pdfClosingText,
+    pdfFooterText: pdfFooterText.present
+        ? pdfFooterText.value
+        : this.pdfFooterText,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -453,6 +576,15 @@ class Company extends DataClass implements Insertable<Company> {
       ordersEnabled: data.ordersEnabled.present
           ? data.ordersEnabled.value
           : this.ordersEnabled,
+      pdfIntroText: data.pdfIntroText.present
+          ? data.pdfIntroText.value
+          : this.pdfIntroText,
+      pdfClosingText: data.pdfClosingText.present
+          ? data.pdfClosingText.value
+          : this.pdfClosingText,
+      pdfFooterText: data.pdfFooterText.present
+          ? data.pdfFooterText.value
+          : this.pdfFooterText,
     );
   }
 
@@ -469,7 +601,10 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('phone: $phone, ')
           ..write('createdAt: $createdAt, ')
           ..write('quotesEnabled: $quotesEnabled, ')
-          ..write('ordersEnabled: $ordersEnabled')
+          ..write('ordersEnabled: $ordersEnabled, ')
+          ..write('pdfIntroText: $pdfIntroText, ')
+          ..write('pdfClosingText: $pdfClosingText, ')
+          ..write('pdfFooterText: $pdfFooterText')
           ..write(')'))
         .toString();
   }
@@ -487,6 +622,9 @@ class Company extends DataClass implements Insertable<Company> {
     createdAt,
     quotesEnabled,
     ordersEnabled,
+    pdfIntroText,
+    pdfClosingText,
+    pdfFooterText,
   );
   @override
   bool operator ==(Object other) =>
@@ -502,7 +640,10 @@ class Company extends DataClass implements Insertable<Company> {
           other.phone == this.phone &&
           other.createdAt == this.createdAt &&
           other.quotesEnabled == this.quotesEnabled &&
-          other.ordersEnabled == this.ordersEnabled);
+          other.ordersEnabled == this.ordersEnabled &&
+          other.pdfIntroText == this.pdfIntroText &&
+          other.pdfClosingText == this.pdfClosingText &&
+          other.pdfFooterText == this.pdfFooterText);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -517,6 +658,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<DateTime> createdAt;
   final Value<bool> quotesEnabled;
   final Value<bool> ordersEnabled;
+  final Value<String?> pdfIntroText;
+  final Value<String?> pdfClosingText;
+  final Value<String?> pdfFooterText;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -530,6 +674,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.createdAt = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
+    this.pdfIntroText = const Value.absent(),
+    this.pdfClosingText = const Value.absent(),
+    this.pdfFooterText = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -544,6 +691,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     required DateTime createdAt,
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
+    this.pdfIntroText = const Value.absent(),
+    this.pdfClosingText = const Value.absent(),
+    this.pdfFooterText = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -560,6 +710,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<DateTime>? createdAt,
     Expression<bool>? quotesEnabled,
     Expression<bool>? ordersEnabled,
+    Expression<String>? pdfIntroText,
+    Expression<String>? pdfClosingText,
+    Expression<String>? pdfFooterText,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -574,6 +727,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (createdAt != null) 'created_at': createdAt,
       if (quotesEnabled != null) 'quotes_enabled': quotesEnabled,
       if (ordersEnabled != null) 'orders_enabled': ordersEnabled,
+      if (pdfIntroText != null) 'pdf_intro_text': pdfIntroText,
+      if (pdfClosingText != null) 'pdf_closing_text': pdfClosingText,
+      if (pdfFooterText != null) 'pdf_footer_text': pdfFooterText,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -590,6 +746,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<DateTime>? createdAt,
     Value<bool>? quotesEnabled,
     Value<bool>? ordersEnabled,
+    Value<String?>? pdfIntroText,
+    Value<String?>? pdfClosingText,
+    Value<String?>? pdfFooterText,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -604,6 +763,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       createdAt: createdAt ?? this.createdAt,
       quotesEnabled: quotesEnabled ?? this.quotesEnabled,
       ordersEnabled: ordersEnabled ?? this.ordersEnabled,
+      pdfIntroText: pdfIntroText ?? this.pdfIntroText,
+      pdfClosingText: pdfClosingText ?? this.pdfClosingText,
+      pdfFooterText: pdfFooterText ?? this.pdfFooterText,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -644,6 +806,15 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (ordersEnabled.present) {
       map['orders_enabled'] = Variable<bool>(ordersEnabled.value);
     }
+    if (pdfIntroText.present) {
+      map['pdf_intro_text'] = Variable<String>(pdfIntroText.value);
+    }
+    if (pdfClosingText.present) {
+      map['pdf_closing_text'] = Variable<String>(pdfClosingText.value);
+    }
+    if (pdfFooterText.present) {
+      map['pdf_footer_text'] = Variable<String>(pdfFooterText.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -664,6 +835,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('createdAt: $createdAt, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
+          ..write('pdfIntroText: $pdfIntroText, ')
+          ..write('pdfClosingText: $pdfClosingText, ')
+          ..write('pdfFooterText: $pdfFooterText, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5681,6 +5855,9 @@ typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
   required DateTime createdAt,
   Value<bool> quotesEnabled,
   Value<bool> ordersEnabled,
+  Value<String?> pdfIntroText,
+  Value<String?> pdfClosingText,
+  Value<String?> pdfFooterText,
   Value<int> rowid,
 });
 typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
@@ -5695,6 +5872,9 @@ typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
   Value<DateTime> createdAt,
   Value<bool> quotesEnabled,
   Value<bool> ordersEnabled,
+  Value<String?> pdfIntroText,
+  Value<String?> pdfClosingText,
+  Value<String?> pdfFooterText,
   Value<int> rowid,
 });
 
@@ -5876,6 +6056,21 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<bool> get ordersEnabled => $composableBuilder(
     column: $table.ordersEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroText => $composableBuilder(
+    column: $table.pdfIntroText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingText => $composableBuilder(
+    column: $table.pdfClosingText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfFooterText => $composableBuilder(
+    column: $table.pdfFooterText,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6093,6 +6288,21 @@ class $$CompaniesTableOrderingComposer
     column: $table.ordersEnabled,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get pdfIntroText => $composableBuilder(
+    column: $table.pdfIntroText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingText => $composableBuilder(
+    column: $table.pdfClosingText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfFooterText => $composableBuilder(
+    column: $table.pdfFooterText,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -6138,6 +6348,21 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<bool> get ordersEnabled => $composableBuilder(
     column: $table.ordersEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfIntroText => $composableBuilder(
+    column: $table.pdfIntroText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingText => $composableBuilder(
+    column: $table.pdfClosingText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfFooterText => $composableBuilder(
+    column: $table.pdfFooterText,
     builder: (column) => column,
   );
 
@@ -6338,6 +6563,9 @@ class $$CompaniesTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
+                Value<String?> pdfIntroText = const Value.absent(),
+                Value<String?> pdfClosingText = const Value.absent(),
+                Value<String?> pdfFooterText = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -6351,6 +6579,9 @@ class $$CompaniesTableTableManager
                 createdAt: createdAt,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
+                pdfIntroText: pdfIntroText,
+                pdfClosingText: pdfClosingText,
+                pdfFooterText: pdfFooterText,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6366,6 +6597,9 @@ class $$CompaniesTableTableManager
                 required DateTime createdAt,
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
+                Value<String?> pdfIntroText = const Value.absent(),
+                Value<String?> pdfClosingText = const Value.absent(),
+                Value<String?> pdfFooterText = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -6379,6 +6613,9 @@ class $$CompaniesTableTableManager
                 createdAt: createdAt,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
+                pdfIntroText: pdfIntroText,
+                pdfClosingText: pdfClosingText,
+                pdfFooterText: pdfFooterText,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

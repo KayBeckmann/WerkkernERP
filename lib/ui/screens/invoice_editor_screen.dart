@@ -315,7 +315,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final repo = context.read<InvoiceRepository>();
     try {
       final items = await repo.itemsFor(invoice.id);
-      final bytes = await buildInvoicePdf(invoice: invoice, items: items);
+      if (!mounted) return;
+      final company = context.read<ActiveCompanyService>().active!;
+      final bytes = await buildInvoicePdf(invoice: invoice, items: items, company: company);
       await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
     } catch (_) {
       // A3 Punkt 4: ein PDF-Fehler darf nie wie ein erfolgreich erstelltes
@@ -391,7 +393,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Vorschau (Entwurf, nicht final)')),
           body: PdfPreview(
-            build: (format) => buildDraftPreviewPdf(invoice: previewInvoice, items: previewItems),
+            build: (format) =>
+                buildDraftPreviewPdf(invoice: previewInvoice, items: previewItems, company: company),
             canChangeOrientation: false,
             canChangePageFormat: false,
             allowSharing: false,
