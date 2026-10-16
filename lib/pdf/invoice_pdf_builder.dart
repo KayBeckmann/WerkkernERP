@@ -122,10 +122,12 @@ Future<Uint8List> _buildPdf({
         ],
       ),
       build: (context) => [
-        // Einleitungstext (Kay-Nachtrag 2026-10-16) — vor der
-        // Positionstabelle, z.B. ein Rechtstext/freundliche Anrede.
-        if (company.pdfIntroText != null) ...[
-          pw.Text(company.pdfIntroText!, style: const pw.TextStyle(fontSize: 10)),
+        // Einleitungstext (Kay-Nachtrag 2026-10-16, je Dokumentart seit
+        // zweitem Nachtrag) — vor der Positionstabelle, z.B. ein
+        // Rechtstext/freundliche Anrede oder bei einem Angebot der
+        // Hinweis auf die Bindefrist.
+        if (_introTextFor(company, invoice.kind) != null) ...[
+          pw.Text(_introTextFor(company, invoice.kind)!, style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 12),
         ],
         pw.SizedBox(height: 16),
@@ -141,11 +143,15 @@ Future<Uint8List> _buildPdf({
           pw.SizedBox(height: 8),
           pw.Text(invoice.notes!, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
         ],
-        // Schlusstext (Kay-Nachtrag 2026-10-16) — z.B. Dank, Rechtstext,
-        // Hinweis auf AGB.
-        if (company.pdfClosingText != null) ...[
+        // Schlusstext (Kay-Nachtrag 2026-10-16, je Dokumentart) — z.B.
+        // Dank, Rechtstext, Hinweis auf AGB oder bei einer Rechnung das
+        // Zahlungsziel.
+        if (_closingTextFor(company, invoice.kind) != null) ...[
           pw.SizedBox(height: 16),
-          pw.Text(company.pdfClosingText!, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+          pw.Text(
+            _closingTextFor(company, invoice.kind)!,
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
         ],
       ],
     ),
@@ -153,6 +159,25 @@ Future<Uint8List> _buildPdf({
 
   return doc.save();
 }
+
+/// Einleitungs-/Schlusstext je Dokumentart (Kay-Nachtrag 2026-10-16,
+/// zweiter Nachtrag: "müssen pro Dokument abweichend sein" — Angebot
+/// braucht z.B. eine Bindefrist, Rechnung ein Zahlungsziel). Rechnung
+/// nutzt weiterhin die unpräfigierten Firmenfelder (siehe Doc-
+/// Kommentar bei `Companies.pdfIntroText` in tables.dart).
+String? _introTextFor(Company company, DocumentKind kind) => switch (kind) {
+      DocumentKind.invoice => company.pdfIntroText,
+      DocumentKind.quote => company.pdfIntroTextQuote,
+      DocumentKind.order => company.pdfIntroTextOrder,
+      DocumentKind.deliveryNote => company.pdfIntroTextDeliveryNote,
+    };
+
+String? _closingTextFor(Company company, DocumentKind kind) => switch (kind) {
+      DocumentKind.invoice => company.pdfClosingText,
+      DocumentKind.quote => company.pdfClosingTextQuote,
+      DocumentKind.order => company.pdfClosingTextOrder,
+      DocumentKind.deliveryNote => company.pdfClosingTextDeliveryNote,
+    };
 
 /// Titel je Dokumentart.
 String _title(DocumentKind kind) => switch (kind) {

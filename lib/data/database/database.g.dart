@@ -162,6 +162,74 @@ class $CompaniesTable extends Companies
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _pdfIntroTextQuoteMeta = const VerificationMeta(
+    'pdfIntroTextQuote',
+  );
+  @override
+  late final GeneratedColumn<String> pdfIntroTextQuote =
+      GeneratedColumn<String>(
+        'pdf_intro_text_quote',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfClosingTextQuoteMeta =
+      const VerificationMeta('pdfClosingTextQuote');
+  @override
+  late final GeneratedColumn<String> pdfClosingTextQuote =
+      GeneratedColumn<String>(
+        'pdf_closing_text_quote',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfIntroTextOrderMeta = const VerificationMeta(
+    'pdfIntroTextOrder',
+  );
+  @override
+  late final GeneratedColumn<String> pdfIntroTextOrder =
+      GeneratedColumn<String>(
+        'pdf_intro_text_order',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfClosingTextOrderMeta =
+      const VerificationMeta('pdfClosingTextOrder');
+  @override
+  late final GeneratedColumn<String> pdfClosingTextOrder =
+      GeneratedColumn<String>(
+        'pdf_closing_text_order',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfIntroTextDeliveryNoteMeta =
+      const VerificationMeta('pdfIntroTextDeliveryNote');
+  @override
+  late final GeneratedColumn<String> pdfIntroTextDeliveryNote =
+      GeneratedColumn<String>(
+        'pdf_intro_text_delivery_note',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfClosingTextDeliveryNoteMeta =
+      const VerificationMeta('pdfClosingTextDeliveryNote');
+  @override
+  late final GeneratedColumn<String> pdfClosingTextDeliveryNote =
+      GeneratedColumn<String>(
+        'pdf_closing_text_delivery_note',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _pdfFooterTextMeta = const VerificationMeta(
     'pdfFooterText',
   );
@@ -189,6 +257,12 @@ class $CompaniesTable extends Companies
     deliveryNotesEnabled,
     pdfIntroText,
     pdfClosingText,
+    pdfIntroTextQuote,
+    pdfClosingTextQuote,
+    pdfIntroTextOrder,
+    pdfClosingTextOrder,
+    pdfIntroTextDeliveryNote,
+    pdfClosingTextDeliveryNote,
     pdfFooterText,
   ];
   @override
@@ -305,6 +379,60 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('pdf_intro_text_quote')) {
+      context.handle(
+        _pdfIntroTextQuoteMeta,
+        pdfIntroTextQuote.isAcceptableOrUnknown(
+          data['pdf_intro_text_quote']!,
+          _pdfIntroTextQuoteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text_quote')) {
+      context.handle(
+        _pdfClosingTextQuoteMeta,
+        pdfClosingTextQuote.isAcceptableOrUnknown(
+          data['pdf_closing_text_quote']!,
+          _pdfClosingTextQuoteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_intro_text_order')) {
+      context.handle(
+        _pdfIntroTextOrderMeta,
+        pdfIntroTextOrder.isAcceptableOrUnknown(
+          data['pdf_intro_text_order']!,
+          _pdfIntroTextOrderMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text_order')) {
+      context.handle(
+        _pdfClosingTextOrderMeta,
+        pdfClosingTextOrder.isAcceptableOrUnknown(
+          data['pdf_closing_text_order']!,
+          _pdfClosingTextOrderMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_intro_text_delivery_note')) {
+      context.handle(
+        _pdfIntroTextDeliveryNoteMeta,
+        pdfIntroTextDeliveryNote.isAcceptableOrUnknown(
+          data['pdf_intro_text_delivery_note']!,
+          _pdfIntroTextDeliveryNoteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text_delivery_note')) {
+      context.handle(
+        _pdfClosingTextDeliveryNoteMeta,
+        pdfClosingTextDeliveryNote.isAcceptableOrUnknown(
+          data['pdf_closing_text_delivery_note']!,
+          _pdfClosingTextDeliveryNoteMeta,
+        ),
+      );
+    }
     if (data.containsKey('pdf_footer_text')) {
       context.handle(
         _pdfFooterTextMeta,
@@ -379,6 +507,30 @@ class $CompaniesTable extends Companies
         DriftSqlType.string,
         data['${effectivePrefix}pdf_closing_text'],
       ),
+      pdfIntroTextQuote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text_quote'],
+      ),
+      pdfClosingTextQuote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text_quote'],
+      ),
+      pdfIntroTextOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text_order'],
+      ),
+      pdfClosingTextOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text_order'],
+      ),
+      pdfIntroTextDeliveryNote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text_delivery_note'],
+      ),
+      pdfClosingTextDeliveryNote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text_delivery_note'],
+      ),
       pdfFooterText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_footer_text'],
@@ -412,14 +564,26 @@ class Company extends DataClass implements Insertable<Company> {
   final bool deliveryNotesEnabled;
 
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
-  /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Gelten
-  /// für alle drei Dokumentarten (Rechnung/Angebot/Auftrag) — anders
-  /// als RechnungsFee (nur als fachliche Anregung angeschaut) bewusst
-  /// EIN gemeinsamer Satz statt separater Texte je Dokumentart, um die
-  /// Einstellungen nicht unnötig aufzublähen; bei Bedarf später pro
-  /// Dokumentart aufteilbar, ohne Bestandsdaten zu verlieren.
+  /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
+  /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
+  /// (2026-10-16): "Einleitungstext und Schlußtext müssen pro Dokument
+  /// abweichend sein!" (Beispiele: Angebot braucht eine Bindefrist,
+  /// Rechnung ein Zahlungsziel). `pdfIntroText`/`pdfClosingText` bleiben
+  /// als Rechnungs-Text erhalten (keine Datenmigration/-verlust nötig,
+  /// analog zu RechnungsFees unpräfigiertem `einleitungstext`/
+  /// `schlusstext` für die Rechnung), die drei neuen Paare kommen für
+  /// Angebot/Auftrag/Lieferschein dazu — exakt RechnungsFees Muster
+  /// (`einleitungstext_angebot` usw., nur fachlich angeschaut, keine
+  /// Code-/Text-Übernahme). Fußzeile bleibt bewusst gemeinsam (enthält
+  /// typischerweise Firma/Anschrift, nicht dokumentartspezifisch).
   final String? pdfIntroText;
   final String? pdfClosingText;
+  final String? pdfIntroTextQuote;
+  final String? pdfClosingTextQuote;
+  final String? pdfIntroTextOrder;
+  final String? pdfClosingTextOrder;
+  final String? pdfIntroTextDeliveryNote;
+  final String? pdfClosingTextDeliveryNote;
   final String? pdfFooterText;
   const Company({
     required this.id,
@@ -436,6 +600,12 @@ class Company extends DataClass implements Insertable<Company> {
     required this.deliveryNotesEnabled,
     this.pdfIntroText,
     this.pdfClosingText,
+    this.pdfIntroTextQuote,
+    this.pdfClosingTextQuote,
+    this.pdfIntroTextOrder,
+    this.pdfClosingTextOrder,
+    this.pdfIntroTextDeliveryNote,
+    this.pdfClosingTextDeliveryNote,
     this.pdfFooterText,
   });
   @override
@@ -470,6 +640,28 @@ class Company extends DataClass implements Insertable<Company> {
     }
     if (!nullToAbsent || pdfClosingText != null) {
       map['pdf_closing_text'] = Variable<String>(pdfClosingText);
+    }
+    if (!nullToAbsent || pdfIntroTextQuote != null) {
+      map['pdf_intro_text_quote'] = Variable<String>(pdfIntroTextQuote);
+    }
+    if (!nullToAbsent || pdfClosingTextQuote != null) {
+      map['pdf_closing_text_quote'] = Variable<String>(pdfClosingTextQuote);
+    }
+    if (!nullToAbsent || pdfIntroTextOrder != null) {
+      map['pdf_intro_text_order'] = Variable<String>(pdfIntroTextOrder);
+    }
+    if (!nullToAbsent || pdfClosingTextOrder != null) {
+      map['pdf_closing_text_order'] = Variable<String>(pdfClosingTextOrder);
+    }
+    if (!nullToAbsent || pdfIntroTextDeliveryNote != null) {
+      map['pdf_intro_text_delivery_note'] = Variable<String>(
+        pdfIntroTextDeliveryNote,
+      );
+    }
+    if (!nullToAbsent || pdfClosingTextDeliveryNote != null) {
+      map['pdf_closing_text_delivery_note'] = Variable<String>(
+        pdfClosingTextDeliveryNote,
+      );
     }
     if (!nullToAbsent || pdfFooterText != null) {
       map['pdf_footer_text'] = Variable<String>(pdfFooterText);
@@ -507,6 +699,25 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingText: pdfClosingText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfClosingText),
+      pdfIntroTextQuote: pdfIntroTextQuote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroTextQuote),
+      pdfClosingTextQuote: pdfClosingTextQuote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingTextQuote),
+      pdfIntroTextOrder: pdfIntroTextOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroTextOrder),
+      pdfClosingTextOrder: pdfClosingTextOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingTextOrder),
+      pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroTextDeliveryNote),
+      pdfClosingTextDeliveryNote:
+          pdfClosingTextDeliveryNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingTextDeliveryNote),
       pdfFooterText: pdfFooterText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfFooterText),
@@ -535,6 +746,24 @@ class Company extends DataClass implements Insertable<Company> {
       ),
       pdfIntroText: serializer.fromJson<String?>(json['pdfIntroText']),
       pdfClosingText: serializer.fromJson<String?>(json['pdfClosingText']),
+      pdfIntroTextQuote: serializer.fromJson<String?>(
+        json['pdfIntroTextQuote'],
+      ),
+      pdfClosingTextQuote: serializer.fromJson<String?>(
+        json['pdfClosingTextQuote'],
+      ),
+      pdfIntroTextOrder: serializer.fromJson<String?>(
+        json['pdfIntroTextOrder'],
+      ),
+      pdfClosingTextOrder: serializer.fromJson<String?>(
+        json['pdfClosingTextOrder'],
+      ),
+      pdfIntroTextDeliveryNote: serializer.fromJson<String?>(
+        json['pdfIntroTextDeliveryNote'],
+      ),
+      pdfClosingTextDeliveryNote: serializer.fromJson<String?>(
+        json['pdfClosingTextDeliveryNote'],
+      ),
       pdfFooterText: serializer.fromJson<String?>(json['pdfFooterText']),
     );
   }
@@ -556,6 +785,16 @@ class Company extends DataClass implements Insertable<Company> {
       'deliveryNotesEnabled': serializer.toJson<bool>(deliveryNotesEnabled),
       'pdfIntroText': serializer.toJson<String?>(pdfIntroText),
       'pdfClosingText': serializer.toJson<String?>(pdfClosingText),
+      'pdfIntroTextQuote': serializer.toJson<String?>(pdfIntroTextQuote),
+      'pdfClosingTextQuote': serializer.toJson<String?>(pdfClosingTextQuote),
+      'pdfIntroTextOrder': serializer.toJson<String?>(pdfIntroTextOrder),
+      'pdfClosingTextOrder': serializer.toJson<String?>(pdfClosingTextOrder),
+      'pdfIntroTextDeliveryNote': serializer.toJson<String?>(
+        pdfIntroTextDeliveryNote,
+      ),
+      'pdfClosingTextDeliveryNote': serializer.toJson<String?>(
+        pdfClosingTextDeliveryNote,
+      ),
       'pdfFooterText': serializer.toJson<String?>(pdfFooterText),
     };
   }
@@ -575,6 +814,12 @@ class Company extends DataClass implements Insertable<Company> {
     bool? deliveryNotesEnabled,
     Value<String?> pdfIntroText = const Value.absent(),
     Value<String?> pdfClosingText = const Value.absent(),
+    Value<String?> pdfIntroTextQuote = const Value.absent(),
+    Value<String?> pdfClosingTextQuote = const Value.absent(),
+    Value<String?> pdfIntroTextOrder = const Value.absent(),
+    Value<String?> pdfClosingTextOrder = const Value.absent(),
+    Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
+    Value<String?> pdfClosingTextDeliveryNote = const Value.absent(),
     Value<String?> pdfFooterText = const Value.absent(),
   }) => Company(
     id: id ?? this.id,
@@ -593,6 +838,24 @@ class Company extends DataClass implements Insertable<Company> {
     pdfClosingText: pdfClosingText.present
         ? pdfClosingText.value
         : this.pdfClosingText,
+    pdfIntroTextQuote: pdfIntroTextQuote.present
+        ? pdfIntroTextQuote.value
+        : this.pdfIntroTextQuote,
+    pdfClosingTextQuote: pdfClosingTextQuote.present
+        ? pdfClosingTextQuote.value
+        : this.pdfClosingTextQuote,
+    pdfIntroTextOrder: pdfIntroTextOrder.present
+        ? pdfIntroTextOrder.value
+        : this.pdfIntroTextOrder,
+    pdfClosingTextOrder: pdfClosingTextOrder.present
+        ? pdfClosingTextOrder.value
+        : this.pdfClosingTextOrder,
+    pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote.present
+        ? pdfIntroTextDeliveryNote.value
+        : this.pdfIntroTextDeliveryNote,
+    pdfClosingTextDeliveryNote: pdfClosingTextDeliveryNote.present
+        ? pdfClosingTextDeliveryNote.value
+        : this.pdfClosingTextDeliveryNote,
     pdfFooterText: pdfFooterText.present
         ? pdfFooterText.value
         : this.pdfFooterText,
@@ -623,6 +886,24 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingText: data.pdfClosingText.present
           ? data.pdfClosingText.value
           : this.pdfClosingText,
+      pdfIntroTextQuote: data.pdfIntroTextQuote.present
+          ? data.pdfIntroTextQuote.value
+          : this.pdfIntroTextQuote,
+      pdfClosingTextQuote: data.pdfClosingTextQuote.present
+          ? data.pdfClosingTextQuote.value
+          : this.pdfClosingTextQuote,
+      pdfIntroTextOrder: data.pdfIntroTextOrder.present
+          ? data.pdfIntroTextOrder.value
+          : this.pdfIntroTextOrder,
+      pdfClosingTextOrder: data.pdfClosingTextOrder.present
+          ? data.pdfClosingTextOrder.value
+          : this.pdfClosingTextOrder,
+      pdfIntroTextDeliveryNote: data.pdfIntroTextDeliveryNote.present
+          ? data.pdfIntroTextDeliveryNote.value
+          : this.pdfIntroTextDeliveryNote,
+      pdfClosingTextDeliveryNote: data.pdfClosingTextDeliveryNote.present
+          ? data.pdfClosingTextDeliveryNote.value
+          : this.pdfClosingTextDeliveryNote,
       pdfFooterText: data.pdfFooterText.present
           ? data.pdfFooterText.value
           : this.pdfFooterText,
@@ -646,13 +927,19 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
+          ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
+          ..write('pdfClosingTextQuote: $pdfClosingTextQuote, ')
+          ..write('pdfIntroTextOrder: $pdfIntroTextOrder, ')
+          ..write('pdfClosingTextOrder: $pdfClosingTextOrder, ')
+          ..write('pdfIntroTextDeliveryNote: $pdfIntroTextDeliveryNote, ')
+          ..write('pdfClosingTextDeliveryNote: $pdfClosingTextDeliveryNote, ')
           ..write('pdfFooterText: $pdfFooterText')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     name,
     address,
@@ -667,8 +954,14 @@ class Company extends DataClass implements Insertable<Company> {
     deliveryNotesEnabled,
     pdfIntroText,
     pdfClosingText,
+    pdfIntroTextQuote,
+    pdfClosingTextQuote,
+    pdfIntroTextOrder,
+    pdfClosingTextOrder,
+    pdfIntroTextDeliveryNote,
+    pdfClosingTextDeliveryNote,
     pdfFooterText,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -687,6 +980,12 @@ class Company extends DataClass implements Insertable<Company> {
           other.deliveryNotesEnabled == this.deliveryNotesEnabled &&
           other.pdfIntroText == this.pdfIntroText &&
           other.pdfClosingText == this.pdfClosingText &&
+          other.pdfIntroTextQuote == this.pdfIntroTextQuote &&
+          other.pdfClosingTextQuote == this.pdfClosingTextQuote &&
+          other.pdfIntroTextOrder == this.pdfIntroTextOrder &&
+          other.pdfClosingTextOrder == this.pdfClosingTextOrder &&
+          other.pdfIntroTextDeliveryNote == this.pdfIntroTextDeliveryNote &&
+          other.pdfClosingTextDeliveryNote == this.pdfClosingTextDeliveryNote &&
           other.pdfFooterText == this.pdfFooterText);
 }
 
@@ -705,6 +1004,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<bool> deliveryNotesEnabled;
   final Value<String?> pdfIntroText;
   final Value<String?> pdfClosingText;
+  final Value<String?> pdfIntroTextQuote;
+  final Value<String?> pdfClosingTextQuote;
+  final Value<String?> pdfIntroTextOrder;
+  final Value<String?> pdfClosingTextOrder;
+  final Value<String?> pdfIntroTextDeliveryNote;
+  final Value<String?> pdfClosingTextDeliveryNote;
   final Value<String?> pdfFooterText;
   final Value<int> rowid;
   const CompaniesCompanion({
@@ -722,6 +1027,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.deliveryNotesEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
+    this.pdfIntroTextQuote = const Value.absent(),
+    this.pdfClosingTextQuote = const Value.absent(),
+    this.pdfIntroTextOrder = const Value.absent(),
+    this.pdfClosingTextOrder = const Value.absent(),
+    this.pdfIntroTextDeliveryNote = const Value.absent(),
+    this.pdfClosingTextDeliveryNote = const Value.absent(),
     this.pdfFooterText = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -740,6 +1051,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.deliveryNotesEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
+    this.pdfIntroTextQuote = const Value.absent(),
+    this.pdfClosingTextQuote = const Value.absent(),
+    this.pdfIntroTextOrder = const Value.absent(),
+    this.pdfClosingTextOrder = const Value.absent(),
+    this.pdfIntroTextDeliveryNote = const Value.absent(),
+    this.pdfClosingTextDeliveryNote = const Value.absent(),
     this.pdfFooterText = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -760,6 +1077,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<bool>? deliveryNotesEnabled,
     Expression<String>? pdfIntroText,
     Expression<String>? pdfClosingText,
+    Expression<String>? pdfIntroTextQuote,
+    Expression<String>? pdfClosingTextQuote,
+    Expression<String>? pdfIntroTextOrder,
+    Expression<String>? pdfClosingTextOrder,
+    Expression<String>? pdfIntroTextDeliveryNote,
+    Expression<String>? pdfClosingTextDeliveryNote,
     Expression<String>? pdfFooterText,
     Expression<int>? rowid,
   }) {
@@ -779,6 +1102,16 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         'delivery_notes_enabled': deliveryNotesEnabled,
       if (pdfIntroText != null) 'pdf_intro_text': pdfIntroText,
       if (pdfClosingText != null) 'pdf_closing_text': pdfClosingText,
+      if (pdfIntroTextQuote != null) 'pdf_intro_text_quote': pdfIntroTextQuote,
+      if (pdfClosingTextQuote != null)
+        'pdf_closing_text_quote': pdfClosingTextQuote,
+      if (pdfIntroTextOrder != null) 'pdf_intro_text_order': pdfIntroTextOrder,
+      if (pdfClosingTextOrder != null)
+        'pdf_closing_text_order': pdfClosingTextOrder,
+      if (pdfIntroTextDeliveryNote != null)
+        'pdf_intro_text_delivery_note': pdfIntroTextDeliveryNote,
+      if (pdfClosingTextDeliveryNote != null)
+        'pdf_closing_text_delivery_note': pdfClosingTextDeliveryNote,
       if (pdfFooterText != null) 'pdf_footer_text': pdfFooterText,
       if (rowid != null) 'rowid': rowid,
     });
@@ -799,6 +1132,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<bool>? deliveryNotesEnabled,
     Value<String?>? pdfIntroText,
     Value<String?>? pdfClosingText,
+    Value<String?>? pdfIntroTextQuote,
+    Value<String?>? pdfClosingTextQuote,
+    Value<String?>? pdfIntroTextOrder,
+    Value<String?>? pdfClosingTextOrder,
+    Value<String?>? pdfIntroTextDeliveryNote,
+    Value<String?>? pdfClosingTextDeliveryNote,
     Value<String?>? pdfFooterText,
     Value<int>? rowid,
   }) {
@@ -817,6 +1156,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
       pdfIntroText: pdfIntroText ?? this.pdfIntroText,
       pdfClosingText: pdfClosingText ?? this.pdfClosingText,
+      pdfIntroTextQuote: pdfIntroTextQuote ?? this.pdfIntroTextQuote,
+      pdfClosingTextQuote: pdfClosingTextQuote ?? this.pdfClosingTextQuote,
+      pdfIntroTextOrder: pdfIntroTextOrder ?? this.pdfIntroTextOrder,
+      pdfClosingTextOrder: pdfClosingTextOrder ?? this.pdfClosingTextOrder,
+      pdfIntroTextDeliveryNote:
+          pdfIntroTextDeliveryNote ?? this.pdfIntroTextDeliveryNote,
+      pdfClosingTextDeliveryNote:
+          pdfClosingTextDeliveryNote ?? this.pdfClosingTextDeliveryNote,
       pdfFooterText: pdfFooterText ?? this.pdfFooterText,
       rowid: rowid ?? this.rowid,
     );
@@ -869,6 +1216,32 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (pdfClosingText.present) {
       map['pdf_closing_text'] = Variable<String>(pdfClosingText.value);
     }
+    if (pdfIntroTextQuote.present) {
+      map['pdf_intro_text_quote'] = Variable<String>(pdfIntroTextQuote.value);
+    }
+    if (pdfClosingTextQuote.present) {
+      map['pdf_closing_text_quote'] = Variable<String>(
+        pdfClosingTextQuote.value,
+      );
+    }
+    if (pdfIntroTextOrder.present) {
+      map['pdf_intro_text_order'] = Variable<String>(pdfIntroTextOrder.value);
+    }
+    if (pdfClosingTextOrder.present) {
+      map['pdf_closing_text_order'] = Variable<String>(
+        pdfClosingTextOrder.value,
+      );
+    }
+    if (pdfIntroTextDeliveryNote.present) {
+      map['pdf_intro_text_delivery_note'] = Variable<String>(
+        pdfIntroTextDeliveryNote.value,
+      );
+    }
+    if (pdfClosingTextDeliveryNote.present) {
+      map['pdf_closing_text_delivery_note'] = Variable<String>(
+        pdfClosingTextDeliveryNote.value,
+      );
+    }
     if (pdfFooterText.present) {
       map['pdf_footer_text'] = Variable<String>(pdfFooterText.value);
     }
@@ -895,6 +1268,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
+          ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
+          ..write('pdfClosingTextQuote: $pdfClosingTextQuote, ')
+          ..write('pdfIntroTextOrder: $pdfIntroTextOrder, ')
+          ..write('pdfClosingTextOrder: $pdfClosingTextOrder, ')
+          ..write('pdfIntroTextDeliveryNote: $pdfIntroTextDeliveryNote, ')
+          ..write('pdfClosingTextDeliveryNote: $pdfClosingTextDeliveryNote, ')
           ..write('pdfFooterText: $pdfFooterText, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6100,6 +6479,12 @@ typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
   Value<bool> deliveryNotesEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
+  Value<String?> pdfIntroTextQuote,
+  Value<String?> pdfClosingTextQuote,
+  Value<String?> pdfIntroTextOrder,
+  Value<String?> pdfClosingTextOrder,
+  Value<String?> pdfIntroTextDeliveryNote,
+  Value<String?> pdfClosingTextDeliveryNote,
   Value<String?> pdfFooterText,
   Value<int> rowid,
 });
@@ -6118,6 +6503,12 @@ typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
   Value<bool> deliveryNotesEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
+  Value<String?> pdfIntroTextQuote,
+  Value<String?> pdfClosingTextQuote,
+  Value<String?> pdfIntroTextOrder,
+  Value<String?> pdfClosingTextOrder,
+  Value<String?> pdfIntroTextDeliveryNote,
+  Value<String?> pdfClosingTextDeliveryNote,
   Value<String?> pdfFooterText,
   Value<int> rowid,
 });
@@ -6315,6 +6706,36 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<String> get pdfClosingText => $composableBuilder(
     column: $table.pdfClosingText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroTextQuote => $composableBuilder(
+    column: $table.pdfIntroTextQuote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingTextQuote => $composableBuilder(
+    column: $table.pdfClosingTextQuote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroTextOrder => $composableBuilder(
+    column: $table.pdfIntroTextOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingTextOrder => $composableBuilder(
+    column: $table.pdfClosingTextOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroTextDeliveryNote => $composableBuilder(
+    column: $table.pdfIntroTextDeliveryNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingTextDeliveryNote => $composableBuilder(
+    column: $table.pdfClosingTextDeliveryNote,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6553,6 +6974,36 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pdfIntroTextQuote => $composableBuilder(
+    column: $table.pdfIntroTextQuote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingTextQuote => $composableBuilder(
+    column: $table.pdfClosingTextQuote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfIntroTextOrder => $composableBuilder(
+    column: $table.pdfIntroTextOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingTextOrder => $composableBuilder(
+    column: $table.pdfClosingTextOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfIntroTextDeliveryNote => $composableBuilder(
+    column: $table.pdfIntroTextDeliveryNote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingTextDeliveryNote => $composableBuilder(
+    column: $table.pdfClosingTextDeliveryNote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get pdfFooterText => $composableBuilder(
     column: $table.pdfFooterText,
     builder: (column) => ColumnOrderings(column),
@@ -6617,6 +7068,36 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<String> get pdfClosingText => $composableBuilder(
     column: $table.pdfClosingText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfIntroTextQuote => $composableBuilder(
+    column: $table.pdfIntroTextQuote,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingTextQuote => $composableBuilder(
+    column: $table.pdfClosingTextQuote,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfIntroTextOrder => $composableBuilder(
+    column: $table.pdfIntroTextOrder,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingTextOrder => $composableBuilder(
+    column: $table.pdfClosingTextOrder,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfIntroTextDeliveryNote => $composableBuilder(
+    column: $table.pdfIntroTextDeliveryNote,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingTextDeliveryNote => $composableBuilder(
+    column: $table.pdfClosingTextDeliveryNote,
     builder: (column) => column,
   );
 
@@ -6825,6 +7306,13 @@ class $$CompaniesTableTableManager
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
+                Value<String?> pdfIntroTextQuote = const Value.absent(),
+                Value<String?> pdfClosingTextQuote = const Value.absent(),
+                Value<String?> pdfIntroTextOrder = const Value.absent(),
+                Value<String?> pdfClosingTextOrder = const Value.absent(),
+                Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
+                Value<String?> pdfClosingTextDeliveryNote =
+                    const Value.absent(),
                 Value<String?> pdfFooterText = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
@@ -6842,6 +7330,12 @@ class $$CompaniesTableTableManager
                 deliveryNotesEnabled: deliveryNotesEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
+                pdfIntroTextQuote: pdfIntroTextQuote,
+                pdfClosingTextQuote: pdfClosingTextQuote,
+                pdfIntroTextOrder: pdfIntroTextOrder,
+                pdfClosingTextOrder: pdfClosingTextOrder,
+                pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote,
+                pdfClosingTextDeliveryNote: pdfClosingTextDeliveryNote,
                 pdfFooterText: pdfFooterText,
                 rowid: rowid,
               ),
@@ -6861,6 +7355,13 @@ class $$CompaniesTableTableManager
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
+                Value<String?> pdfIntroTextQuote = const Value.absent(),
+                Value<String?> pdfClosingTextQuote = const Value.absent(),
+                Value<String?> pdfIntroTextOrder = const Value.absent(),
+                Value<String?> pdfClosingTextOrder = const Value.absent(),
+                Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
+                Value<String?> pdfClosingTextDeliveryNote =
+                    const Value.absent(),
                 Value<String?> pdfFooterText = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
@@ -6878,6 +7379,12 @@ class $$CompaniesTableTableManager
                 deliveryNotesEnabled: deliveryNotesEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
+                pdfIntroTextQuote: pdfIntroTextQuote,
+                pdfClosingTextQuote: pdfClosingTextQuote,
+                pdfIntroTextOrder: pdfIntroTextOrder,
+                pdfClosingTextOrder: pdfClosingTextOrder,
+                pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote,
+                pdfClosingTextDeliveryNote: pdfClosingTextDeliveryNote,
                 pdfFooterText: pdfFooterText,
                 rowid: rowid,
               ),

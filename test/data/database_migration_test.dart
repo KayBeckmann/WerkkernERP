@@ -15,8 +15,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// Migrationen dieser App (v1→v2 A5: Angebot/Auftrag; v2→v3: erweiterte
 /// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte; v4→v5:
 /// Lieferschein + Dokumentumwandlung; v5→v6: Einheit + Rabatt pro
-/// Position). Statt das Spaltentyp-/Datumsspeicherformat von drifts
-/// NativeDatabase zu raten,
+/// Position; v6→v7: PDF-Texte pro Dokumentart). Statt das Spaltentyp-/
+/// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
 /// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
 /// v1-Zustand zurückgebaut (nur die seither hinzugekommenen Spalten
@@ -38,9 +38,9 @@ void main() {
   });
 
   test(
-    'Migration v1→v6 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
-    'Einheit/Rabatt pro Position): Bestandsdaten bekommen automatisch die neuen Default-Werte '
-    '— ohne Datenverlust an bestehenden Spalten',
+    'Migration v1→v7 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart): Bestandsdaten bekommen '
+    'automatisch die neuen Default-Werte — ohne Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -103,6 +103,13 @@ void main() {
       // v5 -> v6 (Einheit + Rabatt pro Position):
       raw.execute('ALTER TABLE invoice_items DROP COLUMN unit;');
       raw.execute('ALTER TABLE invoice_items DROP COLUMN discount_percent;');
+      // v6 -> v7 (PDF-Texte pro Dokumentart):
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_quote;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_quote;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_order;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_order;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_delivery_note;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_delivery_note;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -121,6 +128,12 @@ void main() {
         expect(migratedCompany.pdfClosingText, isNull);
         expect(migratedCompany.pdfFooterText, isNull);
         expect(migratedCompany.deliveryNotesEnabled, isFalse);
+        expect(migratedCompany.pdfIntroTextQuote, isNull);
+        expect(migratedCompany.pdfClosingTextQuote, isNull);
+        expect(migratedCompany.pdfIntroTextOrder, isNull);
+        expect(migratedCompany.pdfClosingTextOrder, isNull);
+        expect(migratedCompany.pdfIntroTextDeliveryNote, isNull);
+        expect(migratedCompany.pdfClosingTextDeliveryNote, isNull);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
