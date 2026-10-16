@@ -35,6 +35,14 @@ class Customers extends Table {
   TextColumn get address => text().nullable()();
   TextColumn get email => text().nullable()();
   TextColumn get phone => text().nullable()();
+
+  /// USt-IdNr. des Kunden (B2B/Reverse-Charge-Fälle) — eigenständig als
+  /// Feld ergänzt (Kay-Nachtrag 2026-10-16: "es fehlen viele Datenfelder",
+  /// RechnungsFee nur als fachliche Anregung angeschaut, keine Übernahme
+  /// von Code/Feldnamen/Texten).
+  TextColumn get vatId => text().nullable()();
+  TextColumn get contactPerson => text().nullable()();
+  TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override
@@ -49,6 +57,9 @@ class Suppliers extends Table {
   TextColumn get address => text().nullable()();
   TextColumn get email => text().nullable()();
   TextColumn get phone => text().nullable()();
+  TextColumn get vatId => text().nullable()();
+  TextColumn get contactPerson => text().nullable()();
+  TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override
@@ -172,6 +183,7 @@ class Invoices extends Table {
   /// gelesen.
   TextColumn get customerSnapshotName => text().nullable()();
   TextColumn get customerSnapshotAddress => text().nullable()();
+  TextColumn get customerSnapshotVatId => text().nullable()();
 
   /// Firmendaten-Schnappschuss zum Finalisierungszeitpunkt, aus demselben
   /// Grund wie der Kunden-Schnappschuss.

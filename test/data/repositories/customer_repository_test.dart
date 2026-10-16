@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
@@ -54,6 +55,35 @@ void main() {
       final deleteAttempt = await customers.delete(companyId: companyB.id, id: customerOfA.id);
       expect(deleteAttempt, isFalse);
       expect(await customers.findById(companyId: companyA.id, id: customerOfA.id), isNotNull);
+    },
+  );
+
+  test(
+    'Kay-Nachtrag 2026-10-16: erweiterte Kontaktfelder (USt-IdNr., Ansprechpartner, Notizen) '
+    'werden gespeichert und sind über update() nachträglich änderbar',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(
+        companyId: company.id,
+        name: 'Testkunde',
+        vatId: 'DE123456789',
+        contactPerson: 'Frau Muster',
+        notes: 'Zahlt immer pünktlich.',
+      );
+      expect(customer.vatId, 'DE123456789');
+      expect(customer.contactPerson, 'Frau Muster');
+      expect(customer.notes, 'Zahlt immer pünktlich.');
+
+      final updated = await customers.update(
+        companyId: company.id,
+        customer: customer.copyWith(contactPerson: const Value('Herr Anders')),
+      );
+      expect(updated, isTrue);
+      final reloaded = await customers.findById(companyId: company.id, id: customer.id);
+      expect(reloaded!.contactPerson, 'Herr Anders');
+      // Unveränderte Felder bleiben erhalten (copyWith betrifft nur das
+      // explizit gesetzte Feld).
+      expect(reloaded.vatId, 'DE123456789');
     },
   );
 

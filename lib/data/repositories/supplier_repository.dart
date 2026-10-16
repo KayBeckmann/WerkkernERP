@@ -25,6 +25,9 @@ class SupplierRepository {
     String? address,
     String? email,
     String? phone,
+    String? vatId,
+    String? contactPerson,
+    String? notes,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.suppliers).insert(
@@ -35,10 +38,25 @@ class SupplierRepository {
             address: Value(address),
             email: Value(email),
             phone: Value(phone),
+            vatId: Value(vatId),
+            contactPerson: Value(contactPerson),
+            notes: Value(notes),
             createdAt: DateTime.now(),
           ),
         );
     return (await findById(companyId: companyId, id: id))!;
+  }
+
+  /// Aktualisiert nur, wenn der Lieferant tatsächlich zu [companyId]
+  /// gehört — sonst betrifft die WHERE-Klausel keine Zeile (kein Cross-
+  /// Tenant-Schreibzugriff über eine erratene ID, siehe
+  /// [CustomerRepository.update]).
+  Future<bool> update({required String companyId, required Supplier supplier}) async {
+    if (supplier.companyId != companyId) return false;
+    final rows = await (_db.update(_db.suppliers)
+          ..where((s) => s.id.equals(supplier.id) & s.companyId.equals(companyId)))
+        .write(supplier.toCompanion(false));
+    return rows > 0;
   }
 
   Future<bool> delete({required String companyId, required String id}) async {

@@ -36,7 +36,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Lieferant anlegen'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'Elektro Großhandel Nord');
+      await tester.enterText(find.widgetWithText(TextField, 'Name *'), 'Elektro Großhandel Nord');
       await tester.tap(find.text('Anlegen'));
       await tester.pumpAndSettle();
 

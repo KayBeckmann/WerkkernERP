@@ -197,6 +197,7 @@ class InvoiceRepository {
           updatedAt: Value(now),
           customerSnapshotName: Value(customer.name),
           customerSnapshotAddress: Value(customer.address),
+          customerSnapshotVatId: Value(customer.vatId),
           companySnapshotName: Value(company.name),
           companySnapshotAddress: Value(company.address),
           companySnapshotTaxNumber: Value(company.taxNumber),

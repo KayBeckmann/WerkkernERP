@@ -737,6 +737,35 @@ class $CustomersTable extends Customers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _vatIdMeta = const VerificationMeta('vatId');
+  @override
+  late final GeneratedColumn<String> vatId = GeneratedColumn<String>(
+    'vat_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contactPersonMeta = const VerificationMeta(
+    'contactPerson',
+  );
+  @override
+  late final GeneratedColumn<String> contactPerson = GeneratedColumn<String>(
+    'contact_person',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -756,6 +785,9 @@ class $CustomersTable extends Customers
     address,
     email,
     phone,
+    vatId,
+    contactPerson,
+    notes,
     createdAt,
   ];
   @override
@@ -809,6 +841,27 @@ class $CustomersTable extends Customers
         phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta),
       );
     }
+    if (data.containsKey('vat_id')) {
+      context.handle(
+        _vatIdMeta,
+        vatId.isAcceptableOrUnknown(data['vat_id']!, _vatIdMeta),
+      );
+    }
+    if (data.containsKey('contact_person')) {
+      context.handle(
+        _contactPersonMeta,
+        contactPerson.isAcceptableOrUnknown(
+          data['contact_person']!,
+          _contactPersonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -850,6 +903,18 @@ class $CustomersTable extends Customers
         DriftSqlType.string,
         data['${effectivePrefix}phone'],
       ),
+      vatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}vat_id'],
+      ),
+      contactPerson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}contact_person'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -870,6 +935,14 @@ class Customer extends DataClass implements Insertable<Customer> {
   final String? address;
   final String? email;
   final String? phone;
+
+  /// USt-IdNr. des Kunden (B2B/Reverse-Charge-Fälle) — eigenständig als
+  /// Feld ergänzt (Kay-Nachtrag 2026-10-16: "es fehlen viele Datenfelder",
+  /// RechnungsFee nur als fachliche Anregung angeschaut, keine Übernahme
+  /// von Code/Feldnamen/Texten).
+  final String? vatId;
+  final String? contactPerson;
+  final String? notes;
   final DateTime createdAt;
   const Customer({
     required this.id,
@@ -878,6 +951,9 @@ class Customer extends DataClass implements Insertable<Customer> {
     this.address,
     this.email,
     this.phone,
+    this.vatId,
+    this.contactPerson,
+    this.notes,
     required this.createdAt,
   });
   @override
@@ -894,6 +970,15 @@ class Customer extends DataClass implements Insertable<Customer> {
     }
     if (!nullToAbsent || phone != null) {
       map['phone'] = Variable<String>(phone);
+    }
+    if (!nullToAbsent || vatId != null) {
+      map['vat_id'] = Variable<String>(vatId);
+    }
+    if (!nullToAbsent || contactPerson != null) {
+      map['contact_person'] = Variable<String>(contactPerson);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -913,6 +998,15 @@ class Customer extends DataClass implements Insertable<Customer> {
       phone: phone == null && nullToAbsent
           ? const Value.absent()
           : Value(phone),
+      vatId: vatId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(vatId),
+      contactPerson: contactPerson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contactPerson),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
       createdAt: Value(createdAt),
     );
   }
@@ -929,6 +1023,9 @@ class Customer extends DataClass implements Insertable<Customer> {
       address: serializer.fromJson<String?>(json['address']),
       email: serializer.fromJson<String?>(json['email']),
       phone: serializer.fromJson<String?>(json['phone']),
+      vatId: serializer.fromJson<String?>(json['vatId']),
+      contactPerson: serializer.fromJson<String?>(json['contactPerson']),
+      notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -942,6 +1039,9 @@ class Customer extends DataClass implements Insertable<Customer> {
       'address': serializer.toJson<String?>(address),
       'email': serializer.toJson<String?>(email),
       'phone': serializer.toJson<String?>(phone),
+      'vatId': serializer.toJson<String?>(vatId),
+      'contactPerson': serializer.toJson<String?>(contactPerson),
+      'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -953,6 +1053,9 @@ class Customer extends DataClass implements Insertable<Customer> {
     Value<String?> address = const Value.absent(),
     Value<String?> email = const Value.absent(),
     Value<String?> phone = const Value.absent(),
+    Value<String?> vatId = const Value.absent(),
+    Value<String?> contactPerson = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
     DateTime? createdAt,
   }) => Customer(
     id: id ?? this.id,
@@ -961,6 +1064,11 @@ class Customer extends DataClass implements Insertable<Customer> {
     address: address.present ? address.value : this.address,
     email: email.present ? email.value : this.email,
     phone: phone.present ? phone.value : this.phone,
+    vatId: vatId.present ? vatId.value : this.vatId,
+    contactPerson: contactPerson.present
+        ? contactPerson.value
+        : this.contactPerson,
+    notes: notes.present ? notes.value : this.notes,
     createdAt: createdAt ?? this.createdAt,
   );
   Customer copyWithCompanion(CustomersCompanion data) {
@@ -971,6 +1079,11 @@ class Customer extends DataClass implements Insertable<Customer> {
       address: data.address.present ? data.address.value : this.address,
       email: data.email.present ? data.email.value : this.email,
       phone: data.phone.present ? data.phone.value : this.phone,
+      vatId: data.vatId.present ? data.vatId.value : this.vatId,
+      contactPerson: data.contactPerson.present
+          ? data.contactPerson.value
+          : this.contactPerson,
+      notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -984,14 +1097,27 @@ class Customer extends DataClass implements Insertable<Customer> {
           ..write('address: $address, ')
           ..write('email: $email, ')
           ..write('phone: $phone, ')
+          ..write('vatId: $vatId, ')
+          ..write('contactPerson: $contactPerson, ')
+          ..write('notes: $notes, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, companyId, name, address, email, phone, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    name,
+    address,
+    email,
+    phone,
+    vatId,
+    contactPerson,
+    notes,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1002,6 +1128,9 @@ class Customer extends DataClass implements Insertable<Customer> {
           other.address == this.address &&
           other.email == this.email &&
           other.phone == this.phone &&
+          other.vatId == this.vatId &&
+          other.contactPerson == this.contactPerson &&
+          other.notes == this.notes &&
           other.createdAt == this.createdAt);
 }
 
@@ -1012,6 +1141,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
   final Value<String?> address;
   final Value<String?> email;
   final Value<String?> phone;
+  final Value<String?> vatId;
+  final Value<String?> contactPerson;
+  final Value<String?> notes;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const CustomersCompanion({
@@ -1021,6 +1153,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.address = const Value.absent(),
     this.email = const Value.absent(),
     this.phone = const Value.absent(),
+    this.vatId = const Value.absent(),
+    this.contactPerson = const Value.absent(),
+    this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1031,6 +1166,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.address = const Value.absent(),
     this.email = const Value.absent(),
     this.phone = const Value.absent(),
+    this.vatId = const Value.absent(),
+    this.contactPerson = const Value.absent(),
+    this.notes = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1044,6 +1182,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Expression<String>? address,
     Expression<String>? email,
     Expression<String>? phone,
+    Expression<String>? vatId,
+    Expression<String>? contactPerson,
+    Expression<String>? notes,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -1054,6 +1195,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       if (address != null) 'address': address,
       if (email != null) 'email': email,
       if (phone != null) 'phone': phone,
+      if (vatId != null) 'vat_id': vatId,
+      if (contactPerson != null) 'contact_person': contactPerson,
+      if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1066,6 +1210,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Value<String?>? address,
     Value<String?>? email,
     Value<String?>? phone,
+    Value<String?>? vatId,
+    Value<String?>? contactPerson,
+    Value<String?>? notes,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -1076,6 +1223,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       address: address ?? this.address,
       email: email ?? this.email,
       phone: phone ?? this.phone,
+      vatId: vatId ?? this.vatId,
+      contactPerson: contactPerson ?? this.contactPerson,
+      notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1102,6 +1252,15 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     if (phone.present) {
       map['phone'] = Variable<String>(phone.value);
     }
+    if (vatId.present) {
+      map['vat_id'] = Variable<String>(vatId.value);
+    }
+    if (contactPerson.present) {
+      map['contact_person'] = Variable<String>(contactPerson.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1120,6 +1279,9 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
           ..write('address: $address, ')
           ..write('email: $email, ')
           ..write('phone: $phone, ')
+          ..write('vatId: $vatId, ')
+          ..write('contactPerson: $contactPerson, ')
+          ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1194,6 +1356,35 @@ class $SuppliersTable extends Suppliers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _vatIdMeta = const VerificationMeta('vatId');
+  @override
+  late final GeneratedColumn<String> vatId = GeneratedColumn<String>(
+    'vat_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contactPersonMeta = const VerificationMeta(
+    'contactPerson',
+  );
+  @override
+  late final GeneratedColumn<String> contactPerson = GeneratedColumn<String>(
+    'contact_person',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1213,6 +1404,9 @@ class $SuppliersTable extends Suppliers
     address,
     email,
     phone,
+    vatId,
+    contactPerson,
+    notes,
     createdAt,
   ];
   @override
@@ -1266,6 +1460,27 @@ class $SuppliersTable extends Suppliers
         phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta),
       );
     }
+    if (data.containsKey('vat_id')) {
+      context.handle(
+        _vatIdMeta,
+        vatId.isAcceptableOrUnknown(data['vat_id']!, _vatIdMeta),
+      );
+    }
+    if (data.containsKey('contact_person')) {
+      context.handle(
+        _contactPersonMeta,
+        contactPerson.isAcceptableOrUnknown(
+          data['contact_person']!,
+          _contactPersonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1307,6 +1522,18 @@ class $SuppliersTable extends Suppliers
         DriftSqlType.string,
         data['${effectivePrefix}phone'],
       ),
+      vatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}vat_id'],
+      ),
+      contactPerson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}contact_person'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1327,6 +1554,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
   final String? address;
   final String? email;
   final String? phone;
+  final String? vatId;
+  final String? contactPerson;
+  final String? notes;
   final DateTime createdAt;
   const Supplier({
     required this.id,
@@ -1335,6 +1565,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     this.address,
     this.email,
     this.phone,
+    this.vatId,
+    this.contactPerson,
+    this.notes,
     required this.createdAt,
   });
   @override
@@ -1351,6 +1584,15 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     }
     if (!nullToAbsent || phone != null) {
       map['phone'] = Variable<String>(phone);
+    }
+    if (!nullToAbsent || vatId != null) {
+      map['vat_id'] = Variable<String>(vatId);
+    }
+    if (!nullToAbsent || contactPerson != null) {
+      map['contact_person'] = Variable<String>(contactPerson);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -1370,6 +1612,15 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       phone: phone == null && nullToAbsent
           ? const Value.absent()
           : Value(phone),
+      vatId: vatId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(vatId),
+      contactPerson: contactPerson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contactPerson),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
       createdAt: Value(createdAt),
     );
   }
@@ -1386,6 +1637,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       address: serializer.fromJson<String?>(json['address']),
       email: serializer.fromJson<String?>(json['email']),
       phone: serializer.fromJson<String?>(json['phone']),
+      vatId: serializer.fromJson<String?>(json['vatId']),
+      contactPerson: serializer.fromJson<String?>(json['contactPerson']),
+      notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -1399,6 +1653,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       'address': serializer.toJson<String?>(address),
       'email': serializer.toJson<String?>(email),
       'phone': serializer.toJson<String?>(phone),
+      'vatId': serializer.toJson<String?>(vatId),
+      'contactPerson': serializer.toJson<String?>(contactPerson),
+      'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -1410,6 +1667,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     Value<String?> address = const Value.absent(),
     Value<String?> email = const Value.absent(),
     Value<String?> phone = const Value.absent(),
+    Value<String?> vatId = const Value.absent(),
+    Value<String?> contactPerson = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
     DateTime? createdAt,
   }) => Supplier(
     id: id ?? this.id,
@@ -1418,6 +1678,11 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     address: address.present ? address.value : this.address,
     email: email.present ? email.value : this.email,
     phone: phone.present ? phone.value : this.phone,
+    vatId: vatId.present ? vatId.value : this.vatId,
+    contactPerson: contactPerson.present
+        ? contactPerson.value
+        : this.contactPerson,
+    notes: notes.present ? notes.value : this.notes,
     createdAt: createdAt ?? this.createdAt,
   );
   Supplier copyWithCompanion(SuppliersCompanion data) {
@@ -1428,6 +1693,11 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       address: data.address.present ? data.address.value : this.address,
       email: data.email.present ? data.email.value : this.email,
       phone: data.phone.present ? data.phone.value : this.phone,
+      vatId: data.vatId.present ? data.vatId.value : this.vatId,
+      contactPerson: data.contactPerson.present
+          ? data.contactPerson.value
+          : this.contactPerson,
+      notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1441,14 +1711,27 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           ..write('address: $address, ')
           ..write('email: $email, ')
           ..write('phone: $phone, ')
+          ..write('vatId: $vatId, ')
+          ..write('contactPerson: $contactPerson, ')
+          ..write('notes: $notes, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, companyId, name, address, email, phone, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    name,
+    address,
+    email,
+    phone,
+    vatId,
+    contactPerson,
+    notes,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1459,6 +1742,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           other.address == this.address &&
           other.email == this.email &&
           other.phone == this.phone &&
+          other.vatId == this.vatId &&
+          other.contactPerson == this.contactPerson &&
+          other.notes == this.notes &&
           other.createdAt == this.createdAt);
 }
 
@@ -1469,6 +1755,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
   final Value<String?> address;
   final Value<String?> email;
   final Value<String?> phone;
+  final Value<String?> vatId;
+  final Value<String?> contactPerson;
+  final Value<String?> notes;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const SuppliersCompanion({
@@ -1478,6 +1767,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     this.address = const Value.absent(),
     this.email = const Value.absent(),
     this.phone = const Value.absent(),
+    this.vatId = const Value.absent(),
+    this.contactPerson = const Value.absent(),
+    this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1488,6 +1780,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     this.address = const Value.absent(),
     this.email = const Value.absent(),
     this.phone = const Value.absent(),
+    this.vatId = const Value.absent(),
+    this.contactPerson = const Value.absent(),
+    this.notes = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1501,6 +1796,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     Expression<String>? address,
     Expression<String>? email,
     Expression<String>? phone,
+    Expression<String>? vatId,
+    Expression<String>? contactPerson,
+    Expression<String>? notes,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -1511,6 +1809,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
       if (address != null) 'address': address,
       if (email != null) 'email': email,
       if (phone != null) 'phone': phone,
+      if (vatId != null) 'vat_id': vatId,
+      if (contactPerson != null) 'contact_person': contactPerson,
+      if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1523,6 +1824,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     Value<String?>? address,
     Value<String?>? email,
     Value<String?>? phone,
+    Value<String?>? vatId,
+    Value<String?>? contactPerson,
+    Value<String?>? notes,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -1533,6 +1837,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
       address: address ?? this.address,
       email: email ?? this.email,
       phone: phone ?? this.phone,
+      vatId: vatId ?? this.vatId,
+      contactPerson: contactPerson ?? this.contactPerson,
+      notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -1559,6 +1866,15 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     if (phone.present) {
       map['phone'] = Variable<String>(phone.value);
     }
+    if (vatId.present) {
+      map['vat_id'] = Variable<String>(vatId.value);
+    }
+    if (contactPerson.present) {
+      map['contact_person'] = Variable<String>(contactPerson.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1577,6 +1893,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
           ..write('address: $address, ')
           ..write('email: $email, ')
           ..write('phone: $phone, ')
+          ..write('vatId: $vatId, ')
+          ..write('contactPerson: $contactPerson, ')
+          ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -3039,6 +3358,17 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _customerSnapshotVatIdMeta =
+      const VerificationMeta('customerSnapshotVatId');
+  @override
+  late final GeneratedColumn<String> customerSnapshotVatId =
+      GeneratedColumn<String>(
+        'customer_snapshot_vat_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _companySnapshotNameMeta =
       const VerificationMeta('companySnapshotName');
   @override
@@ -3142,6 +3472,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     notes,
     customerSnapshotName,
     customerSnapshotAddress,
+    customerSnapshotVatId,
     companySnapshotName,
     companySnapshotAddress,
     companySnapshotTaxNumber,
@@ -3248,6 +3579,15 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         customerSnapshotAddress.isAcceptableOrUnknown(
           data['customer_snapshot_address']!,
           _customerSnapshotAddressMeta,
+        ),
+      );
+    }
+    if (data.containsKey('customer_snapshot_vat_id')) {
+      context.handle(
+        _customerSnapshotVatIdMeta,
+        customerSnapshotVatId.isAcceptableOrUnknown(
+          data['customer_snapshot_vat_id']!,
+          _customerSnapshotVatIdMeta,
         ),
       );
     }
@@ -3386,6 +3726,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.string,
         data['${effectivePrefix}customer_snapshot_address'],
       ),
+      customerSnapshotVatId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_snapshot_vat_id'],
+      ),
       companySnapshotName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}company_snapshot_name'],
@@ -3462,6 +3806,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   /// gelesen.
   final String? customerSnapshotName;
   final String? customerSnapshotAddress;
+  final String? customerSnapshotVatId;
 
   /// Firmendaten-Schnappschuss zum Finalisierungszeitpunkt, aus demselben
   /// Grund wie der Kunden-Schnappschuss.
@@ -3487,6 +3832,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.notes,
     this.customerSnapshotName,
     this.customerSnapshotAddress,
+    this.customerSnapshotVatId,
     this.companySnapshotName,
     this.companySnapshotAddress,
     this.companySnapshotTaxNumber,
@@ -3531,6 +3877,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       map['customer_snapshot_address'] = Variable<String>(
         customerSnapshotAddress,
       );
+    }
+    if (!nullToAbsent || customerSnapshotVatId != null) {
+      map['customer_snapshot_vat_id'] = Variable<String>(customerSnapshotVatId);
     }
     if (!nullToAbsent || companySnapshotName != null) {
       map['company_snapshot_name'] = Variable<String>(companySnapshotName);
@@ -3586,6 +3935,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       customerSnapshotAddress: customerSnapshotAddress == null && nullToAbsent
           ? const Value.absent()
           : Value(customerSnapshotAddress),
+      customerSnapshotVatId: customerSnapshotVatId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerSnapshotVatId),
       companySnapshotName: companySnapshotName == null && nullToAbsent
           ? const Value.absent()
           : Value(companySnapshotName),
@@ -3636,6 +3988,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       customerSnapshotAddress: serializer.fromJson<String?>(
         json['customerSnapshotAddress'],
       ),
+      customerSnapshotVatId: serializer.fromJson<String?>(
+        json['customerSnapshotVatId'],
+      ),
       companySnapshotName: serializer.fromJson<String?>(
         json['companySnapshotName'],
       ),
@@ -3679,6 +4034,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'customerSnapshotAddress': serializer.toJson<String?>(
         customerSnapshotAddress,
       ),
+      'customerSnapshotVatId': serializer.toJson<String?>(
+        customerSnapshotVatId,
+      ),
       'companySnapshotName': serializer.toJson<String?>(companySnapshotName),
       'companySnapshotAddress': serializer.toJson<String?>(
         companySnapshotAddress,
@@ -3708,6 +4066,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<String?> notes = const Value.absent(),
     Value<String?> customerSnapshotName = const Value.absent(),
     Value<String?> customerSnapshotAddress = const Value.absent(),
+    Value<String?> customerSnapshotVatId = const Value.absent(),
     Value<String?> companySnapshotName = const Value.absent(),
     Value<String?> companySnapshotAddress = const Value.absent(),
     Value<String?> companySnapshotTaxNumber = const Value.absent(),
@@ -3736,6 +4095,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     customerSnapshotAddress: customerSnapshotAddress.present
         ? customerSnapshotAddress.value
         : this.customerSnapshotAddress,
+    customerSnapshotVatId: customerSnapshotVatId.present
+        ? customerSnapshotVatId.value
+        : this.customerSnapshotVatId,
     companySnapshotName: companySnapshotName.present
         ? companySnapshotName.value
         : this.companySnapshotName,
@@ -3784,6 +4146,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       customerSnapshotAddress: data.customerSnapshotAddress.present
           ? data.customerSnapshotAddress.value
           : this.customerSnapshotAddress,
+      customerSnapshotVatId: data.customerSnapshotVatId.present
+          ? data.customerSnapshotVatId.value
+          : this.customerSnapshotVatId,
       companySnapshotName: data.companySnapshotName.present
           ? data.companySnapshotName.value
           : this.companySnapshotName,
@@ -3823,6 +4188,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('notes: $notes, ')
           ..write('customerSnapshotName: $customerSnapshotName, ')
           ..write('customerSnapshotAddress: $customerSnapshotAddress, ')
+          ..write('customerSnapshotVatId: $customerSnapshotVatId, ')
           ..write('companySnapshotName: $companySnapshotName, ')
           ..write('companySnapshotAddress: $companySnapshotAddress, ')
           ..write('companySnapshotTaxNumber: $companySnapshotTaxNumber, ')
@@ -3850,6 +4216,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     notes,
     customerSnapshotName,
     customerSnapshotAddress,
+    customerSnapshotVatId,
     companySnapshotName,
     companySnapshotAddress,
     companySnapshotTaxNumber,
@@ -3876,6 +4243,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.notes == this.notes &&
           other.customerSnapshotName == this.customerSnapshotName &&
           other.customerSnapshotAddress == this.customerSnapshotAddress &&
+          other.customerSnapshotVatId == this.customerSnapshotVatId &&
           other.companySnapshotName == this.companySnapshotName &&
           other.companySnapshotAddress == this.companySnapshotAddress &&
           other.companySnapshotTaxNumber == this.companySnapshotTaxNumber &&
@@ -3900,6 +4268,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String?> notes;
   final Value<String?> customerSnapshotName;
   final Value<String?> customerSnapshotAddress;
+  final Value<String?> customerSnapshotVatId;
   final Value<String?> companySnapshotName;
   final Value<String?> companySnapshotAddress;
   final Value<String?> companySnapshotTaxNumber;
@@ -3923,6 +4292,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.notes = const Value.absent(),
     this.customerSnapshotName = const Value.absent(),
     this.customerSnapshotAddress = const Value.absent(),
+    this.customerSnapshotVatId = const Value.absent(),
     this.companySnapshotName = const Value.absent(),
     this.companySnapshotAddress = const Value.absent(),
     this.companySnapshotTaxNumber = const Value.absent(),
@@ -3947,6 +4317,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.notes = const Value.absent(),
     this.customerSnapshotName = const Value.absent(),
     this.customerSnapshotAddress = const Value.absent(),
+    this.customerSnapshotVatId = const Value.absent(),
     this.companySnapshotName = const Value.absent(),
     this.companySnapshotAddress = const Value.absent(),
     this.companySnapshotTaxNumber = const Value.absent(),
@@ -3978,6 +4349,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? notes,
     Expression<String>? customerSnapshotName,
     Expression<String>? customerSnapshotAddress,
+    Expression<String>? customerSnapshotVatId,
     Expression<String>? companySnapshotName,
     Expression<String>? companySnapshotAddress,
     Expression<String>? companySnapshotTaxNumber,
@@ -4004,6 +4376,8 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         'customer_snapshot_name': customerSnapshotName,
       if (customerSnapshotAddress != null)
         'customer_snapshot_address': customerSnapshotAddress,
+      if (customerSnapshotVatId != null)
+        'customer_snapshot_vat_id': customerSnapshotVatId,
       if (companySnapshotName != null)
         'company_snapshot_name': companySnapshotName,
       if (companySnapshotAddress != null)
@@ -4035,6 +4409,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String?>? notes,
     Value<String?>? customerSnapshotName,
     Value<String?>? customerSnapshotAddress,
+    Value<String?>? customerSnapshotVatId,
     Value<String?>? companySnapshotName,
     Value<String?>? companySnapshotAddress,
     Value<String?>? companySnapshotTaxNumber,
@@ -4060,6 +4435,8 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       customerSnapshotName: customerSnapshotName ?? this.customerSnapshotName,
       customerSnapshotAddress:
           customerSnapshotAddress ?? this.customerSnapshotAddress,
+      customerSnapshotVatId:
+          customerSnapshotVatId ?? this.customerSnapshotVatId,
       companySnapshotName: companySnapshotName ?? this.companySnapshotName,
       companySnapshotAddress:
           companySnapshotAddress ?? this.companySnapshotAddress,
@@ -4124,6 +4501,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         customerSnapshotAddress.value,
       );
     }
+    if (customerSnapshotVatId.present) {
+      map['customer_snapshot_vat_id'] = Variable<String>(
+        customerSnapshotVatId.value,
+      );
+    }
     if (companySnapshotName.present) {
       map['company_snapshot_name'] = Variable<String>(
         companySnapshotName.value,
@@ -4180,6 +4562,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('notes: $notes, ')
           ..write('customerSnapshotName: $customerSnapshotName, ')
           ..write('customerSnapshotAddress: $customerSnapshotAddress, ')
+          ..write('customerSnapshotVatId: $customerSnapshotVatId, ')
           ..write('companySnapshotName: $companySnapshotName, ')
           ..write('companySnapshotAddress: $companySnapshotAddress, ')
           ..write('companySnapshotTaxNumber: $companySnapshotTaxNumber, ')
@@ -6190,6 +6573,9 @@ typedef $$CustomersTableCreateCompanionBuilder = CustomersCompanion Function({
   Value<String?> address,
   Value<String?> email,
   Value<String?> phone,
+  Value<String?> vatId,
+  Value<String?> contactPerson,
+  Value<String?> notes,
   required DateTime createdAt,
   Value<int> rowid,
 });
@@ -6200,6 +6586,9 @@ typedef $$CustomersTableUpdateCompanionBuilder = CustomersCompanion Function({
   Value<String?> address,
   Value<String?> email,
   Value<String?> phone,
+  Value<String?> vatId,
+  Value<String?> contactPerson,
+  Value<String?> notes,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -6276,6 +6665,21 @@ class $$CustomersTableFilterComposer
 
   ColumnFilters<String> get phone => $composableBuilder(
     column: $table.phone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get vatId => $composableBuilder(
+    column: $table.vatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6367,6 +6771,21 @@ class $$CustomersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get vatId => $composableBuilder(
+    column: $table.vatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -6419,6 +6838,17 @@ class $$CustomersTableAnnotationComposer
 
   GeneratedColumn<String> get phone =>
       $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get vatId =>
+      $composableBuilder(column: $table.vatId, builder: (column) => column);
+
+  GeneratedColumn<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -6506,6 +6936,9 @@ class $$CustomersTableTableManager
                 Value<String?> address = const Value.absent(),
                 Value<String?> email = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
+                Value<String?> vatId = const Value.absent(),
+                Value<String?> contactPerson = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CustomersCompanion(
@@ -6515,6 +6948,9 @@ class $$CustomersTableTableManager
                 address: address,
                 email: email,
                 phone: phone,
+                vatId: vatId,
+                contactPerson: contactPerson,
+                notes: notes,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -6526,6 +6962,9 @@ class $$CustomersTableTableManager
                 Value<String?> address = const Value.absent(),
                 Value<String?> email = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
+                Value<String?> vatId = const Value.absent(),
+                Value<String?> contactPerson = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => CustomersCompanion.insert(
@@ -6535,6 +6974,9 @@ class $$CustomersTableTableManager
                 address: address,
                 email: email,
                 phone: phone,
+                vatId: vatId,
+                contactPerson: contactPerson,
+                notes: notes,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -6630,6 +7072,9 @@ typedef $$SuppliersTableCreateCompanionBuilder = SuppliersCompanion Function({
   Value<String?> address,
   Value<String?> email,
   Value<String?> phone,
+  Value<String?> vatId,
+  Value<String?> contactPerson,
+  Value<String?> notes,
   required DateTime createdAt,
   Value<int> rowid,
 });
@@ -6640,6 +7085,9 @@ typedef $$SuppliersTableUpdateCompanionBuilder = SuppliersCompanion Function({
   Value<String?> address,
   Value<String?> email,
   Value<String?> phone,
+  Value<String?> vatId,
+  Value<String?> contactPerson,
+  Value<String?> notes,
   Value<DateTime> createdAt,
   Value<int> rowid,
 });
@@ -6740,6 +7188,21 @@ class $$SuppliersTableFilterComposer
 
   ColumnFilters<String> get phone => $composableBuilder(
     column: $table.phone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get vatId => $composableBuilder(
+    column: $table.vatId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6857,6 +7320,21 @@ class $$SuppliersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get vatId => $composableBuilder(
+    column: $table.vatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -6909,6 +7387,17 @@ class $$SuppliersTableAnnotationComposer
 
   GeneratedColumn<String> get phone =>
       $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get vatId =>
+      $composableBuilder(column: $table.vatId, builder: (column) => column);
+
+  GeneratedColumn<String> get contactPerson => $composableBuilder(
+    column: $table.contactPerson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -7026,6 +7515,9 @@ class $$SuppliersTableTableManager
                 Value<String?> address = const Value.absent(),
                 Value<String?> email = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
+                Value<String?> vatId = const Value.absent(),
+                Value<String?> contactPerson = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SuppliersCompanion(
@@ -7035,6 +7527,9 @@ class $$SuppliersTableTableManager
                 address: address,
                 email: email,
                 phone: phone,
+                vatId: vatId,
+                contactPerson: contactPerson,
+                notes: notes,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -7046,6 +7541,9 @@ class $$SuppliersTableTableManager
                 Value<String?> address = const Value.absent(),
                 Value<String?> email = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
+                Value<String?> vatId = const Value.absent(),
+                Value<String?> contactPerson = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => SuppliersCompanion.insert(
@@ -7055,6 +7553,9 @@ class $$SuppliersTableTableManager
                 address: address,
                 email: email,
                 phone: phone,
+                vatId: vatId,
+                contactPerson: contactPerson,
+                notes: notes,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -8779,6 +9280,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> notes,
   Value<String?> customerSnapshotName,
   Value<String?> customerSnapshotAddress,
+  Value<String?> customerSnapshotVatId,
   Value<String?> companySnapshotName,
   Value<String?> companySnapshotAddress,
   Value<String?> companySnapshotTaxNumber,
@@ -8803,6 +9305,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> notes,
   Value<String?> customerSnapshotName,
   Value<String?> customerSnapshotAddress,
+  Value<String?> customerSnapshotVatId,
   Value<String?> companySnapshotName,
   Value<String?> companySnapshotAddress,
   Value<String?> companySnapshotTaxNumber,
@@ -8934,6 +9437,11 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<String> get customerSnapshotAddress => $composableBuilder(
     column: $table.customerSnapshotAddress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerSnapshotVatId => $composableBuilder(
+    column: $table.customerSnapshotVatId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9113,6 +9621,11 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get customerSnapshotVatId => $composableBuilder(
+    column: $table.customerSnapshotVatId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get companySnapshotName => $composableBuilder(
     column: $table.companySnapshotName,
     builder: (column) => ColumnOrderings(column),
@@ -9251,6 +9764,11 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<String> get customerSnapshotAddress => $composableBuilder(
     column: $table.customerSnapshotAddress,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customerSnapshotVatId => $composableBuilder(
+    column: $table.customerSnapshotVatId,
     builder: (column) => column,
   );
 
@@ -9407,6 +9925,7 @@ class $$InvoicesTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<String?> customerSnapshotName = const Value.absent(),
                 Value<String?> customerSnapshotAddress = const Value.absent(),
+                Value<String?> customerSnapshotVatId = const Value.absent(),
                 Value<String?> companySnapshotName = const Value.absent(),
                 Value<String?> companySnapshotAddress = const Value.absent(),
                 Value<String?> companySnapshotTaxNumber = const Value.absent(),
@@ -9430,6 +9949,7 @@ class $$InvoicesTableTableManager
                 notes: notes,
                 customerSnapshotName: customerSnapshotName,
                 customerSnapshotAddress: customerSnapshotAddress,
+                customerSnapshotVatId: customerSnapshotVatId,
                 companySnapshotName: companySnapshotName,
                 companySnapshotAddress: companySnapshotAddress,
                 companySnapshotTaxNumber: companySnapshotTaxNumber,
@@ -9455,6 +9975,7 @@ class $$InvoicesTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<String?> customerSnapshotName = const Value.absent(),
                 Value<String?> customerSnapshotAddress = const Value.absent(),
+                Value<String?> customerSnapshotVatId = const Value.absent(),
                 Value<String?> companySnapshotName = const Value.absent(),
                 Value<String?> companySnapshotAddress = const Value.absent(),
                 Value<String?> companySnapshotTaxNumber = const Value.absent(),
@@ -9478,6 +9999,7 @@ class $$InvoicesTableTableManager
                 notes: notes,
                 customerSnapshotName: customerSnapshotName,
                 customerSnapshotAddress: customerSnapshotAddress,
+                customerSnapshotVatId: customerSnapshotVatId,
                 companySnapshotName: companySnapshotName,
                 companySnapshotAddress: companySnapshotAddress,
                 companySnapshotTaxNumber: companySnapshotTaxNumber,

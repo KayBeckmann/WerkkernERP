@@ -140,12 +140,14 @@ void main() {
       companyId: company.id,
       name: 'Max Mustermann',
       address: 'Kundenweg 2',
+      vatId: 'DE111222333',
     );
     final draft = await draftWithOneItem(company.id, customer.id);
     final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
 
     expect(finalized!.customerSnapshotName, 'Max Mustermann');
     expect(finalized.customerSnapshotAddress, 'Kundenweg 2');
+    expect(finalized.customerSnapshotVatId, 'DE111222333');
     expect(finalized.companySnapshotName, 'Elektro Beckmann');
     expect(finalized.companySnapshotTaxNumber, '123/456/78901');
 
@@ -154,10 +156,15 @@ void main() {
     // verändern").
     await customers.update(
       companyId: company.id,
-      customer: customer.copyWith(name: 'Neuer Name', address: const Value('Neue Adresse')),
+      customer: customer.copyWith(
+        name: 'Neuer Name',
+        address: const Value('Neue Adresse'),
+        vatId: const Value('DE999888777'),
+      ),
     );
     final reloaded = await invoices.findById(companyId: company.id, id: draft.id);
     expect(reloaded!.customerSnapshotName, 'Max Mustermann');
+    expect(reloaded.customerSnapshotVatId, 'DE111222333');
   });
 
   test('Rechnung ohne Positionen kann nicht finalisiert werden', () async {
