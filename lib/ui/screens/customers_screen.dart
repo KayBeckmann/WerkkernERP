@@ -61,14 +61,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
             return const Center(child: Text('Noch keine Kunden angelegt.'));
           }
           return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
             itemCount: customers.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final customer = customers[index];
-              return ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: Text(customer.name),
-                subtitle: customer.address != null ? Text(customer.address!) : null,
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.person_outline),
+                  title: Text(customer.name),
+                  subtitle: customer.address != null ? Text(customer.address!) : null,
+                ),
               );
             },
           );

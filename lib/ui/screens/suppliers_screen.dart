@@ -54,11 +54,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
             return const Center(child: Text('Noch keine Lieferanten angelegt.'));
           }
           return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
             itemCount: suppliers.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, index) => ListTile(
-              leading: const Icon(Icons.local_shipping_outlined),
-              title: Text(suppliers[index].name),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) => Card(
+              child: ListTile(
+                leading: const Icon(Icons.local_shipping_outlined),
+                title: Text(suppliers[index].name),
+              ),
             ),
           );
         },
