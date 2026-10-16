@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../domain/services/active_company_service.dart';
 import 'articles_screen.dart';
+import 'backup_screen.dart';
 import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
 import 'invoices_screen.dart';
@@ -26,6 +27,7 @@ class _HomeShellState extends State<HomeShell> {
     NavigationDestination(icon: Icon(Icons.group_outlined), label: 'Kunden'),
     NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Artikel'),
     NavigationDestination(icon: Icon(Icons.local_shipping_outlined), label: 'Lieferanten'),
+    NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Einstellungen'),
   ];
 
   static const _screens = [
@@ -33,9 +35,10 @@ class _HomeShellState extends State<HomeShell> {
     CustomersScreen(),
     ArticlesScreen(),
     SuppliersScreen(),
+    BackupScreen(),
   ];
 
-  static const _titles = ['Rechnungen', 'Kunden', 'Artikel', 'Lieferanten'];
+  static const _titles = ['Rechnungen', 'Kunden', 'Artikel', 'Lieferanten', 'Einstellungen'];
 
   @override
   Widget build(BuildContext context) {
