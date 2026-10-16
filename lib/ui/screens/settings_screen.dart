@@ -38,7 +38,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _setModule({required bool? quotesEnabled, required bool? ordersEnabled}) async {
+  Future<void> _setModule({
+    bool? quotesEnabled,
+    bool? ordersEnabled,
+    bool? deliveryNotesEnabled,
+  }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
     if (company == null) return;
@@ -48,6 +52,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             companyId: company.id,
             quotesEnabled: quotesEnabled ?? company.quotesEnabled,
             ordersEnabled: ordersEnabled ?? company.ordersEnabled,
+            deliveryNotesEnabled: deliveryNotesEnabled ?? company.deliveryNotesEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -108,13 +113,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Angebote'),
                   value: company.quotesEnabled,
-                  onChanged: _busy ? null : (value) => _setModule(quotesEnabled: value, ordersEnabled: null),
+                  onChanged: _busy ? null : (value) => _setModule(quotesEnabled: value),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Aufträge'),
                   value: company.ordersEnabled,
-                  onChanged: _busy ? null : (value) => _setModule(quotesEnabled: null, ordersEnabled: value),
+                  onChanged: _busy ? null : (value) => _setModule(ordersEnabled: value),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Lieferscheine'),
+                  value: company.deliveryNotesEnabled,
+                  onChanged: _busy ? null : (value) => _setModule(deliveryNotesEnabled: value),
                 ),
               ],
             ),

@@ -20,6 +20,7 @@ Future<InvoiceItemInputResult?> showInvoiceItemDialog({
   required List<Article> articles,
   List<String> existingGroupLabels = const [],
   InvoiceItemInputResult? existing,
+  bool allowHours = true,
 }) {
   return showDialog<InvoiceItemInputResult>(
     context: context,
@@ -27,6 +28,7 @@ Future<InvoiceItemInputResult?> showInvoiceItemDialog({
       articles: articles,
       existingGroupLabels: existingGroupLabels,
       existing: existing,
+      allowHours: allowHours,
     ),
   );
 }
@@ -56,10 +58,16 @@ class _InvoiceItemDialog extends StatefulWidget {
     required this.articles,
     required this.existingGroupLabels,
     this.existing,
+    this.allowHours = true,
   });
   final List<Article> articles;
   final List<String> existingGroupLabels;
   final InvoiceItemInputResult? existing;
+
+  /// `false` für Lieferscheine (Kay: "Lieferscheine sollen KEINE
+  /// Stunden enthalten!!!") — blendet das Segment aus statt nur die
+  /// Auswahl im Nachhinein abzulehnen.
+  final bool allowHours;
 
   bool get isEdit => existing != null;
 
@@ -121,10 +129,11 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SegmentedButton<InvoiceItemKind>(
-                segments: const [
-                  ButtonSegment(value: InvoiceItemKind.article, label: Text('Artikel')),
-                  ButtonSegment(value: InvoiceItemKind.hours, label: Text('Stunden')),
-                  ButtonSegment(value: InvoiceItemKind.text, label: Text('Freitext')),
+                segments: [
+                  const ButtonSegment(value: InvoiceItemKind.article, label: Text('Artikel')),
+                  if (widget.allowHours)
+                    const ButtonSegment(value: InvoiceItemKind.hours, label: Text('Stunden')),
+                  const ButtonSegment(value: InvoiceItemKind.text, label: Text('Freitext')),
                 ],
                 selected: {_kind},
                 onSelectionChanged: (selection) => setState(() => _kind = selection.first),

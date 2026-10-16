@@ -33,30 +33,35 @@ class DocumentLabels {
         DocumentKind.invoice => 'Rechnung',
         DocumentKind.quote => 'Angebot',
         DocumentKind.order => 'Auftrag',
+        DocumentKind.deliveryNote => 'Lieferschein',
       };
 
   static String plural(DocumentKind kind) => switch (kind) {
         DocumentKind.invoice => 'Rechnungen',
         DocumentKind.quote => 'Angebote',
         DocumentKind.order => 'Aufträge',
+        DocumentKind.deliveryNote => 'Lieferscheine',
       };
 
   static String emptyListText(DocumentKind kind) => switch (kind) {
         DocumentKind.invoice => 'Noch keine Rechnungsentwürfe.',
         DocumentKind.quote => 'Noch keine Angebotsentwürfe.',
         DocumentKind.order => 'Noch keine Auftragsentwürfe.',
+        DocumentKind.deliveryNote => 'Noch keine Lieferschein-Entwürfe.',
       };
 
   static String newFabLabel(DocumentKind kind) => switch (kind) {
         DocumentKind.invoice => 'Neue Rechnung',
         DocumentKind.quote => 'Neues Angebot',
         DocumentKind.order => 'Neuer Auftrag',
+        DocumentKind.deliveryNote => 'Neuer Lieferschein',
       };
 
   static String editorDraftTitle(DocumentKind kind) => switch (kind) {
         DocumentKind.invoice => 'Rechnung (Entwurf)',
         DocumentKind.quote => 'Angebot (Entwurf)',
         DocumentKind.order => 'Auftrag (Entwurf)',
+        DocumentKind.deliveryNote => 'Lieferschein (Entwurf)',
       };
 
   static String finalizeConfirmSentence(DocumentKind kind) => switch (kind) {
@@ -66,6 +71,8 @@ class DocumentLabels {
           'Das Angebot erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
         DocumentKind.order =>
           'Der Auftrag erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+        DocumentKind.deliveryNote =>
+          'Der Lieferschein erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
       };
 }
 
