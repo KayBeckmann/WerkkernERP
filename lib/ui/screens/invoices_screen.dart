@@ -9,13 +9,64 @@ import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import 'invoice_editor_screen.dart';
 
-/// Rechnungsliste (Entwürfe) der aktiven Firma (A2). Direkte Aktion
-/// "Kunde → neue Rechnung" ohne Angebot/Auftrag-Zwischenschritt.
+/// Dokumentliste (Entwürfe + finalisiert) der aktiven Firma. Seit A5
+/// generisch für alle drei [DocumentKind]s — Rechnung ist über den
+/// Default immer verfügbar (A0/A2), Angebot/Auftrag werden nur
+/// angezeigt, wenn die Firma das Modul aktiviert hat (Sichtbarkeit
+/// regelt `HomeShell`, nicht dieser Screen). Direkte Aktion "Kunde →
+/// neues Dokument" ohne Zwischenschritt.
 class InvoicesScreen extends StatefulWidget {
-  const InvoicesScreen({super.key});
+  const InvoicesScreen({super.key, this.kind = DocumentKind.invoice});
+
+  final DocumentKind kind;
 
   @override
   State<InvoicesScreen> createState() => _InvoicesScreenState();
+}
+
+/// Beschriftungen je Dokumentart — an einer Stelle gesammelt, damit
+/// Liste/Editor/PDF nicht je einzeln abweichen können.
+class DocumentLabels {
+  const DocumentLabels._();
+
+  static String title(DocumentKind kind) => switch (kind) {
+        DocumentKind.invoice => 'Rechnung',
+        DocumentKind.quote => 'Angebot',
+        DocumentKind.order => 'Auftrag',
+      };
+
+  static String plural(DocumentKind kind) => switch (kind) {
+        DocumentKind.invoice => 'Rechnungen',
+        DocumentKind.quote => 'Angebote',
+        DocumentKind.order => 'Aufträge',
+      };
+
+  static String emptyListText(DocumentKind kind) => switch (kind) {
+        DocumentKind.invoice => 'Noch keine Rechnungsentwürfe.',
+        DocumentKind.quote => 'Noch keine Angebotsentwürfe.',
+        DocumentKind.order => 'Noch keine Auftragsentwürfe.',
+      };
+
+  static String newFabLabel(DocumentKind kind) => switch (kind) {
+        DocumentKind.invoice => 'Neue Rechnung',
+        DocumentKind.quote => 'Neues Angebot',
+        DocumentKind.order => 'Neuer Auftrag',
+      };
+
+  static String editorDraftTitle(DocumentKind kind) => switch (kind) {
+        DocumentKind.invoice => 'Rechnung (Entwurf)',
+        DocumentKind.quote => 'Angebot (Entwurf)',
+        DocumentKind.order => 'Auftrag (Entwurf)',
+      };
+
+  static String finalizeConfirmSentence(DocumentKind kind) => switch (kind) {
+        DocumentKind.invoice =>
+          'Die Rechnung erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+        DocumentKind.quote =>
+          'Das Angebot erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+        DocumentKind.order =>
+          'Der Auftrag erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+      };
 }
 
 class _InvoicesScreenState extends State<InvoicesScreen> {
@@ -27,11 +78,17 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     _future = _load();
   }
 
+  @override
+  void didUpdateWidget(InvoicesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.kind != widget.kind) _reload();
+  }
+
   Future<_InvoicesData> _load() async {
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final invoiceRepo = context.read<InvoiceRepository>();
     final customerRepo = context.read<CustomerRepository>();
-    final invoices = await invoiceRepo.listAllForCompany(companyId);
+    final invoices = await invoiceRepo.listAllForCompany(companyId, kind: widget.kind);
     final customers = await customerRepo.listForCompany(companyId);
     final customerById = {for (final c in customers) c.id: c};
     final totalsById = <String, Money>{};
@@ -45,14 +102,16 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     );
   }
 
-  void _reload() => setState(() { _future = _load(); });
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<void> _createNew() async {
     // Frisch laden statt der gecachten Liste aus dem Tab-FutureBuilder:
     // da IndexedStack diesen Screen nie neu initialisiert, wäre ein
-    // Kunde, der NACH dem ersten Öffnen des Rechnungen-Tabs angelegt
-    // wurde, in der gecachten Liste sonst erst nach einem App-Neustart
-    // sichtbar (gefunden über einen Widget-Test, der genau diesen Ablauf
+    // Kunde, der NACH dem ersten Öffnen dieses Tabs angelegt wurde, in
+    // der gecachten Liste sonst erst nach einem App-Neustart sichtbar
+    // (gefunden über einen Widget-Test, der genau diesen Ablauf
     // nachstellt — kein theoretischer Fall).
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final customers = await context.read<CustomerRepository>().listForCompany(companyId);
@@ -69,7 +128,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     );
     if (customer == null || !mounted) return;
     await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => InvoiceEditorScreen(customer: customer)),
+      MaterialPageRoute(builder: (_) => InvoiceEditorScreen(customer: customer, kind: widget.kind)),
     );
     if (mounted) _reload();
   }
@@ -85,7 +144,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
           }
           final data = snapshot.data!;
           if (data.invoices.isEmpty) {
-            return const Center(child: Text('Noch keine Rechnungsentwürfe.'));
+            return Center(child: Text(DocumentLabels.emptyListText(widget.kind)));
           }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
@@ -111,7 +170,11 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                     if (customer == null) return;
                     await Navigator.of(context).push<bool>(
                       MaterialPageRoute(
-                        builder: (_) => InvoiceEditorScreen(customer: customer, invoice: invoice),
+                        builder: (_) => InvoiceEditorScreen(
+                          customer: customer,
+                          invoice: invoice,
+                          kind: widget.kind,
+                        ),
                       ),
                     );
                     if (mounted) _reload();
@@ -123,10 +186,10 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'invoices-fab',
+        heroTag: 'invoices-fab-${widget.kind.name}',
         onPressed: _createNew,
         icon: const Icon(Icons.add),
-        label: const Text('Neue Rechnung'),
+        label: Text(DocumentLabels.newFabLabel(widget.kind)),
       ),
     );
   }
