@@ -12,6 +12,7 @@ import 'data/repositories/number_sequence_repository.dart';
 import 'data/repositories/supplier_repository.dart';
 import 'domain/services/active_company_service.dart';
 import 'ui/screens/company_switcher_screen.dart';
+import 'ui/theme/app_theme.dart';
 
 void main() {
   runApp(const WerkkernErpApp());
@@ -65,7 +66,9 @@ class WerkkernErpApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'WerkkernERP',
-        theme: ThemeData(colorSchemeSeed: const Color(0xFF26415C), useMaterial3: true),
+        theme: buildAppTheme(brightness: Brightness.light),
+        darkTheme: buildAppTheme(brightness: Brightness.dark),
+        themeMode: ThemeMode.system,
         home: const CompanySwitcherScreen(),
       ),
     );
