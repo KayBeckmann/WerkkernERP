@@ -95,22 +95,25 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             return const Center(child: Text('Noch keine Artikel angelegt.'));
           }
           return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
             itemCount: data.articles.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final article = data.articles[index];
               final price = data.salePrices[article.id];
-              return ListTile(
-                leading: const Icon(Icons.inventory_2_outlined),
-                title: Text(article.name),
-                subtitle: Text(article.unit ?? ''),
-                trailing: Text(price?.toString() ?? '–'),
-                onTap: () async {
-                  await Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: article)),
-                  );
-                  _reload();
-                },
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.inventory_2_outlined),
+                  title: Text(article.name),
+                  subtitle: Text(article.unit ?? ''),
+                  trailing: Text(price?.toString() ?? '–'),
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: article)),
+                    );
+                    _reload();
+                  },
+                ),
               );
             },
           );

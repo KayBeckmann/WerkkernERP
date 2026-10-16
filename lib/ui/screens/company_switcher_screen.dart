@@ -46,8 +46,24 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
   @override
   Widget build(BuildContext context) {
     final service = context.watch<ActiveCompanyService>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseColor = isDark ? Colors.white : const Color(0xFF1E293B);
     return Scaffold(
-      appBar: AppBar(title: const Text('WerkkernERP — Firmen')),
+      appBar: AppBar(
+        title: RichText(
+          text: TextSpan(
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: baseColor),
+            children: [
+              TextSpan(text: 'Werkkern', style: TextStyle(color: baseColor)),
+              const TextSpan(text: 'ERP', style: TextStyle(color: Color(0xFF4F46E5))),
+              const TextSpan(
+                text: ' — Firmen',
+                style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.normal),
+              ),
+            ],
+          ),
+        ),
+      ),
       body: service.companies.isEmpty
           ? const Center(
               child: Padding(
@@ -60,15 +76,18 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
               ),
             )
           : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
               itemCount: service.companies.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final company = service.companies[index];
-                return ListTile(
-                  leading: const Icon(Icons.business_outlined),
-                  title: Text(company.name),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _openCompany(service, company),
+                return Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.business_outlined),
+                    title: Text(company.name),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _openCompany(service, company),
+                  ),
                 );
               },
             ),

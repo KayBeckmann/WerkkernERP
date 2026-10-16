@@ -80,32 +80,35 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             return const Center(child: Text('Noch keine Rechnungsentwürfe.'));
           }
           return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
             itemCount: data.invoices.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final invoice = data.invoices[index];
               final customer = data.customerById[invoice.customerId];
               final isFinalized = invoice.status == InvoiceStatus.finalized;
               final statusLabel = isFinalized ? invoice.invoiceNumber! : 'Entwurf';
-              return ListTile(
-                leading: Icon(
-                  isFinalized ? Icons.receipt_long : Icons.receipt_long_outlined,
-                  color: isFinalized ? Theme.of(context).colorScheme.primary : null,
+              return Card(
+                child: ListTile(
+                  leading: Icon(
+                    isFinalized ? Icons.receipt_long : Icons.receipt_long_outlined,
+                    color: isFinalized ? Theme.of(context).colorScheme.primary : null,
+                  ),
+                  title: Text(customer?.name ?? '(unbekannter Kunde)'),
+                  subtitle: Text(
+                    '$statusLabel — ${invoice.issueDate.toLocal().toString().split(' ').first}',
+                  ),
+                  trailing: Text(data.totalsById[invoice.id]?.toString() ?? '–'),
+                  onTap: () async {
+                    if (customer == null) return;
+                    await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => InvoiceEditorScreen(customer: customer, invoice: invoice),
+                      ),
+                    );
+                    if (mounted) _reload();
+                  },
                 ),
-                title: Text(customer?.name ?? '(unbekannter Kunde)'),
-                subtitle: Text(
-                  '$statusLabel — ${invoice.issueDate.toLocal().toString().split(' ').first}',
-                ),
-                trailing: Text(data.totalsById[invoice.id]?.toString() ?? '–'),
-                onTap: () async {
-                  if (customer == null) return;
-                  await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => InvoiceEditorScreen(customer: customer, invoice: invoice),
-                    ),
-                  );
-                  if (mounted) _reload();
-                },
               );
             },
           );

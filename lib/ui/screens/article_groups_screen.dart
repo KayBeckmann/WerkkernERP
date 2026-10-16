@@ -62,14 +62,17 @@ class _ArticleGroupsScreenState extends State<ArticleGroupsScreen> {
             return const Center(child: Text('Noch keine Artikelgruppen angelegt.'));
           }
           return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
             itemCount: groups.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final group = groups[index];
-              return ListTile(
-                leading: const Icon(Icons.category_outlined),
-                title: Text(group.name),
-                trailing: Text('+${group.markupPercent.toStringAsFixed(1)} %'),
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.category_outlined),
+                  title: Text(group.name),
+                  trailing: Text('+${group.markupPercent.toStringAsFixed(1)} %'),
+                ),
               );
             },
           );
