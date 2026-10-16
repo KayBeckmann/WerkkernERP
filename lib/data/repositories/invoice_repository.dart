@@ -31,6 +31,17 @@ class InvoiceItemInput {
   final String? groupLabel;
 }
 
+/// Erlaubte Umwandlungsziele je Quell-Dokumentart (Kay-Nachtrag
+/// 2026-10-16: "Angebot in Auftrag, Lieferschein oder Rechnung" /
+/// "Auftrag in Lieferschein oder Rechnung"). Rechnung und Lieferschein
+/// sind selbst keine gültigen Quellen — sie sind das Ende der Kette.
+/// Öffentlich (nicht `_`-privat), damit die UI dieselbe Zuordnung für
+/// das "Umwandeln"-Menü nutzen kann statt sie zu duplizieren.
+const allowedConversionTargets = <DocumentKind, Set<DocumentKind>>{
+  DocumentKind.quote: {DocumentKind.order, DocumentKind.deliveryNote, DocumentKind.invoice},
+  DocumentKind.order: {DocumentKind.deliveryNote, DocumentKind.invoice},
+};
+
 /// Rechnungen als Entwurf (A2) — Finalisierung/Nummernvergabe kommt erst
 /// mit A3. Jede Methode verlangt companyId und prüft sie (gleiche
 /// Isolation wie die übrigen A0/A1-Repositories).
@@ -40,6 +51,16 @@ class InvoiceRepository {
   final AppDatabase _db;
   final NumberSequenceRepository _numberSequences;
   static const _uuid = Uuid();
+
+  /// Lieferscheine dürfen keine Stunden-Positionen enthalten (Kay:
+  /// "Lieferscheine sollen KEINE Stunden enthalten!!!") — hier statt
+  /// nur in der UI durchgesetzt, damit kein Aufrufer das versehentlich
+  /// umgehen kann.
+  void _validateItemsForKind(DocumentKind kind, List<InvoiceItemInput> items) {
+    if (kind == DocumentKind.deliveryNote && items.any((i) => i.kind == InvoiceItemKind.hours)) {
+      throw ArgumentError('Ein Lieferschein darf keine Stunden-Positionen enthalten.');
+    }
+  }
 
   Future<List<Invoice>> listDraftsForCompany(
     String companyId, {
@@ -92,6 +113,7 @@ class InvoiceRepository {
     String? notes,
     List<InvoiceItemInput> items = const [],
   }) async {
+    _validateItemsForKind(kind, items);
     final id = _uuid.v4();
     final now = DateTime.now();
     return _db.transaction(() async {
@@ -130,6 +152,7 @@ class InvoiceRepository {
     return _db.transaction(() async {
       final existing = await findById(companyId: companyId, id: id);
       if (existing == null || existing.status != InvoiceStatus.draft) return null;
+      if (items != null) _validateItemsForKind(existing.kind, items);
 
       await (_db.update(_db.invoices)..where((i) => i.id.equals(id)))
           .write(
@@ -208,6 +231,85 @@ class InvoiceRepository {
       return findById(companyId: companyId, id: id);
     });
   }
+
+  /// Wandelt ein **finalisiertes** Angebot/Auftrag in einen neuen
+  /// **Entwurf** einer anderen Dokumentart um (Kay-Nachtrag
+  /// 2026-10-16). Erzeugt bewusst einen Entwurf statt direkt zu
+  /// finalisieren — der Nutzer kann Positionen/Daten vor dem endgültigen
+  /// Abschluss noch prüfen und anpassen, exakt wie bei jedem anderen
+  /// neuen Dokument. Stunden-Positionen werden beim Umwandeln in einen
+  /// Lieferschein automatisch **weggelassen** statt die Umwandlung ganz
+  /// zu verweigern (Kay: "Lieferscheine ... KEINE Stunden" ist eine
+  /// Regel für den Lieferschein selbst, keine Blockade der Umwandlung).
+  ///
+  /// Wirft [ArgumentError] bei einer nicht erlaubten Umwandlung (siehe
+  /// [allowedConversionTargets]) und [StateError], wenn die Quelle
+  /// nicht existiert oder noch nicht finalisiert ist. `null` wird nie
+  /// zurückgegeben — anders als bei [finalize] ist ein ungültiger
+  /// Aufruf hier immer ein Programmfehler des Aufrufers, kein normaler
+  /// "nichts zu tun"-Fall.
+  Future<Invoice> convertTo({
+    required String companyId,
+    required String sourceId,
+    required DocumentKind targetKind,
+  }) async {
+    return _db.transaction(() async {
+      final source = await findById(companyId: companyId, id: sourceId);
+      if (source == null) {
+        throw StateError('Quelldokument $sourceId existiert nicht in Firma $companyId.');
+      }
+      if (source.status != InvoiceStatus.finalized) {
+        throw StateError('Nur finalisierte Dokumente können umgewandelt werden.');
+      }
+      final allowed = allowedConversionTargets[source.kind] ?? const {};
+      if (!allowed.contains(targetKind)) {
+        throw ArgumentError(
+          'Umwandlung von ${source.kind.name} nach ${targetKind.name} ist nicht erlaubt.',
+        );
+      }
+
+      final sourceItems = await itemsFor(sourceId);
+      final newItems = [
+        for (final item in sourceItems)
+          if (!(targetKind == DocumentKind.deliveryNote && item.kind == InvoiceItemKind.hours))
+            InvoiceItemInput(
+              kind: item.kind,
+              articleId: item.articleId,
+              description: item.description,
+              quantity: Decimal.parse(item.quantity),
+              unitPriceCents: item.unitPriceCents,
+              vatRatePercent: item.vatRatePercent,
+              groupLabel: item.groupLabel,
+            ),
+      ];
+
+      final id = _uuid.v4();
+      final now = DateTime.now();
+      await _db.into(_db.invoices).insert(
+            InvoicesCompanion.insert(
+              id: id,
+              companyId: companyId,
+              customerId: source.customerId,
+              kind: Value(targetKind),
+              status: InvoiceStatus.draft,
+              issueDate: now,
+              serviceDate: source.serviceDate,
+              paymentTerms: Value(source.paymentTerms),
+              notes: Value(source.notes),
+              convertedFromId: Value(sourceId),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await _replaceItems(id, newItems);
+      return (await findById(companyId: companyId, id: id))!;
+    });
+  }
+
+  /// Alle Dokumente, die per [convertTo] aus [sourceId] entstanden sind
+  /// — für die Anzeige "Daraus erstellt: ..." auf dem Quelldokument.
+  Future<List<Invoice>> listConvertedFrom(String sourceId) =>
+      (_db.select(_db.invoices)..where((i) => i.convertedFromId.equals(sourceId))).get();
 
   Future<bool> deleteDraft({required String companyId, required String id}) async {
     final existing = await findById(companyId: companyId, id: id);

@@ -22,6 +22,7 @@ class Companies extends Table {
   /// bleibt ohne Zusatzschritt direkt nutzbar (A0-Prinzip).
   BoolColumn get quotesEnabled => boolean().withDefault(const Constant(false))();
   BoolColumn get ordersEnabled => boolean().withDefault(const Constant(false))();
+  BoolColumn get deliveryNotesEnabled => boolean().withDefault(const Constant(false))();
 
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Gelten
@@ -149,14 +150,17 @@ enum InvoiceItemKind { article, hours, text }
 /// (Roadmap F3).
 enum InvoiceStatus { draft, finalized }
 
-/// Dokumentart (A5). Rechnung ("R") existiert seit A2/A3; Angebot
-/// ("An") und Auftrag ("A") kommen mit A5 dazu — gleiche Tabelle/
-/// Positionslogik/Finalisierung wie die Rechnung (Roadmap: Positions-
-/// gruppen werden dort ebenfalls benötigt), aber eigene Nummernkreise
-/// (nie mit dem Rechnungszähler vermischt) und ein eigenes PDF-Layout
-/// je Dokumentart. Keine Konvertierung Angebot→Auftrag→Rechnung in A5
-/// — das ist explizit erst eine spätere C-Phase-Entscheidung.
-enum DocumentKind { invoice, quote, order }
+/// Dokumentart. Rechnung ("R") existiert seit A2/A3; Angebot ("An")
+/// und Auftrag ("A") kamen mit A5 dazu; Lieferschein ("LS") mit dem
+/// Kay-Nachtrag 2026-10-16 — gleiche Tabelle/Positionslogik/
+/// Finalisierung wie die Rechnung, aber eigene Nummernkreise (nie
+/// vermischt) und ein eigenes PDF-Layout je Dokumentart. Ein
+/// Lieferschein darf **keine** Stunden-Positionen enthalten (Kay:
+/// "Lieferscheine sollen KEINE Stunden enthalten!!!") — durchgesetzt
+/// in `InvoiceRepository.createDraft()`/`update()`, nicht nur in der
+/// UI. Konvertierung Angebot→Auftrag/Lieferschein/Rechnung und
+/// Auftrag→Lieferschein/Rechnung über `InvoiceRepository.convertTo()`.
+enum DocumentKind { invoice, quote, order, deliveryNote }
 
 class Invoices extends Table {
   TextColumn get id => text()();
@@ -208,6 +212,20 @@ class Invoices extends Table {
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
+  /// Zeigt auf das **Quelldokument**, aus dem diese Zeile per
+  /// `InvoiceRepository.convertTo()` erzeugt wurde (Kay-Nachtrag
+  /// 2026-10-16: "Finalisierte Dokumente muss man wandeln können —
+  /// Angebot in Auftrag, Lieferschein oder Rechnung"). `null` für
+  /// eigenständig angelegte Dokumente. Bewusst ein einziges rückwärts
+  /// zeigendes Feld statt eines eigenen Fremdschlüssels je möglicher
+  /// Zielart (wie bei RechnungsFee) — ein Angebot kann so sowohl in
+  /// einen Auftrag **als auch** separat in einen Lieferschein
+  /// umgewandelt werden, beide neuen Zeilen zeigen einfach auf
+  /// dasselbe Quelldokument zurück; `onDelete: setNull` ist nur
+  /// defensiv, finalisierte Dokumente werden in der UI nie gelöscht.
+  TextColumn get convertedFromId =>
+      text().nullable().references(Invoices, #id, onDelete: KeyAction.setNull)();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -245,8 +263,8 @@ class NumberSequences extends Table {
   TextColumn get companyId =>
       text().references(Companies, #id, onDelete: KeyAction.cascade)();
 
-  /// `DocumentKind.name`, also "invoice"/"quote"/"order" (Präfixe "R"/
-  /// "An"/"A", seit A5). Gutschrift ("G") kommt erst mit Phase C.
+  /// `DocumentKind.name`, also "invoice"/"quote"/"order"/"deliveryNote"
+  /// (Präfixe "R"/"An"/"A"/"LS"). Gutschrift ("G") kommt erst mit Phase C.
   TextColumn get documentType => text()();
   IntColumn get year => integer()();
   IntColumn get lastNumber => integer().withDefault(const Constant(0))();

@@ -33,6 +33,7 @@ void main() {
         finalizedAt: invoiceNumber == null ? null : DateTime.now(),
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        convertedFromId: null,
       );
 
   Company testCompany({String? pdfIntroText, String? pdfClosingText, String? pdfFooterText}) => Company(
@@ -47,6 +48,7 @@ void main() {
         createdAt: DateTime.now(),
         quotesEnabled: false,
         ordersEnabled: false,
+        deliveryNotesEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,
@@ -158,4 +160,23 @@ void main() {
       },
     );
   }
+
+  test(
+    'Kay-Nachtrag 2026-10-16: Lieferschein-PDF wird ohne Fehler erzeugt, auch mit mehreren '
+    'Positionen/Gruppen (Preise/Summen werden intern weggelassen, hier nur auf Fehlerfreiheit '
+    'geprüft — Sichtprüfung des Layouts bleibt Teil der manuellen Prüfstrategie)',
+    () async {
+      final invoice = draftInvoice(invoiceNumber: 'LS-26001', kind: DocumentKind.deliveryNote);
+      final bytes = await buildInvoicePdf(
+        invoice: invoice,
+        items: [
+          item(description: 'Kabel NYM-J 3x1,5', quantity: '50', price: 150),
+          item(description: 'Steckdose', quantity: '4', price: 850),
+        ],
+        company: testCompany(),
+      );
+      expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
+      expect(bytes.length, greaterThan(1000));
+    },
+  );
 }

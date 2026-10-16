@@ -29,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -65,6 +65,11 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.pdfIntroText);
             await migrator.addColumn(companies, companies.pdfClosingText);
             await migrator.addColumn(companies, companies.pdfFooterText);
+          }
+          if (from < 5) {
+            // Kay-Nachtrag 2026-10-16: Lieferschein + Dokumentumwandlung.
+            await migrator.addColumn(companies, companies.deliveryNotesEnabled);
+            await migrator.addColumn(invoices, invoices.convertedFromId);
           }
         },
       );

@@ -24,7 +24,7 @@ import 'suppliers_screen.dart';
 /// Einstellungen von Index 4 auf Index 5 rutschte). Die ID bleibt
 /// stabil, die tatsächliche Listenposition wird bei jedem Build neu
 /// aufgelöst.
-enum _TabId { invoice, quote, order, customers, articles, suppliers, settings }
+enum _TabId { invoice, quote, order, deliveryNote, customers, articles, suppliers, settings }
 
 /// Ein Navigationseintrag der Shell. Angebot/Auftrag (A5) sind nur
 /// Instanzen von [InvoicesScreen] mit anderer [DocumentKind] — die
@@ -111,6 +111,14 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.assignment_outlined,
             title: 'Aufträge',
             screen: InvoicesScreen(kind: DocumentKind.order),
+            section: _Section.fakturierung,
+          ),
+        if (company.deliveryNotesEnabled)
+          const _Tab(
+            id: _TabId.deliveryNote,
+            icon: Icons.outbox_outlined,
+            title: 'Lieferscheine',
+            screen: InvoicesScreen(kind: DocumentKind.deliveryNote),
             section: _Section.fakturierung,
           ),
         const _Tab(

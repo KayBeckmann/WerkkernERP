@@ -128,9 +128,10 @@ Future<Uint8List> _buildPdf({
           pw.SizedBox(height: 12),
         ],
         pw.SizedBox(height: 16),
-        for (final key in orderedKeys) ..._buildGroup(key, groups[key]!),
+        for (final key in orderedKeys)
+          ..._buildGroup(key, groups[key]!, showPrices: invoice.kind != DocumentKind.deliveryNote),
         pw.SizedBox(height: 16),
-        _buildTotals(totals),
+        if (invoice.kind != DocumentKind.deliveryNote) _buildTotals(totals),
         if (invoice.paymentTerms != null) ...[
           pw.SizedBox(height: 16),
           pw.Text(invoice.paymentTerms!, style: const pw.TextStyle(fontSize: 10)),
@@ -152,13 +153,20 @@ Future<Uint8List> _buildPdf({
   return doc.save();
 }
 
-/// Titel je Dokumentart (A5) — "Rechnungsdatum"/"Angebotsdatum"/
-/// "Auftragsdatum" bilden sich daraus grammatisch korrekt per
-/// Kompositum (`'${_title(kind)}sdatum'`).
+/// Titel je Dokumentart.
 String _title(DocumentKind kind) => switch (kind) {
       DocumentKind.invoice => 'Rechnung',
       DocumentKind.quote => 'Angebot',
       DocumentKind.order => 'Auftrag',
+      DocumentKind.deliveryNote => 'Lieferschein',
+    };
+
+/// "Rechnungsdatum"/"Angebotsdatum"/"Auftragsdatum"/"Lieferscheindatum"
+/// — kein einheitliches Kompositum-Muster (Lieferschein nimmt kein
+/// Fugen-s), daher eine eigene Funktion statt `'${_title(kind)}sdatum'`.
+String _dateLabel(DocumentKind kind) => switch (kind) {
+      DocumentKind.deliveryNote => 'Lieferscheindatum',
+      _ => '${_title(kind)}sdatum',
     };
 
 pw.Widget _buildHeader(Invoice invoice, {required bool isPreview}) {
@@ -204,7 +212,7 @@ pw.Widget _buildHeader(Invoice invoice, {required bool isPreview}) {
                 isPreview ? '$title (Entwurf)' : '$title ${invoice.invoiceNumber}',
                 style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
               ),
-              pw.Text('${title}sdatum: ${_formatDate(invoice.issueDate)}'),
+              pw.Text('${_dateLabel(invoice.kind)}: ${_formatDate(invoice.issueDate)}'),
               pw.Text('Leistungsdatum: ${_formatDate(invoice.serviceDate)}'),
             ],
           ),
@@ -221,7 +229,7 @@ pw.Widget _buildHeader(Invoice invoice, {required bool isPreview}) {
   );
 }
 
-List<pw.Widget> _buildGroup(String? groupLabel, List<InvoiceItem> items) {
+List<pw.Widget> _buildGroup(String? groupLabel, List<InvoiceItem> items, {required bool showPrices}) {
   return [
     if (groupLabel != null)
       pw.Padding(
@@ -230,53 +238,65 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<InvoiceItem> items) {
       ),
     pw.Table(
       border: null,
-      columnWidths: const {
-        0: pw.FlexColumnWidth(4),
-        1: pw.FlexColumnWidth(1.2),
-        2: pw.FlexColumnWidth(1.5),
-        3: pw.FlexColumnWidth(1),
-        4: pw.FlexColumnWidth(1.5),
-      },
+      // Lieferschein (Kay-Nachtrag 2026-10-16) zeigt bewusst keine
+      // Preise/Steuersätze — nur Beschreibung und Menge, wie bei einem
+      // Lieferschein üblich (Kunde bekommt keinen Preis auf dem Beleg,
+      // mit dem die Ware/Leistung übergeben wird).
+      columnWidths: showPrices
+          ? const {
+              0: pw.FlexColumnWidth(4),
+              1: pw.FlexColumnWidth(1.2),
+              2: pw.FlexColumnWidth(1.5),
+              3: pw.FlexColumnWidth(1),
+              4: pw.FlexColumnWidth(1.5),
+            }
+          : const {0: pw.FlexColumnWidth(5), 1: pw.FlexColumnWidth(1.2)},
       children: [
         pw.TableRow(
           decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(width: 0.5))),
-          children: [
-            _cell('Beschreibung', bold: true),
-            _cell('Menge', bold: true, alignRight: true),
-            _cell('Einzelpreis', bold: true, alignRight: true),
-            _cell('MwSt.', bold: true, alignRight: true),
-            _cell('Gesamt', bold: true, alignRight: true),
-          ],
+          children: showPrices
+              ? [
+                  _cell('Beschreibung', bold: true),
+                  _cell('Menge', bold: true, alignRight: true),
+                  _cell('Einzelpreis', bold: true, alignRight: true),
+                  _cell('MwSt.', bold: true, alignRight: true),
+                  _cell('Gesamt', bold: true, alignRight: true),
+                ]
+              : [_cell('Beschreibung', bold: true), _cell('Menge', bold: true, alignRight: true)],
         ),
         for (final item in items)
           pw.TableRow(
-            children: [
-              _cell(item.description),
-              _cell(item.quantity, alignRight: true),
-              _cell(Money.fromCents(item.unitPriceCents).toString(), alignRight: true),
-              _cell('${item.vatRatePercent.toStringAsFixed(0)} %', alignRight: true),
-              _cell(
-                Money.fromCents(item.unitPriceCents)
-                    .multiplyByQuantity(Decimal.parse(item.quantity))
-                    .toString(),
-                alignRight: true,
-              ),
-            ],
+            children: showPrices
+                ? [
+                    _cell(item.description),
+                    _cell(item.quantity, alignRight: true),
+                    _cell(Money.fromCents(item.unitPriceCents).toString(), alignRight: true),
+                    _cell('${item.vatRatePercent.toStringAsFixed(0)} %', alignRight: true),
+                    _cell(
+                      Money.fromCents(item.unitPriceCents)
+                          .multiplyByQuantity(Decimal.parse(item.quantity))
+                          .toString(),
+                      alignRight: true,
+                    ),
+                  ]
+                : [_cell(item.description), _cell(item.quantity, alignRight: true)],
           ),
       ],
     ),
     // Gruppensumme (Kay-Nachtrag 2026-10-16) — derselbe Rechenkern wie
-    // die Gesamtsumme, nur auf diese Gruppe beschränkt.
-    pw.Align(
-      alignment: pw.Alignment.centerRight,
-      child: pw.Padding(
-        padding: const pw.EdgeInsets.only(top: 2, bottom: 4),
-        child: pw.Text(
-          'Gruppensumme: ${_groupTotal(items)}',
-          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+    // die Gesamtsumme, nur auf diese Gruppe beschränkt. Entfällt beim
+    // Lieferschein zusammen mit den übrigen Preisangaben.
+    if (showPrices)
+      pw.Align(
+        alignment: pw.Alignment.centerRight,
+        child: pw.Padding(
+          padding: const pw.EdgeInsets.only(top: 2, bottom: 4),
+          child: pw.Text(
+            'Gruppensumme: ${_groupTotal(items)}',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
         ),
       ),
-    ),
   ];
 }
 

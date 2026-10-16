@@ -178,6 +178,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       context: context,
       articles: _articles,
       existingGroupLabels: _existingGroupLabels,
+      allowHours: _kind != DocumentKind.deliveryNote,
     );
     if (result == null) return;
     setState(() {
@@ -204,6 +205,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       articles: _articles,
       existingGroupLabels: _existingGroupLabels,
       existing: item.toResult(),
+      allowHours: _kind != DocumentKind.deliveryNote,
     );
     if (result == null) return;
     setState(() {
@@ -259,6 +261,37 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Wandelt das aktuelle (finalisierte) Dokument in einen neuen Entwurf
+  /// einer anderen Dokumentart um (Kay-Nachtrag 2026-10-16) und öffnet
+  /// diesen sofort zur Durchsicht — bewusst **kein** automatisches
+  /// Finalisieren, der Nutzer prüft/ergänzt erst wie bei jedem anderen
+  /// neuen Dokument (siehe Doc-Kommentar bei `InvoiceRepository.convertTo`).
+  Future<void> _convertTo(DocumentKind targetKind) async {
+    final invoice = _currentInvoice;
+    if (invoice == null) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final repo = context.read<InvoiceRepository>();
+    try {
+      final draft = await repo.convertTo(
+        companyId: companyId,
+        sourceId: invoice.id,
+        targetKind: targetKind,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => InvoiceEditorScreen(customer: widget.customer, invoice: draft),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Umwandeln nicht möglich: $e')),
+        );
+      }
     }
   }
 
@@ -440,8 +473,21 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               icon: const Icon(Icons.picture_as_pdf_outlined),
               tooltip: 'PDF teilen',
               onPressed: _sharePdf,
-            )
-          else ...[
+            ),
+          if (isFinalized && (allowedConversionTargets[_kind]?.isNotEmpty ?? false))
+            PopupMenuButton<DocumentKind>(
+              icon: const Icon(Icons.sync_alt_outlined),
+              tooltip: 'Umwandeln',
+              itemBuilder: (context) => [
+                for (final target in allowedConversionTargets[_kind]!)
+                  PopupMenuItem(
+                    value: target,
+                    child: Text('In ${DocumentLabels.title(target)} umwandeln'),
+                  ),
+              ],
+              onSelected: _convertTo,
+            ),
+          if (!isFinalized) ...[
             IconButton(
               icon: const Icon(Icons.visibility_outlined),
               tooltip: 'Vorschau (unverbindlich)',
