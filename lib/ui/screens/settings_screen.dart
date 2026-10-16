@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/repositories/company_repository.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/theme_preference_service.dart';
 import 'backup_screen.dart';
 
 /// Einstellungen der aktiven Firma: Modul-Schalter (A5: Angebot/Auftrag
@@ -93,9 +94,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final company = context.watch<ActiveCompanyService>().active;
     if (company == null) return const SizedBox.shrink();
 
+    final themePreference = context.watch<ThemePreferenceService>();
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: [
+        // Design (Kay-Nachtrag 2026-10-16: "Design in den Einstellungen
+        // konfigurieren — Hell/Dunkel/System") — bewusst eine Geräte-,
+        // keine Firmeneinstellung, siehe Doc-Kommentar bei
+        // ThemePreferenceService.
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Design', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 12),
+                SegmentedButton<ThemeMode>(
+                  segments: const [
+                    ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode_outlined), label: Text('Hell')),
+                    ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode_outlined), label: Text('Dunkel')),
+                    ButtonSegment(
+                      value: ThemeMode.system,
+                      icon: Icon(Icons.brightness_auto_outlined),
+                      label: Text('System'),
+                    ),
+                  ],
+                  selected: {themePreference.mode},
+                  onSelectionChanged: (selection) => themePreference.setMode(selection.first),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         Card(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),

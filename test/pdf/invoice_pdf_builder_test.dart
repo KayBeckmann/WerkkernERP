@@ -54,7 +54,13 @@ void main() {
         pdfFooterText: pdfFooterText,
       );
 
-  InvoiceItem item({required String description, String quantity = '1', int price = 10000}) =>
+  InvoiceItem item({
+    required String description,
+    String quantity = '1',
+    int price = 10000,
+    String? unit,
+    double discountPercent = 0,
+  }) =>
       InvoiceItem(
         id: 'item-1',
         invoiceId: 'inv-1',
@@ -64,6 +70,8 @@ void main() {
         quantity: quantity,
         unitPriceCents: price,
         vatRatePercent: 19,
+        unit: unit,
+        discountPercent: discountPercent,
         groupLabel: null,
         sortOrder: 0,
       );

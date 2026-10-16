@@ -68,6 +68,7 @@ Future<Uint8List> _buildPdf({
         quantity: Decimal.parse(item.quantity),
         unitPriceCents: item.unitPriceCents,
         vatRatePercent: item.vatRatePercent,
+        discountPercent: item.discountPercent,
       ),
   ]);
 
@@ -264,23 +265,7 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<InvoiceItem> items, {requir
                 ]
               : [_cell('Beschreibung', bold: true), _cell('Menge', bold: true, alignRight: true)],
         ),
-        for (final item in items)
-          pw.TableRow(
-            children: showPrices
-                ? [
-                    _cell(item.description),
-                    _cell(item.quantity, alignRight: true),
-                    _cell(Money.fromCents(item.unitPriceCents).toString(), alignRight: true),
-                    _cell('${item.vatRatePercent.toStringAsFixed(0)} %', alignRight: true),
-                    _cell(
-                      Money.fromCents(item.unitPriceCents)
-                          .multiplyByQuantity(Decimal.parse(item.quantity))
-                          .toString(),
-                      alignRight: true,
-                    ),
-                  ]
-                : [_cell(item.description), _cell(item.quantity, alignRight: true)],
-          ),
+        for (final item in items) ..._buildItemRows(item, showPrices: showPrices),
       ],
     ),
     // Gruppensumme (Kay-Nachtrag 2026-10-16) — derselbe Rechenkern wie
@@ -300,12 +285,67 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<InvoiceItem> items, {requir
   ];
 }
 
+/// Eine Positionszeile (+ optionale Rabatt-Detailzeile darunter, analog
+/// zu RechnungsFees Darstellung — nur als Layout-Anregung angeschaut,
+/// keine Code-/Text-Übernahme). Menge und Einheit werden in einer
+/// Zelle zusammengefasst ("10 Stk"), um keine zusätzliche, auf A4 eng
+/// werdende Spalte zu brauchen.
+List<pw.TableRow> _buildItemRows(InvoiceItem item, {required bool showPrices}) {
+  final quantityLabel = item.unit == null ? item.quantity : '${item.quantity} ${item.unit}';
+  final grossBeforeDiscount =
+      Money.fromCents(item.unitPriceCents).multiplyByQuantity(Decimal.parse(item.quantity));
+  final netAfterDiscount = item.discountPercent == 0
+      ? grossBeforeDiscount
+      : grossBeforeDiscount - grossBeforeDiscount.applyPercent(item.discountPercent);
+  final lineGrossWithTax = netAfterDiscount + netAfterDiscount.applyPercent(item.vatRatePercent);
+
+  return [
+    pw.TableRow(
+      children: showPrices
+          ? [
+              _cell(item.description),
+              _cell(quantityLabel, alignRight: true),
+              _cell(Money.fromCents(item.unitPriceCents).toString(), alignRight: true),
+              _cell('${item.vatRatePercent.toStringAsFixed(0)} %', alignRight: true),
+              _cell(lineGrossWithTax.toString(), alignRight: true),
+            ]
+          : [_cell(item.description), _cell(quantityLabel, alignRight: true)],
+    ),
+    // Rabatt-Detailzeile (Kay-Nachtrag 2026-10-16) — nur wenn gesetzt,
+    // zeigt Prozentsatz und den tatsächlich abgezogenen Betrag.
+    if (showPrices && item.discountPercent > 0)
+      pw.TableRow(
+        children: [
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 8, bottom: 3),
+            child: pw.Text(
+              '${item.discountPercent.toStringAsFixed(0)} % Rabatt',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+          ),
+          pw.Container(),
+          pw.Container(),
+          pw.Container(),
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 3),
+            child: pw.Text(
+              '− ${(grossBeforeDiscount + grossBeforeDiscount.applyPercent(item.vatRatePercent) - lineGrossWithTax)}',
+              textAlign: pw.TextAlign.right,
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+          ),
+        ],
+      ),
+  ];
+}
+
 Money _groupTotal(List<InvoiceItem> items) => calculateInvoiceTotals([
       for (final item in items)
         InvoiceLineInput(
           quantity: Decimal.parse(item.quantity),
           unitPriceCents: item.unitPriceCents,
           vatRatePercent: item.vatRatePercent,
+          discountPercent: item.discountPercent,
         ),
     ]).totalGross;
 

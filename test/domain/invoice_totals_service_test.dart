@@ -45,6 +45,43 @@ void main() {
     expect(totals.sortedRates, isEmpty);
   });
 
+  test(
+    'Kay-Nachtrag 2026-10-16: Rabatt pro Position wirkt auf den Netto-Betrag vor der '
+    'Steuerberechnung — 100€ netto, 10% Rabatt, 19% MwSt. -> 90€ netto, 17,10€ Steuer',
+    () {
+      final totals = calculateInvoiceTotals([
+        InvoiceLineInput(
+          quantity: Decimal.one,
+          unitPriceCents: 10000,
+          vatRatePercent: 19,
+          discountPercent: 10,
+        ),
+      ]);
+      expect(totals.netByRate[19], Money.fromCents(9000));
+      expect(totals.taxByRate[19], Money.fromCents(1710));
+      expect(totals.totalGross, Money.fromCents(10710));
+    },
+  );
+
+  test('Rabatt 0 % (Default) verändert den Betrag nicht', () {
+    final line = InvoiceLineInput(quantity: Decimal.one, unitPriceCents: 10000, vatRatePercent: 19);
+    expect(line.lineNet, Money.fromCents(10000));
+  });
+
+  test('Rabatt wirkt auf mehrere Positionen unabhängig — nur die rabattierte Position sinkt', () {
+    final totals = calculateInvoiceTotals([
+      InvoiceLineInput(quantity: Decimal.one, unitPriceCents: 10000, vatRatePercent: 19),
+      InvoiceLineInput(
+        quantity: Decimal.one,
+        unitPriceCents: 10000,
+        vatRatePercent: 19,
+        discountPercent: 50,
+      ),
+    ]);
+    // 100€ ohne Rabatt + 50€ nach 50% Rabatt = 150€ netto in derselben Satzgruppe.
+    expect(totals.netByRate[19], Money.fromCents(15000));
+  });
+
   test('sortedRates liefert Sätze aufsteigend für eine stabile Anzeige', () {
     final totals = calculateInvoiceTotals([
       InvoiceLineInput(quantity: Decimal.one, unitPriceCents: 100, vatRatePercent: 19),

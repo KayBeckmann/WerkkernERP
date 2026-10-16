@@ -103,6 +103,40 @@ void main() {
     },
   );
 
+  test(
+    'Kay-Nachtrag 2026-10-16: Einheit und Rabatt pro Position werden gespeichert, beim '
+    'erneuten Laden übernommen und fließen korrekt in totalsFor() ein',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final invoice = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        items: [
+          InvoiceItemInput(
+            kind: InvoiceItemKind.article,
+            description: 'Kabel NYM-J 3x1,5',
+            quantity: Decimal.fromInt(50),
+            unitPriceCents: 150,
+            vatRatePercent: 19,
+            unit: 'm',
+            discountPercent: 10,
+          ),
+        ],
+      );
+
+      final items = await invoices.itemsFor(invoice.id);
+      expect(items.single.unit, 'm');
+      expect(items.single.discountPercent, 10);
+
+      // 50 * 1,50€ = 75,00€ netto vor Rabatt; 10% Rabatt -> 67,50€ netto.
+      final totals = await invoices.totalsFor(invoice.id);
+      expect(totals.netByRate[19], Money.fromCents(6750));
+    },
+  );
+
   test('Freitext- und Stundenposition sind ohne Artikelstamm möglich (articleId null)', () async {
     final company = await companies.create(name: 'Firma A');
     final customer = await customers.create(companyId: company.id, name: 'Kunde');

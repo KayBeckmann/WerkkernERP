@@ -4976,6 +4976,27 @@ class $InvoiceItemsTable extends InvoiceItems
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _discountPercentMeta = const VerificationMeta(
+    'discountPercent',
+  );
+  @override
+  late final GeneratedColumn<double> discountPercent = GeneratedColumn<double>(
+    'discount_percent',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _groupLabelMeta = const VerificationMeta(
     'groupLabel',
   );
@@ -5008,6 +5029,8 @@ class $InvoiceItemsTable extends InvoiceItems
     quantity,
     unitPriceCents,
     vatRatePercent,
+    unit,
+    discountPercent,
     groupLabel,
     sortOrder,
   ];
@@ -5083,6 +5106,21 @@ class $InvoiceItemsTable extends InvoiceItems
     } else if (isInserting) {
       context.missing(_vatRatePercentMeta);
     }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('discount_percent')) {
+      context.handle(
+        _discountPercentMeta,
+        discountPercent.isAcceptableOrUnknown(
+          data['discount_percent']!,
+          _discountPercentMeta,
+        ),
+      );
+    }
     if (data.containsKey('group_label')) {
       context.handle(
         _groupLabelMeta,
@@ -5140,6 +5178,14 @@ class $InvoiceItemsTable extends InvoiceItems
         DriftSqlType.double,
         data['${effectivePrefix}vat_rate_percent'],
       )!,
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      ),
+      discountPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}discount_percent'],
+      )!,
       groupLabel: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}group_label'],
@@ -5173,6 +5219,18 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
   final int unitPriceCents;
   final double vatRatePercent;
 
+  /// Einheit (z. B. "Stk", "h", "m", "pauschal") — Kay-Nachtrag
+  /// 2026-10-16: "Es fehlen Details" beim Vergleich mit RechnungsFee.
+  /// `null` = keine Einheit angegeben (z. B. Freitext-Pauschalposten).
+  final String? unit;
+
+  /// Rabatt in Prozent auf diese Position (Kay-Nachtrag 2026-10-16,
+  /// analog zu RechnungsFees `rabatt_prozent` — nur als fachliche
+  /// Anregung angeschaut, keine Code-/Text-Übernahme). Wird auf den
+  /// Netto-Betrag **vor** Steuerberechnung angewendet, siehe
+  /// `InvoiceLineInput.lineNet`.
+  final double discountPercent;
+
   /// Positionsgruppe (z. B. "Elektroinstallation EG") — ungleich der
   /// Artikelgruppe im Stamm. `null` = ungruppierte Position.
   final String? groupLabel;
@@ -5186,6 +5244,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     required this.quantity,
     required this.unitPriceCents,
     required this.vatRatePercent,
+    this.unit,
+    required this.discountPercent,
     this.groupLabel,
     required this.sortOrder,
   });
@@ -5206,6 +5266,10 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     map['quantity'] = Variable<String>(quantity);
     map['unit_price_cents'] = Variable<int>(unitPriceCents);
     map['vat_rate_percent'] = Variable<double>(vatRatePercent);
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    map['discount_percent'] = Variable<double>(discountPercent);
     if (!nullToAbsent || groupLabel != null) {
       map['group_label'] = Variable<String>(groupLabel);
     }
@@ -5225,6 +5289,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
       quantity: Value(quantity),
       unitPriceCents: Value(unitPriceCents),
       vatRatePercent: Value(vatRatePercent),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      discountPercent: Value(discountPercent),
       groupLabel: groupLabel == null && nullToAbsent
           ? const Value.absent()
           : Value(groupLabel),
@@ -5248,6 +5314,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
       quantity: serializer.fromJson<String>(json['quantity']),
       unitPriceCents: serializer.fromJson<int>(json['unitPriceCents']),
       vatRatePercent: serializer.fromJson<double>(json['vatRatePercent']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      discountPercent: serializer.fromJson<double>(json['discountPercent']),
       groupLabel: serializer.fromJson<String?>(json['groupLabel']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
     );
@@ -5266,6 +5334,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
       'quantity': serializer.toJson<String>(quantity),
       'unitPriceCents': serializer.toJson<int>(unitPriceCents),
       'vatRatePercent': serializer.toJson<double>(vatRatePercent),
+      'unit': serializer.toJson<String?>(unit),
+      'discountPercent': serializer.toJson<double>(discountPercent),
       'groupLabel': serializer.toJson<String?>(groupLabel),
       'sortOrder': serializer.toJson<int>(sortOrder),
     };
@@ -5280,6 +5350,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     String? quantity,
     int? unitPriceCents,
     double? vatRatePercent,
+    Value<String?> unit = const Value.absent(),
+    double? discountPercent,
     Value<String?> groupLabel = const Value.absent(),
     int? sortOrder,
   }) => InvoiceItem(
@@ -5291,6 +5363,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     quantity: quantity ?? this.quantity,
     unitPriceCents: unitPriceCents ?? this.unitPriceCents,
     vatRatePercent: vatRatePercent ?? this.vatRatePercent,
+    unit: unit.present ? unit.value : this.unit,
+    discountPercent: discountPercent ?? this.discountPercent,
     groupLabel: groupLabel.present ? groupLabel.value : this.groupLabel,
     sortOrder: sortOrder ?? this.sortOrder,
   );
@@ -5310,6 +5384,10 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
       vatRatePercent: data.vatRatePercent.present
           ? data.vatRatePercent.value
           : this.vatRatePercent,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      discountPercent: data.discountPercent.present
+          ? data.discountPercent.value
+          : this.discountPercent,
       groupLabel: data.groupLabel.present
           ? data.groupLabel.value
           : this.groupLabel,
@@ -5328,6 +5406,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
           ..write('quantity: $quantity, ')
           ..write('unitPriceCents: $unitPriceCents, ')
           ..write('vatRatePercent: $vatRatePercent, ')
+          ..write('unit: $unit, ')
+          ..write('discountPercent: $discountPercent, ')
           ..write('groupLabel: $groupLabel, ')
           ..write('sortOrder: $sortOrder')
           ..write(')'))
@@ -5344,6 +5424,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     quantity,
     unitPriceCents,
     vatRatePercent,
+    unit,
+    discountPercent,
     groupLabel,
     sortOrder,
   );
@@ -5359,6 +5441,8 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
           other.quantity == this.quantity &&
           other.unitPriceCents == this.unitPriceCents &&
           other.vatRatePercent == this.vatRatePercent &&
+          other.unit == this.unit &&
+          other.discountPercent == this.discountPercent &&
           other.groupLabel == this.groupLabel &&
           other.sortOrder == this.sortOrder);
 }
@@ -5372,6 +5456,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
   final Value<String> quantity;
   final Value<int> unitPriceCents;
   final Value<double> vatRatePercent;
+  final Value<String?> unit;
+  final Value<double> discountPercent;
   final Value<String?> groupLabel;
   final Value<int> sortOrder;
   final Value<int> rowid;
@@ -5384,6 +5470,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     this.quantity = const Value.absent(),
     this.unitPriceCents = const Value.absent(),
     this.vatRatePercent = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.discountPercent = const Value.absent(),
     this.groupLabel = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5397,6 +5485,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     required String quantity,
     required int unitPriceCents,
     required double vatRatePercent,
+    this.unit = const Value.absent(),
+    this.discountPercent = const Value.absent(),
     this.groupLabel = const Value.absent(),
     required int sortOrder,
     this.rowid = const Value.absent(),
@@ -5417,6 +5507,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     Expression<String>? quantity,
     Expression<int>? unitPriceCents,
     Expression<double>? vatRatePercent,
+    Expression<String>? unit,
+    Expression<double>? discountPercent,
     Expression<String>? groupLabel,
     Expression<int>? sortOrder,
     Expression<int>? rowid,
@@ -5430,6 +5522,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
       if (quantity != null) 'quantity': quantity,
       if (unitPriceCents != null) 'unit_price_cents': unitPriceCents,
       if (vatRatePercent != null) 'vat_rate_percent': vatRatePercent,
+      if (unit != null) 'unit': unit,
+      if (discountPercent != null) 'discount_percent': discountPercent,
       if (groupLabel != null) 'group_label': groupLabel,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (rowid != null) 'rowid': rowid,
@@ -5445,6 +5539,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     Value<String>? quantity,
     Value<int>? unitPriceCents,
     Value<double>? vatRatePercent,
+    Value<String?>? unit,
+    Value<double>? discountPercent,
     Value<String?>? groupLabel,
     Value<int>? sortOrder,
     Value<int>? rowid,
@@ -5458,6 +5554,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
       quantity: quantity ?? this.quantity,
       unitPriceCents: unitPriceCents ?? this.unitPriceCents,
       vatRatePercent: vatRatePercent ?? this.vatRatePercent,
+      unit: unit ?? this.unit,
+      discountPercent: discountPercent ?? this.discountPercent,
       groupLabel: groupLabel ?? this.groupLabel,
       sortOrder: sortOrder ?? this.sortOrder,
       rowid: rowid ?? this.rowid,
@@ -5493,6 +5591,12 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     if (vatRatePercent.present) {
       map['vat_rate_percent'] = Variable<double>(vatRatePercent.value);
     }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (discountPercent.present) {
+      map['discount_percent'] = Variable<double>(discountPercent.value);
+    }
     if (groupLabel.present) {
       map['group_label'] = Variable<String>(groupLabel.value);
     }
@@ -5516,6 +5620,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
           ..write('quantity: $quantity, ')
           ..write('unitPriceCents: $unitPriceCents, ')
           ..write('vatRatePercent: $vatRatePercent, ')
+          ..write('unit: $unit, ')
+          ..write('discountPercent: $discountPercent, ')
           ..write('groupLabel: $groupLabel, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('rowid: $rowid')
@@ -10629,6 +10735,8 @@ typedef $$InvoiceItemsTableCreateCompanionBuilder =
       required String quantity,
       required int unitPriceCents,
       required double vatRatePercent,
+      Value<String?> unit,
+      Value<double> discountPercent,
       Value<String?> groupLabel,
       required int sortOrder,
       Value<int> rowid,
@@ -10643,6 +10751,8 @@ typedef $$InvoiceItemsTableUpdateCompanionBuilder =
       Value<String> quantity,
       Value<int> unitPriceCents,
       Value<double> vatRatePercent,
+      Value<String?> unit,
+      Value<double> discountPercent,
       Value<String?> groupLabel,
       Value<int> sortOrder,
       Value<int> rowid,
@@ -10724,6 +10834,16 @@ class $$InvoiceItemsTableFilterComposer
 
   ColumnFilters<double> get vatRatePercent => $composableBuilder(
     column: $table.vatRatePercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10823,6 +10943,16 @@ class $$InvoiceItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get groupLabel => $composableBuilder(
     column: $table.groupLabel,
     builder: (column) => ColumnOrderings(column),
@@ -10910,6 +11040,14 @@ class $$InvoiceItemsTableAnnotationComposer
 
   GeneratedColumn<double> get vatRatePercent => $composableBuilder(
     column: $table.vatRatePercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
     builder: (column) => column,
   );
 
@@ -11004,6 +11142,8 @@ class $$InvoiceItemsTableTableManager
                 Value<String> quantity = const Value.absent(),
                 Value<int> unitPriceCents = const Value.absent(),
                 Value<double> vatRatePercent = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<double> discountPercent = const Value.absent(),
                 Value<String?> groupLabel = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -11016,6 +11156,8 @@ class $$InvoiceItemsTableTableManager
                 quantity: quantity,
                 unitPriceCents: unitPriceCents,
                 vatRatePercent: vatRatePercent,
+                unit: unit,
+                discountPercent: discountPercent,
                 groupLabel: groupLabel,
                 sortOrder: sortOrder,
                 rowid: rowid,
@@ -11030,6 +11172,8 @@ class $$InvoiceItemsTableTableManager
                 required String quantity,
                 required int unitPriceCents,
                 required double vatRatePercent,
+                Value<String?> unit = const Value.absent(),
+                Value<double> discountPercent = const Value.absent(),
                 Value<String?> groupLabel = const Value.absent(),
                 required int sortOrder,
                 Value<int> rowid = const Value.absent(),
@@ -11042,6 +11186,8 @@ class $$InvoiceItemsTableTableManager
                 quantity: quantity,
                 unitPriceCents: unitPriceCents,
                 vatRatePercent: vatRatePercent,
+                unit: unit,
+                discountPercent: discountPercent,
                 groupLabel: groupLabel,
                 sortOrder: sortOrder,
                 rowid: rowid,

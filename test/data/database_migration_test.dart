@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:decimal/decimal.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -13,8 +14,9 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 
 /// Migrationen dieser App (v1→v2 A5: Angebot/Auftrag; v2→v3: erweiterte
 /// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte; v4→v5:
-/// Lieferschein + Dokumentumwandlung). Statt das Spaltentyp-/
-/// Datumsspeicherformat von drifts NativeDatabase zu raten,
+/// Lieferschein + Dokumentumwandlung; v5→v6: Einheit + Rabatt pro
+/// Position). Statt das Spaltentyp-/Datumsspeicherformat von drifts
+/// NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
 /// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
 /// v1-Zustand zurückgebaut (nur die seither hinzugekommenen Spalten
@@ -36,9 +38,9 @@ void main() {
   });
 
   test(
-    'Migration v1→v5 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein): '
-    'Bestandsdaten bekommen automatisch die neuen Default-Werte — ohne Datenverlust an '
-    'bestehenden Spalten',
+    'Migration v1→v6 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Einheit/Rabatt pro Position): Bestandsdaten bekommen automatisch die neuen Default-Werte '
+    '— ohne Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -61,7 +63,15 @@ void main() {
         customerId: customer.id,
         issueDate: DateTime(2026, 1, 10),
         serviceDate: DateTime(2026, 1, 10),
-        items: const [],
+        items: [
+          InvoiceItemInput(
+            kind: InvoiceItemKind.text,
+            description: 'Bestandsposition',
+            quantity: Decimal.one,
+            unitPriceCents: 1000,
+            vatRatePercent: 19,
+          ),
+        ],
       );
       await db.close();
 
@@ -90,6 +100,9 @@ void main() {
       // v4 -> v5 (Lieferschein + Dokumentumwandlung):
       raw.execute('ALTER TABLE companies DROP COLUMN delivery_notes_enabled;');
       raw.execute('ALTER TABLE invoices DROP COLUMN converted_from_id;');
+      // v5 -> v6 (Einheit + Rabatt pro Position):
+      raw.execute('ALTER TABLE invoice_items DROP COLUMN unit;');
+      raw.execute('ALTER TABLE invoice_items DROP COLUMN discount_percent;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -125,6 +138,16 @@ void main() {
         expect(
           migratedCustomer.address,
           'Alte Anschrift 1',
+          reason: 'Bestandsdaten dürfen nicht verändert werden',
+        );
+
+        final migratedItem =
+            await (db.select(db.invoiceItems)..where((i) => i.invoiceId.equals(invoice.id))).getSingle();
+        expect(migratedItem.unit, isNull);
+        expect(migratedItem.discountPercent, 0);
+        expect(
+          migratedItem.description,
+          'Bestandsposition',
           reason: 'Bestandsdaten dürfen nicht verändert werden',
         );
       } finally {

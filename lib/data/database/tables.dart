@@ -245,6 +245,18 @@ class InvoiceItems extends Table {
   IntColumn get unitPriceCents => integer()();
   RealColumn get vatRatePercent => real()();
 
+  /// Einheit (z. B. "Stk", "h", "m", "pauschal") — Kay-Nachtrag
+  /// 2026-10-16: "Es fehlen Details" beim Vergleich mit RechnungsFee.
+  /// `null` = keine Einheit angegeben (z. B. Freitext-Pauschalposten).
+  TextColumn get unit => text().nullable()();
+
+  /// Rabatt in Prozent auf diese Position (Kay-Nachtrag 2026-10-16,
+  /// analog zu RechnungsFees `rabatt_prozent` — nur als fachliche
+  /// Anregung angeschaut, keine Code-/Text-Übernahme). Wird auf den
+  /// Netto-Betrag **vor** Steuerberechnung angewendet, siehe
+  /// `InvoiceLineInput.lineNet`.
+  RealColumn get discountPercent => real().withDefault(const Constant(0))();
+
   /// Positionsgruppe (z. B. "Elektroinstallation EG") — ungleich der
   /// Artikelgruppe im Stamm. `null` = ungruppierte Position.
   TextColumn get groupLabel => text().nullable()();

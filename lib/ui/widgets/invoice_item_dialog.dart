@@ -41,6 +41,8 @@ class InvoiceItemInputResult {
     required this.quantity,
     required this.unitPriceCents,
     required this.vatRatePercent,
+    this.unit,
+    this.discountPercent = 0,
     this.groupLabel,
   });
 
@@ -50,6 +52,13 @@ class InvoiceItemInputResult {
   final Decimal quantity;
   final int unitPriceCents;
   final double vatRatePercent;
+
+  /// Einheit (z. B. "Stk", "h", "m") — Kay-Nachtrag 2026-10-16: "Es
+  /// fehlen Details" beim Vergleich mit RechnungsFee.
+  final String? unit;
+
+  /// Rabatt in Prozent auf diese Position — Kay-Nachtrag 2026-10-16.
+  final double discountPercent;
   final String? groupLabel;
 }
 
@@ -85,6 +94,12 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
     text: widget.existing == null ? null : Money.fromCents(widget.existing!.unitPriceCents).formatEuro(),
   );
   late final _groupCtrl = TextEditingController(text: widget.existing?.groupLabel);
+  late final _unitCtrl = TextEditingController(text: widget.existing?.unit);
+  late final _discountCtrl = TextEditingController(
+    text: (widget.existing?.discountPercent ?? 0) == 0
+        ? ''
+        : widget.existing!.discountPercent.toString(),
+  );
   late double _vatRate = widget.existing?.vatRatePercent ?? 19;
 
   @override
@@ -102,6 +117,8 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
     _quantityCtrl.dispose();
     _priceCtrl.dispose();
     _groupCtrl.dispose();
+    _unitCtrl.dispose();
+    _discountCtrl.dispose();
     super.dispose();
   }
 
@@ -115,6 +132,10 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
       _selectedArticle = article;
       _descriptionCtrl.text = article.name;
       if (price != null) _priceCtrl.text = price.formatEuro();
+      // Einheit vom Artikelstamm übernehmen (Kay-Nachtrag 2026-10-16) —
+      // bisher trug Article.unit zwar den Stammdaten-Wert, wurde aber
+      // nie tatsächlich in eine Position übernommen.
+      if (article.unit != null) _unitCtrl.text = article.unit!;
     });
   }
 
@@ -159,6 +180,7 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
               Row(
                 children: [
                   Expanded(
+                    flex: 2,
                     child: TextField(
                       controller: _quantityCtrl,
                       decoration: InputDecoration(
@@ -168,25 +190,53 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
                     ),
                   ),
                   const SizedBox(width: 12),
+                  // Einheit (Kay-Nachtrag 2026-10-16: "Es fehlen Details"
+                  // im Vergleich mit RechnungsFee) — bisher gab es gar
+                  // kein Feld dafür, nur "10 × 2,50 €" ohne Angabe, ob
+                  // das Stück, Meter oder Stunden sind.
                   Expanded(
                     child: TextField(
-                      controller: _priceCtrl,
-                      decoration: const InputDecoration(labelText: 'Einzelpreis (€) *'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      controller: _unitCtrl,
+                      decoration: const InputDecoration(labelText: 'Einheit', hintText: 'Stk'),
                     ),
                   ),
                 ],
               ),
-              DropdownButtonFormField<double>(
-                isExpanded: true,
-                initialValue: _vatRate,
-                decoration: const InputDecoration(labelText: 'MwSt.'),
-                items: const [
-                  DropdownMenuItem(value: 19.0, child: Text('19 % (Standard)')),
-                  DropdownMenuItem(value: 7.0, child: Text('7 % (ermäßigt)')),
-                  DropdownMenuItem(value: 0.0, child: Text('0 % (ohne Steuerbetrag)')),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _priceCtrl,
+                decoration: const InputDecoration(labelText: 'Einzelpreis (€) *'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<double>(
+                      isExpanded: true,
+                      initialValue: _vatRate,
+                      decoration: const InputDecoration(labelText: 'MwSt.'),
+                      items: const [
+                        DropdownMenuItem(value: 19.0, child: Text('19 %')),
+                        DropdownMenuItem(value: 7.0, child: Text('7 %')),
+                        DropdownMenuItem(value: 0.0, child: Text('0 %')),
+                      ],
+                      onChanged: (value) => setState(() => _vatRate = value ?? 19),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Rabatt pro Position (Kay-Nachtrag 2026-10-16, analog
+                  // zu RechnungsFees Positionsrabatt) — wirkt auf den
+                  // Netto-Betrag vor der Steuerberechnung, siehe
+                  // InvoiceLineInput.lineNet.
+                  Expanded(
+                    child: TextField(
+                      controller: _discountCtrl,
+                      decoration: const InputDecoration(labelText: 'Rabatt %', hintText: '0'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
                 ],
-                onChanged: (value) => setState(() => _vatRate = value ?? 19),
               ),
               // Autocomplete statt reinem Freitext (Kay-Nachtrag
               // 2026-10-16: "Dropdown für Positionsgruppen, die es schon
@@ -232,6 +282,7 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
             final quantity = Decimal.tryParse(_quantityCtrl.text.trim().replaceAll(',', '.'));
             if (description.isEmpty || quantity == null || _priceCtrl.text.trim().isEmpty) return;
             final price = Money.fromEuroString(_priceCtrl.text);
+            final discount = double.tryParse(_discountCtrl.text.trim().replaceAll(',', '.')) ?? 0;
             Navigator.pop(
               context,
               InvoiceItemInputResult(
@@ -241,6 +292,8 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
                 quantity: quantity,
                 unitPriceCents: price.cents,
                 vatRatePercent: _vatRate,
+                unit: _unitCtrl.text.trim().isEmpty ? null : _unitCtrl.text.trim(),
+                discountPercent: discount.clamp(0, 100),
                 groupLabel: _groupCtrl.text.trim().isEmpty ? null : _groupCtrl.text.trim(),
               ),
             );
