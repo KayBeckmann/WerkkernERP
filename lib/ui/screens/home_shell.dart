@@ -15,11 +15,20 @@ import 'suppliers_screen.dart';
 /// Navigationsrahmen innerhalb einer gewählten Firma.
 ///
 /// Adaptiv: auf dem schmalen Android-Smartphone (Roadmap A0 Punkt 4)
-/// bleibt die Bottom-Navigation die richtige Wahl; auf breiteren
-/// Fenstern (Kays Web-/LAN-Vorschau, Desktop-Browser) übernimmt eine
-/// gruppierte Sidebar das Layout-Muster von RechnungsFee (Sektionen,
-/// Indigo-Akzent, kompakte Zeilen) — eigenständig in Flutter nachgebaut,
-/// kein Code/Asset von dort.
+/// bleibt die Bottom-Navigation die richtige Wahl (Detailansichten
+/// decken sie wie gewohnt vollflächig ab — normales Mobil-Verhalten).
+/// Auf breiteren Fenstern (Kays Web-/LAN-Vorschau, Desktop-Browser)
+/// übernimmt eine gruppierte Sidebar das Layout-Muster von RechnungsFee
+/// (Sektionen, Indigo-Akzent, kompakte Zeilen) — eigenständig in
+/// Flutter nachgebaut, kein Code/Asset von dort.
+///
+/// Bugfix (Kay-Feedback 2026-10-16): Eine Rechnung/Artikel zu öffnen
+/// pushte bisher über den Root-Navigator der ganzen App — das deckte
+/// im Breit-Layout die Sidebar mit ab ("Menüleiste verschwindet"). Der
+/// Inhaltsbereich bekommt deshalb einen eigenen, verschachtelten
+/// [Navigator]; `Navigator.of(context)`-Aufrufe aus den Tab-Screens
+/// finden automatisch diesen statt des Root-Navigators, weil er näher
+/// im Widget-Baum liegt — die Sidebar bleibt dadurch immer sichtbar.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -29,6 +38,8 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  final _wideIndex = ValueNotifier<int>(0);
+  final _contentNavKey = GlobalKey<NavigatorState>();
 
   static const _destinations = [
     NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Rechnungen'),
@@ -57,6 +68,20 @@ class _HomeShellState extends State<HomeShell> {
   static const _titles = ['Rechnungen', 'Kunden', 'Artikel', 'Lieferanten', 'Einstellungen'];
 
   @override
+  void dispose() {
+    _wideIndex.dispose();
+    super.dispose();
+  }
+
+  void _selectWide(int i) {
+    // Beim Tab-Wechsel zuerst zurück auf die Liste springen, falls z.B.
+    // gerade eine Rechnung im Inhaltsbereich geöffnet ist — sonst bliebe
+    // der alte Push-Stack unter dem neuen Tab-Inhalt "verborgen" stehen.
+    _contentNavKey.currentState?.popUntil((route) => route.isFirst);
+    _wideIndex.value = i;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final service = context.watch<ActiveCompanyService>();
     final company = service.active;
@@ -70,8 +95,9 @@ class _HomeShellState extends State<HomeShell> {
     if (isWide) {
       return _WideShell(
         companyName: company.name,
-        selectedIndex: _index,
-        onSelect: (i) => setState(() => _index = i),
+        selectedIndex: _wideIndex,
+        contentNavKey: _contentNavKey,
+        onSelect: _selectWide,
         titles: _titles,
         screens: _screens,
         icons: _sidebarIcons,
@@ -110,6 +136,7 @@ class _WideShell extends StatelessWidget {
   const _WideShell({
     required this.companyName,
     required this.selectedIndex,
+    required this.contentNavKey,
     required this.onSelect,
     required this.titles,
     required this.screens,
@@ -117,7 +144,8 @@ class _WideShell extends StatelessWidget {
   });
 
   final String companyName;
-  final int selectedIndex;
+  final ValueNotifier<int> selectedIndex;
+  final GlobalKey<NavigatorState> contentNavKey;
   final ValueChanged<int> onSelect;
   final List<String> titles;
   final List<Widget> screens;
@@ -193,32 +221,35 @@ class _WideShell extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: ListView(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      children: [
-                        const SectionLabel('Fakturierung'),
-                        SidebarNavItem(
-                          icon: icons[0],
-                          label: titles[0],
-                          selected: selectedIndex == 0,
-                          onTap: () => onSelect(0),
-                        ),
-                        const SectionLabel('Stammdaten'),
-                        for (var i = 1; i <= 3; i++)
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: selectedIndex,
+                      builder: (context, current, _) => ListView(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        children: [
+                          const SectionLabel('Fakturierung'),
                           SidebarNavItem(
-                            icon: icons[i],
-                            label: titles[i],
-                            selected: selectedIndex == i,
-                            onTap: () => onSelect(i),
+                            icon: icons[0],
+                            label: titles[0],
+                            selected: current == 0,
+                            onTap: () => onSelect(0),
                           ),
-                        const Divider(height: 24),
-                        SidebarNavItem(
-                          icon: icons[4],
-                          label: titles[4],
-                          selected: selectedIndex == 4,
-                          onTap: () => onSelect(4),
-                        ),
-                      ],
+                          const SectionLabel('Stammdaten'),
+                          for (var i = 1; i <= 3; i++)
+                            SidebarNavItem(
+                              icon: icons[i],
+                              label: titles[i],
+                              selected: current == i,
+                              onTap: () => onSelect(i),
+                            ),
+                          const Divider(height: 24),
+                          SidebarNavItem(
+                            icon: icons[4],
+                            label: titles[4],
+                            selected: current == 4,
+                            onTap: () => onSelect(4),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   Padding(
@@ -245,12 +276,33 @@ class _WideShell extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   decoration: BoxDecoration(border: Border(bottom: BorderSide(color: borderColor))),
-                  child: Text(
-                    titles[selectedIndex],
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: selectedIndex,
+                    builder: (context, current, _) => Text(
+                      titles[current],
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
-                Expanded(child: IndexedStack(index: selectedIndex, children: screens)),
+                Expanded(
+                  // Eigener, verschachtelter Navigator statt direktem
+                  // IndexedStack als Root-Inhalt: Navigator.of(context)
+                  // aus den Tab-Screens (z.B. "Neue Rechnung öffnen")
+                  // findet diesen hier zuerst und pusht dadurch INNERHALB
+                  // des Inhaltsbereichs statt über die ganze App inkl.
+                  // Sidebar (siehe Klassendoc-Kommentar oben).
+                  child: Navigator(
+                    key: contentNavKey,
+                    onGenerateRoute: (settings) => MaterialPageRoute(
+                      settings: settings,
+                      builder: (context) => ValueListenableBuilder<int>(
+                        valueListenable: selectedIndex,
+                        builder: (context, current, _) =>
+                            IndexedStack(index: current, children: screens),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
