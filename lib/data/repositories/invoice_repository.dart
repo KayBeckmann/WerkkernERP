@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/services/invoice_totals_service.dart';
 import '../database/database.dart';
 import '../database/tables.dart';
+import 'number_sequence_repository.dart';
 
 /// Eine einzugebende Rechnungsposition (noch ohne ID — die vergibt das
 /// Repository beim Speichern).
@@ -34,14 +35,24 @@ class InvoiceItemInput {
 /// mit A3. Jede Methode verlangt companyId und prüft sie (gleiche
 /// Isolation wie die übrigen A0/A1-Repositories).
 class InvoiceRepository {
-  InvoiceRepository(this._db);
+  InvoiceRepository(this._db, this._numberSequences);
 
   final AppDatabase _db;
+  final NumberSequenceRepository _numberSequences;
   static const _uuid = Uuid();
 
   Future<List<Invoice>> listDraftsForCompany(String companyId) =>
       (_db.select(_db.invoices)
             ..where((i) => i.companyId.equals(companyId) & i.status.equalsValue(InvoiceStatus.draft))
+            ..orderBy([(i) => OrderingTerm.desc(i.updatedAt)]))
+          .get();
+
+  /// Alle Rechnungen (Entwürfe **und** finalisierte) für die Liste — A2/
+  /// A3-Abnahme verlangt ausdrücklich, Status/Kunde/Betrag in einer
+  /// Liste wiederzufinden, nicht nur Entwürfe.
+  Future<List<Invoice>> listAllForCompany(String companyId) =>
+      (_db.select(_db.invoices)
+            ..where((i) => i.companyId.equals(companyId))
             ..orderBy([(i) => OrderingTerm.desc(i.updatedAt)]))
           .get();
 
@@ -116,6 +127,66 @@ class InvoiceRepository {
       if (items != null) {
         await _replaceItems(id, items);
       }
+      return findById(companyId: companyId, id: id);
+    });
+  }
+
+  /// Finalisiert einen Entwurf: vergibt die nächste Nummer im Firmen-/
+  /// Typ-/Jahreskreis, friert Kunden- und Firmendaten als Schnappschuss
+  /// ein (spätere Stammdatenänderungen dürfen das PDF nicht verändern,
+  /// A1/F3) und setzt den Status unveränderlich auf `finalized` — alles
+  /// in **einer** Transaktion (F3: "atomar persistieren", keine doppelte
+  /// Nummer auch bei Prozessabbruch/erneutem Antippen).
+  ///
+  /// Das Jahr des Nummernkreises ist das Jahr des **Finalisierungs-
+  /// zeitpunkts** (serverseitig/client-seitig durch `DateTime.now()`
+  /// bestimmt, nie ein vom Nutzer eingegebenes Datum) — das war die in
+  /// F3 offen gelassene Frage "welches Datum/Jahr steuert JJ".
+  ///
+  /// `null`, wenn die Rechnung nicht existiert oder bereits finalisiert
+  /// ist (kein Fehler — Aufrufer behandeln das wie "nichts zu tun").
+  /// Wirft [StateError], wenn der Entwurf keine Positionen hat.
+  Future<Invoice?> finalize({required String companyId, required String id}) async {
+    return _db.transaction(() async {
+      final invoice = await findById(companyId: companyId, id: id);
+      if (invoice == null || invoice.status != InvoiceStatus.draft) return null;
+
+      final items = await itemsFor(id);
+      if (items.isEmpty) {
+        throw StateError('Eine Rechnung ohne Positionen kann nicht finalisiert werden.');
+      }
+
+      final company = await (_db.select(_db.companies)..where((c) => c.id.equals(companyId)))
+          .getSingle();
+      final customer = await (_db.select(_db.customers)
+            ..where((c) => c.id.equals(invoice.customerId)))
+          .getSingle();
+
+      final now = DateTime.now();
+      final year = now.year;
+      final number = await _numberSequences.allocateNext(
+        companyId: companyId,
+        documentType: 'invoice',
+        year: year,
+      );
+      final invoiceNumber = formatInvoiceNumber(year: year, number: number);
+
+      await (_db.update(_db.invoices)..where((i) => i.id.equals(id))).write(
+        InvoicesCompanion(
+          status: const Value(InvoiceStatus.finalized),
+          invoiceNumber: Value(invoiceNumber),
+          numberYear: Value(year),
+          finalizedAt: Value(now),
+          updatedAt: Value(now),
+          customerSnapshotName: Value(customer.name),
+          customerSnapshotAddress: Value(customer.address),
+          companySnapshotName: Value(company.name),
+          companySnapshotAddress: Value(company.address),
+          companySnapshotTaxNumber: Value(company.taxNumber),
+          companySnapshotVatId: Value(company.vatId),
+          companySnapshotIban: Value(company.iban),
+        ),
+      );
       return findById(companyId: companyId, id: id);
     });
   }
