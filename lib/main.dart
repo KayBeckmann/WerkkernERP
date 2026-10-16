@@ -11,6 +11,7 @@ import 'data/repositories/invoice_repository.dart';
 import 'data/repositories/number_sequence_repository.dart';
 import 'data/repositories/supplier_repository.dart';
 import 'domain/services/active_company_service.dart';
+import 'domain/services/theme_preference_service.dart';
 import 'ui/screens/company_switcher_screen.dart';
 import 'ui/theme/app_theme.dart';
 
@@ -63,13 +64,18 @@ class WerkkernErpApp extends StatelessWidget {
         ChangeNotifierProvider<ActiveCompanyService>(
           create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),
         ),
+        ChangeNotifierProvider<ThemePreferenceService>(
+          create: (_) => ThemePreferenceService()..load(),
+        ),
       ],
-      child: MaterialApp(
-        title: 'WerkkernERP',
-        theme: buildAppTheme(brightness: Brightness.light),
-        darkTheme: buildAppTheme(brightness: Brightness.dark),
-        themeMode: ThemeMode.system,
-        home: const CompanySwitcherScreen(),
+      child: Consumer<ThemePreferenceService>(
+        builder: (context, themePreference, _) => MaterialApp(
+          title: 'WerkkernERP',
+          theme: buildAppTheme(brightness: Brightness.light),
+          darkTheme: buildAppTheme(brightness: Brightness.dark),
+          themeMode: themePreference.mode,
+          home: const CompanySwitcherScreen(),
+        ),
       ),
     );
   }
