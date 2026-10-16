@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'data/backup/backup_service.dart';
 import 'data/database/database.dart';
 import 'data/repositories/article_group_repository.dart';
 import 'data/repositories/article_repository.dart';
@@ -54,6 +55,9 @@ class WerkkernErpApp extends StatelessWidget {
         Provider<InvoiceRepository>(
           create: (context) =>
               InvoiceRepository(context.read<AppDatabase>(), context.read<NumberSequenceRepository>()),
+        ),
+        Provider<BackupService>(
+          create: (context) => BackupService(context.read<AppDatabase>()),
         ),
         ChangeNotifierProvider<ActiveCompanyService>(
           create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),
