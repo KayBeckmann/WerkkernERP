@@ -20,6 +20,10 @@ import '../domain/services/invoice_totals_service.dart';
 /// Wirft [StateError], wenn [invoice] nicht finalisiert ist — ein PDF
 /// ohne Rechnungsnummer wäre kein gültiger Beleg (A3 Punkt 4: "PDF-Fehler
 /// darf nicht als erfolgreich erstelltes PDF erscheinen").
+///
+/// Funktioniert seit A5 für alle drei Dokumentarten ([DocumentKind]) —
+/// Layout/Positionsgruppen/Steueraufschlüsselung sind identisch, nur
+/// Titel und Datumsbeschriftung richten sich nach `invoice.kind`.
 Future<Uint8List> buildInvoicePdf({required Invoice invoice, required List<InvoiceItem> items}) async {
   if (invoice.status != InvoiceStatus.finalized || invoice.invoiceNumber == null) {
     throw StateError('PDF kann nur für eine finalisierte Rechnung erzeugt werden.');
@@ -86,7 +90,17 @@ Future<Uint8List> buildInvoicePdf({required Invoice invoice, required List<Invoi
   return doc.save();
 }
 
+/// Titel je Dokumentart (A5) — "Rechnungsdatum"/"Angebotsdatum"/
+/// "Auftragsdatum" bilden sich daraus grammatisch korrekt per
+/// Kompositum (`'${_title(kind)}sdatum'`).
+String _title(DocumentKind kind) => switch (kind) {
+      DocumentKind.invoice => 'Rechnung',
+      DocumentKind.quote => 'Angebot',
+      DocumentKind.order => 'Auftrag',
+    };
+
 pw.Widget _buildHeader(Invoice invoice) {
+  final title = _title(invoice.kind);
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
@@ -112,10 +126,10 @@ pw.Widget _buildHeader(Invoice invoice) {
             crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: [
               pw.Text(
-                'Rechnung ${invoice.invoiceNumber}',
+                '$title ${invoice.invoiceNumber}',
                 style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
               ),
-              pw.Text('Rechnungsdatum: ${_formatDate(invoice.issueDate)}'),
+              pw.Text('${title}sdatum: ${_formatDate(invoice.issueDate)}'),
               pw.Text('Leistungsdatum: ${_formatDate(invoice.serviceDate)}'),
             ],
           ),

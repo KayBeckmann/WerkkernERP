@@ -30,6 +30,20 @@ class ActiveCompanyService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Lädt die aktive Firma neu aus der DB — nötig nach A5-Modul-
+  /// Umschaltern (`CompanyRepository.setModules`), da `_active` sonst
+  /// bis zum nächsten Firmenwechsel die alten quotesEnabled/
+  /// ordersEnabled-Werte zeigen würde.
+  Future<void> refreshActive() async {
+    final current = _active;
+    if (current == null) return;
+    final fresh = await _companyRepository.findById(current.id);
+    if (fresh != null) {
+      _active = fresh;
+      notifyListeners();
+    }
+  }
+
   Future<Company> createCompany({required String name}) async {
     final company = await _companyRepository.create(name: name);
     await loadCompanies();
