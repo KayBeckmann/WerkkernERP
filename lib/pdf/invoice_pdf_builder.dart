@@ -190,8 +190,29 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<InvoiceItem> items) {
           ),
       ],
     ),
+    // Gruppensumme (Kay-Nachtrag 2026-10-16) — derselbe Rechenkern wie
+    // die Gesamtsumme, nur auf diese Gruppe beschränkt.
+    pw.Align(
+      alignment: pw.Alignment.centerRight,
+      child: pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 2, bottom: 4),
+        child: pw.Text(
+          'Gruppensumme: ${_groupTotal(items)}',
+          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+        ),
+      ),
+    ),
   ];
 }
+
+Money _groupTotal(List<InvoiceItem> items) => calculateInvoiceTotals([
+      for (final item in items)
+        InvoiceLineInput(
+          quantity: Decimal.parse(item.quantity),
+          unitPriceCents: item.unitPriceCents,
+          vatRatePercent: item.vatRatePercent,
+        ),
+    ]).totalGross;
 
 pw.Widget _buildTotals(InvoiceTotals totals) {
   return pw.Align(
