@@ -78,6 +78,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? deliveryNotesEnabled,
     bool? proformaEnabled,
     bool? projectsEnabled,
+    bool? fleetEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -91,6 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             deliveryNotesEnabled: deliveryNotesEnabled ?? company.deliveryNotesEnabled,
             proformaEnabled: proformaEnabled ?? company.proformaEnabled,
             projectsEnabled: projectsEnabled ?? company.projectsEnabled,
+            fleetEnabled: fleetEnabled ?? company.fleetEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -255,6 +257,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Projekte'),
                     value: company.projectsEnabled,
                     onChanged: _busy ? null : (value) => _setModule(projectsEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Fuhrpark'),
+                    value: company.fleetEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(fleetEnabled: value),
                   ),
                 ],
               ),

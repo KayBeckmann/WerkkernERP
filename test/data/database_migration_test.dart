@@ -16,7 +16,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte; v4→v5:
 /// Lieferschein + Dokumentumwandlung; v5→v6: Einheit + Rabatt pro
 /// Position; v6→v7: PDF-Texte pro Dokumentart; v7→v8: C10
-/// Proforma-Rechnungen; v8→v9: C1 Projekte). Statt das Spaltentyp-/
+/// Proforma-Rechnungen; v8→v9: C1 Projekte; v9→v10: C6 Fuhrpark).
+/// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
 /// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
@@ -39,10 +40,10 @@ void main() {
   });
 
   test(
-    'Migration v1→v9 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v10 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
-    'C1 Projekte): Bestandsdaten bekommen automatisch die neuen Default-Werte — ohne '
-    'Datenverlust an bestehenden Spalten',
+    'C1 Projekte + C6 Fuhrpark): Bestandsdaten bekommen automatisch die neuen Default-Werte '
+    '— ohne Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -123,6 +124,11 @@ void main() {
       raw.execute('ALTER TABLE invoices DROP COLUMN project_id;');
       raw.execute('ALTER TABLE companies DROP COLUMN projects_enabled;');
       raw.execute('DROP TABLE projects;');
+      // v9 -> v10 (C6 Fuhrpark): abhängige Tabelle zuerst, dann die
+      // Tabelle, auf die sie verweist.
+      raw.execute('DROP TABLE vehicle_cost_entries;');
+      raw.execute('DROP TABLE vehicles;');
+      raw.execute('ALTER TABLE companies DROP COLUMN fleet_enabled;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -151,6 +157,7 @@ void main() {
         expect(migratedCompany.pdfIntroTextProforma, isNull);
         expect(migratedCompany.pdfClosingTextProforma, isNull);
         expect(migratedCompany.projectsEnabled, isFalse);
+        expect(migratedCompany.fleetEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -175,6 +182,32 @@ void main() {
               ..where((p) => p.id.equals('project-nach-migration')))
             .getSingle();
         expect(createdProject.status, ProjectStatus.active);
+
+        // Vehicles/VehicleCostEntries-Tabellen existieren nach der
+        // Migration und sind nutzbar.
+        await db.into(db.vehicles).insert(
+              VehiclesCompanion.insert(
+                id: 'vehicle-nach-migration',
+                companyId: company.id,
+                name: 'Transporter 1',
+                createdAt: DateTime.now(),
+              ),
+            );
+        await db.into(db.vehicleCostEntries).insert(
+              VehicleCostEntriesCompanion.insert(
+                id: 'cost-nach-migration',
+                companyId: company.id,
+                vehicleId: 'vehicle-nach-migration',
+                date: DateTime.now(),
+                amountCents: 5000,
+                category: VehicleCostCategory.fuel,
+                createdAt: DateTime.now(),
+              ),
+            );
+        final createdCost = await (db.select(db.vehicleCostEntries)
+              ..where((c) => c.id.equals('cost-nach-migration')))
+            .getSingle();
+        expect(createdCost.amountCents, 5000);
 
         final migratedCustomer =
             await (db.select(db.customers)..where((c) => c.id.equals(customer.id))).getSingle();

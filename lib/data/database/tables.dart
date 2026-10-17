@@ -34,6 +34,11 @@ class Companies extends Table {
   /// [Projects].
   BoolColumn get projectsEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C6 Fuhrpark/Auswärtsmontage (Kay-Priorisierungsentscheidung
+  /// 2026-10-17): ebenfalls ein pro Firma ein-/ausblendbares Modul,
+  /// Default aus — siehe [Vehicles].
+  BoolColumn get fleetEnabled => boolean().withDefault(const Constant(false))();
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -337,6 +342,65 @@ class Projects extends Table {
   TextColumn get notes => text().nullable()();
   TextColumn get status =>
       textEnum<ProjectStatus>().withDefault(Constant(ProjectStatus.active.name))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Kostenart einer Fahrzeugkosten-Buchung (C6). `other` deckt alles ab,
+/// was noch nicht in eine eigene Kategorie gehört (z. B. Maut, Bußgeld).
+enum VehicleCostCategory { fuel, maintenance, leasing, insurance, other }
+
+/// C6 Fuhrpark/Auswärtsmontage (Kay-Priorisierungsentscheidung
+/// 2026-10-17, Brainstorming: "Fahrzeuge je Firma mit Zuordnung, Kosten
+/// und Terminen verwalten"). **Dies ist der C6-Kern**: Fahrzeuge
+/// anlegen und Kosten erfassen. Bewusst OHNE die in der Roadmap als
+/// offen markierte Umlage in eine Projekt-Ergebnisrechnung (Rate vs.
+/// Tilgung, Verteilungsschlüssel) — die braucht erst eine entschiedene
+/// Projekt-GuV-Methodik (C1), die es noch nicht gibt. [VehicleCostEntries]
+/// trägt deshalb bereits eine optionale Projektzuordnung als reine
+/// Markierung/Vormerkung, ohne dass irgendwo automatisch summiert oder
+/// einer GuV zugerechnet wird.
+class Vehicles extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+  TextColumn get licensePlate => text().nullable()();
+  TextColumn get notes => text().nullable()();
+
+  /// Nächster TÜV-/Hauptuntersuchungstermin (Brainstorming: "TÜV-Termine
+  /// ... Fälligkeiten"). `null` = nicht erfasst.
+  DateTimeColumn get nextInspectionDate => dateTime().nullable()();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class VehicleCostEntries extends Table {
+  TextColumn get id => text()();
+
+  /// Direkt auf der Buchung statt nur über [vehicleId] ableitbar — ein
+  /// bewusst durchgehaltenes Muster in diesem Schema (siehe z. B.
+  /// [Invoices].companyId trotz customerId), hält jede Abfrage
+  /// unmittelbar companyId-filterbar statt über einen Join.
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get vehicleId =>
+      text().references(Vehicles, #id, onDelete: KeyAction.cascade)();
+  DateTimeColumn get date => dateTime()();
+  IntColumn get amountCents => integer()();
+  TextColumn get category => textEnum<VehicleCostCategory>()();
+  TextColumn get description => text().nullable()();
+
+  /// Reine Markierung für eine spätere, noch zu entscheidende
+  /// Projektumlage (siehe Klassendoc) — `onDelete: setNull`, ein
+  /// gelöschtes Projekt darf keine Kostenbuchung mitreißen.
+  TextColumn get projectId =>
+      text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
   DateTimeColumn get createdAt => dateTime()();
 
   @override

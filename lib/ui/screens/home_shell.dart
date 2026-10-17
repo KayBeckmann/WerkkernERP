@@ -14,6 +14,7 @@ import 'invoices_screen.dart';
 import 'projects_screen.dart';
 import 'settings_screen.dart';
 import 'suppliers_screen.dart';
+import 'vehicles_screen.dart';
 
 /// Stabile Kennung eines Tabs, unabhängig von seiner **Position** in der
 /// Liste. A5 fügt Angebot/Auftrag mittendrin ein (zwischen Rechnungen
@@ -35,6 +36,7 @@ enum _TabId {
   articles,
   suppliers,
   projects,
+  vehicles,
   settings,
 }
 
@@ -170,6 +172,16 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.folder_outlined,
             title: 'Projekte',
             screen: ProjectsScreen(),
+            section: _Section.stammdaten,
+          ),
+        // C6 Fuhrpark/Auswärtsmontage (Kay-Priorisierungsentscheidung
+        // 2026-10-17).
+        if (company.fleetEnabled)
+          const _Tab(
+            id: _TabId.vehicles,
+            icon: Icons.directions_car_outlined,
+            title: 'Fuhrpark',
+            screen: VehiclesScreen(),
             section: _Section.stammdaten,
           ),
         const _Tab(
