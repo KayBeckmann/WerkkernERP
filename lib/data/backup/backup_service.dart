@@ -21,6 +21,16 @@ class RestoreResult {
   final int schemaVersionInBackup;
 }
 
+/// Ein Fehler beim Dateiaustausch **nach** dem Schließen der aktiven
+/// Verbindung — siehe Doc-Kommentar bei [BackupService.restoreBackup].
+class RestoreWriteException implements Exception {
+  const RestoreWriteException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 /// Lokales Backup/Restore (A4) — kein automatischer Cloud-Upload, keine
 /// stillschweigende Überschreibung. Nur auf Android/Desktop verfügbar
 /// ([backupSupported]); im Web-Build bewusst deaktiviert (siehe
@@ -100,19 +110,47 @@ class BackupService {
       );
     }
 
+    // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.2): das
+    // Manifest führte schemaVersion, wurde aber nie mit der tatsächlich
+    // laufenden Datenbankversion verglichen. Eine Backup-Datei aus einer
+    // NEUEREN App-Version könnte Spalten/Tabellen enthalten, die diese
+    // Version noch nicht kennt — klar abweisen statt es zu versuchen.
+    // Ein ÄLTERES Backup ist dagegen unkritisch: drifts eigene
+    // `onUpgrade`-Migration läuft beim nächsten Öffnen der
+    // wiederhergestellten Datei ganz normal durch (exakt der bereits
+    // getestete Pfad in `database_migration_test.dart`).
+    final schemaVersionInBackup = manifest['schemaVersion'] as int;
+    if (schemaVersionInBackup > _db.schemaVersion) {
+      throw FormatException(
+        'Dieses Backup stammt von einer neueren App-Version (Schema $schemaVersionInBackup, '
+        'diese App kennt nur bis ${_db.schemaVersion}). Bitte zuerst WerkkernERP aktualisieren.',
+      );
+    }
+
     final sqliteBytes = sqliteFile.content;
-    // SQLite-Dateien beginnen mit dieser 16-Byte-Signatur — eine letzte
-    // Plausibilitätsprüfung, bevor die Datei als Datenbank behandelt wird.
+    // SQLite-Dateien beginnen mit dieser 16-Byte-Signatur — eine erste
+    // Plausibilitätsprüfung, bevor die Datei überhaupt als Kandidat
+    // behandelt wird.
     const sqliteHeader = 'SQLite format 3\x00';
     if (sqliteBytes.length < sqliteHeader.length ||
         latin1.decode(sqliteBytes.sublist(0, sqliteHeader.length)) != sqliteHeader) {
       throw const FormatException('Enthaltene Datenbankdatei ist beschädigt (ungültiger Header).');
     }
 
+    // Audit-Befund 2026-10-17: der Header allein belegt nicht, dass die
+    // Datei tatsächlich eine intakte Datenbank ist (z. B. abgeschnittene
+    // Übertragung). `PRAGMA quick_check` liest die komplette B-Tree-
+    // Struktur — das ist die eigentliche Integritätsprüfung.
+    if (!await sqliteQuickCheckOk(Uint8List.fromList(sqliteBytes))) {
+      throw const FormatException(
+        'Enthaltene Datenbankdatei ist beschädigt (Integritätsprüfung fehlgeschlagen).',
+      );
+    }
+
     return _ValidatedBackup(
       sqliteBytes: sqliteBytes,
       exportedAt: DateTime.parse(manifest['exportedAt'] as String),
-      schemaVersionInBackup: manifest['schemaVersion'] as int,
+      schemaVersionInBackup: schemaVersionInBackup,
     );
   }
 
@@ -122,6 +160,20 @@ class BackupService {
   /// werden (kein Inprozess-Hotswap der offenen Verbindung, um keinen
   /// inkonsistenten Zustand zwischen Provider-Baum und Datei zu
   /// riskieren).
+  ///
+  /// Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.2): Ein Fehler,
+  /// der **vor** [_db.close] auftritt (also in [_validate]), wirft
+  /// weiterhin [FormatException]/[ArgumentError] — hier stimmt die
+  /// bisherige Aussage "deine Daten sind unverändert" uneingeschränkt,
+  /// die aktive Verbindung läuft sogar noch normal weiter. Ein Fehler
+  /// **danach** (beim atomaren Dateiaustausch, siehe
+  /// `writeDatabaseFile`) wirft stattdessen [RestoreWriteException]:
+  /// Die alte Datei bleibt dank des atomaren Austauschs zwar ebenfalls
+  /// unangetastet, aber die aktive DB-Verbindung ist in diesem Fall
+  /// bereits geschlossen — die App braucht in jedem Fall einen Neustart,
+  /// bevor überhaupt wieder gearbeitet werden kann. Diese Unterscheidung
+  /// erlaubt der UI eine ehrliche, phasenabhängige Fehlermeldung statt
+  /// einer pauschalen Zusicherung.
   Future<RestoreResult> restoreBackup(Uint8List fileBytes, {String? passphrase}) async {
     if (!backupSupported) {
       throw UnsupportedError('Restore ist auf dieser Plattform nicht verfügbar.');
@@ -130,8 +182,16 @@ class BackupService {
     final validated = await _validate(fileBytes, passphrase);
 
     await _db.close();
-    final path = await resolveDatabaseFilePath();
-    await writeDatabaseFile(path, validated.sqliteBytes);
+    try {
+      final path = await resolveDatabaseFilePath();
+      await writeDatabaseFile(path, validated.sqliteBytes);
+    } catch (e) {
+      throw RestoreWriteException(
+        'Schreiben der wiederhergestellten Datenbank fehlgeschlagen: $e. '
+        'Die ursprüngliche Datei ist dank atomarem Austausch unangetastet, '
+        'aber die App muss jetzt neu gestartet werden.',
+      );
+    }
 
     return RestoreResult(
       exportedAt: validated.exportedAt,

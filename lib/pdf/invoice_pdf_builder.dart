@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../data/database/database.dart';
 import '../data/database/tables.dart';
 import '../domain/models/money.dart';
+import '../domain/services/document_text_resolver.dart';
 import '../domain/services/invoice_totals_service.dart';
 
 /// Eigenständig gestaltetes Rechnungs-PDF — an RechnungsFee orientiert
@@ -91,6 +92,17 @@ Future<Uint8List> _buildPdf({
   final regularFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans.ttf'));
   final boldFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'));
 
+  // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.1): Für ein
+  // bereits finalisiertes Dokument wird NIE aus den aktuellen (live)
+  // Firmeneinstellungen gelesen — nur aus dem beim Finalisieren
+  // eingefrorenen Schnappschuss. Sonst könnte ein später geänderter
+  // Text beim erneuten Teilen eine andere PDF-Fassung derselben
+  // Rechnung erzeugen. Eine Vorschau (noch kein Schnappschuss
+  // vorhanden) liest weiterhin live, wie bisher.
+  final introText = isPreview ? introTextFor(company, invoice.kind) : invoice.pdfIntroTextSnapshot;
+  final closingText = isPreview ? closingTextFor(company, invoice.kind) : invoice.pdfClosingTextSnapshot;
+  final footerText = isPreview ? company.pdfFooterText : invoice.pdfFooterTextSnapshot;
+
   final doc = pw.Document(theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont));
   doc.addPage(
     pw.MultiPage(
@@ -103,10 +115,10 @@ Future<Uint8List> _buildPdf({
       footer: (context) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
-          if (company.pdfFooterText != null) ...[
+          if (footerText != null) ...[
             pw.Divider(color: PdfColors.grey400),
             pw.Text(
-              company.pdfFooterText!,
+              footerText,
               textAlign: pw.TextAlign.center,
               style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
             ),
@@ -126,8 +138,8 @@ Future<Uint8List> _buildPdf({
         // zweitem Nachtrag) — vor der Positionstabelle, z.B. ein
         // Rechtstext/freundliche Anrede oder bei einem Angebot der
         // Hinweis auf die Bindefrist.
-        if (_introTextFor(company, invoice.kind) != null) ...[
-          pw.Text(_introTextFor(company, invoice.kind)!, style: const pw.TextStyle(fontSize: 10)),
+        if (introText != null) ...[
+          pw.Text(introText, style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 12),
         ],
         pw.SizedBox(height: 16),
@@ -146,12 +158,9 @@ Future<Uint8List> _buildPdf({
         // Schlusstext (Kay-Nachtrag 2026-10-16, je Dokumentart) — z.B.
         // Dank, Rechtstext, Hinweis auf AGB oder bei einer Rechnung das
         // Zahlungsziel.
-        if (_closingTextFor(company, invoice.kind) != null) ...[
+        if (closingText != null) ...[
           pw.SizedBox(height: 16),
-          pw.Text(
-            _closingTextFor(company, invoice.kind)!,
-            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-          ),
+          pw.Text(closingText, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
         ],
       ],
     ),
@@ -159,27 +168,6 @@ Future<Uint8List> _buildPdf({
 
   return doc.save();
 }
-
-/// Einleitungs-/Schlusstext je Dokumentart (Kay-Nachtrag 2026-10-16,
-/// zweiter Nachtrag: "müssen pro Dokument abweichend sein" — Angebot
-/// braucht z.B. eine Bindefrist, Rechnung ein Zahlungsziel). Rechnung
-/// nutzt weiterhin die unpräfigierten Firmenfelder (siehe Doc-
-/// Kommentar bei `Companies.pdfIntroText` in tables.dart).
-String? _introTextFor(Company company, DocumentKind kind) => switch (kind) {
-      DocumentKind.invoice => company.pdfIntroText,
-      DocumentKind.quote => company.pdfIntroTextQuote,
-      DocumentKind.order => company.pdfIntroTextOrder,
-      DocumentKind.deliveryNote => company.pdfIntroTextDeliveryNote,
-      DocumentKind.proforma => company.pdfIntroTextProforma,
-    };
-
-String? _closingTextFor(Company company, DocumentKind kind) => switch (kind) {
-      DocumentKind.invoice => company.pdfClosingText,
-      DocumentKind.quote => company.pdfClosingTextQuote,
-      DocumentKind.order => company.pdfClosingTextOrder,
-      DocumentKind.deliveryNote => company.pdfClosingTextDeliveryNote,
-      DocumentKind.proforma => company.pdfClosingTextProforma,
-    };
 
 /// Titel je Dokumentart.
 String _title(DocumentKind kind) => switch (kind) {

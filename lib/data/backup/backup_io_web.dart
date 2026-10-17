@@ -16,3 +16,5 @@ Future<Uint8List> readTempVacuumFile(
     _unsupported();
 
 Future<void> writeDatabaseFile(String path, Uint8List bytes) async => _unsupported();
+
+Future<bool> sqliteQuickCheckOk(Uint8List bytes) async => _unsupported();

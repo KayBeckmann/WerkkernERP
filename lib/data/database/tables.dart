@@ -248,6 +248,20 @@ class Invoices extends Table {
   TextColumn get companySnapshotVatId => text().nullable()();
   TextColumn get companySnapshotIban => text().nullable()();
 
+  /// PDF-Text-Schnappschuss zum Finalisierungszeitpunkt (Audit-Befund
+  /// 2026-10-17, `Abweichungen.md` Abschnitt 2.1: "Ein später geänderter
+  /// Text kann bei erneutem Teilen eine andere PDF-Fassung derselben
+  /// finalisierten Rechnung erzeugen"). `buildInvoicePdf()` liest für
+  /// finalisierte Dokumente **ausschließlich** diese drei Felder statt
+  /// der aktuellen, möglicherweise seither geänderten Firmeneinstellungen
+  /// — das PDF einer finalisierten Rechnung bleibt dadurch über die Zeit
+  /// byte-identisch reproduzierbar, ohne die Texte selbst als Datei/BLOB
+  /// archivieren zu müssen. `null` im Entwurf — dort gilt weiterhin live
+  /// aus [Companies] gelesen (siehe `buildDraftPreviewPdf`).
+  TextColumn get pdfIntroTextSnapshot => text().nullable()();
+  TextColumn get pdfClosingTextSnapshot => text().nullable()();
+  TextColumn get pdfFooterTextSnapshot => text().nullable()();
+
   DateTimeColumn get finalizedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
