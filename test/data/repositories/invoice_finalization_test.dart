@@ -225,4 +225,50 @@ void main() {
       throwsStateError,
     );
   });
+
+  // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17).
+
+  test(
+    'markPaid()/markOpen() setzen den Zahlungsstatus nur für finalisierte Dokumente — ein '
+    'Entwurf bleibt unverändert',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final draft = await draftWithOneItem(company.id, customer.id);
+
+      expect(await invoices.markPaid(companyId: company.id, id: draft.id), isNull);
+
+      final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+      expect(finalized!.paymentStatus, PaymentStatus.open);
+
+      final paid = await invoices.markPaid(companyId: company.id, id: finalized.id);
+      expect(paid!.paymentStatus, PaymentStatus.paid);
+      expect(paid.paidAt, isNotNull);
+
+      final open = await invoices.markOpen(companyId: company.id, id: finalized.id);
+      expect(open!.paymentStatus, PaymentStatus.open);
+      expect(open.paidAt, isNull);
+    },
+  );
+
+  test('dueDate wird beim Anlegen gesetzt und kann über update() wieder entfernt werden', () async {
+    final company = await companies.create(name: 'Firma A');
+    final customer = await customers.create(companyId: company.id, name: 'Kunde');
+    final dueDate = DateTime(2026, 11, 15);
+    final draft = await invoices.createDraft(
+      companyId: company.id,
+      customerId: customer.id,
+      issueDate: DateTime.now(),
+      serviceDate: DateTime.now(),
+      dueDate: dueDate,
+    );
+    expect(draft.dueDate, dueDate);
+
+    final cleared = await invoices.update(
+      companyId: company.id,
+      id: draft.id,
+      dueDate: const Value(null),
+    );
+    expect(cleared!.dueDate, isNull);
+  });
 }

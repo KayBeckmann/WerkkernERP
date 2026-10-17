@@ -81,6 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? fleetEnabled,
     bool? recurringInvoicesEnabled,
     bool? advancePaymentInvoicesEnabled,
+    bool? dunningEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -98,6 +99,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             recurringInvoicesEnabled: recurringInvoicesEnabled ?? company.recurringInvoicesEnabled,
             advancePaymentInvoicesEnabled:
                 advancePaymentInvoicesEnabled ?? company.advancePaymentInvoicesEnabled,
+            dunningEnabled: dunningEnabled ?? company.dunningEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -282,6 +284,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: _busy
                         ? null
                         : (value) => _setModule(advancePaymentInvoicesEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Mahnwesen'),
+                    value: company.dunningEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(dunningEnabled: value),
                   ),
                 ],
               ),

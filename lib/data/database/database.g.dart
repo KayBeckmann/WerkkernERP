@@ -215,6 +215,21 @@ class $CompaniesTable extends Companies
         ),
         defaultValue: const Constant(false),
       );
+  static const VerificationMeta _dunningEnabledMeta = const VerificationMeta(
+    'dunningEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> dunningEnabled = GeneratedColumn<bool>(
+    'dunning_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("dunning_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _pdfIntroTextMeta = const VerificationMeta(
     'pdfIntroText',
   );
@@ -357,6 +372,7 @@ class $CompaniesTable extends Companies
     fleetEnabled,
     recurringInvoicesEnabled,
     advancePaymentInvoicesEnabled,
+    dunningEnabled,
     pdfIntroText,
     pdfClosingText,
     pdfIntroTextQuote,
@@ -507,6 +523,15 @@ class $CompaniesTable extends Companies
         advancePaymentInvoicesEnabled.isAcceptableOrUnknown(
           data['advance_payment_invoices_enabled']!,
           _advancePaymentInvoicesEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dunning_enabled')) {
+      context.handle(
+        _dunningEnabledMeta,
+        dunningEnabled.isAcceptableOrUnknown(
+          data['dunning_enabled']!,
+          _dunningEnabledMeta,
         ),
       );
     }
@@ -686,6 +711,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}advance_payment_invoices_enabled'],
       )!,
+      dunningEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}dunning_enabled'],
+      )!,
       pdfIntroText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_intro_text'],
@@ -784,6 +813,11 @@ class Company extends DataClass implements Insertable<Company> {
   /// frei — keine eigene Tabelle/Liste, siehe `Invoices.isAdvancePayment`.
   final bool advancePaymentInvoicesEnabled;
 
+  /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): schaltet
+  /// Fälligkeitsdatum, Zahlungsstatus und die berechnete Mahnstufen-
+  /// Anzeige im Rechnungseditor/-liste frei — keine eigene Tabelle.
+  final bool dunningEnabled;
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -829,6 +863,7 @@ class Company extends DataClass implements Insertable<Company> {
     required this.fleetEnabled,
     required this.recurringInvoicesEnabled,
     required this.advancePaymentInvoicesEnabled,
+    required this.dunningEnabled,
     this.pdfIntroText,
     this.pdfClosingText,
     this.pdfIntroTextQuote,
@@ -877,6 +912,7 @@ class Company extends DataClass implements Insertable<Company> {
     map['advance_payment_invoices_enabled'] = Variable<bool>(
       advancePaymentInvoicesEnabled,
     );
+    map['dunning_enabled'] = Variable<bool>(dunningEnabled);
     if (!nullToAbsent || pdfIntroText != null) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText);
     }
@@ -948,6 +984,7 @@ class Company extends DataClass implements Insertable<Company> {
       fleetEnabled: Value(fleetEnabled),
       recurringInvoicesEnabled: Value(recurringInvoicesEnabled),
       advancePaymentInvoicesEnabled: Value(advancePaymentInvoicesEnabled),
+      dunningEnabled: Value(dunningEnabled),
       pdfIntroText: pdfIntroText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfIntroText),
@@ -1014,6 +1051,7 @@ class Company extends DataClass implements Insertable<Company> {
       advancePaymentInvoicesEnabled: serializer.fromJson<bool>(
         json['advancePaymentInvoicesEnabled'],
       ),
+      dunningEnabled: serializer.fromJson<bool>(json['dunningEnabled']),
       pdfIntroText: serializer.fromJson<String?>(json['pdfIntroText']),
       pdfClosingText: serializer.fromJson<String?>(json['pdfClosingText']),
       pdfIntroTextQuote: serializer.fromJson<String?>(
@@ -1068,6 +1106,7 @@ class Company extends DataClass implements Insertable<Company> {
       'advancePaymentInvoicesEnabled': serializer.toJson<bool>(
         advancePaymentInvoicesEnabled,
       ),
+      'dunningEnabled': serializer.toJson<bool>(dunningEnabled),
       'pdfIntroText': serializer.toJson<String?>(pdfIntroText),
       'pdfClosingText': serializer.toJson<String?>(pdfClosingText),
       'pdfIntroTextQuote': serializer.toJson<String?>(pdfIntroTextQuote),
@@ -1106,6 +1145,7 @@ class Company extends DataClass implements Insertable<Company> {
     bool? fleetEnabled,
     bool? recurringInvoicesEnabled,
     bool? advancePaymentInvoicesEnabled,
+    bool? dunningEnabled,
     Value<String?> pdfIntroText = const Value.absent(),
     Value<String?> pdfClosingText = const Value.absent(),
     Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -1137,6 +1177,7 @@ class Company extends DataClass implements Insertable<Company> {
         recurringInvoicesEnabled ?? this.recurringInvoicesEnabled,
     advancePaymentInvoicesEnabled:
         advancePaymentInvoicesEnabled ?? this.advancePaymentInvoicesEnabled,
+    dunningEnabled: dunningEnabled ?? this.dunningEnabled,
     pdfIntroText: pdfIntroText.present ? pdfIntroText.value : this.pdfIntroText,
     pdfClosingText: pdfClosingText.present
         ? pdfClosingText.value
@@ -1204,6 +1245,9 @@ class Company extends DataClass implements Insertable<Company> {
       advancePaymentInvoicesEnabled: data.advancePaymentInvoicesEnabled.present
           ? data.advancePaymentInvoicesEnabled.value
           : this.advancePaymentInvoicesEnabled,
+      dunningEnabled: data.dunningEnabled.present
+          ? data.dunningEnabled.value
+          : this.dunningEnabled,
       pdfIntroText: data.pdfIntroText.present
           ? data.pdfIntroText.value
           : this.pdfIntroText,
@@ -1262,6 +1306,7 @@ class Company extends DataClass implements Insertable<Company> {
           ..write(
             'advancePaymentInvoicesEnabled: $advancePaymentInvoicesEnabled, ',
           )
+          ..write('dunningEnabled: $dunningEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
@@ -1296,6 +1341,7 @@ class Company extends DataClass implements Insertable<Company> {
     fleetEnabled,
     recurringInvoicesEnabled,
     advancePaymentInvoicesEnabled,
+    dunningEnabled,
     pdfIntroText,
     pdfClosingText,
     pdfIntroTextQuote,
@@ -1330,6 +1376,7 @@ class Company extends DataClass implements Insertable<Company> {
           other.recurringInvoicesEnabled == this.recurringInvoicesEnabled &&
           other.advancePaymentInvoicesEnabled ==
               this.advancePaymentInvoicesEnabled &&
+          other.dunningEnabled == this.dunningEnabled &&
           other.pdfIntroText == this.pdfIntroText &&
           other.pdfClosingText == this.pdfClosingText &&
           other.pdfIntroTextQuote == this.pdfIntroTextQuote &&
@@ -1361,6 +1408,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<bool> fleetEnabled;
   final Value<bool> recurringInvoicesEnabled;
   final Value<bool> advancePaymentInvoicesEnabled;
+  final Value<bool> dunningEnabled;
   final Value<String?> pdfIntroText;
   final Value<String?> pdfClosingText;
   final Value<String?> pdfIntroTextQuote;
@@ -1391,6 +1439,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.fleetEnabled = const Value.absent(),
     this.recurringInvoicesEnabled = const Value.absent(),
     this.advancePaymentInvoicesEnabled = const Value.absent(),
+    this.dunningEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfIntroTextQuote = const Value.absent(),
@@ -1422,6 +1471,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.fleetEnabled = const Value.absent(),
     this.recurringInvoicesEnabled = const Value.absent(),
     this.advancePaymentInvoicesEnabled = const Value.absent(),
+    this.dunningEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfIntroTextQuote = const Value.absent(),
@@ -1455,6 +1505,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<bool>? fleetEnabled,
     Expression<bool>? recurringInvoicesEnabled,
     Expression<bool>? advancePaymentInvoicesEnabled,
+    Expression<bool>? dunningEnabled,
     Expression<String>? pdfIntroText,
     Expression<String>? pdfClosingText,
     Expression<String>? pdfIntroTextQuote,
@@ -1489,6 +1540,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         'recurring_invoices_enabled': recurringInvoicesEnabled,
       if (advancePaymentInvoicesEnabled != null)
         'advance_payment_invoices_enabled': advancePaymentInvoicesEnabled,
+      if (dunningEnabled != null) 'dunning_enabled': dunningEnabled,
       if (pdfIntroText != null) 'pdf_intro_text': pdfIntroText,
       if (pdfClosingText != null) 'pdf_closing_text': pdfClosingText,
       if (pdfIntroTextQuote != null) 'pdf_intro_text_quote': pdfIntroTextQuote,
@@ -1528,6 +1580,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<bool>? fleetEnabled,
     Value<bool>? recurringInvoicesEnabled,
     Value<bool>? advancePaymentInvoicesEnabled,
+    Value<bool>? dunningEnabled,
     Value<String?>? pdfIntroText,
     Value<String?>? pdfClosingText,
     Value<String?>? pdfIntroTextQuote,
@@ -1561,6 +1614,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           recurringInvoicesEnabled ?? this.recurringInvoicesEnabled,
       advancePaymentInvoicesEnabled:
           advancePaymentInvoicesEnabled ?? this.advancePaymentInvoicesEnabled,
+      dunningEnabled: dunningEnabled ?? this.dunningEnabled,
       pdfIntroText: pdfIntroText ?? this.pdfIntroText,
       pdfClosingText: pdfClosingText ?? this.pdfClosingText,
       pdfIntroTextQuote: pdfIntroTextQuote ?? this.pdfIntroTextQuote,
@@ -1639,6 +1693,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         advancePaymentInvoicesEnabled.value,
       );
     }
+    if (dunningEnabled.present) {
+      map['dunning_enabled'] = Variable<bool>(dunningEnabled.value);
+    }
     if (pdfIntroText.present) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText.value);
     }
@@ -1712,6 +1769,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write(
             'advancePaymentInvoicesEnabled: $advancePaymentInvoicesEnabled, ',
           )
+          ..write('dunningEnabled: $dunningEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
@@ -5062,6 +5120,36 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _dueDateMeta = const VerificationMeta(
+    'dueDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> dueDate = GeneratedColumn<DateTime>(
+    'due_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<PaymentStatus, String>
+  paymentStatus = GeneratedColumn<String>(
+    'payment_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: Constant(PaymentStatus.open.name),
+  ).withConverter<PaymentStatus>($InvoicesTable.$converterpaymentStatus);
+  static const VerificationMeta _paidAtMeta = const VerificationMeta('paidAt');
+  @override
+  late final GeneratedColumn<DateTime> paidAt = GeneratedColumn<DateTime>(
+    'paid_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -5092,6 +5180,9 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     convertedFromId,
     projectId,
     isAdvancePayment,
+    dueDate,
+    paymentStatus,
+    paidAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5323,6 +5414,18 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         ),
       );
     }
+    if (data.containsKey('due_date')) {
+      context.handle(
+        _dueDateMeta,
+        dueDate.isAcceptableOrUnknown(data['due_date']!, _dueDateMeta),
+      );
+    }
+    if (data.containsKey('paid_at')) {
+      context.handle(
+        _paidAtMeta,
+        paidAt.isAcceptableOrUnknown(data['paid_at']!, _paidAtMeta),
+      );
+    }
     return context;
   }
 
@@ -5448,6 +5551,20 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_advance_payment'],
       )!,
+      dueDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}due_date'],
+      ),
+      paymentStatus: $InvoicesTable.$converterpaymentStatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}payment_status'],
+        )!,
+      ),
+      paidAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}paid_at'],
+      ),
     );
   }
 
@@ -5460,6 +5577,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
       const EnumNameConverter<DocumentKind>(DocumentKind.values);
   static JsonTypeConverter2<InvoiceStatus, String, String> $converterstatus =
       const EnumNameConverter<InvoiceStatus>(InvoiceStatus.values);
+  static JsonTypeConverter2<PaymentStatus, String, String>
+  $converterpaymentStatus = const EnumNameConverter<PaymentStatus>(
+    PaymentStatus.values,
+  );
 }
 
 class Invoice extends DataClass implements Insertable<Invoice> {
@@ -5550,6 +5671,22 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   /// `kind == invoice` sinnvoll — Angebot/Auftrag/Lieferschein/Proforma
   /// kennen dieses Feld, setzen es aber nie.
   final bool isAdvancePayment;
+
+  /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales
+  /// Fälligkeitsdatum, vom Nutzer im Entwurf gesetzt. `null` = keine
+  /// Fälligkeitsüberwachung für dieses Dokument. Nur bei `kind ==
+  /// invoice` sinnvoll — siehe `domain/services/dunning_service.dart`
+  /// für die reine Anzeige-Berechnung der Mahnstufe daraus (keine
+  /// Mahngebühr/Verzugszins-Berechnung, das braucht eine eigene
+  /// rechtliche Prüfung nach §286/288 BGB, siehe Roadmap C12).
+  final DateTime? dueDate;
+
+  /// C12 Mahnwesen: reiner, **manuell** gesetzter Zahlungsstatus — kein
+  /// Bankabgleich/automatische Zahlungserfassung (das ist C7, eigenes
+  /// Entscheidungstor). Bewusst binär (offen/bezahlt), keine
+  /// Teilzahlungen.
+  final PaymentStatus paymentStatus;
+  final DateTime? paidAt;
   const Invoice({
     required this.id,
     required this.companyId,
@@ -5579,6 +5716,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.convertedFromId,
     this.projectId,
     required this.isAdvancePayment,
+    this.dueDate,
+    required this.paymentStatus,
+    this.paidAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5661,6 +5801,17 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       map['project_id'] = Variable<String>(projectId);
     }
     map['is_advance_payment'] = Variable<bool>(isAdvancePayment);
+    if (!nullToAbsent || dueDate != null) {
+      map['due_date'] = Variable<DateTime>(dueDate);
+    }
+    {
+      map['payment_status'] = Variable<String>(
+        $InvoicesTable.$converterpaymentStatus.toSql(paymentStatus),
+      );
+    }
+    if (!nullToAbsent || paidAt != null) {
+      map['paid_at'] = Variable<DateTime>(paidAt);
+    }
     return map;
   }
 
@@ -5730,6 +5881,13 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ? const Value.absent()
           : Value(projectId),
       isAdvancePayment: Value(isAdvancePayment),
+      dueDate: dueDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueDate),
+      paymentStatus: Value(paymentStatus),
+      paidAt: paidAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paidAt),
     );
   }
 
@@ -5793,6 +5951,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       convertedFromId: serializer.fromJson<String?>(json['convertedFromId']),
       projectId: serializer.fromJson<String?>(json['projectId']),
       isAdvancePayment: serializer.fromJson<bool>(json['isAdvancePayment']),
+      dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
+      paymentStatus: $InvoicesTable.$converterpaymentStatus.fromJson(
+        serializer.fromJson<String>(json['paymentStatus']),
+      ),
+      paidAt: serializer.fromJson<DateTime?>(json['paidAt']),
     );
   }
   @override
@@ -5843,6 +6006,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'convertedFromId': serializer.toJson<String?>(convertedFromId),
       'projectId': serializer.toJson<String?>(projectId),
       'isAdvancePayment': serializer.toJson<bool>(isAdvancePayment),
+      'dueDate': serializer.toJson<DateTime?>(dueDate),
+      'paymentStatus': serializer.toJson<String>(
+        $InvoicesTable.$converterpaymentStatus.toJson(paymentStatus),
+      ),
+      'paidAt': serializer.toJson<DateTime?>(paidAt),
     };
   }
 
@@ -5875,6 +6043,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<String?> convertedFromId = const Value.absent(),
     Value<String?> projectId = const Value.absent(),
     bool? isAdvancePayment,
+    Value<DateTime?> dueDate = const Value.absent(),
+    PaymentStatus? paymentStatus,
+    Value<DateTime?> paidAt = const Value.absent(),
   }) => Invoice(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -5930,6 +6101,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
         : this.convertedFromId,
     projectId: projectId.present ? projectId.value : this.projectId,
     isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
+    dueDate: dueDate.present ? dueDate.value : this.dueDate,
+    paymentStatus: paymentStatus ?? this.paymentStatus,
+    paidAt: paidAt.present ? paidAt.value : this.paidAt,
   );
   Invoice copyWithCompanion(InvoicesCompanion data) {
     return Invoice(
@@ -5999,6 +6173,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       isAdvancePayment: data.isAdvancePayment.present
           ? data.isAdvancePayment.value
           : this.isAdvancePayment,
+      dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
+      paymentStatus: data.paymentStatus.present
+          ? data.paymentStatus.value
+          : this.paymentStatus,
+      paidAt: data.paidAt.present ? data.paidAt.value : this.paidAt,
     );
   }
 
@@ -6032,7 +6211,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('updatedAt: $updatedAt, ')
           ..write('convertedFromId: $convertedFromId, ')
           ..write('projectId: $projectId, ')
-          ..write('isAdvancePayment: $isAdvancePayment')
+          ..write('isAdvancePayment: $isAdvancePayment, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('paymentStatus: $paymentStatus, ')
+          ..write('paidAt: $paidAt')
           ..write(')'))
         .toString();
   }
@@ -6067,6 +6249,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     convertedFromId,
     projectId,
     isAdvancePayment,
+    dueDate,
+    paymentStatus,
+    paidAt,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -6099,7 +6284,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.updatedAt == this.updatedAt &&
           other.convertedFromId == this.convertedFromId &&
           other.projectId == this.projectId &&
-          other.isAdvancePayment == this.isAdvancePayment);
+          other.isAdvancePayment == this.isAdvancePayment &&
+          other.dueDate == this.dueDate &&
+          other.paymentStatus == this.paymentStatus &&
+          other.paidAt == this.paidAt);
 }
 
 class InvoicesCompanion extends UpdateCompanion<Invoice> {
@@ -6131,6 +6319,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String?> convertedFromId;
   final Value<String?> projectId;
   final Value<bool> isAdvancePayment;
+  final Value<DateTime?> dueDate;
+  final Value<PaymentStatus> paymentStatus;
+  final Value<DateTime?> paidAt;
   final Value<int> rowid;
   const InvoicesCompanion({
     this.id = const Value.absent(),
@@ -6161,6 +6352,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.convertedFromId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.paymentStatus = const Value.absent(),
+    this.paidAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   InvoicesCompanion.insert({
@@ -6192,6 +6386,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.convertedFromId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
+    this.dueDate = const Value.absent(),
+    this.paymentStatus = const Value.absent(),
+    this.paidAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -6230,6 +6427,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? convertedFromId,
     Expression<String>? projectId,
     Expression<bool>? isAdvancePayment,
+    Expression<DateTime>? dueDate,
+    Expression<String>? paymentStatus,
+    Expression<DateTime>? paidAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6272,6 +6472,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (convertedFromId != null) 'converted_from_id': convertedFromId,
       if (projectId != null) 'project_id': projectId,
       if (isAdvancePayment != null) 'is_advance_payment': isAdvancePayment,
+      if (dueDate != null) 'due_date': dueDate,
+      if (paymentStatus != null) 'payment_status': paymentStatus,
+      if (paidAt != null) 'paid_at': paidAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6305,6 +6508,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String?>? convertedFromId,
     Value<String?>? projectId,
     Value<bool>? isAdvancePayment,
+    Value<DateTime?>? dueDate,
+    Value<PaymentStatus>? paymentStatus,
+    Value<DateTime?>? paidAt,
     Value<int>? rowid,
   }) {
     return InvoicesCompanion(
@@ -6342,6 +6548,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       convertedFromId: convertedFromId ?? this.convertedFromId,
       projectId: projectId ?? this.projectId,
       isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
+      dueDate: dueDate ?? this.dueDate,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
+      paidAt: paidAt ?? this.paidAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6459,6 +6668,17 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (isAdvancePayment.present) {
       map['is_advance_payment'] = Variable<bool>(isAdvancePayment.value);
     }
+    if (dueDate.present) {
+      map['due_date'] = Variable<DateTime>(dueDate.value);
+    }
+    if (paymentStatus.present) {
+      map['payment_status'] = Variable<String>(
+        $InvoicesTable.$converterpaymentStatus.toSql(paymentStatus.value),
+      );
+    }
+    if (paidAt.present) {
+      map['paid_at'] = Variable<DateTime>(paidAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -6496,6 +6716,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('convertedFromId: $convertedFromId, ')
           ..write('projectId: $projectId, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
+          ..write('dueDate: $dueDate, ')
+          ..write('paymentStatus: $paymentStatus, ')
+          ..write('paidAt: $paidAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10352,6 +10575,7 @@ typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
   Value<bool> fleetEnabled,
   Value<bool> recurringInvoicesEnabled,
   Value<bool> advancePaymentInvoicesEnabled,
+  Value<bool> dunningEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
   Value<String?> pdfIntroTextQuote,
@@ -10383,6 +10607,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
   Value<bool> fleetEnabled,
   Value<bool> recurringInvoicesEnabled,
   Value<bool> advancePaymentInvoicesEnabled,
+  Value<bool> dunningEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
   Value<String?> pdfIntroTextQuote,
@@ -10689,6 +10914,11 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<bool> get advancePaymentInvoicesEnabled => $composableBuilder(
     column: $table.advancePaymentInvoicesEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get dunningEnabled => $composableBuilder(
+    column: $table.dunningEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11094,6 +11324,11 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get dunningEnabled => $composableBuilder(
+    column: $table.dunningEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get pdfIntroText => $composableBuilder(
     column: $table.pdfIntroText,
     builder: (column) => ColumnOrderings(column),
@@ -11223,6 +11458,11 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<bool> get advancePaymentInvoicesEnabled => $composableBuilder(
     column: $table.advancePaymentInvoicesEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get dunningEnabled => $composableBuilder(
+    column: $table.dunningEnabled,
     builder: (column) => column,
   );
 
@@ -11592,6 +11832,7 @@ class $$CompaniesTableTableManager
                 Value<bool> recurringInvoicesEnabled = const Value.absent(),
                 Value<bool> advancePaymentInvoicesEnabled =
                     const Value.absent(),
+                Value<bool> dunningEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -11623,6 +11864,7 @@ class $$CompaniesTableTableManager
                 fleetEnabled: fleetEnabled,
                 recurringInvoicesEnabled: recurringInvoicesEnabled,
                 advancePaymentInvoicesEnabled: advancePaymentInvoicesEnabled,
+                dunningEnabled: dunningEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfIntroTextQuote: pdfIntroTextQuote,
@@ -11656,6 +11898,7 @@ class $$CompaniesTableTableManager
                 Value<bool> recurringInvoicesEnabled = const Value.absent(),
                 Value<bool> advancePaymentInvoicesEnabled =
                     const Value.absent(),
+                Value<bool> dunningEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -11687,6 +11930,7 @@ class $$CompaniesTableTableManager
                 fleetEnabled: fleetEnabled,
                 recurringInvoicesEnabled: recurringInvoicesEnabled,
                 advancePaymentInvoicesEnabled: advancePaymentInvoicesEnabled,
+                dunningEnabled: dunningEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfIntroTextQuote: pdfIntroTextQuote,
@@ -15672,6 +15916,9 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> convertedFromId,
   Value<String?> projectId,
   Value<bool> isAdvancePayment,
+  Value<DateTime?> dueDate,
+  Value<PaymentStatus> paymentStatus,
+  Value<DateTime?> paidAt,
   Value<int> rowid,
 });
 typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
@@ -15703,6 +15950,9 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> convertedFromId,
   Value<String?> projectId,
   Value<bool> isAdvancePayment,
+  Value<DateTime?> dueDate,
+  Value<PaymentStatus> paymentStatus,
+  Value<DateTime?> paidAt,
   Value<int> rowid,
 });
 
@@ -15925,6 +16175,22 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<bool> get isAdvancePayment => $composableBuilder(
     column: $table.isAdvancePayment,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<PaymentStatus, PaymentStatus, String>
+  get paymentStatus => $composableBuilder(
+    column: $table.paymentStatus,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get paidAt => $composableBuilder(
+    column: $table.paidAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -16175,6 +16441,21 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get dueDate => $composableBuilder(
+    column: $table.dueDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paymentStatus => $composableBuilder(
+    column: $table.paymentStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get paidAt => $composableBuilder(
+    column: $table.paidAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CompaniesTableOrderingComposer get companyId {
     final $$CompaniesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -16383,6 +16664,18 @@ class $$InvoicesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<DateTime> get dueDate =>
+      $composableBuilder(column: $table.dueDate, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<PaymentStatus, String> get paymentStatus =>
+      $composableBuilder(
+        column: $table.paymentStatus,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get paidAt =>
+      $composableBuilder(column: $table.paidAt, builder: (column) => column);
+
   $$CompaniesTableAnnotationComposer get companyId {
     final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -16563,6 +16856,9 @@ class $$InvoicesTableTableManager
                 Value<String?> convertedFromId = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
+                Value<PaymentStatus> paymentStatus = const Value.absent(),
+                Value<DateTime?> paidAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InvoicesCompanion(
                 id: id,
@@ -16593,6 +16889,9 @@ class $$InvoicesTableTableManager
                 convertedFromId: convertedFromId,
                 projectId: projectId,
                 isAdvancePayment: isAdvancePayment,
+                dueDate: dueDate,
+                paymentStatus: paymentStatus,
+                paidAt: paidAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -16625,6 +16924,9 @@ class $$InvoicesTableTableManager
                 Value<String?> convertedFromId = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
+                Value<DateTime?> dueDate = const Value.absent(),
+                Value<PaymentStatus> paymentStatus = const Value.absent(),
+                Value<DateTime?> paidAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InvoicesCompanion.insert(
                 id: id,
@@ -16655,6 +16957,9 @@ class $$InvoicesTableTableManager
                 convertedFromId: convertedFromId,
                 projectId: projectId,
                 isAdvancePayment: isAdvancePayment,
+                dueDate: dueDate,
+                paymentStatus: paymentStatus,
+                paidAt: paidAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

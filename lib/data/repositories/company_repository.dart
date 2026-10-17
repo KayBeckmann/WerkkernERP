@@ -59,6 +59,7 @@ class CompanyRepository {
     required bool fleetEnabled,
     required bool recurringInvoicesEnabled,
     required bool advancePaymentInvoicesEnabled,
+    required bool dunningEnabled,
   }) async {
     final company = await findById(companyId);
     if (company == null) {
@@ -73,6 +74,7 @@ class CompanyRepository {
       fleetEnabled: fleetEnabled,
       recurringInvoicesEnabled: recurringInvoicesEnabled,
       advancePaymentInvoicesEnabled: advancePaymentInvoicesEnabled,
+      dunningEnabled: dunningEnabled,
     );
     await update(updated);
     return updated;

@@ -8,6 +8,7 @@ import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/recurring_invoice_template_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/dunning_service.dart';
 import '../theme/app_theme.dart';
 import 'invoice_editor_screen.dart';
 
@@ -263,6 +264,11 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         final isFinalized = invoice.status == InvoiceStatus.finalized;
         final statusLabel = isFinalized ? invoice.invoiceNumber! : 'Entwurf';
         final selected = isWide && !_creatingNew && _selectedInvoice?.id == invoice.id;
+        // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): rein
+        // datumsbasierte Anzeige, siehe `dunning_service.dart` — ergibt
+        // `DunningLevel.none`, solange kein Fälligkeitsdatum gesetzt ist
+        // (z. B. Modul ausgeschaltet), kein zusätzlicher Flag-Check nötig.
+        final dunningLevel = dunningLevelFor(invoice, DateTime.now());
         return Card(
           color: selected ? Theme.of(context).colorScheme.primaryContainer : null,
           child: ListTile(
@@ -272,7 +278,12 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             ),
             title: Text(customer?.name ?? '(unbekannter Kunde)'),
             subtitle: Text(
-              '$statusLabel — ${invoice.issueDate.toLocal().toString().split(' ').first}',
+              dunningLevel == DunningLevel.none
+                  ? '$statusLabel — ${invoice.issueDate.toLocal().toString().split(' ').first}'
+                  : '$statusLabel — ${dunningLevelLabel(dunningLevel)}',
+              style: dunningLevel == DunningLevel.none
+                  ? null
+                  : TextStyle(color: Theme.of(context).colorScheme.error),
             ),
             trailing: Text(data.totalsById[invoice.id]?.toString() ?? '–'),
             onTap: customer == null

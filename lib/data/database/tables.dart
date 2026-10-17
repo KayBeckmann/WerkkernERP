@@ -50,6 +50,11 @@ class Companies extends Table {
   /// frei — keine eigene Tabelle/Liste, siehe `Invoices.isAdvancePayment`.
   BoolColumn get advancePaymentInvoicesEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): schaltet
+  /// Fälligkeitsdatum, Zahlungsstatus und die berechnete Mahnstufen-
+  /// Anzeige im Rechnungseditor/-liste frei — keine eigene Tabelle.
+  BoolColumn get dunningEnabled => boolean().withDefault(const Constant(false))();
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -213,6 +218,10 @@ enum InvoiceStatus { draft, finalized }
 /// per `convertTo()` in eine echte Rechnung umwandelbar.
 enum DocumentKind { invoice, quote, order, deliveryNote, proforma }
 
+/// C12 Mahnwesen — bewusst binär (offen/bezahlt), keine Teilzahlungen
+/// oder Zahlungseingänge aus einem Bankabgleich (das ist C7).
+enum PaymentStatus { open, paid }
+
 class Invoices extends Table {
   TextColumn get id => text()();
   TextColumn get companyId =>
@@ -310,6 +319,23 @@ class Invoices extends Table {
   /// `kind == invoice` sinnvoll — Angebot/Auftrag/Lieferschein/Proforma
   /// kennen dieses Feld, setzen es aber nie.
   BoolColumn get isAdvancePayment => boolean().withDefault(const Constant(false))();
+
+  /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales
+  /// Fälligkeitsdatum, vom Nutzer im Entwurf gesetzt. `null` = keine
+  /// Fälligkeitsüberwachung für dieses Dokument. Nur bei `kind ==
+  /// invoice` sinnvoll — siehe `domain/services/dunning_service.dart`
+  /// für die reine Anzeige-Berechnung der Mahnstufe daraus (keine
+  /// Mahngebühr/Verzugszins-Berechnung, das braucht eine eigene
+  /// rechtliche Prüfung nach §286/288 BGB, siehe Roadmap C12).
+  DateTimeColumn get dueDate => dateTime().nullable()();
+
+  /// C12 Mahnwesen: reiner, **manuell** gesetzter Zahlungsstatus — kein
+  /// Bankabgleich/automatische Zahlungserfassung (das ist C7, eigenes
+  /// Entscheidungstor). Bewusst binär (offen/bezahlt), keine
+  /// Teilzahlungen.
+  TextColumn get paymentStatus =>
+      textEnum<PaymentStatus>().withDefault(Constant(PaymentStatus.open.name))();
+  DateTimeColumn get paidAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

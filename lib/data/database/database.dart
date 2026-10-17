@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -142,6 +142,13 @@ class AppDatabase extends _$AppDatabase {
             // 2026-10-17).
             await migrator.addColumn(invoices, invoices.isAdvancePayment);
             await migrator.addColumn(companies, companies.advancePaymentInvoicesEnabled);
+          }
+          if (from < 14) {
+            // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17).
+            await migrator.addColumn(invoices, invoices.dueDate);
+            await migrator.addColumn(invoices, invoices.paymentStatus);
+            await migrator.addColumn(invoices, invoices.paidAt);
+            await migrator.addColumn(companies, companies.dunningEnabled);
           }
         },
       );
