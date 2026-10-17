@@ -61,12 +61,18 @@ void main() {
     await _createCompanyAndEnter(tester);
 
     // Sanity-Check: Sidebar ist wirklich aktiv (sonst würde ein Tap auf
-    // "Kunden" fälschlich über die Bottom-Navigation treffen und die
-    // eigentliche Sidebar-Navigation wäre nicht getestet).
+    // "Rechnungen"/"Kunden" fälschlich über die Bottom-Navigation
+    // treffen und die eigentliche Sidebar-Navigation wäre nicht
+    // getestet). Dashboard ist seit Kays Anfrage 2026-10-17 der
+    // Standard-Einstiegspunkt statt Rechnungen.
     expect(find.byType(SidebarNavItem), findsWidgets);
+    expect(find.text('Dashboard'), findsWidgets);
+
+    await tester.tap(find.widgetWithText(SidebarNavItem, 'Rechnungen'));
+    await tester.pumpAndSettle();
     expect(find.text('Noch keine Rechnungsentwürfe.'), findsOneWidget);
 
-    await tester.tap(find.text('Kunden'));
+    await tester.tap(find.widgetWithText(SidebarNavItem, 'Kunden'));
     await tester.pumpAndSettle();
 
     expect(find.text('Noch keine Kunden angelegt.'), findsOneWidget);

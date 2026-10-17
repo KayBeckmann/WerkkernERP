@@ -10,6 +10,7 @@ import '../widgets/sidebar_nav_item.dart';
 import 'articles_screen.dart';
 import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
+import 'dashboard_screen.dart';
 import 'invoices_screen.dart';
 import 'projects_screen.dart';
 import 'recurring_invoice_templates_screen.dart';
@@ -28,6 +29,7 @@ import 'vehicles_screen.dart';
 /// stabil, die tatsächliche Listenposition wird bei jedem Build neu
 /// aufgelöst.
 enum _TabId {
+  dashboard,
   invoice,
   quote,
   order,
@@ -61,7 +63,7 @@ class _Tab {
   final _Section section;
 }
 
-enum _Section { fakturierung, stammdaten, einstellungen }
+enum _Section { dashboard, fakturierung, stammdaten, einstellungen }
 
 /// Navigationsrahmen innerhalb einer gewählten Firma.
 ///
@@ -91,8 +93,11 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  _TabId _narrowId = _TabId.invoice;
-  final _wideId = ValueNotifier<_TabId>(_TabId.invoice);
+  // Kay-Anfrage 2026-10-17: "Ein Dashboard hätte ich auch gerne als
+  // Einstiegspunkt, wenn man eine Firma ausgewählt hat" — Standard-Tab
+  // ist deshalb jetzt das Dashboard statt direkt die Rechnungsliste.
+  _TabId _narrowId = _TabId.dashboard;
+  final _wideId = ValueNotifier<_TabId>(_TabId.dashboard);
   // Die Tab-Liste selbst muss ebenfalls über ein Listenable laufen, nicht
   // nur die aktuelle ID: der Inhaltsbereich liegt in der ERSTEN Route
   // eines verschachtelten Navigators (siehe unten), deren `builder`-
@@ -106,6 +111,13 @@ class _HomeShellState extends State<HomeShell> {
   final _contentNavKey = GlobalKey<NavigatorState>();
 
   List<_Tab> _buildTabs(Company company) => [
+        const _Tab(
+          id: _TabId.dashboard,
+          icon: Icons.dashboard_outlined,
+          title: 'Dashboard',
+          screen: DashboardScreen(),
+          section: _Section.dashboard,
+        ),
         const _Tab(
           id: _TabId.invoice,
           icon: Icons.receipt_long_outlined,
@@ -391,7 +403,10 @@ class _WideShell extends StatelessWidget {
                               children.add(const SectionLabel('Fakturierung'));
                             } else if (tab.section == _Section.stammdaten) {
                               children.add(const SectionLabel('Stammdaten'));
-                            } else {
+                            } else if (tab.section != _Section.dashboard) {
+                              // Für Dashboard bewusst KEINE Überschrift/
+                              // Trennlinie — es ist der Einstiegspunkt,
+                              // keine Kategorie mit mehreren Einträgen.
                               children.add(const Divider(height: 24));
                             }
                             lastSection = tab.section;
