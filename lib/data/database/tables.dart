@@ -39,6 +39,11 @@ class Companies extends Table {
   /// Default aus — siehe [Vehicles].
   BoolColumn get fleetEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C11 Wiederkehrende Rechnungen (Kay-Priorisierungsentscheidung
+  /// 2026-10-17): ebenfalls ein pro Firma ein-/ausblendbares Modul,
+  /// Default aus — siehe [RecurringInvoiceTemplates].
+  BoolColumn get recurringInvoicesEnabled => boolean().withDefault(const Constant(false))();
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -438,4 +443,73 @@ class NumberSequences extends Table {
 
   @override
   Set<Column> get primaryKey => {companyId, documentType, year};
+}
+
+/// Intervall einer wiederkehrenden Rechnungsvorlage (C11).
+enum RecurrenceInterval { monthly, quarterly, yearly }
+
+/// C11 Wiederkehrende Rechnungen (Kay-Priorisierungsentscheidung
+/// 2026-10-17, Lücke aus dem RechnungsFee-Funktionsabgleich). Eine
+/// Vorlage erzeugt bei Fälligkeit einen **neuen Rechnungsentwurf** — nie
+/// automatisch finalisiert, der Nutzer prüft/bestätigt wie bei jedem
+/// anderen Entwurf (gleiches Prinzip wie `InvoiceRepository.convertTo()`).
+///
+/// **Ohne Server/Hintergrunddienst** kann die Fälligkeitsprüfung nur
+/// beim Öffnen der App laufen, nicht als echter Cronjob (siehe Roadmap-
+/// Entscheidung bei C11) — `RecurringInvoiceTemplateRepository.
+/// generateDueDrafts()` holt dabei ausdrücklich **alle** fälligen
+/// Perioden seit dem letzten Lauf nach (nicht nur die aktuell fällige),
+/// damit eine länger nicht geöffnete App keine Rechnung stillschweigend
+/// überspringt.
+class RecurringInvoiceTemplates extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get customerId =>
+      text().references(Customers, #id, onDelete: KeyAction.restrict)();
+
+  /// Freitext zur Wiedererkennung der Vorlage (z. B. "Hosting Kunde X
+  /// monatlich") — keine der üblichen Rechnungsfelder, nur für die
+  /// Vorlagenliste selbst.
+  TextColumn get label => text()();
+  TextColumn get interval => textEnum<RecurrenceInterval>()();
+
+  /// Nächstes Fälligkeitsdatum — wird nach jeder Generierung um
+  /// [interval] weitergeschoben (siehe Klassendoc).
+  DateTimeColumn get nextDueDate => dateTime()();
+  TextColumn get paymentTerms => text().nullable()();
+  TextColumn get notes => text().nullable()();
+
+  /// Pausiert statt gelöscht — gleiches "Deaktivieren löscht keine
+  /// Daten"-Prinzip wie die Modul-Schalter und Projekte/Fahrzeuge.
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Positionen einer wiederkehrenden Vorlage — bewusst dieselben Felder
+/// wie [InvoiceItems] (ohne `invoiceId`, dafür mit `templateId`), damit
+/// sie 1:1 in `InvoiceItemInput` für `InvoiceRepository.createDraft()`
+/// übersetzt werden können, ohne ein zweites Positionsmodell zu
+/// erfinden.
+class RecurringInvoiceTemplateItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get templateId =>
+      text().references(RecurringInvoiceTemplates, #id, onDelete: KeyAction.cascade)();
+  TextColumn get kind => textEnum<InvoiceItemKind>()();
+  TextColumn get articleId =>
+      text().nullable().references(Articles, #id, onDelete: KeyAction.setNull)();
+  TextColumn get description => text()();
+  TextColumn get quantity => text()();
+  IntColumn get unitPriceCents => integer()();
+  RealColumn get vatRatePercent => real()();
+  TextColumn get unit => text().nullable()();
+  RealColumn get discountPercent => real().withDefault(const Constant(0))();
+  TextColumn get groupLabel => text().nullable()();
+  IntColumn get sortOrder => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }

@@ -23,6 +23,8 @@ part 'database.g.dart';
     Projects,
     Vehicles,
     VehicleCostEntries,
+    RecurringInvoiceTemplates,
+    RecurringInvoiceTemplateItems,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -32,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -126,6 +128,14 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(invoices, invoices.pdfIntroTextSnapshot);
             await migrator.addColumn(invoices, invoices.pdfClosingTextSnapshot);
             await migrator.addColumn(invoices, invoices.pdfFooterTextSnapshot);
+          }
+          if (from < 12) {
+            // C11 Wiederkehrende Rechnungen (Kay-Priorisierungsentscheidung
+            // 2026-10-17). Vorlagen-Tabelle zuerst, dann die Positionen,
+            // die auf sie verweisen.
+            await migrator.createTable(recurringInvoiceTemplates);
+            await migrator.createTable(recurringInvoiceTemplateItems);
+            await migrator.addColumn(companies, companies.recurringInvoicesEnabled);
           }
         },
       );

@@ -12,6 +12,7 @@ import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
 import 'invoices_screen.dart';
 import 'projects_screen.dart';
+import 'recurring_invoice_templates_screen.dart';
 import 'settings_screen.dart';
 import 'suppliers_screen.dart';
 import 'vehicles_screen.dart';
@@ -37,6 +38,7 @@ enum _TabId {
   suppliers,
   projects,
   vehicles,
+  recurringTemplates,
   settings,
 }
 
@@ -142,6 +144,19 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.fact_check_outlined,
             title: 'Proforma-Rechnungen',
             screen: InvoicesScreen(kind: DocumentKind.proforma),
+            section: _Section.fakturierung,
+          ),
+        // C11 Wiederkehrende Rechnungen (Kay-Priorisierungsentscheidung
+        // 2026-10-17) — bei Fakturierung eingruppiert (muss direkt neben
+        // den übrigen Fakturierung-Tabs stehen, sonst würde die Sidebar
+        // die Sektionsbeschriftung "Fakturierung" ein zweites Mal
+        // einfügen, siehe `_WideShell`-Gruppierung nach `_Section`).
+        if (company.recurringInvoicesEnabled)
+          const _Tab(
+            id: _TabId.recurringTemplates,
+            icon: Icons.repeat_outlined,
+            title: 'Vorlagen',
+            screen: RecurringInvoiceTemplatesScreen(),
             section: _Section.fakturierung,
           ),
         const _Tab(

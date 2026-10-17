@@ -32,7 +32,14 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     return context.read<VehicleRepository>().listForCompany(companyId);
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Bewusst ein Block-Body, nicht `setState(() => _future = _load())` —
+  // eine Zuweisung als Ausdruck liefert ihren Wert (hier ein `Future`)
+  // zurück, und Flutter wirft im Debug-Modus bei jedem `setState()`,
+  // dessen Callback ein `Future` zurückgibt (bereits einmal in A5 so
+  // gefunden).
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<void> _create() async {
     final result = await showDialog<_VehicleFormResult>(
@@ -247,7 +254,9 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
         );
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<void> _deactivate() async {
     setState(() => _busy = true);

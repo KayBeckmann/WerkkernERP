@@ -39,7 +39,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     return _ProjectsData(projects: projects, customerById: {for (final c in customers) c.id: c});
   }
 
-  void _reload() => setState(() => _future = _load());
+  // Bewusst ein Block-Body, nicht `setState(() => _future = _load())` —
+  // eine Zuweisung als Ausdruck liefert ihren Wert (hier ein `Future`)
+  // zurück, und Flutter wirft im Debug-Modus bei jedem `setState()`,
+  // dessen Callback ein `Future` zurückgibt (bereits einmal in A5 so
+  // gefunden).
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<void> _create() async {
     final companyId = context.read<ActiveCompanyService>().active!.id;

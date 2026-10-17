@@ -5,6 +5,7 @@ import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
+import '../../data/repositories/recurring_invoice_template_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../theme/app_theme.dart';
@@ -113,10 +114,46 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     if (oldWidget.kind != widget.kind) _reload();
   }
 
+  /// C11 (Kay-Priorisierungsentscheidung 2026-10-17): ohne Server/
+  /// Hintergrunddienst kann die Fälligkeitsprüfung wiederkehrender
+  /// Vorlagen nur laufen, wenn diese Liste tatsächlich **gelesen** wird —
+  /// bewusst in [_load] statt nur in `initState`: `HomeShell` hält alle
+  /// Tab-Screens dauerhaft in einem `IndexedStack` lebend, ein einmal
+  /// gemountetes `InvoicesScreen` bekommt beim erneuten Antippen des
+  /// Tabs **kein** neues `initState()` mehr (gefunden über einen Widget-
+  /// Test: ein Modul, das erst NACH dem ersten Mount aktiviert wurde,
+  /// hätte seine fällige Vorlage sonst nie generiert). `generateDueDrafts`
+  /// ist für wiederholte Aufrufe unschädlich — nach der Generierung
+  /// liegt `nextDueDate` in der Zukunft, ein erneuter Aufruf findet
+  /// nichts mehr zu tun. Nur für `kind == invoice` relevant, da Vorlagen
+  /// ausschließlich Rechnungsentwürfe erzeugen.
+  Future<void> _checkDueTemplates(String companyId) async {
+    if (widget.kind != DocumentKind.invoice) return;
+    final company = context.read<ActiveCompanyService>().active!;
+    if (!company.recurringInvoicesEnabled) return;
+    final created = await context
+        .read<RecurringInvoiceTemplateRepository>()
+        .generateDueDrafts(companyId: companyId);
+    if (created.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${created.length} Rechnungsentwurf/-entwürfe aus wiederkehrenden Vorlagen erstellt.',
+              ),
+            ),
+          );
+        }
+      });
+    }
+  }
+
   Future<_InvoicesData> _load() async {
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final invoiceRepo = context.read<InvoiceRepository>();
     final customerRepo = context.read<CustomerRepository>();
+    await _checkDueTemplates(companyId);
     final invoices = await invoiceRepo.listAllForCompany(companyId, kind: widget.kind);
     final customers = await customerRepo.listForCompany(companyId);
     final customerById = {for (final c in customers) c.id: c};
