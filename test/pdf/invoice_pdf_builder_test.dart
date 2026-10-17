@@ -41,6 +41,7 @@ void main() {
         updatedAt: DateTime.now(),
         convertedFromId: null,
         isAdvancePayment: isAdvancePayment,
+        paymentStatus: PaymentStatus.open,
       );
 
   Company testCompany({String? pdfIntroText, String? pdfClosingText, String? pdfFooterText}) => Company(
@@ -61,6 +62,7 @@ void main() {
         fleetEnabled: false,
         recurringInvoicesEnabled: false,
         advancePaymentInvoicesEnabled: false,
+        dunningEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

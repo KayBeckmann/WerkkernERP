@@ -134,6 +134,9 @@ class InvoiceRepository {
     // nur bei kind == invoice sinnvoll, sonst ignoriert — siehe Doc-
     // Kommentar bei `Invoices.isAdvancePayment`.
     bool isAdvancePayment = false,
+    // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): nur bei
+    // kind == invoice sinnvoll, sonst ignoriert.
+    DateTime? dueDate,
     List<InvoiceItemInput> items = const [],
   }) async {
     _validateItemsForKind(kind, items);
@@ -153,6 +156,7 @@ class InvoiceRepository {
               notes: Value(notes),
               projectId: Value(projectId),
               isAdvancePayment: Value(isAdvancePayment),
+              dueDate: Value(dueDate),
               createdAt: now,
               updatedAt: now,
             ),
@@ -199,6 +203,9 @@ class InvoiceRepository {
     // "wieder entfernen", kein reines "überschreiben oder unverändert".
     Value<String?> projectId = const Value.absent(),
     bool? isAdvancePayment,
+    // C12 Mahnwesen: wie bei projectId braucht ein Fälligkeitsdatum ein
+    // echtes "wieder entfernen".
+    Value<DateTime?> dueDate = const Value.absent(),
     List<InvoiceItemInput>? items,
   }) async {
     return _db.transaction(() async {
@@ -215,6 +222,7 @@ class InvoiceRepository {
           notes: Value(notes ?? existing.notes),
           projectId: projectId,
           isAdvancePayment: Value(isAdvancePayment ?? existing.isAdvancePayment),
+          dueDate: dueDate,
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -406,6 +414,35 @@ class InvoiceRepository {
       }
     }
     return sum;
+  }
+
+  /// C12 Mahnwesen: manuell "als bezahlt markieren"/wieder zurücksetzen
+  /// — kein Bankabgleich, keine Teilzahlungen (siehe Doc-Kommentar bei
+  /// `Invoices.paymentStatus`). Nur für **finalisierte** Dokumente
+  /// sinnvoll; ein Entwurf kennt keinen Zahlungsstatus im fachlichen
+  /// Sinne.
+  Future<Invoice?> markPaid({required String companyId, required String id}) async {
+    final existing = await findById(companyId: companyId, id: id);
+    if (existing == null || existing.status != InvoiceStatus.finalized) return null;
+    await (_db.update(_db.invoices)..where((i) => i.id.equals(id))).write(
+      InvoicesCompanion(
+        paymentStatus: const Value(PaymentStatus.paid),
+        paidAt: Value(DateTime.now()),
+      ),
+    );
+    return findById(companyId: companyId, id: id);
+  }
+
+  Future<Invoice?> markOpen({required String companyId, required String id}) async {
+    final existing = await findById(companyId: companyId, id: id);
+    if (existing == null || existing.status != InvoiceStatus.finalized) return null;
+    await (_db.update(_db.invoices)..where((i) => i.id.equals(id))).write(
+      const InvoicesCompanion(
+        paymentStatus: Value(PaymentStatus.open),
+        paidAt: Value(null),
+      ),
+    );
+    return findById(companyId: companyId, id: id);
   }
 
   Future<bool> deleteDraft({required String companyId, required String id}) async {

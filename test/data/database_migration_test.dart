@@ -18,7 +18,7 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// Position; v6→v7: PDF-Texte pro Dokumentart; v7→v8: C10
 /// Proforma-Rechnungen; v8→v9: C1 Projekte; v9→v10: C6 Fuhrpark; v10→v11:
 /// PDF-Text-Schnappschuss; v11→v12: C11 Wiederkehrende Rechnungen;
-/// v12→v13: C13 Abschlagsrechnungen).
+/// v12→v13: C13 Abschlagsrechnungen; v13→v14: C12 Mahnwesen).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -42,11 +42,11 @@ void main() {
   });
 
   test(
-    'Migration v1→v13 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v14 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
-    'C13 Abschlagsrechnungen): Bestandsdaten bekommen automatisch die neuen Default-Werte — '
-    'ohne Datenverlust an bestehenden Spalten',
+    'C13 Abschlagsrechnungen + C12 Mahnwesen): Bestandsdaten bekommen automatisch die neuen '
+    'Default-Werte — ohne Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -143,6 +143,11 @@ void main() {
       // v12 -> v13 (C13 Abschlagsrechnungen):
       raw.execute('ALTER TABLE invoices DROP COLUMN is_advance_payment;');
       raw.execute('ALTER TABLE companies DROP COLUMN advance_payment_invoices_enabled;');
+      // v13 -> v14 (C12 Mahnwesen):
+      raw.execute('ALTER TABLE invoices DROP COLUMN due_date;');
+      raw.execute('ALTER TABLE invoices DROP COLUMN payment_status;');
+      raw.execute('ALTER TABLE invoices DROP COLUMN paid_at;');
+      raw.execute('ALTER TABLE companies DROP COLUMN dunning_enabled;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -174,6 +179,7 @@ void main() {
         expect(migratedCompany.fleetEnabled, isFalse);
         expect(migratedCompany.recurringInvoicesEnabled, isFalse);
         expect(migratedCompany.advancePaymentInvoicesEnabled, isFalse);
+        expect(migratedCompany.dunningEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -187,6 +193,9 @@ void main() {
         expect(migratedInvoice.pdfClosingTextSnapshot, isNull);
         expect(migratedInvoice.pdfFooterTextSnapshot, isNull);
         expect(migratedInvoice.isAdvancePayment, isFalse);
+        expect(migratedInvoice.dueDate, isNull);
+        expect(migratedInvoice.paymentStatus, PaymentStatus.open);
+        expect(migratedInvoice.paidAt, isNull);
 
         // Projects-Tabelle existiert nach der Migration und ist nutzbar
         // (nicht nur die Spalte auf Invoices).

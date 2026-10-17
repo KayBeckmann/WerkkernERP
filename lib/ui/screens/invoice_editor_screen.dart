@@ -11,6 +11,7 @@ import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/dunning_service.dart';
 import '../../domain/services/invoice_totals_service.dart';
 import '../../pdf/invoice_pdf_builder.dart';
 import '../widgets/invoice_item_dialog.dart';
@@ -165,6 +166,15 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _isAdvancePayment = false;
   Money _priorAdvancePaymentsGross = Money.zero();
 
+  // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): nur bei
+  // kind == invoice relevant und nur sichtbar, wenn die Firma das Modul
+  // aktiviert hat. Fälligkeitsdatum ist nur im Entwurf änderbar; Status
+  // "bezahlt" nur für finalisierte Dokumente (siehe
+  // `InvoiceRepository.markPaid`).
+  bool _dunningEnabled = false;
+  DateTime? _dueDate;
+  bool _markingPaid = false;
+
   bool get _isFinalized => _currentInvoice?.status == InvoiceStatus.finalized;
   DocumentKind get _kind => _currentInvoice?.kind ?? widget.kind;
 
@@ -195,6 +205,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _projects = await projectRepo.listForCompany(companyId);
     }
     _advancePaymentInvoicesEnabled = company.advancePaymentInvoicesEnabled;
+    _dunningEnabled = company.dunningEnabled;
 
     final invoice = widget.invoice;
     _currentInvoice = invoice;
@@ -205,6 +216,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _paymentTermsCtrl.text = invoice.paymentTerms ?? '';
       _projectId = invoice.projectId;
       _isAdvancePayment = invoice.isAdvancePayment;
+      _dueDate = invoice.dueDate;
       if (invoice.status == InvoiceStatus.finalized) {
         _hasBeenConverted = (await invoiceRepo.listConvertedFrom(invoice.id)).isNotEmpty;
       }
@@ -347,6 +359,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           projectId: _projectId,
           isAdvancePayment: _isAdvancePayment,
+          dueDate: _dueDate,
           items: items,
         );
       } else {
@@ -359,6 +372,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           projectId: Value(_projectId),
           isAdvancePayment: _isAdvancePayment,
+          dueDate: Value(_dueDate),
           items: items,
         );
       }
@@ -379,6 +393,40 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// C12 Mahnwesen — Fälligkeitsdatum ist nur im Entwurf änderbar
+  /// (gleiche Logik wie andere Entwurfsfelder, über [_save] persistiert).
+  Future<void> _pickDueDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dueDate ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _dueDate = picked);
+  }
+
+  /// C12 Mahnwesen — manuell "als bezahlt"/"als offen" markieren, sofort
+  /// persistiert (kein separater Speichern-Schritt nötig, anders als die
+  /// übrigen Entwurfsfelder — der Zahlungsstatus existiert nur bei
+  /// finalisierten Dokumenten).
+  Future<void> _togglePaid() async {
+    final invoice = _currentInvoice;
+    if (invoice == null) return;
+    setState(() => _markingPaid = true);
+    try {
+      final companyId = context.read<ActiveCompanyService>().active!.id;
+      final repo = context.read<InvoiceRepository>();
+      final updated = invoice.paymentStatus == PaymentStatus.paid
+          ? await repo.markOpen(companyId: companyId, id: invoice.id)
+          : await repo.markPaid(companyId: companyId, id: invoice.id);
+      if (updated != null && mounted) {
+        setState(() => _currentInvoice = updated);
+      }
+    } finally {
+      if (mounted) setState(() => _markingPaid = false);
     }
   }
 
@@ -533,6 +581,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       createdAt: now,
       updatedAt: now,
       isAdvancePayment: _isAdvancePayment,
+      dueDate: _dueDate,
+      paymentStatus: PaymentStatus.open,
+      paidAt: null,
     );
     final previewItems = [
       for (var i = 0; i < _items.length; i++)
@@ -786,6 +837,63 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 value: _isAdvancePayment,
                 onChanged: (value) => setState(() => _isAdvancePayment = value ?? false),
               ),
+          ],
+          // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17) —
+          // nur bei Rechnungen sinnvoll. Fälligkeitsdatum nur im Entwurf
+          // änderbar; Zahlungsstatus/Mahnstufe nur bei finalisierten
+          // Dokumenten (ein Entwurf hat fachlich keinen Zahlungsstatus).
+          if (_dunningEnabled && _kind == DocumentKind.invoice) ...[
+            const SizedBox(height: 8),
+            if (!isLocked)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  _dueDate == null
+                      ? 'Fälligkeitsdatum (optional)'
+                      : 'Fälligkeitsdatum: ${_dueDate!.toLocal().toString().split(' ').first}',
+                ),
+                trailing: const Icon(Icons.calendar_today_outlined),
+                onTap: _pickDueDate,
+              ),
+            if (isFinalized) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _currentInvoice!.paymentStatus == PaymentStatus.paid
+                          ? 'Bezahlt am ${_currentInvoice!.paidAt?.toLocal().toString().split(' ').first}'
+                          : _dueDate == null
+                              ? 'Offen (kein Fälligkeitsdatum gesetzt)'
+                              : 'Offen — fällig am ${_dueDate!.toLocal().toString().split(' ').first}',
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _markingPaid ? null : _togglePaid,
+                    child: Text(
+                      _currentInvoice!.paymentStatus == PaymentStatus.paid
+                          ? 'Als offen markieren'
+                          : 'Als bezahlt markieren',
+                    ),
+                  ),
+                ],
+              ),
+              // Rein datumsbasierte Anzeige, keine Mahngebühr/Verzugszins
+              // (siehe Doc-Kommentar bei `dunningLevelFor` — eigene
+              // rechtliche Prüfung nötig, hier bewusst nicht behauptet).
+              Builder(
+                builder: (context) {
+                  final level = dunningLevelFor(_currentInvoice!, DateTime.now());
+                  if (level == DunningLevel.none) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      dunningLevelLabel(level),
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  );
+                },
+              ),
+            ],
           ],
           const SizedBox(height: 16),
           for (final key in orderedKeys) ...[
