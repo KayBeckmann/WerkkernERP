@@ -79,6 +79,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? proformaEnabled,
     bool? projectsEnabled,
     bool? fleetEnabled,
+    bool? recurringInvoicesEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -93,6 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             proformaEnabled: proformaEnabled ?? company.proformaEnabled,
             projectsEnabled: projectsEnabled ?? company.projectsEnabled,
             fleetEnabled: fleetEnabled ?? company.fleetEnabled,
+            recurringInvoicesEnabled: recurringInvoicesEnabled ?? company.recurringInvoicesEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -263,6 +265,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Fuhrpark'),
                     value: company.fleetEnabled,
                     onChanged: _busy ? null : (value) => _setModule(fleetEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Wiederkehrende Rechnungen'),
+                    value: company.recurringInvoicesEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(recurringInvoicesEnabled: value),
                   ),
                 ],
               ),

@@ -52,6 +52,7 @@ void main() {
         proformaEnabled: false,
         projectsEnabled: false,
         fleetEnabled: false,
+        recurringInvoicesEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

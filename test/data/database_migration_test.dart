@@ -17,7 +17,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// Lieferschein + Dokumentumwandlung; v5→v6: Einheit + Rabatt pro
 /// Position; v6→v7: PDF-Texte pro Dokumentart; v7→v8: C10
 /// Proforma-Rechnungen; v8→v9: C1 Projekte; v9→v10: C6 Fuhrpark; v10→v11:
-/// PDF-Text-Schnappschuss). Statt das Spaltentyp-/
+/// PDF-Text-Schnappschuss; v11→v12: C11 Wiederkehrende Rechnungen).
+/// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
 /// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
@@ -40,10 +41,11 @@ void main() {
   });
 
   test(
-    'Migration v1→v11 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v12 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
-    'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss): Bestandsdaten bekommen automatisch '
-    'die neuen Default-Werte — ohne Datenverlust an bestehenden Spalten',
+    'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen): '
+    'Bestandsdaten bekommen automatisch die neuen Default-Werte — ohne Datenverlust an '
+    'bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -133,6 +135,10 @@ void main() {
       raw.execute('ALTER TABLE invoices DROP COLUMN pdf_intro_text_snapshot;');
       raw.execute('ALTER TABLE invoices DROP COLUMN pdf_closing_text_snapshot;');
       raw.execute('ALTER TABLE invoices DROP COLUMN pdf_footer_text_snapshot;');
+      // v11 -> v12 (C11 Wiederkehrende Rechnungen):
+      raw.execute('DROP TABLE recurring_invoice_template_items;');
+      raw.execute('DROP TABLE recurring_invoice_templates;');
+      raw.execute('ALTER TABLE companies DROP COLUMN recurring_invoices_enabled;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -162,6 +168,7 @@ void main() {
         expect(migratedCompany.pdfClosingTextProforma, isNull);
         expect(migratedCompany.projectsEnabled, isFalse);
         expect(migratedCompany.fleetEnabled, isFalse);
+        expect(migratedCompany.recurringInvoicesEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -215,6 +222,24 @@ void main() {
               ..where((c) => c.id.equals('cost-nach-migration')))
             .getSingle();
         expect(createdCost.amountCents, 5000);
+
+        // RecurringInvoiceTemplates/-Items existieren nach der Migration
+        // und sind nutzbar.
+        await db.into(db.recurringInvoiceTemplates).insert(
+              RecurringInvoiceTemplatesCompanion.insert(
+                id: 'template-nach-migration',
+                companyId: company.id,
+                customerId: customer.id,
+                label: 'Hosting monatlich',
+                interval: RecurrenceInterval.monthly,
+                nextDueDate: DateTime(2026, 11, 1),
+                createdAt: DateTime.now(),
+              ),
+            );
+        final createdTemplate = await (db.select(db.recurringInvoiceTemplates)
+              ..where((t) => t.id.equals('template-nach-migration')))
+            .getSingle();
+        expect(createdTemplate.active, isTrue);
 
         final migratedCustomer =
             await (db.select(db.customers)..where((c) => c.id.equals(customer.id))).getSingle();

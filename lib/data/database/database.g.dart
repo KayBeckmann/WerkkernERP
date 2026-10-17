@@ -185,6 +185,21 @@ class $CompaniesTable extends Companies
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _recurringInvoicesEnabledMeta =
+      const VerificationMeta('recurringInvoicesEnabled');
+  @override
+  late final GeneratedColumn<bool> recurringInvoicesEnabled =
+      GeneratedColumn<bool>(
+        'recurring_invoices_enabled',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("recurring_invoices_enabled" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
   static const VerificationMeta _pdfIntroTextMeta = const VerificationMeta(
     'pdfIntroText',
   );
@@ -325,6 +340,7 @@ class $CompaniesTable extends Companies
     proformaEnabled,
     projectsEnabled,
     fleetEnabled,
+    recurringInvoicesEnabled,
     pdfIntroText,
     pdfClosingText,
     pdfIntroTextQuote,
@@ -457,6 +473,15 @@ class $CompaniesTable extends Companies
         fleetEnabled.isAcceptableOrUnknown(
           data['fleet_enabled']!,
           _fleetEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('recurring_invoices_enabled')) {
+      context.handle(
+        _recurringInvoicesEnabledMeta,
+        recurringInvoicesEnabled.isAcceptableOrUnknown(
+          data['recurring_invoices_enabled']!,
+          _recurringInvoicesEnabledMeta,
         ),
       );
     }
@@ -628,6 +653,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}fleet_enabled'],
       )!,
+      recurringInvoicesEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}recurring_invoices_enabled'],
+      )!,
       pdfIntroText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_intro_text'],
@@ -715,6 +744,11 @@ class Company extends DataClass implements Insertable<Company> {
   /// Default aus — siehe [Vehicles].
   final bool fleetEnabled;
 
+  /// C11 Wiederkehrende Rechnungen (Kay-Priorisierungsentscheidung
+  /// 2026-10-17): ebenfalls ein pro Firma ein-/ausblendbares Modul,
+  /// Default aus — siehe [RecurringInvoiceTemplates].
+  final bool recurringInvoicesEnabled;
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -758,6 +792,7 @@ class Company extends DataClass implements Insertable<Company> {
     required this.proformaEnabled,
     required this.projectsEnabled,
     required this.fleetEnabled,
+    required this.recurringInvoicesEnabled,
     this.pdfIntroText,
     this.pdfClosingText,
     this.pdfIntroTextQuote,
@@ -800,6 +835,9 @@ class Company extends DataClass implements Insertable<Company> {
     map['proforma_enabled'] = Variable<bool>(proformaEnabled);
     map['projects_enabled'] = Variable<bool>(projectsEnabled);
     map['fleet_enabled'] = Variable<bool>(fleetEnabled);
+    map['recurring_invoices_enabled'] = Variable<bool>(
+      recurringInvoicesEnabled,
+    );
     if (!nullToAbsent || pdfIntroText != null) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText);
     }
@@ -869,6 +907,7 @@ class Company extends DataClass implements Insertable<Company> {
       proformaEnabled: Value(proformaEnabled),
       projectsEnabled: Value(projectsEnabled),
       fleetEnabled: Value(fleetEnabled),
+      recurringInvoicesEnabled: Value(recurringInvoicesEnabled),
       pdfIntroText: pdfIntroText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfIntroText),
@@ -929,6 +968,9 @@ class Company extends DataClass implements Insertable<Company> {
       proformaEnabled: serializer.fromJson<bool>(json['proformaEnabled']),
       projectsEnabled: serializer.fromJson<bool>(json['projectsEnabled']),
       fleetEnabled: serializer.fromJson<bool>(json['fleetEnabled']),
+      recurringInvoicesEnabled: serializer.fromJson<bool>(
+        json['recurringInvoicesEnabled'],
+      ),
       pdfIntroText: serializer.fromJson<String?>(json['pdfIntroText']),
       pdfClosingText: serializer.fromJson<String?>(json['pdfClosingText']),
       pdfIntroTextQuote: serializer.fromJson<String?>(
@@ -977,6 +1019,9 @@ class Company extends DataClass implements Insertable<Company> {
       'proformaEnabled': serializer.toJson<bool>(proformaEnabled),
       'projectsEnabled': serializer.toJson<bool>(projectsEnabled),
       'fleetEnabled': serializer.toJson<bool>(fleetEnabled),
+      'recurringInvoicesEnabled': serializer.toJson<bool>(
+        recurringInvoicesEnabled,
+      ),
       'pdfIntroText': serializer.toJson<String?>(pdfIntroText),
       'pdfClosingText': serializer.toJson<String?>(pdfClosingText),
       'pdfIntroTextQuote': serializer.toJson<String?>(pdfIntroTextQuote),
@@ -1013,6 +1058,7 @@ class Company extends DataClass implements Insertable<Company> {
     bool? proformaEnabled,
     bool? projectsEnabled,
     bool? fleetEnabled,
+    bool? recurringInvoicesEnabled,
     Value<String?> pdfIntroText = const Value.absent(),
     Value<String?> pdfClosingText = const Value.absent(),
     Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -1040,6 +1086,8 @@ class Company extends DataClass implements Insertable<Company> {
     proformaEnabled: proformaEnabled ?? this.proformaEnabled,
     projectsEnabled: projectsEnabled ?? this.projectsEnabled,
     fleetEnabled: fleetEnabled ?? this.fleetEnabled,
+    recurringInvoicesEnabled:
+        recurringInvoicesEnabled ?? this.recurringInvoicesEnabled,
     pdfIntroText: pdfIntroText.present ? pdfIntroText.value : this.pdfIntroText,
     pdfClosingText: pdfClosingText.present
         ? pdfClosingText.value
@@ -1101,6 +1149,9 @@ class Company extends DataClass implements Insertable<Company> {
       fleetEnabled: data.fleetEnabled.present
           ? data.fleetEnabled.value
           : this.fleetEnabled,
+      recurringInvoicesEnabled: data.recurringInvoicesEnabled.present
+          ? data.recurringInvoicesEnabled.value
+          : this.recurringInvoicesEnabled,
       pdfIntroText: data.pdfIntroText.present
           ? data.pdfIntroText.value
           : this.pdfIntroText,
@@ -1155,6 +1206,7 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('proformaEnabled: $proformaEnabled, ')
           ..write('projectsEnabled: $projectsEnabled, ')
           ..write('fleetEnabled: $fleetEnabled, ')
+          ..write('recurringInvoicesEnabled: $recurringInvoicesEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
@@ -1187,6 +1239,7 @@ class Company extends DataClass implements Insertable<Company> {
     proformaEnabled,
     projectsEnabled,
     fleetEnabled,
+    recurringInvoicesEnabled,
     pdfIntroText,
     pdfClosingText,
     pdfIntroTextQuote,
@@ -1218,6 +1271,7 @@ class Company extends DataClass implements Insertable<Company> {
           other.proformaEnabled == this.proformaEnabled &&
           other.projectsEnabled == this.projectsEnabled &&
           other.fleetEnabled == this.fleetEnabled &&
+          other.recurringInvoicesEnabled == this.recurringInvoicesEnabled &&
           other.pdfIntroText == this.pdfIntroText &&
           other.pdfClosingText == this.pdfClosingText &&
           other.pdfIntroTextQuote == this.pdfIntroTextQuote &&
@@ -1247,6 +1301,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<bool> proformaEnabled;
   final Value<bool> projectsEnabled;
   final Value<bool> fleetEnabled;
+  final Value<bool> recurringInvoicesEnabled;
   final Value<String?> pdfIntroText;
   final Value<String?> pdfClosingText;
   final Value<String?> pdfIntroTextQuote;
@@ -1275,6 +1330,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.proformaEnabled = const Value.absent(),
     this.projectsEnabled = const Value.absent(),
     this.fleetEnabled = const Value.absent(),
+    this.recurringInvoicesEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfIntroTextQuote = const Value.absent(),
@@ -1304,6 +1360,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.proformaEnabled = const Value.absent(),
     this.projectsEnabled = const Value.absent(),
     this.fleetEnabled = const Value.absent(),
+    this.recurringInvoicesEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfIntroTextQuote = const Value.absent(),
@@ -1335,6 +1392,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<bool>? proformaEnabled,
     Expression<bool>? projectsEnabled,
     Expression<bool>? fleetEnabled,
+    Expression<bool>? recurringInvoicesEnabled,
     Expression<String>? pdfIntroText,
     Expression<String>? pdfClosingText,
     Expression<String>? pdfIntroTextQuote,
@@ -1365,6 +1423,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (proformaEnabled != null) 'proforma_enabled': proformaEnabled,
       if (projectsEnabled != null) 'projects_enabled': projectsEnabled,
       if (fleetEnabled != null) 'fleet_enabled': fleetEnabled,
+      if (recurringInvoicesEnabled != null)
+        'recurring_invoices_enabled': recurringInvoicesEnabled,
       if (pdfIntroText != null) 'pdf_intro_text': pdfIntroText,
       if (pdfClosingText != null) 'pdf_closing_text': pdfClosingText,
       if (pdfIntroTextQuote != null) 'pdf_intro_text_quote': pdfIntroTextQuote,
@@ -1402,6 +1462,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<bool>? proformaEnabled,
     Value<bool>? projectsEnabled,
     Value<bool>? fleetEnabled,
+    Value<bool>? recurringInvoicesEnabled,
     Value<String?>? pdfIntroText,
     Value<String?>? pdfClosingText,
     Value<String?>? pdfIntroTextQuote,
@@ -1431,6 +1492,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       proformaEnabled: proformaEnabled ?? this.proformaEnabled,
       projectsEnabled: projectsEnabled ?? this.projectsEnabled,
       fleetEnabled: fleetEnabled ?? this.fleetEnabled,
+      recurringInvoicesEnabled:
+          recurringInvoicesEnabled ?? this.recurringInvoicesEnabled,
       pdfIntroText: pdfIntroText ?? this.pdfIntroText,
       pdfClosingText: pdfClosingText ?? this.pdfClosingText,
       pdfIntroTextQuote: pdfIntroTextQuote ?? this.pdfIntroTextQuote,
@@ -1498,6 +1561,11 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     }
     if (fleetEnabled.present) {
       map['fleet_enabled'] = Variable<bool>(fleetEnabled.value);
+    }
+    if (recurringInvoicesEnabled.present) {
+      map['recurring_invoices_enabled'] = Variable<bool>(
+        recurringInvoicesEnabled.value,
+      );
     }
     if (pdfIntroText.present) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText.value);
@@ -1568,6 +1636,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('proformaEnabled: $proformaEnabled, ')
           ..write('projectsEnabled: $projectsEnabled, ')
           ..write('fleetEnabled: $fleetEnabled, ')
+          ..write('recurringInvoicesEnabled: $recurringInvoicesEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
@@ -8502,6 +8571,1407 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
   }
 }
 
+class $RecurringInvoiceTemplatesTable extends RecurringInvoiceTemplates
+    with TableInfo<$RecurringInvoiceTemplatesTable, RecurringInvoiceTemplate> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RecurringInvoiceTemplatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES companies (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _customerIdMeta = const VerificationMeta(
+    'customerId',
+  );
+  @override
+  late final GeneratedColumn<String> customerId = GeneratedColumn<String>(
+    'customer_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES customers (id) ON DELETE RESTRICT',
+    ),
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<RecurrenceInterval, String>
+  interval =
+      GeneratedColumn<String>(
+        'interval',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<RecurrenceInterval>(
+        $RecurringInvoiceTemplatesTable.$converterinterval,
+      );
+  static const VerificationMeta _nextDueDateMeta = const VerificationMeta(
+    'nextDueDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> nextDueDate = GeneratedColumn<DateTime>(
+    'next_due_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _paymentTermsMeta = const VerificationMeta(
+    'paymentTerms',
+  );
+  @override
+  late final GeneratedColumn<String> paymentTerms = GeneratedColumn<String>(
+    'payment_terms',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _activeMeta = const VerificationMeta('active');
+  @override
+  late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
+    'active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    companyId,
+    customerId,
+    label,
+    interval,
+    nextDueDate,
+    paymentTerms,
+    notes,
+    active,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'recurring_invoice_templates';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RecurringInvoiceTemplate> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+        _customerIdMeta,
+        customerId.isAcceptableOrUnknown(data['customer_id']!, _customerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_customerIdMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('next_due_date')) {
+      context.handle(
+        _nextDueDateMeta,
+        nextDueDate.isAcceptableOrUnknown(
+          data['next_due_date']!,
+          _nextDueDateMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_nextDueDateMeta);
+    }
+    if (data.containsKey('payment_terms')) {
+      context.handle(
+        _paymentTermsMeta,
+        paymentTerms.isAcceptableOrUnknown(
+          data['payment_terms']!,
+          _paymentTermsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('active')) {
+      context.handle(
+        _activeMeta,
+        active.isAcceptableOrUnknown(data['active']!, _activeMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RecurringInvoiceTemplate map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RecurringInvoiceTemplate(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_id'],
+      )!,
+      customerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_id'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      interval: $RecurringInvoiceTemplatesTable.$converterinterval.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}interval'],
+        )!,
+      ),
+      nextDueDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}next_due_date'],
+      )!,
+      paymentTerms: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payment_terms'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      active: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}active'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RecurringInvoiceTemplatesTable createAlias(String alias) {
+    return $RecurringInvoiceTemplatesTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<RecurrenceInterval, String, String>
+  $converterinterval = const EnumNameConverter<RecurrenceInterval>(
+    RecurrenceInterval.values,
+  );
+}
+
+class RecurringInvoiceTemplate extends DataClass
+    implements Insertable<RecurringInvoiceTemplate> {
+  final String id;
+  final String companyId;
+  final String customerId;
+
+  /// Freitext zur Wiedererkennung der Vorlage (z. B. "Hosting Kunde X
+  /// monatlich") — keine der üblichen Rechnungsfelder, nur für die
+  /// Vorlagenliste selbst.
+  final String label;
+  final RecurrenceInterval interval;
+
+  /// Nächstes Fälligkeitsdatum — wird nach jeder Generierung um
+  /// [interval] weitergeschoben (siehe Klassendoc).
+  final DateTime nextDueDate;
+  final String? paymentTerms;
+  final String? notes;
+
+  /// Pausiert statt gelöscht — gleiches "Deaktivieren löscht keine
+  /// Daten"-Prinzip wie die Modul-Schalter und Projekte/Fahrzeuge.
+  final bool active;
+  final DateTime createdAt;
+  const RecurringInvoiceTemplate({
+    required this.id,
+    required this.companyId,
+    required this.customerId,
+    required this.label,
+    required this.interval,
+    required this.nextDueDate,
+    this.paymentTerms,
+    this.notes,
+    required this.active,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['company_id'] = Variable<String>(companyId);
+    map['customer_id'] = Variable<String>(customerId);
+    map['label'] = Variable<String>(label);
+    {
+      map['interval'] = Variable<String>(
+        $RecurringInvoiceTemplatesTable.$converterinterval.toSql(interval),
+      );
+    }
+    map['next_due_date'] = Variable<DateTime>(nextDueDate);
+    if (!nullToAbsent || paymentTerms != null) {
+      map['payment_terms'] = Variable<String>(paymentTerms);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['active'] = Variable<bool>(active);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  RecurringInvoiceTemplatesCompanion toCompanion(bool nullToAbsent) {
+    return RecurringInvoiceTemplatesCompanion(
+      id: Value(id),
+      companyId: Value(companyId),
+      customerId: Value(customerId),
+      label: Value(label),
+      interval: Value(interval),
+      nextDueDate: Value(nextDueDate),
+      paymentTerms: paymentTerms == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentTerms),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      active: Value(active),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory RecurringInvoiceTemplate.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RecurringInvoiceTemplate(
+      id: serializer.fromJson<String>(json['id']),
+      companyId: serializer.fromJson<String>(json['companyId']),
+      customerId: serializer.fromJson<String>(json['customerId']),
+      label: serializer.fromJson<String>(json['label']),
+      interval: $RecurringInvoiceTemplatesTable.$converterinterval.fromJson(
+        serializer.fromJson<String>(json['interval']),
+      ),
+      nextDueDate: serializer.fromJson<DateTime>(json['nextDueDate']),
+      paymentTerms: serializer.fromJson<String?>(json['paymentTerms']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      active: serializer.fromJson<bool>(json['active']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'companyId': serializer.toJson<String>(companyId),
+      'customerId': serializer.toJson<String>(customerId),
+      'label': serializer.toJson<String>(label),
+      'interval': serializer.toJson<String>(
+        $RecurringInvoiceTemplatesTable.$converterinterval.toJson(interval),
+      ),
+      'nextDueDate': serializer.toJson<DateTime>(nextDueDate),
+      'paymentTerms': serializer.toJson<String?>(paymentTerms),
+      'notes': serializer.toJson<String?>(notes),
+      'active': serializer.toJson<bool>(active),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  RecurringInvoiceTemplate copyWith({
+    String? id,
+    String? companyId,
+    String? customerId,
+    String? label,
+    RecurrenceInterval? interval,
+    DateTime? nextDueDate,
+    Value<String?> paymentTerms = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    bool? active,
+    DateTime? createdAt,
+  }) => RecurringInvoiceTemplate(
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    customerId: customerId ?? this.customerId,
+    label: label ?? this.label,
+    interval: interval ?? this.interval,
+    nextDueDate: nextDueDate ?? this.nextDueDate,
+    paymentTerms: paymentTerms.present ? paymentTerms.value : this.paymentTerms,
+    notes: notes.present ? notes.value : this.notes,
+    active: active ?? this.active,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  RecurringInvoiceTemplate copyWithCompanion(
+    RecurringInvoiceTemplatesCompanion data,
+  ) {
+    return RecurringInvoiceTemplate(
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      customerId: data.customerId.present
+          ? data.customerId.value
+          : this.customerId,
+      label: data.label.present ? data.label.value : this.label,
+      interval: data.interval.present ? data.interval.value : this.interval,
+      nextDueDate: data.nextDueDate.present
+          ? data.nextDueDate.value
+          : this.nextDueDate,
+      paymentTerms: data.paymentTerms.present
+          ? data.paymentTerms.value
+          : this.paymentTerms,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      active: data.active.present ? data.active.value : this.active,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecurringInvoiceTemplate(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('customerId: $customerId, ')
+          ..write('label: $label, ')
+          ..write('interval: $interval, ')
+          ..write('nextDueDate: $nextDueDate, ')
+          ..write('paymentTerms: $paymentTerms, ')
+          ..write('notes: $notes, ')
+          ..write('active: $active, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    customerId,
+    label,
+    interval,
+    nextDueDate,
+    paymentTerms,
+    notes,
+    active,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RecurringInvoiceTemplate &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.customerId == this.customerId &&
+          other.label == this.label &&
+          other.interval == this.interval &&
+          other.nextDueDate == this.nextDueDate &&
+          other.paymentTerms == this.paymentTerms &&
+          other.notes == this.notes &&
+          other.active == this.active &&
+          other.createdAt == this.createdAt);
+}
+
+class RecurringInvoiceTemplatesCompanion
+    extends UpdateCompanion<RecurringInvoiceTemplate> {
+  final Value<String> id;
+  final Value<String> companyId;
+  final Value<String> customerId;
+  final Value<String> label;
+  final Value<RecurrenceInterval> interval;
+  final Value<DateTime> nextDueDate;
+  final Value<String?> paymentTerms;
+  final Value<String?> notes;
+  final Value<bool> active;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const RecurringInvoiceTemplatesCompanion({
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.customerId = const Value.absent(),
+    this.label = const Value.absent(),
+    this.interval = const Value.absent(),
+    this.nextDueDate = const Value.absent(),
+    this.paymentTerms = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.active = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RecurringInvoiceTemplatesCompanion.insert({
+    required String id,
+    required String companyId,
+    required String customerId,
+    required String label,
+    required RecurrenceInterval interval,
+    required DateTime nextDueDate,
+    this.paymentTerms = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.active = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       companyId = Value(companyId),
+       customerId = Value(customerId),
+       label = Value(label),
+       interval = Value(interval),
+       nextDueDate = Value(nextDueDate),
+       createdAt = Value(createdAt);
+  static Insertable<RecurringInvoiceTemplate> custom({
+    Expression<String>? id,
+    Expression<String>? companyId,
+    Expression<String>? customerId,
+    Expression<String>? label,
+    Expression<String>? interval,
+    Expression<DateTime>? nextDueDate,
+    Expression<String>? paymentTerms,
+    Expression<String>? notes,
+    Expression<bool>? active,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (customerId != null) 'customer_id': customerId,
+      if (label != null) 'label': label,
+      if (interval != null) 'interval': interval,
+      if (nextDueDate != null) 'next_due_date': nextDueDate,
+      if (paymentTerms != null) 'payment_terms': paymentTerms,
+      if (notes != null) 'notes': notes,
+      if (active != null) 'active': active,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RecurringInvoiceTemplatesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? companyId,
+    Value<String>? customerId,
+    Value<String>? label,
+    Value<RecurrenceInterval>? interval,
+    Value<DateTime>? nextDueDate,
+    Value<String?>? paymentTerms,
+    Value<String?>? notes,
+    Value<bool>? active,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return RecurringInvoiceTemplatesCompanion(
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      customerId: customerId ?? this.customerId,
+      label: label ?? this.label,
+      interval: interval ?? this.interval,
+      nextDueDate: nextDueDate ?? this.nextDueDate,
+      paymentTerms: paymentTerms ?? this.paymentTerms,
+      notes: notes ?? this.notes,
+      active: active ?? this.active,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<String>(companyId.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<String>(customerId.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (interval.present) {
+      map['interval'] = Variable<String>(
+        $RecurringInvoiceTemplatesTable.$converterinterval.toSql(
+          interval.value,
+        ),
+      );
+    }
+    if (nextDueDate.present) {
+      map['next_due_date'] = Variable<DateTime>(nextDueDate.value);
+    }
+    if (paymentTerms.present) {
+      map['payment_terms'] = Variable<String>(paymentTerms.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (active.present) {
+      map['active'] = Variable<bool>(active.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecurringInvoiceTemplatesCompanion(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('customerId: $customerId, ')
+          ..write('label: $label, ')
+          ..write('interval: $interval, ')
+          ..write('nextDueDate: $nextDueDate, ')
+          ..write('paymentTerms: $paymentTerms, ')
+          ..write('notes: $notes, ')
+          ..write('active: $active, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RecurringInvoiceTemplateItemsTable extends RecurringInvoiceTemplateItems
+    with
+        TableInfo<
+          $RecurringInvoiceTemplateItemsTable,
+          RecurringInvoiceTemplateItem
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RecurringInvoiceTemplateItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _templateIdMeta = const VerificationMeta(
+    'templateId',
+  );
+  @override
+  late final GeneratedColumn<String> templateId = GeneratedColumn<String>(
+    'template_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES recurring_invoice_templates (id) ON DELETE CASCADE',
+    ),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<InvoiceItemKind, String> kind =
+      GeneratedColumn<String>(
+        'kind',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: true,
+      ).withConverter<InvoiceItemKind>(
+        $RecurringInvoiceTemplateItemsTable.$converterkind,
+      );
+  static const VerificationMeta _articleIdMeta = const VerificationMeta(
+    'articleId',
+  );
+  @override
+  late final GeneratedColumn<String> articleId = GeneratedColumn<String>(
+    'article_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES articles (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<String> quantity = GeneratedColumn<String>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitPriceCentsMeta = const VerificationMeta(
+    'unitPriceCents',
+  );
+  @override
+  late final GeneratedColumn<int> unitPriceCents = GeneratedColumn<int>(
+    'unit_price_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _vatRatePercentMeta = const VerificationMeta(
+    'vatRatePercent',
+  );
+  @override
+  late final GeneratedColumn<double> vatRatePercent = GeneratedColumn<double>(
+    'vat_rate_percent',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+    'unit',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _discountPercentMeta = const VerificationMeta(
+    'discountPercent',
+  );
+  @override
+  late final GeneratedColumn<double> discountPercent = GeneratedColumn<double>(
+    'discount_percent',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _groupLabelMeta = const VerificationMeta(
+    'groupLabel',
+  );
+  @override
+  late final GeneratedColumn<String> groupLabel = GeneratedColumn<String>(
+    'group_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    templateId,
+    kind,
+    articleId,
+    description,
+    quantity,
+    unitPriceCents,
+    vatRatePercent,
+    unit,
+    discountPercent,
+    groupLabel,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'recurring_invoice_template_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RecurringInvoiceTemplateItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('template_id')) {
+      context.handle(
+        _templateIdMeta,
+        templateId.isAcceptableOrUnknown(data['template_id']!, _templateIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_templateIdMeta);
+    }
+    if (data.containsKey('article_id')) {
+      context.handle(
+        _articleIdMeta,
+        articleId.isAcceptableOrUnknown(data['article_id']!, _articleIdMeta),
+      );
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_descriptionMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_quantityMeta);
+    }
+    if (data.containsKey('unit_price_cents')) {
+      context.handle(
+        _unitPriceCentsMeta,
+        unitPriceCents.isAcceptableOrUnknown(
+          data['unit_price_cents']!,
+          _unitPriceCentsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_unitPriceCentsMeta);
+    }
+    if (data.containsKey('vat_rate_percent')) {
+      context.handle(
+        _vatRatePercentMeta,
+        vatRatePercent.isAcceptableOrUnknown(
+          data['vat_rate_percent']!,
+          _vatRatePercentMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_vatRatePercentMeta);
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+        _unitMeta,
+        unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('discount_percent')) {
+      context.handle(
+        _discountPercentMeta,
+        discountPercent.isAcceptableOrUnknown(
+          data['discount_percent']!,
+          _discountPercentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('group_label')) {
+      context.handle(
+        _groupLabelMeta,
+        groupLabel.isAcceptableOrUnknown(data['group_label']!, _groupLabelMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RecurringInvoiceTemplateItem map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RecurringInvoiceTemplateItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      templateId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}template_id'],
+      )!,
+      kind: $RecurringInvoiceTemplateItemsTable.$converterkind.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}kind'],
+        )!,
+      ),
+      articleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}article_id'],
+      ),
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      )!,
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}quantity'],
+      )!,
+      unitPriceCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}unit_price_cents'],
+      )!,
+      vatRatePercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}vat_rate_percent'],
+      )!,
+      unit: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}unit'],
+      ),
+      discountPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}discount_percent'],
+      )!,
+      groupLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_label'],
+      ),
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $RecurringInvoiceTemplateItemsTable createAlias(String alias) {
+    return $RecurringInvoiceTemplateItemsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<InvoiceItemKind, String, String> $converterkind =
+      const EnumNameConverter<InvoiceItemKind>(InvoiceItemKind.values);
+}
+
+class RecurringInvoiceTemplateItem extends DataClass
+    implements Insertable<RecurringInvoiceTemplateItem> {
+  final String id;
+  final String templateId;
+  final InvoiceItemKind kind;
+  final String? articleId;
+  final String description;
+  final String quantity;
+  final int unitPriceCents;
+  final double vatRatePercent;
+  final String? unit;
+  final double discountPercent;
+  final String? groupLabel;
+  final int sortOrder;
+  const RecurringInvoiceTemplateItem({
+    required this.id,
+    required this.templateId,
+    required this.kind,
+    this.articleId,
+    required this.description,
+    required this.quantity,
+    required this.unitPriceCents,
+    required this.vatRatePercent,
+    this.unit,
+    required this.discountPercent,
+    this.groupLabel,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['template_id'] = Variable<String>(templateId);
+    {
+      map['kind'] = Variable<String>(
+        $RecurringInvoiceTemplateItemsTable.$converterkind.toSql(kind),
+      );
+    }
+    if (!nullToAbsent || articleId != null) {
+      map['article_id'] = Variable<String>(articleId);
+    }
+    map['description'] = Variable<String>(description);
+    map['quantity'] = Variable<String>(quantity);
+    map['unit_price_cents'] = Variable<int>(unitPriceCents);
+    map['vat_rate_percent'] = Variable<double>(vatRatePercent);
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(unit);
+    }
+    map['discount_percent'] = Variable<double>(discountPercent);
+    if (!nullToAbsent || groupLabel != null) {
+      map['group_label'] = Variable<String>(groupLabel);
+    }
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  RecurringInvoiceTemplateItemsCompanion toCompanion(bool nullToAbsent) {
+    return RecurringInvoiceTemplateItemsCompanion(
+      id: Value(id),
+      templateId: Value(templateId),
+      kind: Value(kind),
+      articleId: articleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(articleId),
+      description: Value(description),
+      quantity: Value(quantity),
+      unitPriceCents: Value(unitPriceCents),
+      vatRatePercent: Value(vatRatePercent),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      discountPercent: Value(discountPercent),
+      groupLabel: groupLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(groupLabel),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory RecurringInvoiceTemplateItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RecurringInvoiceTemplateItem(
+      id: serializer.fromJson<String>(json['id']),
+      templateId: serializer.fromJson<String>(json['templateId']),
+      kind: $RecurringInvoiceTemplateItemsTable.$converterkind.fromJson(
+        serializer.fromJson<String>(json['kind']),
+      ),
+      articleId: serializer.fromJson<String?>(json['articleId']),
+      description: serializer.fromJson<String>(json['description']),
+      quantity: serializer.fromJson<String>(json['quantity']),
+      unitPriceCents: serializer.fromJson<int>(json['unitPriceCents']),
+      vatRatePercent: serializer.fromJson<double>(json['vatRatePercent']),
+      unit: serializer.fromJson<String?>(json['unit']),
+      discountPercent: serializer.fromJson<double>(json['discountPercent']),
+      groupLabel: serializer.fromJson<String?>(json['groupLabel']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'templateId': serializer.toJson<String>(templateId),
+      'kind': serializer.toJson<String>(
+        $RecurringInvoiceTemplateItemsTable.$converterkind.toJson(kind),
+      ),
+      'articleId': serializer.toJson<String?>(articleId),
+      'description': serializer.toJson<String>(description),
+      'quantity': serializer.toJson<String>(quantity),
+      'unitPriceCents': serializer.toJson<int>(unitPriceCents),
+      'vatRatePercent': serializer.toJson<double>(vatRatePercent),
+      'unit': serializer.toJson<String?>(unit),
+      'discountPercent': serializer.toJson<double>(discountPercent),
+      'groupLabel': serializer.toJson<String?>(groupLabel),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  RecurringInvoiceTemplateItem copyWith({
+    String? id,
+    String? templateId,
+    InvoiceItemKind? kind,
+    Value<String?> articleId = const Value.absent(),
+    String? description,
+    String? quantity,
+    int? unitPriceCents,
+    double? vatRatePercent,
+    Value<String?> unit = const Value.absent(),
+    double? discountPercent,
+    Value<String?> groupLabel = const Value.absent(),
+    int? sortOrder,
+  }) => RecurringInvoiceTemplateItem(
+    id: id ?? this.id,
+    templateId: templateId ?? this.templateId,
+    kind: kind ?? this.kind,
+    articleId: articleId.present ? articleId.value : this.articleId,
+    description: description ?? this.description,
+    quantity: quantity ?? this.quantity,
+    unitPriceCents: unitPriceCents ?? this.unitPriceCents,
+    vatRatePercent: vatRatePercent ?? this.vatRatePercent,
+    unit: unit.present ? unit.value : this.unit,
+    discountPercent: discountPercent ?? this.discountPercent,
+    groupLabel: groupLabel.present ? groupLabel.value : this.groupLabel,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  RecurringInvoiceTemplateItem copyWithCompanion(
+    RecurringInvoiceTemplateItemsCompanion data,
+  ) {
+    return RecurringInvoiceTemplateItem(
+      id: data.id.present ? data.id.value : this.id,
+      templateId: data.templateId.present
+          ? data.templateId.value
+          : this.templateId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      articleId: data.articleId.present ? data.articleId.value : this.articleId,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unitPriceCents: data.unitPriceCents.present
+          ? data.unitPriceCents.value
+          : this.unitPriceCents,
+      vatRatePercent: data.vatRatePercent.present
+          ? data.vatRatePercent.value
+          : this.vatRatePercent,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      discountPercent: data.discountPercent.present
+          ? data.discountPercent.value
+          : this.discountPercent,
+      groupLabel: data.groupLabel.present
+          ? data.groupLabel.value
+          : this.groupLabel,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecurringInvoiceTemplateItem(')
+          ..write('id: $id, ')
+          ..write('templateId: $templateId, ')
+          ..write('kind: $kind, ')
+          ..write('articleId: $articleId, ')
+          ..write('description: $description, ')
+          ..write('quantity: $quantity, ')
+          ..write('unitPriceCents: $unitPriceCents, ')
+          ..write('vatRatePercent: $vatRatePercent, ')
+          ..write('unit: $unit, ')
+          ..write('discountPercent: $discountPercent, ')
+          ..write('groupLabel: $groupLabel, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    templateId,
+    kind,
+    articleId,
+    description,
+    quantity,
+    unitPriceCents,
+    vatRatePercent,
+    unit,
+    discountPercent,
+    groupLabel,
+    sortOrder,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RecurringInvoiceTemplateItem &&
+          other.id == this.id &&
+          other.templateId == this.templateId &&
+          other.kind == this.kind &&
+          other.articleId == this.articleId &&
+          other.description == this.description &&
+          other.quantity == this.quantity &&
+          other.unitPriceCents == this.unitPriceCents &&
+          other.vatRatePercent == this.vatRatePercent &&
+          other.unit == this.unit &&
+          other.discountPercent == this.discountPercent &&
+          other.groupLabel == this.groupLabel &&
+          other.sortOrder == this.sortOrder);
+}
+
+class RecurringInvoiceTemplateItemsCompanion
+    extends UpdateCompanion<RecurringInvoiceTemplateItem> {
+  final Value<String> id;
+  final Value<String> templateId;
+  final Value<InvoiceItemKind> kind;
+  final Value<String?> articleId;
+  final Value<String> description;
+  final Value<String> quantity;
+  final Value<int> unitPriceCents;
+  final Value<double> vatRatePercent;
+  final Value<String?> unit;
+  final Value<double> discountPercent;
+  final Value<String?> groupLabel;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const RecurringInvoiceTemplateItemsCompanion({
+    this.id = const Value.absent(),
+    this.templateId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.articleId = const Value.absent(),
+    this.description = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.unitPriceCents = const Value.absent(),
+    this.vatRatePercent = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.discountPercent = const Value.absent(),
+    this.groupLabel = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RecurringInvoiceTemplateItemsCompanion.insert({
+    required String id,
+    required String templateId,
+    required InvoiceItemKind kind,
+    this.articleId = const Value.absent(),
+    required String description,
+    required String quantity,
+    required int unitPriceCents,
+    required double vatRatePercent,
+    this.unit = const Value.absent(),
+    this.discountPercent = const Value.absent(),
+    this.groupLabel = const Value.absent(),
+    required int sortOrder,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       templateId = Value(templateId),
+       kind = Value(kind),
+       description = Value(description),
+       quantity = Value(quantity),
+       unitPriceCents = Value(unitPriceCents),
+       vatRatePercent = Value(vatRatePercent),
+       sortOrder = Value(sortOrder);
+  static Insertable<RecurringInvoiceTemplateItem> custom({
+    Expression<String>? id,
+    Expression<String>? templateId,
+    Expression<String>? kind,
+    Expression<String>? articleId,
+    Expression<String>? description,
+    Expression<String>? quantity,
+    Expression<int>? unitPriceCents,
+    Expression<double>? vatRatePercent,
+    Expression<String>? unit,
+    Expression<double>? discountPercent,
+    Expression<String>? groupLabel,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (templateId != null) 'template_id': templateId,
+      if (kind != null) 'kind': kind,
+      if (articleId != null) 'article_id': articleId,
+      if (description != null) 'description': description,
+      if (quantity != null) 'quantity': quantity,
+      if (unitPriceCents != null) 'unit_price_cents': unitPriceCents,
+      if (vatRatePercent != null) 'vat_rate_percent': vatRatePercent,
+      if (unit != null) 'unit': unit,
+      if (discountPercent != null) 'discount_percent': discountPercent,
+      if (groupLabel != null) 'group_label': groupLabel,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RecurringInvoiceTemplateItemsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? templateId,
+    Value<InvoiceItemKind>? kind,
+    Value<String?>? articleId,
+    Value<String>? description,
+    Value<String>? quantity,
+    Value<int>? unitPriceCents,
+    Value<double>? vatRatePercent,
+    Value<String?>? unit,
+    Value<double>? discountPercent,
+    Value<String?>? groupLabel,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return RecurringInvoiceTemplateItemsCompanion(
+      id: id ?? this.id,
+      templateId: templateId ?? this.templateId,
+      kind: kind ?? this.kind,
+      articleId: articleId ?? this.articleId,
+      description: description ?? this.description,
+      quantity: quantity ?? this.quantity,
+      unitPriceCents: unitPriceCents ?? this.unitPriceCents,
+      vatRatePercent: vatRatePercent ?? this.vatRatePercent,
+      unit: unit ?? this.unit,
+      discountPercent: discountPercent ?? this.discountPercent,
+      groupLabel: groupLabel ?? this.groupLabel,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (templateId.present) {
+      map['template_id'] = Variable<String>(templateId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(
+        $RecurringInvoiceTemplateItemsTable.$converterkind.toSql(kind.value),
+      );
+    }
+    if (articleId.present) {
+      map['article_id'] = Variable<String>(articleId.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<String>(quantity.value);
+    }
+    if (unitPriceCents.present) {
+      map['unit_price_cents'] = Variable<int>(unitPriceCents.value);
+    }
+    if (vatRatePercent.present) {
+      map['vat_rate_percent'] = Variable<double>(vatRatePercent.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (discountPercent.present) {
+      map['discount_percent'] = Variable<double>(discountPercent.value);
+    }
+    if (groupLabel.present) {
+      map['group_label'] = Variable<String>(groupLabel.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecurringInvoiceTemplateItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('templateId: $templateId, ')
+          ..write('kind: $kind, ')
+          ..write('articleId: $articleId, ')
+          ..write('description: $description, ')
+          ..write('quantity: $quantity, ')
+          ..write('unitPriceCents: $unitPriceCents, ')
+          ..write('vatRatePercent: $vatRatePercent, ')
+          ..write('unit: $unit, ')
+          ..write('discountPercent: $discountPercent, ')
+          ..write('groupLabel: $groupLabel, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -8521,6 +9991,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $VehiclesTable vehicles = $VehiclesTable(this);
   late final $VehicleCostEntriesTable vehicleCostEntries =
       $VehicleCostEntriesTable(this);
+  late final $RecurringInvoiceTemplatesTable recurringInvoiceTemplates =
+      $RecurringInvoiceTemplatesTable(this);
+  late final $RecurringInvoiceTemplateItemsTable recurringInvoiceTemplateItems =
+      $RecurringInvoiceTemplateItemsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -8538,6 +10012,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     numberSequences,
     vehicles,
     vehicleCostEntries,
+    recurringInvoiceTemplates,
+    recurringInvoiceTemplateItems,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -8681,6 +10157,39 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ),
       result: [TableUpdate('vehicle_cost_entries', kind: UpdateKind.update)],
     ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'companies',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('recurring_invoice_templates', kind: UpdateKind.delete),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'recurring_invoice_templates',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate(
+          'recurring_invoice_template_items',
+          kind: UpdateKind.delete,
+        ),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'articles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate(
+          'recurring_invoice_template_items',
+          kind: UpdateKind.update,
+        ),
+      ],
+    ),
   ]);
 }
 
@@ -8700,6 +10209,7 @@ typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
   Value<bool> proformaEnabled,
   Value<bool> projectsEnabled,
   Value<bool> fleetEnabled,
+  Value<bool> recurringInvoicesEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
   Value<String?> pdfIntroTextQuote,
@@ -8729,6 +10239,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
   Value<bool> proformaEnabled,
   Value<bool> projectsEnabled,
   Value<bool> fleetEnabled,
+  Value<bool> recurringInvoicesEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
   Value<String?> pdfIntroTextQuote,
@@ -8917,6 +10428,31 @@ final class $$CompaniesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<
+    $RecurringInvoiceTemplatesTable,
+    List<RecurringInvoiceTemplate>
+  >
+  _recurringInvoiceTemplatesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.recurringInvoiceTemplates,
+        aliasName: 'companies__id__recurring_invoice_templates__company_id',
+      );
+
+  $$RecurringInvoiceTemplatesTableProcessedTableManager
+  get recurringInvoiceTemplatesRefs {
+    final manager = $$RecurringInvoiceTemplatesTableTableManager(
+      $_db,
+      $_db.recurringInvoiceTemplates,
+    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _recurringInvoiceTemplatesRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$CompaniesTableFilterComposer
@@ -9000,6 +10536,11 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<bool> get fleetEnabled => $composableBuilder(
     column: $table.fleetEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get recurringInvoicesEnabled => $composableBuilder(
+    column: $table.recurringInvoicesEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9282,6 +10823,33 @@ class $$CompaniesTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> recurringInvoiceTemplatesRefs(
+    Expression<bool> Function($$RecurringInvoiceTemplatesTableFilterComposer f)
+    f,
+  ) {
+    final $$RecurringInvoiceTemplatesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.recurringInvoiceTemplates,
+          getReferencedColumn: (t) => t.companyId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplatesTableFilterComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$CompaniesTableOrderingComposer
@@ -9365,6 +10933,11 @@ class $$CompaniesTableOrderingComposer
 
   ColumnOrderings<bool> get fleetEnabled => $composableBuilder(
     column: $table.fleetEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get recurringInvoicesEnabled => $composableBuilder(
+    column: $table.recurringInvoicesEnabled,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -9487,6 +11060,11 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<bool> get fleetEnabled => $composableBuilder(
     column: $table.fleetEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get recurringInvoicesEnabled => $composableBuilder(
+    column: $table.recurringInvoicesEnabled,
     builder: (column) => column,
   );
 
@@ -9770,6 +11348,33 @@ class $$CompaniesTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> recurringInvoiceTemplatesRefs<T extends Object>(
+    Expression<T> Function($$RecurringInvoiceTemplatesTableAnnotationComposer a)
+    f,
+  ) {
+    final $$RecurringInvoiceTemplatesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.recurringInvoiceTemplates,
+          getReferencedColumn: (t) => t.companyId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplatesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$CompaniesTableTableManager
@@ -9795,6 +11400,7 @@ class $$CompaniesTableTableManager
             bool numberSequencesRefs,
             bool vehiclesRefs,
             bool vehicleCostEntriesRefs,
+            bool recurringInvoiceTemplatesRefs,
           })
         > {
   $$CompaniesTableTableManager(_$AppDatabase db, $CompaniesTable table)
@@ -9825,6 +11431,7 @@ class $$CompaniesTableTableManager
                 Value<bool> proformaEnabled = const Value.absent(),
                 Value<bool> projectsEnabled = const Value.absent(),
                 Value<bool> fleetEnabled = const Value.absent(),
+                Value<bool> recurringInvoicesEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -9854,6 +11461,7 @@ class $$CompaniesTableTableManager
                 proformaEnabled: proformaEnabled,
                 projectsEnabled: projectsEnabled,
                 fleetEnabled: fleetEnabled,
+                recurringInvoicesEnabled: recurringInvoicesEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfIntroTextQuote: pdfIntroTextQuote,
@@ -9884,6 +11492,7 @@ class $$CompaniesTableTableManager
                 Value<bool> proformaEnabled = const Value.absent(),
                 Value<bool> projectsEnabled = const Value.absent(),
                 Value<bool> fleetEnabled = const Value.absent(),
+                Value<bool> recurringInvoicesEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -9913,6 +11522,7 @@ class $$CompaniesTableTableManager
                 proformaEnabled: proformaEnabled,
                 projectsEnabled: projectsEnabled,
                 fleetEnabled: fleetEnabled,
+                recurringInvoicesEnabled: recurringInvoicesEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfIntroTextQuote: pdfIntroTextQuote,
@@ -9945,6 +11555,7 @@ class $$CompaniesTableTableManager
                 numberSequencesRefs = false,
                 vehiclesRefs = false,
                 vehicleCostEntriesRefs = false,
+                recurringInvoiceTemplatesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -9958,6 +11569,8 @@ class $$CompaniesTableTableManager
                     if (numberSequencesRefs) db.numberSequences,
                     if (vehiclesRefs) db.vehicles,
                     if (vehicleCostEntriesRefs) db.vehicleCostEntries,
+                    if (recurringInvoiceTemplatesRefs)
+                      db.recurringInvoiceTemplates,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -10151,6 +11764,27 @@ class $$CompaniesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (recurringInvoiceTemplatesRefs)
+                        await $_getPrefetchedData<
+                          Company,
+                          $CompaniesTable,
+                          RecurringInvoiceTemplate
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompaniesTableReferences
+                              ._recurringInvoiceTemplatesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompaniesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).recurringInvoiceTemplatesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.companyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -10181,6 +11815,7 @@ typedef $$CompaniesTableProcessedTableManager =
         bool numberSequencesRefs,
         bool vehiclesRefs,
         bool vehicleCostEntriesRefs,
+        bool recurringInvoiceTemplatesRefs,
       })
     >;
 typedef $$CustomersTableCreateCompanionBuilder = CustomersCompanion Function({
@@ -10264,6 +11899,31 @@ final class $$CustomersTableReferences
     ).filter((f) => f.customerId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_invoicesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $RecurringInvoiceTemplatesTable,
+    List<RecurringInvoiceTemplate>
+  >
+  _recurringInvoiceTemplatesRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.recurringInvoiceTemplates,
+        aliasName: 'customers__id__recurring_invoice_templates__customer_id',
+      );
+
+  $$RecurringInvoiceTemplatesTableProcessedTableManager
+  get recurringInvoiceTemplatesRefs {
+    final manager = $$RecurringInvoiceTemplatesTableTableManager(
+      $_db,
+      $_db.recurringInvoiceTemplates,
+    ).filter((f) => f.customerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _recurringInvoiceTemplatesRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -10394,6 +12054,33 @@ class $$CustomersTableFilterComposer
                 $removeJoinBuilderFromRootComposer,
           ),
     );
+    return f(composer);
+  }
+
+  Expression<bool> recurringInvoiceTemplatesRefs(
+    Expression<bool> Function($$RecurringInvoiceTemplatesTableFilterComposer f)
+    f,
+  ) {
+    final $$RecurringInvoiceTemplatesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.recurringInvoiceTemplates,
+          getReferencedColumn: (t) => t.customerId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplatesTableFilterComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return f(composer);
   }
 }
@@ -10586,6 +12273,33 @@ class $$CustomersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> recurringInvoiceTemplatesRefs<T extends Object>(
+    Expression<T> Function($$RecurringInvoiceTemplatesTableAnnotationComposer a)
+    f,
+  ) {
+    final $$RecurringInvoiceTemplatesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.recurringInvoiceTemplates,
+          getReferencedColumn: (t) => t.customerId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplatesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$CustomersTableTableManager
@@ -10605,6 +12319,7 @@ class $$CustomersTableTableManager
             bool companyId,
             bool projectsRefs,
             bool invoicesRefs,
+            bool recurringInvoiceTemplatesRefs,
           })
         > {
   $$CustomersTableTableManager(_$AppDatabase db, $CustomersTable table)
@@ -10683,12 +12398,15 @@ class $$CustomersTableTableManager
                 companyId = false,
                 projectsRefs = false,
                 invoicesRefs = false,
+                recurringInvoiceTemplatesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (projectsRefs) db.projects,
                     if (invoicesRefs) db.invoices,
+                    if (recurringInvoiceTemplatesRefs)
+                      db.recurringInvoiceTemplates,
                   ],
                   addJoins:
                       <
@@ -10764,6 +12482,27 @@ class $$CustomersTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (recurringInvoiceTemplatesRefs)
+                        await $_getPrefetchedData<
+                          Customer,
+                          $CustomersTable,
+                          RecurringInvoiceTemplate
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CustomersTableReferences
+                              ._recurringInvoiceTemplatesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CustomersTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).recurringInvoiceTemplatesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.customerId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -10788,6 +12527,7 @@ typedef $$CustomersTableProcessedTableManager =
         bool companyId,
         bool projectsRefs,
         bool invoicesRefs,
+        bool recurringInvoiceTemplatesRefs,
       })
     >;
 typedef $$SuppliersTableCreateCompanionBuilder = SuppliersCompanion Function({
@@ -11937,6 +13677,31 @@ final class $$ArticlesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<
+    $RecurringInvoiceTemplateItemsTable,
+    List<RecurringInvoiceTemplateItem>
+  >
+  _recurringInvoiceTemplateItemsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.recurringInvoiceTemplateItems,
+        aliasName: 'articles__id__recurring_invoice_template_items__article_id',
+      );
+
+  $$RecurringInvoiceTemplateItemsTableProcessedTableManager
+  get recurringInvoiceTemplateItemsRefs {
+    final manager = $$RecurringInvoiceTemplateItemsTableTableManager(
+      $_db,
+      $_db.recurringInvoiceTemplateItems,
+    ).filter((f) => f.articleId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _recurringInvoiceTemplateItemsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ArticlesTableFilterComposer
@@ -12090,6 +13855,35 @@ class $$ArticlesTableFilterComposer
                 $removeJoinBuilderFromRootComposer,
           ),
     );
+    return f(composer);
+  }
+
+  Expression<bool> recurringInvoiceTemplateItemsRefs(
+    Expression<bool> Function(
+      $$RecurringInvoiceTemplateItemsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$RecurringInvoiceTemplateItemsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.recurringInvoiceTemplateItems,
+          getReferencedColumn: (t) => t.articleId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplateItemsTableFilterComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplateItems,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return f(composer);
   }
 }
@@ -12343,6 +14137,35 @@ class $$ArticlesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> recurringInvoiceTemplateItemsRefs<T extends Object>(
+    Expression<T> Function(
+      $$RecurringInvoiceTemplateItemsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$RecurringInvoiceTemplateItemsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.recurringInvoiceTemplateItems,
+          getReferencedColumn: (t) => t.articleId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplateItemsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplateItems,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$ArticlesTableTableManager
@@ -12364,6 +14187,7 @@ class $$ArticlesTableTableManager
             bool defaultSupplierId,
             bool articleSupplierPricesRefs,
             bool invoiceItemsRefs,
+            bool recurringInvoiceTemplateItemsRefs,
           })
         > {
   $$ArticlesTableTableManager(_$AppDatabase db, $ArticlesTable table)
@@ -12436,12 +14260,15 @@ class $$ArticlesTableTableManager
                 defaultSupplierId = false,
                 articleSupplierPricesRefs = false,
                 invoiceItemsRefs = false,
+                recurringInvoiceTemplateItemsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (articleSupplierPricesRefs) db.articleSupplierPrices,
                     if (invoiceItemsRefs) db.invoiceItems,
+                    if (recurringInvoiceTemplateItemsRefs)
+                      db.recurringInvoiceTemplateItems,
                   ],
                   addJoins:
                       <
@@ -12539,6 +14366,27 @@ class $$ArticlesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (recurringInvoiceTemplateItemsRefs)
+                        await $_getPrefetchedData<
+                          Article,
+                          $ArticlesTable,
+                          RecurringInvoiceTemplateItem
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ArticlesTableReferences
+                              ._recurringInvoiceTemplateItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ArticlesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).recurringInvoiceTemplateItemsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.articleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -12565,6 +14413,7 @@ typedef $$ArticlesTableProcessedTableManager =
         bool defaultSupplierId,
         bool articleSupplierPricesRefs,
         bool invoiceItemsRefs,
+        bool recurringInvoiceTemplateItemsRefs,
       })
     >;
 typedef $$ArticleSupplierPricesTableCreateCompanionBuilder =
@@ -16671,6 +18520,1240 @@ typedef $$VehicleCostEntriesTableProcessedTableManager =
       VehicleCostEntry,
       PrefetchHooks Function({bool companyId, bool vehicleId, bool projectId})
     >;
+typedef $$RecurringInvoiceTemplatesTableCreateCompanionBuilder =
+    RecurringInvoiceTemplatesCompanion Function({
+      required String id,
+      required String companyId,
+      required String customerId,
+      required String label,
+      required RecurrenceInterval interval,
+      required DateTime nextDueDate,
+      Value<String?> paymentTerms,
+      Value<String?> notes,
+      Value<bool> active,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$RecurringInvoiceTemplatesTableUpdateCompanionBuilder =
+    RecurringInvoiceTemplatesCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> customerId,
+      Value<String> label,
+      Value<RecurrenceInterval> interval,
+      Value<DateTime> nextDueDate,
+      Value<String?> paymentTerms,
+      Value<String?> notes,
+      Value<bool> active,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$RecurringInvoiceTemplatesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $RecurringInvoiceTemplatesTable,
+          RecurringInvoiceTemplate
+        > {
+  $$RecurringInvoiceTemplatesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CompaniesTable _companyIdTable(_$AppDatabase db) => db.companies
+      .createAlias('recurring_invoice_templates__company_id__companies__id');
+
+  $$CompaniesTableProcessedTableManager get companyId {
+    final $_column = $_itemColumn<String>('company_id')!;
+
+    final manager = $$CompaniesTableTableManager(
+      $_db,
+      $_db.companies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $CustomersTable _customerIdTable(_$AppDatabase db) => db.customers
+      .createAlias('recurring_invoice_templates__customer_id__customers__id');
+
+  $$CustomersTableProcessedTableManager get customerId {
+    final $_column = $_itemColumn<String>('customer_id')!;
+
+    final manager = $$CustomersTableTableManager(
+      $_db,
+      $_db.customers,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_customerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $RecurringInvoiceTemplateItemsTable,
+    List<RecurringInvoiceTemplateItem>
+  >
+  _recurringInvoiceTemplateItemsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.recurringInvoiceTemplateItems,
+        aliasName: 'recurring_invoice_templates__id__recurring_invoice_template_items__template_id',
+      );
+
+  $$RecurringInvoiceTemplateItemsTableProcessedTableManager
+  get recurringInvoiceTemplateItemsRefs {
+    final manager = $$RecurringInvoiceTemplateItemsTableTableManager(
+      $_db,
+      $_db.recurringInvoiceTemplateItems,
+    ).filter((f) => f.templateId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _recurringInvoiceTemplateItemsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$RecurringInvoiceTemplatesTableFilterComposer
+    extends Composer<_$AppDatabase, $RecurringInvoiceTemplatesTable> {
+  $$RecurringInvoiceTemplatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<RecurrenceInterval, RecurrenceInterval, String>
+  get interval => $composableBuilder(
+    column: $table.interval,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<DateTime> get nextDueDate => $composableBuilder(
+    column: $table.nextDueDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paymentTerms => $composableBuilder(
+    column: $table.paymentTerms,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CompaniesTableFilterComposer get companyId {
+    final $$CompaniesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableFilterComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CustomersTableFilterComposer get customerId {
+    final $$CustomersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.customerId,
+      referencedTable: $db.customers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CustomersTableFilterComposer(
+            $db: $db,
+            $table: $db.customers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> recurringInvoiceTemplateItemsRefs(
+    Expression<bool> Function(
+      $$RecurringInvoiceTemplateItemsTableFilterComposer f,
+    )
+    f,
+  ) {
+    final $$RecurringInvoiceTemplateItemsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.recurringInvoiceTemplateItems,
+          getReferencedColumn: (t) => t.templateId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplateItemsTableFilterComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplateItems,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$RecurringInvoiceTemplatesTableOrderingComposer
+    extends Composer<_$AppDatabase, $RecurringInvoiceTemplatesTable> {
+  $$RecurringInvoiceTemplatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get interval => $composableBuilder(
+    column: $table.interval,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get nextDueDate => $composableBuilder(
+    column: $table.nextDueDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paymentTerms => $composableBuilder(
+    column: $table.paymentTerms,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CompaniesTableOrderingComposer get companyId {
+    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableOrderingComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CustomersTableOrderingComposer get customerId {
+    final $$CustomersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.customerId,
+      referencedTable: $db.customers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CustomersTableOrderingComposer(
+            $db: $db,
+            $table: $db.customers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RecurringInvoiceTemplatesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RecurringInvoiceTemplatesTable> {
+  $$RecurringInvoiceTemplatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<RecurrenceInterval, String> get interval =>
+      $composableBuilder(column: $table.interval, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get nextDueDate => $composableBuilder(
+    column: $table.nextDueDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get paymentTerms => $composableBuilder(
+    column: $table.paymentTerms,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<bool> get active =>
+      $composableBuilder(column: $table.active, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$CompaniesTableAnnotationComposer get companyId {
+    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CustomersTableAnnotationComposer get customerId {
+    final $$CustomersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.customerId,
+      referencedTable: $db.customers,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CustomersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.customers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> recurringInvoiceTemplateItemsRefs<T extends Object>(
+    Expression<T> Function(
+      $$RecurringInvoiceTemplateItemsTableAnnotationComposer a,
+    )
+    f,
+  ) {
+    final $$RecurringInvoiceTemplateItemsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.recurringInvoiceTemplateItems,
+          getReferencedColumn: (t) => t.templateId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplateItemsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplateItems,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$RecurringInvoiceTemplatesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RecurringInvoiceTemplatesTable,
+          RecurringInvoiceTemplate,
+          $$RecurringInvoiceTemplatesTableFilterComposer,
+          $$RecurringInvoiceTemplatesTableOrderingComposer,
+          $$RecurringInvoiceTemplatesTableAnnotationComposer,
+          $$RecurringInvoiceTemplatesTableCreateCompanionBuilder,
+          $$RecurringInvoiceTemplatesTableUpdateCompanionBuilder,
+          (
+            RecurringInvoiceTemplate,
+            $$RecurringInvoiceTemplatesTableReferences,
+          ),
+          RecurringInvoiceTemplate,
+          PrefetchHooks Function({
+            bool companyId,
+            bool customerId,
+            bool recurringInvoiceTemplateItemsRefs,
+          })
+        > {
+  $$RecurringInvoiceTemplatesTableTableManager(
+    _$AppDatabase db,
+    $RecurringInvoiceTemplatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RecurringInvoiceTemplatesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$RecurringInvoiceTemplatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$RecurringInvoiceTemplatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> companyId = const Value.absent(),
+                Value<String> customerId = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<RecurrenceInterval> interval = const Value.absent(),
+                Value<DateTime> nextDueDate = const Value.absent(),
+                Value<String?> paymentTerms = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RecurringInvoiceTemplatesCompanion(
+                id: id,
+                companyId: companyId,
+                customerId: customerId,
+                label: label,
+                interval: interval,
+                nextDueDate: nextDueDate,
+                paymentTerms: paymentTerms,
+                notes: notes,
+                active: active,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String companyId,
+                required String customerId,
+                required String label,
+                required RecurrenceInterval interval,
+                required DateTime nextDueDate,
+                Value<String?> paymentTerms = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => RecurringInvoiceTemplatesCompanion.insert(
+                id: id,
+                companyId: companyId,
+                customerId: customerId,
+                label: label,
+                interval: interval,
+                nextDueDate: nextDueDate,
+                paymentTerms: paymentTerms,
+                notes: notes,
+                active: active,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $RecurringInvoiceTemplatesTable,
+                    RecurringInvoiceTemplate
+                  >(table),
+                  $$RecurringInvoiceTemplatesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                companyId = false,
+                customerId = false,
+                recurringInvoiceTemplateItemsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (recurringInvoiceTemplateItemsRefs)
+                      db.recurringInvoiceTemplateItems,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (companyId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.companyId,
+                            referencedTable:
+                                $$RecurringInvoiceTemplatesTableReferences
+                                    ._companyIdTable(db),
+                            referencedColumn:
+                                $$RecurringInvoiceTemplatesTableReferences
+                                    ._companyIdTable(db)
+                                    .id,
+                          ) as T;
+                        }
+                        if (customerId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.customerId,
+                            referencedTable:
+                                $$RecurringInvoiceTemplatesTableReferences
+                                    ._customerIdTable(db),
+                            referencedColumn:
+                                $$RecurringInvoiceTemplatesTableReferences
+                                    ._customerIdTable(db)
+                                    .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (recurringInvoiceTemplateItemsRefs)
+                        await $_getPrefetchedData<
+                          RecurringInvoiceTemplate,
+                          $RecurringInvoiceTemplatesTable,
+                          RecurringInvoiceTemplateItem
+                        >(
+                          currentTable: table,
+                          referencedTable:
+                              $$RecurringInvoiceTemplatesTableReferences
+                                  ._recurringInvoiceTemplateItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$RecurringInvoiceTemplatesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).recurringInvoiceTemplateItemsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.templateId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$RecurringInvoiceTemplatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RecurringInvoiceTemplatesTable,
+      RecurringInvoiceTemplate,
+      $$RecurringInvoiceTemplatesTableFilterComposer,
+      $$RecurringInvoiceTemplatesTableOrderingComposer,
+      $$RecurringInvoiceTemplatesTableAnnotationComposer,
+      $$RecurringInvoiceTemplatesTableCreateCompanionBuilder,
+      $$RecurringInvoiceTemplatesTableUpdateCompanionBuilder,
+      (RecurringInvoiceTemplate, $$RecurringInvoiceTemplatesTableReferences),
+      RecurringInvoiceTemplate,
+      PrefetchHooks Function({
+        bool companyId,
+        bool customerId,
+        bool recurringInvoiceTemplateItemsRefs,
+      })
+    >;
+typedef $$RecurringInvoiceTemplateItemsTableCreateCompanionBuilder =
+    RecurringInvoiceTemplateItemsCompanion Function({
+      required String id,
+      required String templateId,
+      required InvoiceItemKind kind,
+      Value<String?> articleId,
+      required String description,
+      required String quantity,
+      required int unitPriceCents,
+      required double vatRatePercent,
+      Value<String?> unit,
+      Value<double> discountPercent,
+      Value<String?> groupLabel,
+      required int sortOrder,
+      Value<int> rowid,
+    });
+typedef $$RecurringInvoiceTemplateItemsTableUpdateCompanionBuilder =
+    RecurringInvoiceTemplateItemsCompanion Function({
+      Value<String> id,
+      Value<String> templateId,
+      Value<InvoiceItemKind> kind,
+      Value<String?> articleId,
+      Value<String> description,
+      Value<String> quantity,
+      Value<int> unitPriceCents,
+      Value<double> vatRatePercent,
+      Value<String?> unit,
+      Value<double> discountPercent,
+      Value<String?> groupLabel,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+final class $$RecurringInvoiceTemplateItemsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $RecurringInvoiceTemplateItemsTable,
+          RecurringInvoiceTemplateItem
+        > {
+  $$RecurringInvoiceTemplateItemsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $RecurringInvoiceTemplatesTable _templateIdTable(_$AppDatabase db) =>
+      db.recurringInvoiceTemplates.createAlias(
+        'recurring_invoice_template_items__template_id__recurring_invoice_templates__id',
+      );
+
+  $$RecurringInvoiceTemplatesTableProcessedTableManager get templateId {
+    final $_column = $_itemColumn<String>('template_id')!;
+
+    final manager = $$RecurringInvoiceTemplatesTableTableManager(
+      $_db,
+      $_db.recurringInvoiceTemplates,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_templateIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ArticlesTable _articleIdTable(_$AppDatabase db) =>
+      db.articles.createAlias(
+        'recurring_invoice_template_items__article_id__articles__id',
+      );
+
+  $$ArticlesTableProcessedTableManager? get articleId {
+    final $_column = $_itemColumn<String>('article_id');
+    if ($_column == null) return null;
+    final manager = $$ArticlesTableTableManager(
+      $_db,
+      $_db.articles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_articleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$RecurringInvoiceTemplateItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $RecurringInvoiceTemplateItemsTable> {
+  $$RecurringInvoiceTemplateItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<InvoiceItemKind, InvoiceItemKind, String>
+  get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get unitPriceCents => $composableBuilder(
+    column: $table.unitPriceCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get vatRatePercent => $composableBuilder(
+    column: $table.vatRatePercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get groupLabel => $composableBuilder(
+    column: $table.groupLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$RecurringInvoiceTemplatesTableFilterComposer get templateId {
+    final $$RecurringInvoiceTemplatesTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.templateId,
+          referencedTable: $db.recurringInvoiceTemplates,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplatesTableFilterComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ArticlesTableFilterComposer get articleId {
+    final $$ArticlesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.articleId,
+      referencedTable: $db.articles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticlesTableFilterComposer(
+            $db: $db,
+            $table: $db.articles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RecurringInvoiceTemplateItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $RecurringInvoiceTemplateItemsTable> {
+  $$RecurringInvoiceTemplateItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get unitPriceCents => $composableBuilder(
+    column: $table.unitPriceCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get vatRatePercent => $composableBuilder(
+    column: $table.vatRatePercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get groupLabel => $composableBuilder(
+    column: $table.groupLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$RecurringInvoiceTemplatesTableOrderingComposer get templateId {
+    final $$RecurringInvoiceTemplatesTableOrderingComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.templateId,
+          referencedTable: $db.recurringInvoiceTemplates,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplatesTableOrderingComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ArticlesTableOrderingComposer get articleId {
+    final $$ArticlesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.articleId,
+      referencedTable: $db.articles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticlesTableOrderingComposer(
+            $db: $db,
+            $table: $db.articles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RecurringInvoiceTemplateItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RecurringInvoiceTemplateItemsTable> {
+  $$RecurringInvoiceTemplateItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<InvoiceItemKind, String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<int> get unitPriceCents => $composableBuilder(
+    column: $table.unitPriceCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get vatRatePercent => $composableBuilder(
+    column: $table.vatRatePercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get groupLabel => $composableBuilder(
+    column: $table.groupLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  $$RecurringInvoiceTemplatesTableAnnotationComposer get templateId {
+    final $$RecurringInvoiceTemplatesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.templateId,
+          referencedTable: $db.recurringInvoiceTemplates,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$RecurringInvoiceTemplatesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.recurringInvoiceTemplates,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
+
+  $$ArticlesTableAnnotationComposer get articleId {
+    final $$ArticlesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.articleId,
+      referencedTable: $db.articles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticlesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.articles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$RecurringInvoiceTemplateItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RecurringInvoiceTemplateItemsTable,
+          RecurringInvoiceTemplateItem,
+          $$RecurringInvoiceTemplateItemsTableFilterComposer,
+          $$RecurringInvoiceTemplateItemsTableOrderingComposer,
+          $$RecurringInvoiceTemplateItemsTableAnnotationComposer,
+          $$RecurringInvoiceTemplateItemsTableCreateCompanionBuilder,
+          $$RecurringInvoiceTemplateItemsTableUpdateCompanionBuilder,
+          (
+            RecurringInvoiceTemplateItem,
+            $$RecurringInvoiceTemplateItemsTableReferences,
+          ),
+          RecurringInvoiceTemplateItem,
+          PrefetchHooks Function({bool templateId, bool articleId})
+        > {
+  $$RecurringInvoiceTemplateItemsTableTableManager(
+    _$AppDatabase db,
+    $RecurringInvoiceTemplateItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RecurringInvoiceTemplateItemsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$RecurringInvoiceTemplateItemsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$RecurringInvoiceTemplateItemsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> templateId = const Value.absent(),
+                Value<InvoiceItemKind> kind = const Value.absent(),
+                Value<String?> articleId = const Value.absent(),
+                Value<String> description = const Value.absent(),
+                Value<String> quantity = const Value.absent(),
+                Value<int> unitPriceCents = const Value.absent(),
+                Value<double> vatRatePercent = const Value.absent(),
+                Value<String?> unit = const Value.absent(),
+                Value<double> discountPercent = const Value.absent(),
+                Value<String?> groupLabel = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RecurringInvoiceTemplateItemsCompanion(
+                id: id,
+                templateId: templateId,
+                kind: kind,
+                articleId: articleId,
+                description: description,
+                quantity: quantity,
+                unitPriceCents: unitPriceCents,
+                vatRatePercent: vatRatePercent,
+                unit: unit,
+                discountPercent: discountPercent,
+                groupLabel: groupLabel,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String templateId,
+                required InvoiceItemKind kind,
+                Value<String?> articleId = const Value.absent(),
+                required String description,
+                required String quantity,
+                required int unitPriceCents,
+                required double vatRatePercent,
+                Value<String?> unit = const Value.absent(),
+                Value<double> discountPercent = const Value.absent(),
+                Value<String?> groupLabel = const Value.absent(),
+                required int sortOrder,
+                Value<int> rowid = const Value.absent(),
+              }) => RecurringInvoiceTemplateItemsCompanion.insert(
+                id: id,
+                templateId: templateId,
+                kind: kind,
+                articleId: articleId,
+                description: description,
+                quantity: quantity,
+                unitPriceCents: unitPriceCents,
+                vatRatePercent: vatRatePercent,
+                unit: unit,
+                discountPercent: discountPercent,
+                groupLabel: groupLabel,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $RecurringInvoiceTemplateItemsTable,
+                    RecurringInvoiceTemplateItem
+                  >(table),
+                  $$RecurringInvoiceTemplateItemsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({templateId = false, articleId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (templateId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.templateId,
+                        referencedTable:
+                            $$RecurringInvoiceTemplateItemsTableReferences
+                                ._templateIdTable(db),
+                        referencedColumn:
+                            $$RecurringInvoiceTemplateItemsTableReferences
+                                ._templateIdTable(db)
+                                .id,
+                      ) as T;
+                    }
+                    if (articleId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.articleId,
+                        referencedTable:
+                            $$RecurringInvoiceTemplateItemsTableReferences
+                                ._articleIdTable(db),
+                        referencedColumn:
+                            $$RecurringInvoiceTemplateItemsTableReferences
+                                ._articleIdTable(db)
+                                .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$RecurringInvoiceTemplateItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RecurringInvoiceTemplateItemsTable,
+      RecurringInvoiceTemplateItem,
+      $$RecurringInvoiceTemplateItemsTableFilterComposer,
+      $$RecurringInvoiceTemplateItemsTableOrderingComposer,
+      $$RecurringInvoiceTemplateItemsTableAnnotationComposer,
+      $$RecurringInvoiceTemplateItemsTableCreateCompanionBuilder,
+      $$RecurringInvoiceTemplateItemsTableUpdateCompanionBuilder,
+      (
+        RecurringInvoiceTemplateItem,
+        $$RecurringInvoiceTemplateItemsTableReferences,
+      ),
+      RecurringInvoiceTemplateItem,
+      PrefetchHooks Function({bool templateId, bool articleId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -16699,4 +19782,15 @@ class $AppDatabaseManager {
       $$VehiclesTableTableManager(_db, _db.vehicles);
   $$VehicleCostEntriesTableTableManager get vehicleCostEntries =>
       $$VehicleCostEntriesTableTableManager(_db, _db.vehicleCostEntries);
+  $$RecurringInvoiceTemplatesTableTableManager get recurringInvoiceTemplates =>
+      $$RecurringInvoiceTemplatesTableTableManager(
+        _db,
+        _db.recurringInvoiceTemplates,
+      );
+  $$RecurringInvoiceTemplateItemsTableTableManager
+  get recurringInvoiceTemplateItems =>
+      $$RecurringInvoiceTemplateItemsTableTableManager(
+        _db,
+        _db.recurringInvoiceTemplateItems,
+      );
 }
