@@ -27,6 +27,7 @@ class InvoiceEditorScreen extends StatefulWidget {
     required this.customer,
     this.invoice,
     this.kind = DocumentKind.invoice,
+    this.onChanged,
   });
 
   final Customer customer;
@@ -38,6 +39,16 @@ class InvoiceEditorScreen extends StatefulWidget {
   /// [invoice], gilt stattdessen dessen eigene `kind` (eine Dokumentart
   /// ist nach dem Anlegen nicht mehr wechselbar, siehe [_kind]).
   final DocumentKind kind;
+
+  /// Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 3, Breit-Layout):
+  /// wird mit dem gespeicherten/finalisierten Dokument aufgerufen. Im
+  /// schmalen Layout (Push-Navigation) ist das nicht nötig — dort löst
+  /// `Navigator.pop` mit Rückgabewert das Neuladen der Liste aus. Im
+  /// breiten Layout ist dieser Editor dagegen direkt **eingebettet**
+  /// (kein Push/Pop); die Liste übernimmt das übergebene Dokument auch
+  /// gleich als neue Auswahl, damit ein frisch angelegter Entwurf nach
+  /// dem ersten Speichern sofort als ausgewählt markiert erscheint.
+  final ValueChanged<Invoice>? onChanged;
 
   @override
   State<InvoiceEditorScreen> createState() => _InvoiceEditorScreenState();
@@ -337,6 +348,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           return;
         }
         setState(() => _currentInvoice = saved);
+        widget.onChanged?.call(saved);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_isFinalized ? 'Änderungen gespeichert.' : 'Entwurf gespeichert.'),
@@ -418,6 +430,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         return;
       }
       setState(() => _currentInvoice = finalized);
+      widget.onChanged?.call(finalized);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Finalisiert als ${finalized.invoiceNumber}.')),
       );
