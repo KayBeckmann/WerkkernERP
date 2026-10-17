@@ -254,6 +254,9 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     if (data.invoices.isEmpty) {
       return Center(child: Text(DocumentLabels.emptyListText(widget.kind)));
     }
+    // C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17): Fristen
+    // kommen jetzt aus den Firmen-Einstellungen statt fester Konstanten.
+    final dunningConfig = DunningConfig.fromCompany(context.read<ActiveCompanyService>().active!);
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
       itemCount: data.invoices.length,
@@ -268,7 +271,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         // datumsbasierte Anzeige, siehe `dunning_service.dart` — ergibt
         // `DunningLevel.none`, solange kein Fälligkeitsdatum gesetzt ist
         // (z. B. Modul ausgeschaltet), kein zusätzlicher Flag-Check nötig.
-        final dunningLevel = dunningLevelFor(invoice, DateTime.now());
+        final dunningLevel = dunningLevelFor(invoice, DateTime.now(), dunningConfig);
         return Card(
           color: selected ? Theme.of(context).colorScheme.primaryContainer : null,
           child: ListTile(

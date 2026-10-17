@@ -13,6 +13,7 @@ import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/dunning_service.dart';
 import '../../domain/services/invoice_totals_service.dart';
+import '../../pdf/dunning_letter_pdf_builder.dart';
 import '../../pdf/invoice_pdf_builder.dart';
 import '../widgets/invoice_item_dialog.dart';
 import 'invoices_screen.dart' show DocumentLabels;
@@ -174,6 +175,15 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _dunningEnabled = false;
   DateTime? _dueDate;
   bool _markingPaid = false;
+  DunningConfig _dunningConfig = const DunningConfig(
+    reminder2AfterDays: 14,
+    reminder3AfterDays: 28,
+    feeLevel1: Money.fromCents(0),
+    feeLevel2: Money.fromCents(0),
+    feeLevel3: Money.fromCents(0),
+    interestRatePercent: 0,
+  );
+  bool _generatingDunningLetter = false;
 
   bool get _isFinalized => _currentInvoice?.status == InvoiceStatus.finalized;
   DocumentKind get _kind => _currentInvoice?.kind ?? widget.kind;
@@ -206,6 +216,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
     _advancePaymentInvoicesEnabled = company.advancePaymentInvoicesEnabled;
     _dunningEnabled = company.dunningEnabled;
+    _dunningConfig = DunningConfig.fromCompany(company);
 
     final invoice = widget.invoice;
     _currentInvoice = invoice;
@@ -439,6 +450,43 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       }
     } finally {
       if (mounted) setState(() => _markingPaid = false);
+    }
+  }
+
+  /// C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17: "Mahngebühren
+  /// und Mahnschreiben-PDF bitte umsetzen"). Erzeugt und teilt ein
+  /// Mahnschreiben für die aktuelle Mahnstufe. Rein lesend — löst **kein**
+  /// Fortschreiten der Mahnstufe o. Ä. aus, da die Stufe ausschließlich
+  /// aus dem Fälligkeitsdatum berechnet wird (siehe `dunningLevelFor`);
+  /// wiederholtes Erzeugen ist absichtlich jederzeit möglich.
+  Future<void> _generateDunningLetter(DunningLevel level) async {
+    final invoice = _currentInvoice;
+    if (invoice == null) return;
+    setState(() => _generatingDunningLetter = true);
+    try {
+      final repo = context.read<InvoiceRepository>();
+      final company = context.read<ActiveCompanyService>().active!;
+      final invoiceGross = (await repo.totalsFor(invoice.id)).totalGross;
+      if (!mounted) return;
+      final bytes = await buildDunningLetterPdf(
+        invoice: invoice,
+        company: company,
+        level: level,
+        config: _dunningConfig,
+        invoiceGross: invoiceGross,
+      );
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: '${invoice.invoiceNumber}-${dunningLetterTitle(level)}.pdf',
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Mahnschreiben konnte nicht erstellt/geteilt werden.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _generatingDunningLetter = false);
     }
   }
 
@@ -890,18 +938,28 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   ),
                 ],
               ),
-              // Rein datumsbasierte Anzeige, keine Mahngebühr/Verzugszins
-              // (siehe Doc-Kommentar bei `dunningLevelFor` — eigene
-              // rechtliche Prüfung nötig, hier bewusst nicht behauptet).
+              // Mahnstufe weiterhin rein datumsbasiert (siehe
+              // `dunningLevelFor`); Gebühr/Zins kommen jetzt aber aus den
+              // Firmen-Einstellungen statt gar nicht berechnet zu werden.
               Builder(
                 builder: (context) {
-                  final level = dunningLevelFor(_currentInvoice!, DateTime.now());
+                  final level = dunningLevelFor(_currentInvoice!, DateTime.now(), _dunningConfig);
                   if (level == DunningLevel.none) return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      dunningLevelLabel(level),
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            dunningLevelLabel(level),
+                            style: TextStyle(color: Theme.of(context).colorScheme.error),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _generatingDunningLetter ? null : () => _generateDunningLetter(level),
+                          child: Text('${dunningLetterTitle(level)} erzeugen'),
+                        ),
+                      ],
                     ),
                   );
                 },

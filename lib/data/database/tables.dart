@@ -55,6 +55,28 @@ class Companies extends Table {
   /// Anzeige im Rechnungseditor/-liste frei — keine eigene Tabelle.
   BoolColumn get dunningEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17: "Wo stelle
+  /// ich die Gebühren und die Fristen ein?"). **Kays eigene Werte**,
+  /// keine von dieser App vorgegebenen oder rechtlich geprüften Fristen/
+  /// Beträge — siehe ausführlichen Doc-Kommentar bei `DunningConfig` in
+  /// `domain/services/dunning_service.dart`. Default-Fristen (14/28
+  /// Tage) entsprechen den bisherigen festverdrahteten Werten, Default-
+  /// Gebühren/Zins sind 0 (kein Automatismus ohne explizite Eingabe).
+  IntColumn get dunningReminder2AfterDays => integer().withDefault(const Constant(14))();
+  IntColumn get dunningReminder3AfterDays => integer().withDefault(const Constant(28))();
+  IntColumn get dunningFeeLevel1Cents => integer().withDefault(const Constant(0))();
+  IntColumn get dunningFeeLevel2Cents => integer().withDefault(const Constant(0))();
+  IntColumn get dunningFeeLevel3Cents => integer().withDefault(const Constant(0))();
+  RealColumn get dunningInterestRatePercent => real().withDefault(const Constant(0))();
+
+  /// Einleitungs-/Schlusstext für ein erzeugtes Mahnschreiben — gleiches
+  /// Muster wie die Dokumentart-Texte oben, aber nicht an einen
+  /// [DocumentKind] gebunden (ein Mahnschreiben ist kein eigenständiges
+  /// Dokument mit eigenem Nummernkreis, sondern ein Zusatzschreiben zu
+  /// einer bereits finalisierten Rechnung).
+  TextColumn get pdfIntroTextDunning => text().nullable()();
+  TextColumn get pdfClosingTextDunning => text().nullable()();
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag

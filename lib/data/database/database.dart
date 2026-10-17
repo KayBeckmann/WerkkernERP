@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -149,6 +149,18 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(invoices, invoices.paymentStatus);
             await migrator.addColumn(invoices, invoices.paidAt);
             await migrator.addColumn(companies, companies.dunningEnabled);
+          }
+          if (from < 15) {
+            // C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17):
+            // konfigurierbare Fristen/Gebühren/Zins + Mahnschreiben-Texte.
+            await migrator.addColumn(companies, companies.dunningReminder2AfterDays);
+            await migrator.addColumn(companies, companies.dunningReminder3AfterDays);
+            await migrator.addColumn(companies, companies.dunningFeeLevel1Cents);
+            await migrator.addColumn(companies, companies.dunningFeeLevel2Cents);
+            await migrator.addColumn(companies, companies.dunningFeeLevel3Cents);
+            await migrator.addColumn(companies, companies.dunningInterestRatePercent);
+            await migrator.addColumn(companies, companies.pdfIntroTextDunning);
+            await migrator.addColumn(companies, companies.pdfClosingTextDunning);
           }
         },
       );
