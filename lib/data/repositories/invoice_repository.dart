@@ -445,6 +445,27 @@ class InvoiceRepository {
     return findById(companyId: companyId, id: id);
   }
 
+  /// C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17): das
+  /// Fälligkeitsdatum muss sich **auch nachträglich an einer bereits
+  /// finalisierten Rechnung** setzen/ändern lassen. Ursprünglich lief
+  /// das ausschließlich über [update], das aber wie jedes andere Feld
+  /// durch [isEditable] blockiert wird — eine Rechnung ist ab
+  /// Finalisierung sofort gesperrt (siehe Doc-Kommentar dort), wodurch
+  /// ein erst NACH der Finalisierung aktiviertes Mahnwesen-Modul für
+  /// bereits bestehende Rechnungen nie ein Fälligkeitsdatum bekommen
+  /// konnte — der eigentliche Grund für "es wird nirgends etwas
+  /// angezeigt". Das Fälligkeitsdatum ist reine Nachverfolgung, kein
+  /// Teil des festgeschriebenen Rechnungsinhalts (Positionen/Summen/
+  /// Nummer bleiben unberührt) — deshalb hier bewusst **ohne**
+  /// [isEditable]-Prüfung, analog zu [markPaid]/[markOpen].
+  Future<Invoice?> setDueDate({required String companyId, required String id, DateTime? dueDate}) async {
+    final existing = await findById(companyId: companyId, id: id);
+    if (existing == null) return null;
+    await (_db.update(_db.invoices)..where((i) => i.id.equals(id)))
+        .write(InvoicesCompanion(dueDate: Value(dueDate)));
+    return findById(companyId: companyId, id: id);
+  }
+
   Future<bool> deleteDraft({required String companyId, required String id}) async {
     final existing = await findById(companyId: companyId, id: id);
     if (existing == null || existing.status != InvoiceStatus.draft) return false;

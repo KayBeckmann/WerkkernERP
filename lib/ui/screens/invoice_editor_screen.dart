@@ -396,8 +396,13 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
   }
 
-  /// C12 Mahnwesen — Fälligkeitsdatum ist nur im Entwurf änderbar
-  /// (gleiche Logik wie andere Entwurfsfelder, über [_save] persistiert).
+  /// C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17): das
+  /// Fälligkeitsdatum ist jetzt **jederzeit** änderbar, nicht nur im
+  /// Entwurf (siehe Doc-Kommentar bei `InvoiceRepository.setDueDate`).
+  /// Im Entwurf bleibt es wie bisher Teil von [_save] (kein zusätzlicher
+  /// Persistierungsweg nötig); bei einer bereits finalisierten/
+  /// gesperrten Rechnung wird sofort direkt gespeichert, analog zu
+  /// "Als bezahlt markieren".
   Future<void> _pickDueDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -405,7 +410,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    if (picked != null) setState(() => _dueDate = picked);
+    if (picked == null || !mounted) return;
+    setState(() => _dueDate = picked);
+    if (_isLocked) {
+      final companyId = context.read<ActiveCompanyService>().active!.id;
+      final repo = context.read<InvoiceRepository>();
+      final updated = await repo.setDueDate(companyId: companyId, id: _currentInvoice!.id, dueDate: picked);
+      if (updated != null && mounted) setState(() => _currentInvoice = updated);
+    }
   }
 
   /// C12 Mahnwesen — manuell "als bezahlt"/"als offen" markieren, sofort
@@ -838,23 +850,24 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 onChanged: (value) => setState(() => _isAdvancePayment = value ?? false),
               ),
           ],
-          // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17) —
-          // nur bei Rechnungen sinnvoll. Fälligkeitsdatum nur im Entwurf
-          // änderbar; Zahlungsstatus/Mahnstufe nur bei finalisierten
-          // Dokumenten (ein Entwurf hat fachlich keinen Zahlungsstatus).
+          // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17,
+          // Nachbesserung nach Kay-Feedback 2026-10-17) — nur bei
+          // Rechnungen sinnvoll. Fälligkeitsdatum ist **jederzeit**
+          // änderbar (auch nach Finalisierung, siehe `_pickDueDate`);
+          // Zahlungsstatus/Mahnstufe nur bei finalisierten Dokumenten
+          // (ein Entwurf hat fachlich keinen Zahlungsstatus).
           if (_dunningEnabled && _kind == DocumentKind.invoice) ...[
             const SizedBox(height: 8),
-            if (!isLocked)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  _dueDate == null
-                      ? 'Fälligkeitsdatum (optional)'
-                      : 'Fälligkeitsdatum: ${_dueDate!.toLocal().toString().split(' ').first}',
-                ),
-                trailing: const Icon(Icons.calendar_today_outlined),
-                onTap: _pickDueDate,
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                _dueDate == null
+                    ? 'Fälligkeitsdatum (optional)'
+                    : 'Fälligkeitsdatum: ${_dueDate!.toLocal().toString().split(' ').first}',
               ),
+              trailing: const Icon(Icons.calendar_today_outlined),
+              onTap: _pickDueDate,
+            ),
             if (isFinalized) ...[
               Row(
                 children: [

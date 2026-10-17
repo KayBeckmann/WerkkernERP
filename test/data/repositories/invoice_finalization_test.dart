@@ -271,4 +271,33 @@ void main() {
     );
     expect(cleared!.dueDate, isNull);
   });
+
+  test(
+    'setDueDate(): Nachbesserung (Kay-Feedback 2026-10-17) — ein Fälligkeitsdatum lässt sich '
+    'auch an einer bereits finalisierten Rechnung noch setzen, anders als über update()',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final draft = await draftWithOneItem(company.id, customer.id);
+      final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+      expect(finalized!.dueDate, isNull);
+
+      // update() wäre hier blockiert (isEditable() == false für eine
+      // finalisierte Rechnung) — genau das war der gemeldete Fehler.
+      final viaUpdate = await invoices.update(
+        companyId: company.id,
+        id: finalized.id,
+        dueDate: Value(DateTime(2026, 12, 1)),
+      );
+      expect(viaUpdate, isNull, reason: 'update() bleibt für finalisierte Rechnungen gesperrt');
+
+      final dueDate = DateTime(2026, 12, 1);
+      final updated = await invoices.setDueDate(companyId: company.id, id: finalized.id, dueDate: dueDate);
+      expect(updated!.dueDate, dueDate);
+      expect(updated.invoiceNumber, finalized.invoiceNumber, reason: 'Nummer bleibt unverändert');
+
+      final removed = await invoices.setDueDate(companyId: company.id, id: finalized.id, dueDate: null);
+      expect(removed!.dueDate, isNull);
+    },
+  );
 }
