@@ -167,6 +167,49 @@ void main() {
     expect(reloaded.customerSnapshotVatId, 'DE111222333');
   });
 
+  // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.1): PDF-Text-
+  // Schnappschuss — derselbe Grundsatz wie bei Kunden-/Firmendaten, nur
+  // für die Einleitungs-/Schluss-/Fußzeilentexte.
+  test(
+    'PDF-Texte werden beim Finalisieren eingefroren — eine spätere Änderung der '
+    'Firmeneinstellungen verändert den Schnappschuss nicht mehr',
+    () async {
+      var company = await companies.create(name: 'Elektro Beckmann');
+      await companies.update(
+        company.copyWith(
+          pdfIntroText: const Value('Vielen Dank für Ihren Auftrag.'),
+          pdfClosingText: const Value('Es gelten unsere AGB.'),
+          pdfFooterText: const Value('Elektro Beckmann — Musterstraße 1'),
+        ),
+      );
+      company = (await companies.findById(company.id))!;
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final draft = await draftWithOneItem(company.id, customer.id);
+      final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+
+      expect(finalized!.pdfIntroTextSnapshot, 'Vielen Dank für Ihren Auftrag.');
+      expect(finalized.pdfClosingTextSnapshot, 'Es gelten unsere AGB.');
+      expect(finalized.pdfFooterTextSnapshot, 'Elektro Beckmann — Musterstraße 1');
+
+      // Texte in den Einstellungen nachträglich ändern ...
+      await companies.update(
+        company.copyWith(
+          pdfIntroText: const Value('Komplett anderer Text.'),
+          pdfClosingText: const Value('Andere AGB.'),
+          pdfFooterText: const Value('Andere Fußzeile'),
+        ),
+      );
+
+      // ... der Schnappschuss auf der schon finalisierten Rechnung bleibt
+      // unverändert (sonst würde ein erneutes PDF-Teilen eine andere
+      // Fassung desselben Dokuments erzeugen).
+      final reloaded = await invoices.findById(companyId: company.id, id: draft.id);
+      expect(reloaded!.pdfIntroTextSnapshot, 'Vielen Dank für Ihren Auftrag.');
+      expect(reloaded.pdfClosingTextSnapshot, 'Es gelten unsere AGB.');
+      expect(reloaded.pdfFooterTextSnapshot, 'Elektro Beckmann — Musterstraße 1');
+    },
+  );
+
   test('Rechnung ohne Positionen kann nicht finalisiert werden', () async {
     final company = await companies.create(name: 'Firma A');
     final customer = await customers.create(companyId: company.id, name: 'Kunde');

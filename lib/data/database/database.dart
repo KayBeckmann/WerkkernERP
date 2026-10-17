@@ -32,7 +32,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -112,6 +112,20 @@ class AppDatabase extends _$AppDatabase {
             await migrator.createTable(vehicles);
             await migrator.createTable(vehicleCostEntries);
             await migrator.addColumn(companies, companies.fleetEnabled);
+          }
+          if (from < 11) {
+            // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.1):
+            // PDF-Text-Schnappschuss, damit ein später geänderter
+            // Einleitungs-/Schluss-/Fußzeilentext eine bereits
+            // finalisierte Rechnung nicht nachträglich anders aussehen
+            // lässt. Bestehende finalisierte Dokumente bekommen hier
+            // bewusst KEINEN rückwirkenden Schnappschuss (die zum
+            // damaligen Finalisierungszeitpunkt tatsächlich verwendeten
+            // Texte sind nicht mehr rekonstruierbar) — `null` bedeutet
+            // für sie weiterhin "kein Text", genau wie zuvor.
+            await migrator.addColumn(invoices, invoices.pdfIntroTextSnapshot);
+            await migrator.addColumn(invoices, invoices.pdfClosingTextSnapshot);
+            await migrator.addColumn(invoices, invoices.pdfFooterTextSnapshot);
           }
         },
       );

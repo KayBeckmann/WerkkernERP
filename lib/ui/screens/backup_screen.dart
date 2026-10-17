@@ -36,16 +36,25 @@ class _BackupScreenState extends State<BackupScreen> {
       final service = context.read<BackupService>();
       final bytes = await service.createBackup(passphrase: passphrase.isEmpty ? null : passphrase);
       final timestamp = DateTime.now().toIso8601String().replaceAll(RegExp('[:.]'), '-');
-      await FilePicker.saveFile(
+      // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.2): die
+      // Rückgabe von saveFile() wurde bisher nicht geprüft, bevor
+      // "Backup erstellt" erschien — ein abgebrochener Dateidialog
+      // (Rückgabe `null`) zeigte fälschlich einen Erfolg an.
+      final savedUri = await FilePicker.saveFile(
         fileName: 'werkkernerp-backup-$timestamp.wkbackup',
         bytes: bytes,
         dialogTitle: 'Backup speichern',
       );
-      if (mounted) {
+      if (!mounted) return;
+      if (savedUri == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Backup erstellt.')),
+          const SnackBar(content: Text('Speichern abgebrochen — kein Backup erstellt.')),
         );
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Backup erstellt.')),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -118,10 +127,23 @@ class _BackupScreenState extends State<BackupScreen> {
           ],
         ),
       );
+    } on RestoreWriteException catch (e) {
+      // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.2): dieser
+      // Fehler tritt NACH dem Schließen der aktiven Verbindung auf —
+      // die alte Datei ist dank atomarem Austausch unangetastet, aber
+      // die App braucht einen Neustart, bevor überhaupt wieder
+      // gearbeitet werden kann. "Daten sind unverändert" allein wäre
+      // hier irreführend, ohne den nötigen Neustart zu erwähnen.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e')),
+        );
+      }
     } catch (e) {
       // Validierung in restoreBackup() läuft vollständig VOR jedem
-      // Eingriff in die Live-Daten — ein Fehler hier bedeutet, die
-      // aktuellen Daten sind unverändert (kein stilles Überschreiben).
+      // Eingriff in die Live-Daten (inkl. Schließen der Verbindung) —
+      // ein Fehler hier bedeutet wirklich uneingeschränkt, dass die
+      // aktuellen Daten unverändert sind UND die App normal weiterläuft.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Wiederherstellung fehlgeschlagen: $e. Deine Daten sind unverändert.')),

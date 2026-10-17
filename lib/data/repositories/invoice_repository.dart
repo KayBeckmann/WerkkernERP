@@ -2,6 +2,7 @@ import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/services/document_text_resolver.dart';
 import '../../domain/services/invoice_totals_service.dart';
 import '../database/database.dart';
 import '../database/tables.dart';
@@ -271,6 +272,13 @@ class InvoiceRepository {
           companySnapshotTaxNumber: Value(company.taxNumber),
           companySnapshotVatId: Value(company.vatId),
           companySnapshotIban: Value(company.iban),
+          // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.1):
+          // Texte zum Finalisierungszeitpunkt einfrieren, damit eine
+          // spätere Änderung an den Firmeneinstellungen das PDF dieser
+          // Rechnung nicht mehr verändert (siehe `invoice_pdf_builder.dart`).
+          pdfIntroTextSnapshot: Value(introTextFor(company, invoice.kind)),
+          pdfClosingTextSnapshot: Value(closingTextFor(company, invoice.kind)),
+          pdfFooterTextSnapshot: Value(company.pdfFooterText),
         ),
       );
       return findById(companyId: companyId, id: id);

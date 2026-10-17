@@ -4809,6 +4809,39 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _pdfIntroTextSnapshotMeta =
+      const VerificationMeta('pdfIntroTextSnapshot');
+  @override
+  late final GeneratedColumn<String> pdfIntroTextSnapshot =
+      GeneratedColumn<String>(
+        'pdf_intro_text_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfClosingTextSnapshotMeta =
+      const VerificationMeta('pdfClosingTextSnapshot');
+  @override
+  late final GeneratedColumn<String> pdfClosingTextSnapshot =
+      GeneratedColumn<String>(
+        'pdf_closing_text_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfFooterTextSnapshotMeta =
+      const VerificationMeta('pdfFooterTextSnapshot');
+  @override
+  late final GeneratedColumn<String> pdfFooterTextSnapshot =
+      GeneratedColumn<String>(
+        'pdf_footer_text_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _finalizedAtMeta = const VerificationMeta(
     'finalizedAt',
   );
@@ -4891,6 +4924,9 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     companySnapshotTaxNumber,
     companySnapshotVatId,
     companySnapshotIban,
+    pdfIntroTextSnapshot,
+    pdfClosingTextSnapshot,
+    pdfFooterTextSnapshot,
     finalizedAt,
     createdAt,
     updatedAt,
@@ -5051,6 +5087,33 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         ),
       );
     }
+    if (data.containsKey('pdf_intro_text_snapshot')) {
+      context.handle(
+        _pdfIntroTextSnapshotMeta,
+        pdfIntroTextSnapshot.isAcceptableOrUnknown(
+          data['pdf_intro_text_snapshot']!,
+          _pdfIntroTextSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text_snapshot')) {
+      context.handle(
+        _pdfClosingTextSnapshotMeta,
+        pdfClosingTextSnapshot.isAcceptableOrUnknown(
+          data['pdf_closing_text_snapshot']!,
+          _pdfClosingTextSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_footer_text_snapshot')) {
+      context.handle(
+        _pdfFooterTextSnapshotMeta,
+        pdfFooterTextSnapshot.isAcceptableOrUnknown(
+          data['pdf_footer_text_snapshot']!,
+          _pdfFooterTextSnapshotMeta,
+        ),
+      );
+    }
     if (data.containsKey('finalized_at')) {
       context.handle(
         _finalizedAtMeta,
@@ -5180,6 +5243,18 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.string,
         data['${effectivePrefix}company_snapshot_iban'],
       ),
+      pdfIntroTextSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text_snapshot'],
+      ),
+      pdfClosingTextSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text_snapshot'],
+      ),
+      pdfFooterTextSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_footer_text_snapshot'],
+      ),
       finalizedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}finalized_at'],
@@ -5253,6 +5328,20 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final String? companySnapshotTaxNumber;
   final String? companySnapshotVatId;
   final String? companySnapshotIban;
+
+  /// PDF-Text-Schnappschuss zum Finalisierungszeitpunkt (Audit-Befund
+  /// 2026-10-17, `Abweichungen.md` Abschnitt 2.1: "Ein später geänderter
+  /// Text kann bei erneutem Teilen eine andere PDF-Fassung derselben
+  /// finalisierten Rechnung erzeugen"). `buildInvoicePdf()` liest für
+  /// finalisierte Dokumente **ausschließlich** diese drei Felder statt
+  /// der aktuellen, möglicherweise seither geänderten Firmeneinstellungen
+  /// — das PDF einer finalisierten Rechnung bleibt dadurch über die Zeit
+  /// byte-identisch reproduzierbar, ohne die Texte selbst als Datei/BLOB
+  /// archivieren zu müssen. `null` im Entwurf — dort gilt weiterhin live
+  /// aus [Companies] gelesen (siehe `buildDraftPreviewPdf`).
+  final String? pdfIntroTextSnapshot;
+  final String? pdfClosingTextSnapshot;
+  final String? pdfFooterTextSnapshot;
   final DateTime? finalizedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -5295,6 +5384,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.companySnapshotTaxNumber,
     this.companySnapshotVatId,
     this.companySnapshotIban,
+    this.pdfIntroTextSnapshot,
+    this.pdfClosingTextSnapshot,
+    this.pdfFooterTextSnapshot,
     this.finalizedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -5359,6 +5451,17 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     if (!nullToAbsent || companySnapshotIban != null) {
       map['company_snapshot_iban'] = Variable<String>(companySnapshotIban);
     }
+    if (!nullToAbsent || pdfIntroTextSnapshot != null) {
+      map['pdf_intro_text_snapshot'] = Variable<String>(pdfIntroTextSnapshot);
+    }
+    if (!nullToAbsent || pdfClosingTextSnapshot != null) {
+      map['pdf_closing_text_snapshot'] = Variable<String>(
+        pdfClosingTextSnapshot,
+      );
+    }
+    if (!nullToAbsent || pdfFooterTextSnapshot != null) {
+      map['pdf_footer_text_snapshot'] = Variable<String>(pdfFooterTextSnapshot);
+    }
     if (!nullToAbsent || finalizedAt != null) {
       map['finalized_at'] = Variable<DateTime>(finalizedAt);
     }
@@ -5418,6 +5521,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       companySnapshotIban: companySnapshotIban == null && nullToAbsent
           ? const Value.absent()
           : Value(companySnapshotIban),
+      pdfIntroTextSnapshot: pdfIntroTextSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroTextSnapshot),
+      pdfClosingTextSnapshot: pdfClosingTextSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingTextSnapshot),
+      pdfFooterTextSnapshot: pdfFooterTextSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfFooterTextSnapshot),
       finalizedAt: finalizedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(finalizedAt),
@@ -5477,6 +5589,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       companySnapshotIban: serializer.fromJson<String?>(
         json['companySnapshotIban'],
       ),
+      pdfIntroTextSnapshot: serializer.fromJson<String?>(
+        json['pdfIntroTextSnapshot'],
+      ),
+      pdfClosingTextSnapshot: serializer.fromJson<String?>(
+        json['pdfClosingTextSnapshot'],
+      ),
+      pdfFooterTextSnapshot: serializer.fromJson<String?>(
+        json['pdfFooterTextSnapshot'],
+      ),
       finalizedAt: serializer.fromJson<DateTime?>(json['finalizedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -5519,6 +5640,13 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       ),
       'companySnapshotVatId': serializer.toJson<String?>(companySnapshotVatId),
       'companySnapshotIban': serializer.toJson<String?>(companySnapshotIban),
+      'pdfIntroTextSnapshot': serializer.toJson<String?>(pdfIntroTextSnapshot),
+      'pdfClosingTextSnapshot': serializer.toJson<String?>(
+        pdfClosingTextSnapshot,
+      ),
+      'pdfFooterTextSnapshot': serializer.toJson<String?>(
+        pdfFooterTextSnapshot,
+      ),
       'finalizedAt': serializer.toJson<DateTime?>(finalizedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -5547,6 +5675,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<String?> companySnapshotTaxNumber = const Value.absent(),
     Value<String?> companySnapshotVatId = const Value.absent(),
     Value<String?> companySnapshotIban = const Value.absent(),
+    Value<String?> pdfIntroTextSnapshot = const Value.absent(),
+    Value<String?> pdfClosingTextSnapshot = const Value.absent(),
+    Value<String?> pdfFooterTextSnapshot = const Value.absent(),
     Value<DateTime?> finalizedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -5590,6 +5721,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     companySnapshotIban: companySnapshotIban.present
         ? companySnapshotIban.value
         : this.companySnapshotIban,
+    pdfIntroTextSnapshot: pdfIntroTextSnapshot.present
+        ? pdfIntroTextSnapshot.value
+        : this.pdfIntroTextSnapshot,
+    pdfClosingTextSnapshot: pdfClosingTextSnapshot.present
+        ? pdfClosingTextSnapshot.value
+        : this.pdfClosingTextSnapshot,
+    pdfFooterTextSnapshot: pdfFooterTextSnapshot.present
+        ? pdfFooterTextSnapshot.value
+        : this.pdfFooterTextSnapshot,
     finalizedAt: finalizedAt.present ? finalizedAt.value : this.finalizedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -5645,6 +5785,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       companySnapshotIban: data.companySnapshotIban.present
           ? data.companySnapshotIban.value
           : this.companySnapshotIban,
+      pdfIntroTextSnapshot: data.pdfIntroTextSnapshot.present
+          ? data.pdfIntroTextSnapshot.value
+          : this.pdfIntroTextSnapshot,
+      pdfClosingTextSnapshot: data.pdfClosingTextSnapshot.present
+          ? data.pdfClosingTextSnapshot.value
+          : this.pdfClosingTextSnapshot,
+      pdfFooterTextSnapshot: data.pdfFooterTextSnapshot.present
+          ? data.pdfFooterTextSnapshot.value
+          : this.pdfFooterTextSnapshot,
       finalizedAt: data.finalizedAt.present
           ? data.finalizedAt.value
           : this.finalizedAt,
@@ -5679,6 +5828,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('companySnapshotTaxNumber: $companySnapshotTaxNumber, ')
           ..write('companySnapshotVatId: $companySnapshotVatId, ')
           ..write('companySnapshotIban: $companySnapshotIban, ')
+          ..write('pdfIntroTextSnapshot: $pdfIntroTextSnapshot, ')
+          ..write('pdfClosingTextSnapshot: $pdfClosingTextSnapshot, ')
+          ..write('pdfFooterTextSnapshot: $pdfFooterTextSnapshot, ')
           ..write('finalizedAt: $finalizedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -5709,6 +5861,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     companySnapshotTaxNumber,
     companySnapshotVatId,
     companySnapshotIban,
+    pdfIntroTextSnapshot,
+    pdfClosingTextSnapshot,
+    pdfFooterTextSnapshot,
     finalizedAt,
     createdAt,
     updatedAt,
@@ -5738,6 +5893,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.companySnapshotTaxNumber == this.companySnapshotTaxNumber &&
           other.companySnapshotVatId == this.companySnapshotVatId &&
           other.companySnapshotIban == this.companySnapshotIban &&
+          other.pdfIntroTextSnapshot == this.pdfIntroTextSnapshot &&
+          other.pdfClosingTextSnapshot == this.pdfClosingTextSnapshot &&
+          other.pdfFooterTextSnapshot == this.pdfFooterTextSnapshot &&
           other.finalizedAt == this.finalizedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -5765,6 +5923,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String?> companySnapshotTaxNumber;
   final Value<String?> companySnapshotVatId;
   final Value<String?> companySnapshotIban;
+  final Value<String?> pdfIntroTextSnapshot;
+  final Value<String?> pdfClosingTextSnapshot;
+  final Value<String?> pdfFooterTextSnapshot;
   final Value<DateTime?> finalizedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -5791,6 +5952,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.companySnapshotTaxNumber = const Value.absent(),
     this.companySnapshotVatId = const Value.absent(),
     this.companySnapshotIban = const Value.absent(),
+    this.pdfIntroTextSnapshot = const Value.absent(),
+    this.pdfClosingTextSnapshot = const Value.absent(),
+    this.pdfFooterTextSnapshot = const Value.absent(),
     this.finalizedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -5818,6 +5982,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.companySnapshotTaxNumber = const Value.absent(),
     this.companySnapshotVatId = const Value.absent(),
     this.companySnapshotIban = const Value.absent(),
+    this.pdfIntroTextSnapshot = const Value.absent(),
+    this.pdfClosingTextSnapshot = const Value.absent(),
+    this.pdfFooterTextSnapshot = const Value.absent(),
     this.finalizedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -5852,6 +6019,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? companySnapshotTaxNumber,
     Expression<String>? companySnapshotVatId,
     Expression<String>? companySnapshotIban,
+    Expression<String>? pdfIntroTextSnapshot,
+    Expression<String>? pdfClosingTextSnapshot,
+    Expression<String>? pdfFooterTextSnapshot,
     Expression<DateTime>? finalizedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -5887,6 +6057,12 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         'company_snapshot_vat_id': companySnapshotVatId,
       if (companySnapshotIban != null)
         'company_snapshot_iban': companySnapshotIban,
+      if (pdfIntroTextSnapshot != null)
+        'pdf_intro_text_snapshot': pdfIntroTextSnapshot,
+      if (pdfClosingTextSnapshot != null)
+        'pdf_closing_text_snapshot': pdfClosingTextSnapshot,
+      if (pdfFooterTextSnapshot != null)
+        'pdf_footer_text_snapshot': pdfFooterTextSnapshot,
       if (finalizedAt != null) 'finalized_at': finalizedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -5916,6 +6092,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String?>? companySnapshotTaxNumber,
     Value<String?>? companySnapshotVatId,
     Value<String?>? companySnapshotIban,
+    Value<String?>? pdfIntroTextSnapshot,
+    Value<String?>? pdfClosingTextSnapshot,
+    Value<String?>? pdfFooterTextSnapshot,
     Value<DateTime?>? finalizedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -5947,6 +6126,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           companySnapshotTaxNumber ?? this.companySnapshotTaxNumber,
       companySnapshotVatId: companySnapshotVatId ?? this.companySnapshotVatId,
       companySnapshotIban: companySnapshotIban ?? this.companySnapshotIban,
+      pdfIntroTextSnapshot: pdfIntroTextSnapshot ?? this.pdfIntroTextSnapshot,
+      pdfClosingTextSnapshot:
+          pdfClosingTextSnapshot ?? this.pdfClosingTextSnapshot,
+      pdfFooterTextSnapshot:
+          pdfFooterTextSnapshot ?? this.pdfFooterTextSnapshot,
       finalizedAt: finalizedAt ?? this.finalizedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -6036,6 +6220,21 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         companySnapshotIban.value,
       );
     }
+    if (pdfIntroTextSnapshot.present) {
+      map['pdf_intro_text_snapshot'] = Variable<String>(
+        pdfIntroTextSnapshot.value,
+      );
+    }
+    if (pdfClosingTextSnapshot.present) {
+      map['pdf_closing_text_snapshot'] = Variable<String>(
+        pdfClosingTextSnapshot.value,
+      );
+    }
+    if (pdfFooterTextSnapshot.present) {
+      map['pdf_footer_text_snapshot'] = Variable<String>(
+        pdfFooterTextSnapshot.value,
+      );
+    }
     if (finalizedAt.present) {
       map['finalized_at'] = Variable<DateTime>(finalizedAt.value);
     }
@@ -6079,6 +6278,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('companySnapshotTaxNumber: $companySnapshotTaxNumber, ')
           ..write('companySnapshotVatId: $companySnapshotVatId, ')
           ..write('companySnapshotIban: $companySnapshotIban, ')
+          ..write('pdfIntroTextSnapshot: $pdfIntroTextSnapshot, ')
+          ..write('pdfClosingTextSnapshot: $pdfClosingTextSnapshot, ')
+          ..write('pdfFooterTextSnapshot: $pdfFooterTextSnapshot, ')
           ..write('finalizedAt: $finalizedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -13448,6 +13650,9 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> companySnapshotTaxNumber,
   Value<String?> companySnapshotVatId,
   Value<String?> companySnapshotIban,
+  Value<String?> pdfIntroTextSnapshot,
+  Value<String?> pdfClosingTextSnapshot,
+  Value<String?> pdfFooterTextSnapshot,
   Value<DateTime?> finalizedAt,
   required DateTime createdAt,
   required DateTime updatedAt,
@@ -13475,6 +13680,9 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> companySnapshotTaxNumber,
   Value<String?> companySnapshotVatId,
   Value<String?> companySnapshotIban,
+  Value<String?> pdfIntroTextSnapshot,
+  Value<String?> pdfClosingTextSnapshot,
+  Value<String?> pdfFooterTextSnapshot,
   Value<DateTime?> finalizedAt,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -13667,6 +13875,21 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<String> get companySnapshotIban => $composableBuilder(
     column: $table.companySnapshotIban,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroTextSnapshot => $composableBuilder(
+    column: $table.pdfIntroTextSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingTextSnapshot => $composableBuilder(
+    column: $table.pdfClosingTextSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfFooterTextSnapshot => $composableBuilder(
+    column: $table.pdfFooterTextSnapshot,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13897,6 +14120,21 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pdfIntroTextSnapshot => $composableBuilder(
+    column: $table.pdfIntroTextSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingTextSnapshot => $composableBuilder(
+    column: $table.pdfClosingTextSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfFooterTextSnapshot => $composableBuilder(
+    column: $table.pdfFooterTextSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get finalizedAt => $composableBuilder(
     column: $table.finalizedAt,
     builder: (column) => ColumnOrderings(column),
@@ -14089,6 +14327,21 @@ class $$InvoicesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get pdfIntroTextSnapshot => $composableBuilder(
+    column: $table.pdfIntroTextSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingTextSnapshot => $composableBuilder(
+    column: $table.pdfClosingTextSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfFooterTextSnapshot => $composableBuilder(
+    column: $table.pdfFooterTextSnapshot,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get finalizedAt => $composableBuilder(
     column: $table.finalizedAt,
     builder: (column) => column,
@@ -14271,6 +14524,9 @@ class $$InvoicesTableTableManager
                 Value<String?> companySnapshotTaxNumber = const Value.absent(),
                 Value<String?> companySnapshotVatId = const Value.absent(),
                 Value<String?> companySnapshotIban = const Value.absent(),
+                Value<String?> pdfIntroTextSnapshot = const Value.absent(),
+                Value<String?> pdfClosingTextSnapshot = const Value.absent(),
+                Value<String?> pdfFooterTextSnapshot = const Value.absent(),
                 Value<DateTime?> finalizedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -14297,6 +14553,9 @@ class $$InvoicesTableTableManager
                 companySnapshotTaxNumber: companySnapshotTaxNumber,
                 companySnapshotVatId: companySnapshotVatId,
                 companySnapshotIban: companySnapshotIban,
+                pdfIntroTextSnapshot: pdfIntroTextSnapshot,
+                pdfClosingTextSnapshot: pdfClosingTextSnapshot,
+                pdfFooterTextSnapshot: pdfFooterTextSnapshot,
                 finalizedAt: finalizedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -14325,6 +14584,9 @@ class $$InvoicesTableTableManager
                 Value<String?> companySnapshotTaxNumber = const Value.absent(),
                 Value<String?> companySnapshotVatId = const Value.absent(),
                 Value<String?> companySnapshotIban = const Value.absent(),
+                Value<String?> pdfIntroTextSnapshot = const Value.absent(),
+                Value<String?> pdfClosingTextSnapshot = const Value.absent(),
+                Value<String?> pdfFooterTextSnapshot = const Value.absent(),
                 Value<DateTime?> finalizedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -14351,6 +14613,9 @@ class $$InvoicesTableTableManager
                 companySnapshotTaxNumber: companySnapshotTaxNumber,
                 companySnapshotVatId: companySnapshotVatId,
                 companySnapshotIban: companySnapshotIban,
+                pdfIntroTextSnapshot: pdfIntroTextSnapshot,
+                pdfClosingTextSnapshot: pdfClosingTextSnapshot,
+                pdfFooterTextSnapshot: pdfFooterTextSnapshot,
                 finalizedAt: finalizedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

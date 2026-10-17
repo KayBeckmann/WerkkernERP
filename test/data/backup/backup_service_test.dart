@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:drift/native.dart';
@@ -122,6 +123,122 @@ void main() {
       } finally {
         await reopened.close();
       }
+    },
+  );
+
+  // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.2): Manifest-
+  // Schemaversion vs. laufende DB-Version, sowie eine tiefere
+  // Integritätsprüfung statt nur des 16-Byte-Headers.
+
+  /// Baut ein gültiges unverschlüsseltes Backup und ersetzt darin das
+  /// Manifest — für Tests, die absichtlich ein manipuliertes Manifest
+  /// brauchen, ohne `BackupEncryption`/`ZipEncoder` in jedem Testfall neu
+  /// zusammenzusetzen.
+  Future<Uint8List> backupWithManifest(AppDatabase db, Map<String, dynamic> manifest) async {
+    final original = await BackupService(db).createBackup();
+    // Unverschlüsselt: 5-Byte-Magic-Präfix + reines Zip (siehe
+    // `BackupEncryption.encryptIfRequested`).
+    final zipBytes = original.sublist(5);
+    final archive = ZipDecoder().decodeBytes(zipBytes);
+    final sqliteFile = archive.findFile('werkkernerp.sqlite')!;
+
+    final manifestJson = utf8.encode(jsonEncode(manifest));
+    final newArchive = Archive()
+      ..addFile(ArchiveFile('manifest.json', manifestJson.length, manifestJson))
+      ..addFile(ArchiveFile('werkkernerp.sqlite', sqliteFile.content.length, sqliteFile.content));
+    final newZip = ZipEncoder().encode(newArchive);
+    return Uint8List.fromList([0x57, 0x4B, 0x42, 0x31, 0x00, ...newZip]);
+  }
+
+  test(
+    'Restore lehnt ein Backup ab, dessen Manifest eine NEUERE Schemaversion nennt als '
+    'die laufende App kennt',
+    () async {
+      final db = AppDatabase.forTesting(
+        NativeDatabase.memory(setup: (rawDb) => rawDb.execute('PRAGMA foreign_keys = ON;')),
+      );
+      final tamperedBytes = await backupWithManifest(db, {
+        'app': 'WerkkernERP',
+        'format': 1,
+        'schemaVersion': db.schemaVersion + 1,
+        'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      final liveDb = AppDatabase.forTesting(
+        NativeDatabase.memory(setup: (rawDb) => rawDb.execute('PRAGMA foreign_keys = ON;')),
+      );
+      await CompanyRepository(liveDb).create(name: 'Bleibt unverändert');
+
+      await expectLater(
+        BackupService(liveDb).restoreBackup(tamperedBytes),
+        throwsFormatException,
+      );
+      final stillThere = await CompanyRepository(liveDb).listAll();
+      expect(stillThere.map((c) => c.name), ['Bleibt unverändert']);
+      await liveDb.close();
+      await db.close();
+    },
+  );
+
+  test(
+    'Restore akzeptiert ein Backup mit ÄLTERER Schemaversion weiterhin — die normale '
+    'Migration beim nächsten Öffnen übernimmt das',
+    () async {
+      final db = AppDatabase.forTesting(
+        NativeDatabase.memory(setup: (rawDb) => rawDb.execute('PRAGMA foreign_keys = ON;')),
+      );
+      await CompanyRepository(db).create(name: 'Firma aus altem Backup');
+      final backedUpWithOlderVersion = await backupWithManifest(db, {
+        'app': 'WerkkernERP',
+        'format': 1,
+        'schemaVersion': 1,
+        'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+
+      final liveDb = AppDatabase.forTesting(
+        NativeDatabase.memory(setup: (rawDb) => rawDb.execute('PRAGMA foreign_keys = ON;')),
+      );
+      final result = await BackupService(liveDb).restoreBackup(backedUpWithOlderVersion);
+      expect(result.schemaVersionInBackup, 1);
+      await db.close();
+    },
+  );
+
+  test(
+    'Restore lehnt eine Datei mit gültigem SQLite-Header, aber beschädigtem Inhalt ab — '
+    'Header-Check allein reicht nicht',
+    () async {
+      const sqliteHeader = 'SQLite format 3\x00';
+      final corruptedSqlite = Uint8List.fromList([
+        ...latin1.encode(sqliteHeader),
+        // Plausibler Seitenheader-Anfang, aber willkürlicher Rest statt
+        // einer echten B-Tree-Struktur.
+        ...List.generate(4096, (i) => i % 251),
+      ]);
+      final manifest = jsonEncode({
+        'app': 'WerkkernERP',
+        'format': 1,
+        'schemaVersion': 1,
+        'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+      final archive = Archive()
+        ..addFile(ArchiveFile('manifest.json', utf8.encode(manifest).length, utf8.encode(manifest)))
+        ..addFile(ArchiveFile('werkkernerp.sqlite', corruptedSqlite.length, corruptedSqlite));
+      final zip = ZipEncoder().encode(archive);
+      final tamperedBytes = Uint8List.fromList([0x57, 0x4B, 0x42, 0x31, 0x00, ...zip]);
+
+      final liveDb = AppDatabase.forTesting(
+        NativeDatabase.memory(setup: (rawDb) => rawDb.execute('PRAGMA foreign_keys = ON;')),
+      );
+      await CompanyRepository(liveDb).create(name: 'Bleibt unverändert');
+
+      await expectLater(
+        BackupService(liveDb).restoreBackup(tamperedBytes),
+        throwsFormatException,
+      );
+      final stillThere = await CompanyRepository(liveDb).listAll();
+      expect(stillThere.map((c) => c.name), ['Bleibt unverändert']);
+      await liveDb.close();
     },
   );
 
