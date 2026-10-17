@@ -16,7 +16,11 @@ void main() {
   testWidgets(
     'Rechnungs- und Angebots-Texte sind unabhängig voneinander speicherbar',
     (tester) async {
-      tester.view.physicalSize = const Size(1200, 1200);
+      // C10 (Kay-Priorisierungsentscheidung 2026-10-17) fügt einen vierten
+      // Modul-Schalter hinzu — die Einstellungen-Seite braucht dadurch
+      // mehr Höhe, um "Speichern" noch innerhalb des Testviewports zu
+      // treffen (sonst Tap-Miss außerhalb des Render-Baums).
+      tester.view.physicalSize = const Size(1200, 1800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 

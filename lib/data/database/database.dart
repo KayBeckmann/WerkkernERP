@@ -29,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -85,6 +85,13 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.pdfClosingTextOrder);
             await migrator.addColumn(companies, companies.pdfIntroTextDeliveryNote);
             await migrator.addColumn(companies, companies.pdfClosingTextDeliveryNote);
+          }
+          if (from < 8) {
+            // C10 Proforma-Rechnungen (Kay-Priorisierungsentscheidung
+            // 2026-10-17, vor Phase B).
+            await migrator.addColumn(companies, companies.proformaEnabled);
+            await migrator.addColumn(companies, companies.pdfIntroTextProforma);
+            await migrator.addColumn(companies, companies.pdfClosingTextProforma);
           }
         },
       );

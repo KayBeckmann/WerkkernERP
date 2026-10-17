@@ -122,6 +122,7 @@ void main() {
         quotesEnabled: true,
         ordersEnabled: true,
         deliveryNotesEnabled: false,
+        proformaEnabled: false,
       );
       final quoteDraft = await draftWithOneItem(company.id, customer.id, kind: DocumentKind.quote);
       await invoices.finalize(companyId: company.id, id: quoteDraft.id);
@@ -132,6 +133,7 @@ void main() {
         quotesEnabled: false,
         ordersEnabled: false,
         deliveryNotesEnabled: false,
+        proformaEnabled: false,
       );
       expect(disabled.quotesEnabled, isFalse);
 

@@ -24,7 +24,7 @@ import 'suppliers_screen.dart';
 /// Einstellungen von Index 4 auf Index 5 rutschte). Die ID bleibt
 /// stabil, die tatsächliche Listenposition wird bei jedem Build neu
 /// aufgelöst.
-enum _TabId { invoice, quote, order, deliveryNote, customers, articles, suppliers, settings }
+enum _TabId { invoice, quote, order, deliveryNote, proforma, customers, articles, suppliers, settings }
 
 /// Ein Navigationseintrag der Shell. Angebot/Auftrag (A5) sind nur
 /// Instanzen von [InvoicesScreen] mit anderer [DocumentKind] — die
@@ -119,6 +119,15 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.outbox_outlined,
             title: 'Lieferscheine',
             screen: InvoicesScreen(kind: DocumentKind.deliveryNote),
+            section: _Section.fakturierung,
+          ),
+        // C10 (Kay-Priorisierungsentscheidung 2026-10-17).
+        if (company.proformaEnabled)
+          const _Tab(
+            id: _TabId.proforma,
+            icon: Icons.fact_check_outlined,
+            title: 'Proforma-Rechnungen',
+            screen: InvoicesScreen(kind: DocumentKind.proforma),
             section: _Section.fakturierung,
           ),
         const _Tab(

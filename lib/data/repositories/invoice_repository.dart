@@ -45,9 +45,14 @@ class InvoiceItemInput {
 /// sind selbst keine gültigen Quellen — sie sind das Ende der Kette.
 /// Öffentlich (nicht `_`-privat), damit die UI dieselbe Zuordnung für
 /// das "Umwandeln"-Menü nutzen kann statt sie zu duplizieren.
+/// C10 (Kay-Priorisierungsentscheidung 2026-10-17): eine finalisierte
+/// Proforma-Rechnung ist in eine echte Rechnung umwandelbar — anders als
+/// Angebot/Auftrag ist sie aber selbst kein gültiges Umwandlungsziel
+/// (eine Rechnung wird nicht "zu einer Proforma zurückgewandelt").
 const allowedConversionTargets = <DocumentKind, Set<DocumentKind>>{
   DocumentKind.quote: {DocumentKind.order, DocumentKind.deliveryNote, DocumentKind.invoice},
   DocumentKind.order: {DocumentKind.deliveryNote, DocumentKind.invoice},
+  DocumentKind.proforma: {DocumentKind.invoice},
 };
 
 /// Rechnungen als Entwurf (A2) — Finalisierung/Nummernvergabe kommt erst

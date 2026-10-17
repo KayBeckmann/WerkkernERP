@@ -34,6 +34,7 @@ class DocumentLabels {
         DocumentKind.quote => 'Angebot',
         DocumentKind.order => 'Auftrag',
         DocumentKind.deliveryNote => 'Lieferschein',
+        DocumentKind.proforma => 'Proforma-Rechnung',
       };
 
   static String plural(DocumentKind kind) => switch (kind) {
@@ -41,6 +42,7 @@ class DocumentLabels {
         DocumentKind.quote => 'Angebote',
         DocumentKind.order => 'Aufträge',
         DocumentKind.deliveryNote => 'Lieferscheine',
+        DocumentKind.proforma => 'Proforma-Rechnungen',
       };
 
   static String emptyListText(DocumentKind kind) => switch (kind) {
@@ -48,6 +50,7 @@ class DocumentLabels {
         DocumentKind.quote => 'Noch keine Angebotsentwürfe.',
         DocumentKind.order => 'Noch keine Auftragsentwürfe.',
         DocumentKind.deliveryNote => 'Noch keine Lieferschein-Entwürfe.',
+        DocumentKind.proforma => 'Noch keine Proforma-Entwürfe.',
       };
 
   static String newFabLabel(DocumentKind kind) => switch (kind) {
@@ -55,6 +58,7 @@ class DocumentLabels {
         DocumentKind.quote => 'Neues Angebot',
         DocumentKind.order => 'Neuer Auftrag',
         DocumentKind.deliveryNote => 'Neuer Lieferschein',
+        DocumentKind.proforma => 'Neue Proforma-Rechnung',
       };
 
   static String editorDraftTitle(DocumentKind kind) => switch (kind) {
@@ -62,6 +66,7 @@ class DocumentLabels {
         DocumentKind.quote => 'Angebot (Entwurf)',
         DocumentKind.order => 'Auftrag (Entwurf)',
         DocumentKind.deliveryNote => 'Lieferschein (Entwurf)',
+        DocumentKind.proforma => 'Proforma-Rechnung (Entwurf)',
       };
 
   static String finalizeConfirmSentence(DocumentKind kind) => switch (kind) {
@@ -73,6 +78,9 @@ class DocumentLabels {
           'Der Auftrag erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
         DocumentKind.deliveryNote =>
           'Der Lieferschein erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+        DocumentKind.proforma =>
+          'Die Proforma-Rechnung erhält jetzt eine endgültige Nummer (eigener Nummernkreis, keine '
+              'umsatzsteuerliche Rechnungsnummer) und kann danach nicht mehr geändert werden.',
       };
 }
 
