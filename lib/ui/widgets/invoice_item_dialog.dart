@@ -128,6 +128,12 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
           companyId: companyId,
           articleId: article.id,
         );
+    // Dialog kann waehrend des Preis-Lookups bereits geschlossen worden
+    // sein (z. B. schnelles Abbrechen) — ohne diesen Check wuerden
+    // setState() UND der Zugriff auf die (dann schon dispose()ten)
+    // Controller darunter einen Absturz auslösen (siehe gleiche
+    // Fehlerklasse in email_send_dialog.dart/settings_screen.dart).
+    if (!mounted) return;
     setState(() {
       _selectedArticle = article;
       _descriptionCtrl.text = article.name;
