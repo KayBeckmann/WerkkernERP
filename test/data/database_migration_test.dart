@@ -18,7 +18,9 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// Position; v6→v7: PDF-Texte pro Dokumentart; v7→v8: C10
 /// Proforma-Rechnungen; v8→v9: C1 Projekte; v9→v10: C6 Fuhrpark; v10→v11:
 /// PDF-Text-Schnappschuss; v11→v12: C11 Wiederkehrende Rechnungen;
-/// v12→v13: C13 Abschlagsrechnungen; v13→v14: C12 Mahnwesen).
+/// v12→v13: C13 Abschlagsrechnungen; v13→v14: C12 Mahnwesen; v14→v15:
+/// C12 Mahnwesen — Nachbesserung (konfigurierbare Fristen/Gebühren/Zins +
+/// Mahnschreiben-Texte, Kay-Feedback 2026-10-17)).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -42,11 +44,11 @@ void main() {
   });
 
   test(
-    'Migration v1→v14 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v15 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
-    'C13 Abschlagsrechnungen + C12 Mahnwesen): Bestandsdaten bekommen automatisch die neuen '
-    'Default-Werte — ohne Datenverlust an bestehenden Spalten',
+    'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung): Bestandsdaten '
+    'bekommen automatisch die neuen Default-Werte — ohne Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -148,6 +150,16 @@ void main() {
       raw.execute('ALTER TABLE invoices DROP COLUMN payment_status;');
       raw.execute('ALTER TABLE invoices DROP COLUMN paid_at;');
       raw.execute('ALTER TABLE companies DROP COLUMN dunning_enabled;');
+      // v14 -> v15 (C12 Mahnwesen — Nachbesserung: konfigurierbare
+      // Fristen/Gebühren/Zins + Mahnschreiben-Texte):
+      raw.execute('ALTER TABLE companies DROP COLUMN dunning_reminder2_after_days;');
+      raw.execute('ALTER TABLE companies DROP COLUMN dunning_reminder3_after_days;');
+      raw.execute('ALTER TABLE companies DROP COLUMN dunning_fee_level1_cents;');
+      raw.execute('ALTER TABLE companies DROP COLUMN dunning_fee_level2_cents;');
+      raw.execute('ALTER TABLE companies DROP COLUMN dunning_fee_level3_cents;');
+      raw.execute('ALTER TABLE companies DROP COLUMN dunning_interest_rate_percent;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_dunning;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_dunning;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -180,6 +192,14 @@ void main() {
         expect(migratedCompany.recurringInvoicesEnabled, isFalse);
         expect(migratedCompany.advancePaymentInvoicesEnabled, isFalse);
         expect(migratedCompany.dunningEnabled, isFalse);
+        expect(migratedCompany.dunningReminder2AfterDays, 14);
+        expect(migratedCompany.dunningReminder3AfterDays, 28);
+        expect(migratedCompany.dunningFeeLevel1Cents, 0);
+        expect(migratedCompany.dunningFeeLevel2Cents, 0);
+        expect(migratedCompany.dunningFeeLevel3Cents, 0);
+        expect(migratedCompany.dunningInterestRatePercent, 0);
+        expect(migratedCompany.pdfIntroTextDunning, isNull);
+        expect(migratedCompany.pdfClosingTextDunning, isNull);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =

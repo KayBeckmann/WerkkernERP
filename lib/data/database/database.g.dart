@@ -230,6 +230,97 @@ class $CompaniesTable extends Companies
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _dunningReminder2AfterDaysMeta =
+      const VerificationMeta('dunningReminder2AfterDays');
+  @override
+  late final GeneratedColumn<int> dunningReminder2AfterDays =
+      GeneratedColumn<int>(
+        'dunning_reminder2_after_days',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(14),
+      );
+  static const VerificationMeta _dunningReminder3AfterDaysMeta =
+      const VerificationMeta('dunningReminder3AfterDays');
+  @override
+  late final GeneratedColumn<int> dunningReminder3AfterDays =
+      GeneratedColumn<int>(
+        'dunning_reminder3_after_days',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(28),
+      );
+  static const VerificationMeta _dunningFeeLevel1CentsMeta =
+      const VerificationMeta('dunningFeeLevel1Cents');
+  @override
+  late final GeneratedColumn<int> dunningFeeLevel1Cents = GeneratedColumn<int>(
+    'dunning_fee_level1_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _dunningFeeLevel2CentsMeta =
+      const VerificationMeta('dunningFeeLevel2Cents');
+  @override
+  late final GeneratedColumn<int> dunningFeeLevel2Cents = GeneratedColumn<int>(
+    'dunning_fee_level2_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _dunningFeeLevel3CentsMeta =
+      const VerificationMeta('dunningFeeLevel3Cents');
+  @override
+  late final GeneratedColumn<int> dunningFeeLevel3Cents = GeneratedColumn<int>(
+    'dunning_fee_level3_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _dunningInterestRatePercentMeta =
+      const VerificationMeta('dunningInterestRatePercent');
+  @override
+  late final GeneratedColumn<double> dunningInterestRatePercent =
+      GeneratedColumn<double>(
+        'dunning_interest_rate_percent',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      );
+  static const VerificationMeta _pdfIntroTextDunningMeta =
+      const VerificationMeta('pdfIntroTextDunning');
+  @override
+  late final GeneratedColumn<String> pdfIntroTextDunning =
+      GeneratedColumn<String>(
+        'pdf_intro_text_dunning',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfClosingTextDunningMeta =
+      const VerificationMeta('pdfClosingTextDunning');
+  @override
+  late final GeneratedColumn<String> pdfClosingTextDunning =
+      GeneratedColumn<String>(
+        'pdf_closing_text_dunning',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _pdfIntroTextMeta = const VerificationMeta(
     'pdfIntroText',
   );
@@ -373,6 +464,14 @@ class $CompaniesTable extends Companies
     recurringInvoicesEnabled,
     advancePaymentInvoicesEnabled,
     dunningEnabled,
+    dunningReminder2AfterDays,
+    dunningReminder3AfterDays,
+    dunningFeeLevel1Cents,
+    dunningFeeLevel2Cents,
+    dunningFeeLevel3Cents,
+    dunningInterestRatePercent,
+    pdfIntroTextDunning,
+    pdfClosingTextDunning,
     pdfIntroText,
     pdfClosingText,
     pdfIntroTextQuote,
@@ -532,6 +631,78 @@ class $CompaniesTable extends Companies
         dunningEnabled.isAcceptableOrUnknown(
           data['dunning_enabled']!,
           _dunningEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dunning_reminder2_after_days')) {
+      context.handle(
+        _dunningReminder2AfterDaysMeta,
+        dunningReminder2AfterDays.isAcceptableOrUnknown(
+          data['dunning_reminder2_after_days']!,
+          _dunningReminder2AfterDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dunning_reminder3_after_days')) {
+      context.handle(
+        _dunningReminder3AfterDaysMeta,
+        dunningReminder3AfterDays.isAcceptableOrUnknown(
+          data['dunning_reminder3_after_days']!,
+          _dunningReminder3AfterDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dunning_fee_level1_cents')) {
+      context.handle(
+        _dunningFeeLevel1CentsMeta,
+        dunningFeeLevel1Cents.isAcceptableOrUnknown(
+          data['dunning_fee_level1_cents']!,
+          _dunningFeeLevel1CentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dunning_fee_level2_cents')) {
+      context.handle(
+        _dunningFeeLevel2CentsMeta,
+        dunningFeeLevel2Cents.isAcceptableOrUnknown(
+          data['dunning_fee_level2_cents']!,
+          _dunningFeeLevel2CentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dunning_fee_level3_cents')) {
+      context.handle(
+        _dunningFeeLevel3CentsMeta,
+        dunningFeeLevel3Cents.isAcceptableOrUnknown(
+          data['dunning_fee_level3_cents']!,
+          _dunningFeeLevel3CentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dunning_interest_rate_percent')) {
+      context.handle(
+        _dunningInterestRatePercentMeta,
+        dunningInterestRatePercent.isAcceptableOrUnknown(
+          data['dunning_interest_rate_percent']!,
+          _dunningInterestRatePercentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_intro_text_dunning')) {
+      context.handle(
+        _pdfIntroTextDunningMeta,
+        pdfIntroTextDunning.isAcceptableOrUnknown(
+          data['pdf_intro_text_dunning']!,
+          _pdfIntroTextDunningMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text_dunning')) {
+      context.handle(
+        _pdfClosingTextDunningMeta,
+        pdfClosingTextDunning.isAcceptableOrUnknown(
+          data['pdf_closing_text_dunning']!,
+          _pdfClosingTextDunningMeta,
         ),
       );
     }
@@ -715,6 +886,38 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}dunning_enabled'],
       )!,
+      dunningReminder2AfterDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}dunning_reminder2_after_days'],
+      )!,
+      dunningReminder3AfterDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}dunning_reminder3_after_days'],
+      )!,
+      dunningFeeLevel1Cents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}dunning_fee_level1_cents'],
+      )!,
+      dunningFeeLevel2Cents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}dunning_fee_level2_cents'],
+      )!,
+      dunningFeeLevel3Cents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}dunning_fee_level3_cents'],
+      )!,
+      dunningInterestRatePercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}dunning_interest_rate_percent'],
+      )!,
+      pdfIntroTextDunning: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text_dunning'],
+      ),
+      pdfClosingTextDunning: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text_dunning'],
+      ),
       pdfIntroText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_intro_text'],
@@ -818,6 +1021,28 @@ class Company extends DataClass implements Insertable<Company> {
   /// Anzeige im Rechnungseditor/-liste frei — keine eigene Tabelle.
   final bool dunningEnabled;
 
+  /// C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17: "Wo stelle
+  /// ich die Gebühren und die Fristen ein?"). **Kays eigene Werte**,
+  /// keine von dieser App vorgegebenen oder rechtlich geprüften Fristen/
+  /// Beträge — siehe ausführlichen Doc-Kommentar bei `DunningConfig` in
+  /// `domain/services/dunning_service.dart`. Default-Fristen (14/28
+  /// Tage) entsprechen den bisherigen festverdrahteten Werten, Default-
+  /// Gebühren/Zins sind 0 (kein Automatismus ohne explizite Eingabe).
+  final int dunningReminder2AfterDays;
+  final int dunningReminder3AfterDays;
+  final int dunningFeeLevel1Cents;
+  final int dunningFeeLevel2Cents;
+  final int dunningFeeLevel3Cents;
+  final double dunningInterestRatePercent;
+
+  /// Einleitungs-/Schlusstext für ein erzeugtes Mahnschreiben — gleiches
+  /// Muster wie die Dokumentart-Texte oben, aber nicht an einen
+  /// [DocumentKind] gebunden (ein Mahnschreiben ist kein eigenständiges
+  /// Dokument mit eigenem Nummernkreis, sondern ein Zusatzschreiben zu
+  /// einer bereits finalisierten Rechnung).
+  final String? pdfIntroTextDunning;
+  final String? pdfClosingTextDunning;
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -864,6 +1089,14 @@ class Company extends DataClass implements Insertable<Company> {
     required this.recurringInvoicesEnabled,
     required this.advancePaymentInvoicesEnabled,
     required this.dunningEnabled,
+    required this.dunningReminder2AfterDays,
+    required this.dunningReminder3AfterDays,
+    required this.dunningFeeLevel1Cents,
+    required this.dunningFeeLevel2Cents,
+    required this.dunningFeeLevel3Cents,
+    required this.dunningInterestRatePercent,
+    this.pdfIntroTextDunning,
+    this.pdfClosingTextDunning,
     this.pdfIntroText,
     this.pdfClosingText,
     this.pdfIntroTextQuote,
@@ -913,6 +1146,24 @@ class Company extends DataClass implements Insertable<Company> {
       advancePaymentInvoicesEnabled,
     );
     map['dunning_enabled'] = Variable<bool>(dunningEnabled);
+    map['dunning_reminder2_after_days'] = Variable<int>(
+      dunningReminder2AfterDays,
+    );
+    map['dunning_reminder3_after_days'] = Variable<int>(
+      dunningReminder3AfterDays,
+    );
+    map['dunning_fee_level1_cents'] = Variable<int>(dunningFeeLevel1Cents);
+    map['dunning_fee_level2_cents'] = Variable<int>(dunningFeeLevel2Cents);
+    map['dunning_fee_level3_cents'] = Variable<int>(dunningFeeLevel3Cents);
+    map['dunning_interest_rate_percent'] = Variable<double>(
+      dunningInterestRatePercent,
+    );
+    if (!nullToAbsent || pdfIntroTextDunning != null) {
+      map['pdf_intro_text_dunning'] = Variable<String>(pdfIntroTextDunning);
+    }
+    if (!nullToAbsent || pdfClosingTextDunning != null) {
+      map['pdf_closing_text_dunning'] = Variable<String>(pdfClosingTextDunning);
+    }
     if (!nullToAbsent || pdfIntroText != null) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText);
     }
@@ -985,6 +1236,18 @@ class Company extends DataClass implements Insertable<Company> {
       recurringInvoicesEnabled: Value(recurringInvoicesEnabled),
       advancePaymentInvoicesEnabled: Value(advancePaymentInvoicesEnabled),
       dunningEnabled: Value(dunningEnabled),
+      dunningReminder2AfterDays: Value(dunningReminder2AfterDays),
+      dunningReminder3AfterDays: Value(dunningReminder3AfterDays),
+      dunningFeeLevel1Cents: Value(dunningFeeLevel1Cents),
+      dunningFeeLevel2Cents: Value(dunningFeeLevel2Cents),
+      dunningFeeLevel3Cents: Value(dunningFeeLevel3Cents),
+      dunningInterestRatePercent: Value(dunningInterestRatePercent),
+      pdfIntroTextDunning: pdfIntroTextDunning == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroTextDunning),
+      pdfClosingTextDunning: pdfClosingTextDunning == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingTextDunning),
       pdfIntroText: pdfIntroText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfIntroText),
@@ -1052,6 +1315,30 @@ class Company extends DataClass implements Insertable<Company> {
         json['advancePaymentInvoicesEnabled'],
       ),
       dunningEnabled: serializer.fromJson<bool>(json['dunningEnabled']),
+      dunningReminder2AfterDays: serializer.fromJson<int>(
+        json['dunningReminder2AfterDays'],
+      ),
+      dunningReminder3AfterDays: serializer.fromJson<int>(
+        json['dunningReminder3AfterDays'],
+      ),
+      dunningFeeLevel1Cents: serializer.fromJson<int>(
+        json['dunningFeeLevel1Cents'],
+      ),
+      dunningFeeLevel2Cents: serializer.fromJson<int>(
+        json['dunningFeeLevel2Cents'],
+      ),
+      dunningFeeLevel3Cents: serializer.fromJson<int>(
+        json['dunningFeeLevel3Cents'],
+      ),
+      dunningInterestRatePercent: serializer.fromJson<double>(
+        json['dunningInterestRatePercent'],
+      ),
+      pdfIntroTextDunning: serializer.fromJson<String?>(
+        json['pdfIntroTextDunning'],
+      ),
+      pdfClosingTextDunning: serializer.fromJson<String?>(
+        json['pdfClosingTextDunning'],
+      ),
       pdfIntroText: serializer.fromJson<String?>(json['pdfIntroText']),
       pdfClosingText: serializer.fromJson<String?>(json['pdfClosingText']),
       pdfIntroTextQuote: serializer.fromJson<String?>(
@@ -1107,6 +1394,22 @@ class Company extends DataClass implements Insertable<Company> {
         advancePaymentInvoicesEnabled,
       ),
       'dunningEnabled': serializer.toJson<bool>(dunningEnabled),
+      'dunningReminder2AfterDays': serializer.toJson<int>(
+        dunningReminder2AfterDays,
+      ),
+      'dunningReminder3AfterDays': serializer.toJson<int>(
+        dunningReminder3AfterDays,
+      ),
+      'dunningFeeLevel1Cents': serializer.toJson<int>(dunningFeeLevel1Cents),
+      'dunningFeeLevel2Cents': serializer.toJson<int>(dunningFeeLevel2Cents),
+      'dunningFeeLevel3Cents': serializer.toJson<int>(dunningFeeLevel3Cents),
+      'dunningInterestRatePercent': serializer.toJson<double>(
+        dunningInterestRatePercent,
+      ),
+      'pdfIntroTextDunning': serializer.toJson<String?>(pdfIntroTextDunning),
+      'pdfClosingTextDunning': serializer.toJson<String?>(
+        pdfClosingTextDunning,
+      ),
       'pdfIntroText': serializer.toJson<String?>(pdfIntroText),
       'pdfClosingText': serializer.toJson<String?>(pdfClosingText),
       'pdfIntroTextQuote': serializer.toJson<String?>(pdfIntroTextQuote),
@@ -1146,6 +1449,14 @@ class Company extends DataClass implements Insertable<Company> {
     bool? recurringInvoicesEnabled,
     bool? advancePaymentInvoicesEnabled,
     bool? dunningEnabled,
+    int? dunningReminder2AfterDays,
+    int? dunningReminder3AfterDays,
+    int? dunningFeeLevel1Cents,
+    int? dunningFeeLevel2Cents,
+    int? dunningFeeLevel3Cents,
+    double? dunningInterestRatePercent,
+    Value<String?> pdfIntroTextDunning = const Value.absent(),
+    Value<String?> pdfClosingTextDunning = const Value.absent(),
     Value<String?> pdfIntroText = const Value.absent(),
     Value<String?> pdfClosingText = const Value.absent(),
     Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -1178,6 +1489,21 @@ class Company extends DataClass implements Insertable<Company> {
     advancePaymentInvoicesEnabled:
         advancePaymentInvoicesEnabled ?? this.advancePaymentInvoicesEnabled,
     dunningEnabled: dunningEnabled ?? this.dunningEnabled,
+    dunningReminder2AfterDays:
+        dunningReminder2AfterDays ?? this.dunningReminder2AfterDays,
+    dunningReminder3AfterDays:
+        dunningReminder3AfterDays ?? this.dunningReminder3AfterDays,
+    dunningFeeLevel1Cents: dunningFeeLevel1Cents ?? this.dunningFeeLevel1Cents,
+    dunningFeeLevel2Cents: dunningFeeLevel2Cents ?? this.dunningFeeLevel2Cents,
+    dunningFeeLevel3Cents: dunningFeeLevel3Cents ?? this.dunningFeeLevel3Cents,
+    dunningInterestRatePercent:
+        dunningInterestRatePercent ?? this.dunningInterestRatePercent,
+    pdfIntroTextDunning: pdfIntroTextDunning.present
+        ? pdfIntroTextDunning.value
+        : this.pdfIntroTextDunning,
+    pdfClosingTextDunning: pdfClosingTextDunning.present
+        ? pdfClosingTextDunning.value
+        : this.pdfClosingTextDunning,
     pdfIntroText: pdfIntroText.present ? pdfIntroText.value : this.pdfIntroText,
     pdfClosingText: pdfClosingText.present
         ? pdfClosingText.value
@@ -1248,6 +1574,30 @@ class Company extends DataClass implements Insertable<Company> {
       dunningEnabled: data.dunningEnabled.present
           ? data.dunningEnabled.value
           : this.dunningEnabled,
+      dunningReminder2AfterDays: data.dunningReminder2AfterDays.present
+          ? data.dunningReminder2AfterDays.value
+          : this.dunningReminder2AfterDays,
+      dunningReminder3AfterDays: data.dunningReminder3AfterDays.present
+          ? data.dunningReminder3AfterDays.value
+          : this.dunningReminder3AfterDays,
+      dunningFeeLevel1Cents: data.dunningFeeLevel1Cents.present
+          ? data.dunningFeeLevel1Cents.value
+          : this.dunningFeeLevel1Cents,
+      dunningFeeLevel2Cents: data.dunningFeeLevel2Cents.present
+          ? data.dunningFeeLevel2Cents.value
+          : this.dunningFeeLevel2Cents,
+      dunningFeeLevel3Cents: data.dunningFeeLevel3Cents.present
+          ? data.dunningFeeLevel3Cents.value
+          : this.dunningFeeLevel3Cents,
+      dunningInterestRatePercent: data.dunningInterestRatePercent.present
+          ? data.dunningInterestRatePercent.value
+          : this.dunningInterestRatePercent,
+      pdfIntroTextDunning: data.pdfIntroTextDunning.present
+          ? data.pdfIntroTextDunning.value
+          : this.pdfIntroTextDunning,
+      pdfClosingTextDunning: data.pdfClosingTextDunning.present
+          ? data.pdfClosingTextDunning.value
+          : this.pdfClosingTextDunning,
       pdfIntroText: data.pdfIntroText.present
           ? data.pdfIntroText.value
           : this.pdfIntroText,
@@ -1307,6 +1657,14 @@ class Company extends DataClass implements Insertable<Company> {
             'advancePaymentInvoicesEnabled: $advancePaymentInvoicesEnabled, ',
           )
           ..write('dunningEnabled: $dunningEnabled, ')
+          ..write('dunningReminder2AfterDays: $dunningReminder2AfterDays, ')
+          ..write('dunningReminder3AfterDays: $dunningReminder3AfterDays, ')
+          ..write('dunningFeeLevel1Cents: $dunningFeeLevel1Cents, ')
+          ..write('dunningFeeLevel2Cents: $dunningFeeLevel2Cents, ')
+          ..write('dunningFeeLevel3Cents: $dunningFeeLevel3Cents, ')
+          ..write('dunningInterestRatePercent: $dunningInterestRatePercent, ')
+          ..write('pdfIntroTextDunning: $pdfIntroTextDunning, ')
+          ..write('pdfClosingTextDunning: $pdfClosingTextDunning, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
@@ -1342,6 +1700,14 @@ class Company extends DataClass implements Insertable<Company> {
     recurringInvoicesEnabled,
     advancePaymentInvoicesEnabled,
     dunningEnabled,
+    dunningReminder2AfterDays,
+    dunningReminder3AfterDays,
+    dunningFeeLevel1Cents,
+    dunningFeeLevel2Cents,
+    dunningFeeLevel3Cents,
+    dunningInterestRatePercent,
+    pdfIntroTextDunning,
+    pdfClosingTextDunning,
     pdfIntroText,
     pdfClosingText,
     pdfIntroTextQuote,
@@ -1377,6 +1743,14 @@ class Company extends DataClass implements Insertable<Company> {
           other.advancePaymentInvoicesEnabled ==
               this.advancePaymentInvoicesEnabled &&
           other.dunningEnabled == this.dunningEnabled &&
+          other.dunningReminder2AfterDays == this.dunningReminder2AfterDays &&
+          other.dunningReminder3AfterDays == this.dunningReminder3AfterDays &&
+          other.dunningFeeLevel1Cents == this.dunningFeeLevel1Cents &&
+          other.dunningFeeLevel2Cents == this.dunningFeeLevel2Cents &&
+          other.dunningFeeLevel3Cents == this.dunningFeeLevel3Cents &&
+          other.dunningInterestRatePercent == this.dunningInterestRatePercent &&
+          other.pdfIntroTextDunning == this.pdfIntroTextDunning &&
+          other.pdfClosingTextDunning == this.pdfClosingTextDunning &&
           other.pdfIntroText == this.pdfIntroText &&
           other.pdfClosingText == this.pdfClosingText &&
           other.pdfIntroTextQuote == this.pdfIntroTextQuote &&
@@ -1409,6 +1783,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<bool> recurringInvoicesEnabled;
   final Value<bool> advancePaymentInvoicesEnabled;
   final Value<bool> dunningEnabled;
+  final Value<int> dunningReminder2AfterDays;
+  final Value<int> dunningReminder3AfterDays;
+  final Value<int> dunningFeeLevel1Cents;
+  final Value<int> dunningFeeLevel2Cents;
+  final Value<int> dunningFeeLevel3Cents;
+  final Value<double> dunningInterestRatePercent;
+  final Value<String?> pdfIntroTextDunning;
+  final Value<String?> pdfClosingTextDunning;
   final Value<String?> pdfIntroText;
   final Value<String?> pdfClosingText;
   final Value<String?> pdfIntroTextQuote;
@@ -1440,6 +1822,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.recurringInvoicesEnabled = const Value.absent(),
     this.advancePaymentInvoicesEnabled = const Value.absent(),
     this.dunningEnabled = const Value.absent(),
+    this.dunningReminder2AfterDays = const Value.absent(),
+    this.dunningReminder3AfterDays = const Value.absent(),
+    this.dunningFeeLevel1Cents = const Value.absent(),
+    this.dunningFeeLevel2Cents = const Value.absent(),
+    this.dunningFeeLevel3Cents = const Value.absent(),
+    this.dunningInterestRatePercent = const Value.absent(),
+    this.pdfIntroTextDunning = const Value.absent(),
+    this.pdfClosingTextDunning = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfIntroTextQuote = const Value.absent(),
@@ -1472,6 +1862,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.recurringInvoicesEnabled = const Value.absent(),
     this.advancePaymentInvoicesEnabled = const Value.absent(),
     this.dunningEnabled = const Value.absent(),
+    this.dunningReminder2AfterDays = const Value.absent(),
+    this.dunningReminder3AfterDays = const Value.absent(),
+    this.dunningFeeLevel1Cents = const Value.absent(),
+    this.dunningFeeLevel2Cents = const Value.absent(),
+    this.dunningFeeLevel3Cents = const Value.absent(),
+    this.dunningInterestRatePercent = const Value.absent(),
+    this.pdfIntroTextDunning = const Value.absent(),
+    this.pdfClosingTextDunning = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfIntroTextQuote = const Value.absent(),
@@ -1506,6 +1904,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<bool>? recurringInvoicesEnabled,
     Expression<bool>? advancePaymentInvoicesEnabled,
     Expression<bool>? dunningEnabled,
+    Expression<int>? dunningReminder2AfterDays,
+    Expression<int>? dunningReminder3AfterDays,
+    Expression<int>? dunningFeeLevel1Cents,
+    Expression<int>? dunningFeeLevel2Cents,
+    Expression<int>? dunningFeeLevel3Cents,
+    Expression<double>? dunningInterestRatePercent,
+    Expression<String>? pdfIntroTextDunning,
+    Expression<String>? pdfClosingTextDunning,
     Expression<String>? pdfIntroText,
     Expression<String>? pdfClosingText,
     Expression<String>? pdfIntroTextQuote,
@@ -1541,6 +1947,22 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (advancePaymentInvoicesEnabled != null)
         'advance_payment_invoices_enabled': advancePaymentInvoicesEnabled,
       if (dunningEnabled != null) 'dunning_enabled': dunningEnabled,
+      if (dunningReminder2AfterDays != null)
+        'dunning_reminder2_after_days': dunningReminder2AfterDays,
+      if (dunningReminder3AfterDays != null)
+        'dunning_reminder3_after_days': dunningReminder3AfterDays,
+      if (dunningFeeLevel1Cents != null)
+        'dunning_fee_level1_cents': dunningFeeLevel1Cents,
+      if (dunningFeeLevel2Cents != null)
+        'dunning_fee_level2_cents': dunningFeeLevel2Cents,
+      if (dunningFeeLevel3Cents != null)
+        'dunning_fee_level3_cents': dunningFeeLevel3Cents,
+      if (dunningInterestRatePercent != null)
+        'dunning_interest_rate_percent': dunningInterestRatePercent,
+      if (pdfIntroTextDunning != null)
+        'pdf_intro_text_dunning': pdfIntroTextDunning,
+      if (pdfClosingTextDunning != null)
+        'pdf_closing_text_dunning': pdfClosingTextDunning,
       if (pdfIntroText != null) 'pdf_intro_text': pdfIntroText,
       if (pdfClosingText != null) 'pdf_closing_text': pdfClosingText,
       if (pdfIntroTextQuote != null) 'pdf_intro_text_quote': pdfIntroTextQuote,
@@ -1581,6 +2003,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<bool>? recurringInvoicesEnabled,
     Value<bool>? advancePaymentInvoicesEnabled,
     Value<bool>? dunningEnabled,
+    Value<int>? dunningReminder2AfterDays,
+    Value<int>? dunningReminder3AfterDays,
+    Value<int>? dunningFeeLevel1Cents,
+    Value<int>? dunningFeeLevel2Cents,
+    Value<int>? dunningFeeLevel3Cents,
+    Value<double>? dunningInterestRatePercent,
+    Value<String?>? pdfIntroTextDunning,
+    Value<String?>? pdfClosingTextDunning,
     Value<String?>? pdfIntroText,
     Value<String?>? pdfClosingText,
     Value<String?>? pdfIntroTextQuote,
@@ -1615,6 +2045,21 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       advancePaymentInvoicesEnabled:
           advancePaymentInvoicesEnabled ?? this.advancePaymentInvoicesEnabled,
       dunningEnabled: dunningEnabled ?? this.dunningEnabled,
+      dunningReminder2AfterDays:
+          dunningReminder2AfterDays ?? this.dunningReminder2AfterDays,
+      dunningReminder3AfterDays:
+          dunningReminder3AfterDays ?? this.dunningReminder3AfterDays,
+      dunningFeeLevel1Cents:
+          dunningFeeLevel1Cents ?? this.dunningFeeLevel1Cents,
+      dunningFeeLevel2Cents:
+          dunningFeeLevel2Cents ?? this.dunningFeeLevel2Cents,
+      dunningFeeLevel3Cents:
+          dunningFeeLevel3Cents ?? this.dunningFeeLevel3Cents,
+      dunningInterestRatePercent:
+          dunningInterestRatePercent ?? this.dunningInterestRatePercent,
+      pdfIntroTextDunning: pdfIntroTextDunning ?? this.pdfIntroTextDunning,
+      pdfClosingTextDunning:
+          pdfClosingTextDunning ?? this.pdfClosingTextDunning,
       pdfIntroText: pdfIntroText ?? this.pdfIntroText,
       pdfClosingText: pdfClosingText ?? this.pdfClosingText,
       pdfIntroTextQuote: pdfIntroTextQuote ?? this.pdfIntroTextQuote,
@@ -1696,6 +2141,46 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (dunningEnabled.present) {
       map['dunning_enabled'] = Variable<bool>(dunningEnabled.value);
     }
+    if (dunningReminder2AfterDays.present) {
+      map['dunning_reminder2_after_days'] = Variable<int>(
+        dunningReminder2AfterDays.value,
+      );
+    }
+    if (dunningReminder3AfterDays.present) {
+      map['dunning_reminder3_after_days'] = Variable<int>(
+        dunningReminder3AfterDays.value,
+      );
+    }
+    if (dunningFeeLevel1Cents.present) {
+      map['dunning_fee_level1_cents'] = Variable<int>(
+        dunningFeeLevel1Cents.value,
+      );
+    }
+    if (dunningFeeLevel2Cents.present) {
+      map['dunning_fee_level2_cents'] = Variable<int>(
+        dunningFeeLevel2Cents.value,
+      );
+    }
+    if (dunningFeeLevel3Cents.present) {
+      map['dunning_fee_level3_cents'] = Variable<int>(
+        dunningFeeLevel3Cents.value,
+      );
+    }
+    if (dunningInterestRatePercent.present) {
+      map['dunning_interest_rate_percent'] = Variable<double>(
+        dunningInterestRatePercent.value,
+      );
+    }
+    if (pdfIntroTextDunning.present) {
+      map['pdf_intro_text_dunning'] = Variable<String>(
+        pdfIntroTextDunning.value,
+      );
+    }
+    if (pdfClosingTextDunning.present) {
+      map['pdf_closing_text_dunning'] = Variable<String>(
+        pdfClosingTextDunning.value,
+      );
+    }
     if (pdfIntroText.present) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText.value);
     }
@@ -1770,6 +2255,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
             'advancePaymentInvoicesEnabled: $advancePaymentInvoicesEnabled, ',
           )
           ..write('dunningEnabled: $dunningEnabled, ')
+          ..write('dunningReminder2AfterDays: $dunningReminder2AfterDays, ')
+          ..write('dunningReminder3AfterDays: $dunningReminder3AfterDays, ')
+          ..write('dunningFeeLevel1Cents: $dunningFeeLevel1Cents, ')
+          ..write('dunningFeeLevel2Cents: $dunningFeeLevel2Cents, ')
+          ..write('dunningFeeLevel3Cents: $dunningFeeLevel3Cents, ')
+          ..write('dunningInterestRatePercent: $dunningInterestRatePercent, ')
+          ..write('pdfIntroTextDunning: $pdfIntroTextDunning, ')
+          ..write('pdfClosingTextDunning: $pdfClosingTextDunning, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
@@ -10557,70 +11050,88 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   ]);
 }
 
-typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
-  required String id,
-  required String name,
-  Value<String?> address,
-  Value<String?> taxNumber,
-  Value<String?> vatId,
-  Value<String?> iban,
-  Value<String?> email,
-  Value<String?> phone,
-  required DateTime createdAt,
-  Value<bool> quotesEnabled,
-  Value<bool> ordersEnabled,
-  Value<bool> deliveryNotesEnabled,
-  Value<bool> proformaEnabled,
-  Value<bool> projectsEnabled,
-  Value<bool> fleetEnabled,
-  Value<bool> recurringInvoicesEnabled,
-  Value<bool> advancePaymentInvoicesEnabled,
-  Value<bool> dunningEnabled,
-  Value<String?> pdfIntroText,
-  Value<String?> pdfClosingText,
-  Value<String?> pdfIntroTextQuote,
-  Value<String?> pdfClosingTextQuote,
-  Value<String?> pdfIntroTextOrder,
-  Value<String?> pdfClosingTextOrder,
-  Value<String?> pdfIntroTextDeliveryNote,
-  Value<String?> pdfClosingTextDeliveryNote,
-  Value<String?> pdfIntroTextProforma,
-  Value<String?> pdfClosingTextProforma,
-  Value<String?> pdfFooterText,
-  Value<int> rowid,
-});
-typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
-  Value<String> id,
-  Value<String> name,
-  Value<String?> address,
-  Value<String?> taxNumber,
-  Value<String?> vatId,
-  Value<String?> iban,
-  Value<String?> email,
-  Value<String?> phone,
-  Value<DateTime> createdAt,
-  Value<bool> quotesEnabled,
-  Value<bool> ordersEnabled,
-  Value<bool> deliveryNotesEnabled,
-  Value<bool> proformaEnabled,
-  Value<bool> projectsEnabled,
-  Value<bool> fleetEnabled,
-  Value<bool> recurringInvoicesEnabled,
-  Value<bool> advancePaymentInvoicesEnabled,
-  Value<bool> dunningEnabled,
-  Value<String?> pdfIntroText,
-  Value<String?> pdfClosingText,
-  Value<String?> pdfIntroTextQuote,
-  Value<String?> pdfClosingTextQuote,
-  Value<String?> pdfIntroTextOrder,
-  Value<String?> pdfClosingTextOrder,
-  Value<String?> pdfIntroTextDeliveryNote,
-  Value<String?> pdfClosingTextDeliveryNote,
-  Value<String?> pdfIntroTextProforma,
-  Value<String?> pdfClosingTextProforma,
-  Value<String?> pdfFooterText,
-  Value<int> rowid,
-});
+typedef $$CompaniesTableCreateCompanionBuilder =
+    CompaniesCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> address,
+      Value<String?> taxNumber,
+      Value<String?> vatId,
+      Value<String?> iban,
+      Value<String?> email,
+      Value<String?> phone,
+      required DateTime createdAt,
+      Value<bool> quotesEnabled,
+      Value<bool> ordersEnabled,
+      Value<bool> deliveryNotesEnabled,
+      Value<bool> proformaEnabled,
+      Value<bool> projectsEnabled,
+      Value<bool> fleetEnabled,
+      Value<bool> recurringInvoicesEnabled,
+      Value<bool> advancePaymentInvoicesEnabled,
+      Value<bool> dunningEnabled,
+      Value<int> dunningReminder2AfterDays,
+      Value<int> dunningReminder3AfterDays,
+      Value<int> dunningFeeLevel1Cents,
+      Value<int> dunningFeeLevel2Cents,
+      Value<int> dunningFeeLevel3Cents,
+      Value<double> dunningInterestRatePercent,
+      Value<String?> pdfIntroTextDunning,
+      Value<String?> pdfClosingTextDunning,
+      Value<String?> pdfIntroText,
+      Value<String?> pdfClosingText,
+      Value<String?> pdfIntroTextQuote,
+      Value<String?> pdfClosingTextQuote,
+      Value<String?> pdfIntroTextOrder,
+      Value<String?> pdfClosingTextOrder,
+      Value<String?> pdfIntroTextDeliveryNote,
+      Value<String?> pdfClosingTextDeliveryNote,
+      Value<String?> pdfIntroTextProforma,
+      Value<String?> pdfClosingTextProforma,
+      Value<String?> pdfFooterText,
+      Value<int> rowid,
+    });
+typedef $$CompaniesTableUpdateCompanionBuilder =
+    CompaniesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> address,
+      Value<String?> taxNumber,
+      Value<String?> vatId,
+      Value<String?> iban,
+      Value<String?> email,
+      Value<String?> phone,
+      Value<DateTime> createdAt,
+      Value<bool> quotesEnabled,
+      Value<bool> ordersEnabled,
+      Value<bool> deliveryNotesEnabled,
+      Value<bool> proformaEnabled,
+      Value<bool> projectsEnabled,
+      Value<bool> fleetEnabled,
+      Value<bool> recurringInvoicesEnabled,
+      Value<bool> advancePaymentInvoicesEnabled,
+      Value<bool> dunningEnabled,
+      Value<int> dunningReminder2AfterDays,
+      Value<int> dunningReminder3AfterDays,
+      Value<int> dunningFeeLevel1Cents,
+      Value<int> dunningFeeLevel2Cents,
+      Value<int> dunningFeeLevel3Cents,
+      Value<double> dunningInterestRatePercent,
+      Value<String?> pdfIntroTextDunning,
+      Value<String?> pdfClosingTextDunning,
+      Value<String?> pdfIntroText,
+      Value<String?> pdfClosingText,
+      Value<String?> pdfIntroTextQuote,
+      Value<String?> pdfClosingTextQuote,
+      Value<String?> pdfIntroTextOrder,
+      Value<String?> pdfClosingTextOrder,
+      Value<String?> pdfIntroTextDeliveryNote,
+      Value<String?> pdfClosingTextDeliveryNote,
+      Value<String?> pdfIntroTextProforma,
+      Value<String?> pdfClosingTextProforma,
+      Value<String?> pdfFooterText,
+      Value<int> rowid,
+    });
 
 final class $$CompaniesTableReferences
     extends BaseReferences<_$AppDatabase, $CompaniesTable, Company> {
@@ -10919,6 +11430,46 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<bool> get dunningEnabled => $composableBuilder(
     column: $table.dunningEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dunningReminder2AfterDays => $composableBuilder(
+    column: $table.dunningReminder2AfterDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dunningReminder3AfterDays => $composableBuilder(
+    column: $table.dunningReminder3AfterDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dunningFeeLevel1Cents => $composableBuilder(
+    column: $table.dunningFeeLevel1Cents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dunningFeeLevel2Cents => $composableBuilder(
+    column: $table.dunningFeeLevel2Cents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get dunningFeeLevel3Cents => $composableBuilder(
+    column: $table.dunningFeeLevel3Cents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get dunningInterestRatePercent => $composableBuilder(
+    column: $table.dunningInterestRatePercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroTextDunning => $composableBuilder(
+    column: $table.pdfIntroTextDunning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingTextDunning => $composableBuilder(
+    column: $table.pdfClosingTextDunning,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11329,6 +11880,46 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get dunningReminder2AfterDays => $composableBuilder(
+    column: $table.dunningReminder2AfterDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dunningReminder3AfterDays => $composableBuilder(
+    column: $table.dunningReminder3AfterDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dunningFeeLevel1Cents => $composableBuilder(
+    column: $table.dunningFeeLevel1Cents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dunningFeeLevel2Cents => $composableBuilder(
+    column: $table.dunningFeeLevel2Cents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get dunningFeeLevel3Cents => $composableBuilder(
+    column: $table.dunningFeeLevel3Cents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get dunningInterestRatePercent => $composableBuilder(
+    column: $table.dunningInterestRatePercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfIntroTextDunning => $composableBuilder(
+    column: $table.pdfIntroTextDunning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingTextDunning => $composableBuilder(
+    column: $table.pdfClosingTextDunning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get pdfIntroText => $composableBuilder(
     column: $table.pdfIntroText,
     builder: (column) => ColumnOrderings(column),
@@ -11463,6 +12054,46 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<bool> get dunningEnabled => $composableBuilder(
     column: $table.dunningEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get dunningReminder2AfterDays => $composableBuilder(
+    column: $table.dunningReminder2AfterDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get dunningReminder3AfterDays => $composableBuilder(
+    column: $table.dunningReminder3AfterDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get dunningFeeLevel1Cents => $composableBuilder(
+    column: $table.dunningFeeLevel1Cents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get dunningFeeLevel2Cents => $composableBuilder(
+    column: $table.dunningFeeLevel2Cents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get dunningFeeLevel3Cents => $composableBuilder(
+    column: $table.dunningFeeLevel3Cents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get dunningInterestRatePercent => $composableBuilder(
+    column: $table.dunningInterestRatePercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfIntroTextDunning => $composableBuilder(
+    column: $table.pdfIntroTextDunning,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingTextDunning => $composableBuilder(
+    column: $table.pdfClosingTextDunning,
     builder: (column) => column,
   );
 
@@ -11833,6 +12464,14 @@ class $$CompaniesTableTableManager
                 Value<bool> advancePaymentInvoicesEnabled =
                     const Value.absent(),
                 Value<bool> dunningEnabled = const Value.absent(),
+                Value<int> dunningReminder2AfterDays = const Value.absent(),
+                Value<int> dunningReminder3AfterDays = const Value.absent(),
+                Value<int> dunningFeeLevel1Cents = const Value.absent(),
+                Value<int> dunningFeeLevel2Cents = const Value.absent(),
+                Value<int> dunningFeeLevel3Cents = const Value.absent(),
+                Value<double> dunningInterestRatePercent = const Value.absent(),
+                Value<String?> pdfIntroTextDunning = const Value.absent(),
+                Value<String?> pdfClosingTextDunning = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -11865,6 +12504,14 @@ class $$CompaniesTableTableManager
                 recurringInvoicesEnabled: recurringInvoicesEnabled,
                 advancePaymentInvoicesEnabled: advancePaymentInvoicesEnabled,
                 dunningEnabled: dunningEnabled,
+                dunningReminder2AfterDays: dunningReminder2AfterDays,
+                dunningReminder3AfterDays: dunningReminder3AfterDays,
+                dunningFeeLevel1Cents: dunningFeeLevel1Cents,
+                dunningFeeLevel2Cents: dunningFeeLevel2Cents,
+                dunningFeeLevel3Cents: dunningFeeLevel3Cents,
+                dunningInterestRatePercent: dunningInterestRatePercent,
+                pdfIntroTextDunning: pdfIntroTextDunning,
+                pdfClosingTextDunning: pdfClosingTextDunning,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfIntroTextQuote: pdfIntroTextQuote,
@@ -11899,6 +12546,14 @@ class $$CompaniesTableTableManager
                 Value<bool> advancePaymentInvoicesEnabled =
                     const Value.absent(),
                 Value<bool> dunningEnabled = const Value.absent(),
+                Value<int> dunningReminder2AfterDays = const Value.absent(),
+                Value<int> dunningReminder3AfterDays = const Value.absent(),
+                Value<int> dunningFeeLevel1Cents = const Value.absent(),
+                Value<int> dunningFeeLevel2Cents = const Value.absent(),
+                Value<int> dunningFeeLevel3Cents = const Value.absent(),
+                Value<double> dunningInterestRatePercent = const Value.absent(),
+                Value<String?> pdfIntroTextDunning = const Value.absent(),
+                Value<String?> pdfClosingTextDunning = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -11931,6 +12586,14 @@ class $$CompaniesTableTableManager
                 recurringInvoicesEnabled: recurringInvoicesEnabled,
                 advancePaymentInvoicesEnabled: advancePaymentInvoicesEnabled,
                 dunningEnabled: dunningEnabled,
+                dunningReminder2AfterDays: dunningReminder2AfterDays,
+                dunningReminder3AfterDays: dunningReminder3AfterDays,
+                dunningFeeLevel1Cents: dunningFeeLevel1Cents,
+                dunningFeeLevel2Cents: dunningFeeLevel2Cents,
+                dunningFeeLevel3Cents: dunningFeeLevel3Cents,
+                dunningInterestRatePercent: dunningInterestRatePercent,
+                pdfIntroTextDunning: pdfIntroTextDunning,
+                pdfClosingTextDunning: pdfClosingTextDunning,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfIntroTextQuote: pdfIntroTextQuote,
@@ -12226,32 +12889,34 @@ typedef $$CompaniesTableProcessedTableManager =
         bool recurringInvoiceTemplatesRefs,
       })
     >;
-typedef $$CustomersTableCreateCompanionBuilder = CustomersCompanion Function({
-  required String id,
-  required String companyId,
-  required String name,
-  Value<String?> address,
-  Value<String?> email,
-  Value<String?> phone,
-  Value<String?> vatId,
-  Value<String?> contactPerson,
-  Value<String?> notes,
-  required DateTime createdAt,
-  Value<int> rowid,
-});
-typedef $$CustomersTableUpdateCompanionBuilder = CustomersCompanion Function({
-  Value<String> id,
-  Value<String> companyId,
-  Value<String> name,
-  Value<String?> address,
-  Value<String?> email,
-  Value<String?> phone,
-  Value<String?> vatId,
-  Value<String?> contactPerson,
-  Value<String?> notes,
-  Value<DateTime> createdAt,
-  Value<int> rowid,
-});
+typedef $$CustomersTableCreateCompanionBuilder =
+    CustomersCompanion Function({
+      required String id,
+      required String companyId,
+      required String name,
+      Value<String?> address,
+      Value<String?> email,
+      Value<String?> phone,
+      Value<String?> vatId,
+      Value<String?> contactPerson,
+      Value<String?> notes,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$CustomersTableUpdateCompanionBuilder =
+    CustomersCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> name,
+      Value<String?> address,
+      Value<String?> email,
+      Value<String?> phone,
+      Value<String?> vatId,
+      Value<String?> contactPerson,
+      Value<String?> notes,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
 
 final class $$CustomersTableReferences
     extends BaseReferences<_$AppDatabase, $CustomersTable, Customer> {
@@ -12833,15 +13498,17 @@ class $$CustomersTableTableManager
                         >
                       >(state) {
                         if (companyId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.companyId,
-                            referencedTable: $$CustomersTableReferences
-                                ._companyIdTable(db),
-                            referencedColumn: $$CustomersTableReferences
-                                ._companyIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$CustomersTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn: $$CustomersTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
 
                         return state;
@@ -12938,32 +13605,34 @@ typedef $$CustomersTableProcessedTableManager =
         bool recurringInvoiceTemplatesRefs,
       })
     >;
-typedef $$SuppliersTableCreateCompanionBuilder = SuppliersCompanion Function({
-  required String id,
-  required String companyId,
-  required String name,
-  Value<String?> address,
-  Value<String?> email,
-  Value<String?> phone,
-  Value<String?> vatId,
-  Value<String?> contactPerson,
-  Value<String?> notes,
-  required DateTime createdAt,
-  Value<int> rowid,
-});
-typedef $$SuppliersTableUpdateCompanionBuilder = SuppliersCompanion Function({
-  Value<String> id,
-  Value<String> companyId,
-  Value<String> name,
-  Value<String?> address,
-  Value<String?> email,
-  Value<String?> phone,
-  Value<String?> vatId,
-  Value<String?> contactPerson,
-  Value<String?> notes,
-  Value<DateTime> createdAt,
-  Value<int> rowid,
-});
+typedef $$SuppliersTableCreateCompanionBuilder =
+    SuppliersCompanion Function({
+      required String id,
+      required String companyId,
+      required String name,
+      Value<String?> address,
+      Value<String?> email,
+      Value<String?> phone,
+      Value<String?> vatId,
+      Value<String?> contactPerson,
+      Value<String?> notes,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$SuppliersTableUpdateCompanionBuilder =
+    SuppliersCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> name,
+      Value<String?> address,
+      Value<String?> email,
+      Value<String?> phone,
+      Value<String?> vatId,
+      Value<String?> contactPerson,
+      Value<String?> notes,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
 
 final class $$SuppliersTableReferences
     extends BaseReferences<_$AppDatabase, $SuppliersTable, Supplier> {
@@ -13469,15 +14138,17 @@ class $$SuppliersTableTableManager
                         >
                       >(state) {
                         if (companyId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.companyId,
-                            referencedTable: $$SuppliersTableReferences
-                                ._companyIdTable(db),
-                            referencedColumn: $$SuppliersTableReferences
-                                ._companyIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$SuppliersTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn: $$SuppliersTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
 
                         return state;
@@ -13906,15 +14577,17 @@ class $$ArticleGroupsTableTableManager
                     >
                   >(state) {
                     if (companyId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.companyId,
-                        referencedTable: $$ArticleGroupsTableReferences
-                            ._companyIdTable(db),
-                        referencedColumn: $$ArticleGroupsTableReferences
-                            ._companyIdTable(db)
-                            .id,
-                      ) as T;
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.companyId,
+                                referencedTable: $$ArticleGroupsTableReferences
+                                    ._companyIdTable(db),
+                                referencedColumn: $$ArticleGroupsTableReferences
+                                    ._companyIdTable(db)
+                                    .id,
+                              )
+                              as T;
                     }
 
                     return state;
@@ -13964,28 +14637,30 @@ typedef $$ArticleGroupsTableProcessedTableManager =
       ArticleGroup,
       PrefetchHooks Function({bool companyId, bool articlesRefs})
     >;
-typedef $$ArticlesTableCreateCompanionBuilder = ArticlesCompanion Function({
-  required String id,
-  required String companyId,
-  required String name,
-  Value<String?> unit,
-  Value<String?> articleGroupId,
-  Value<String?> defaultSupplierId,
-  Value<int?> manualSalePriceCents,
-  required DateTime createdAt,
-  Value<int> rowid,
-});
-typedef $$ArticlesTableUpdateCompanionBuilder = ArticlesCompanion Function({
-  Value<String> id,
-  Value<String> companyId,
-  Value<String> name,
-  Value<String?> unit,
-  Value<String?> articleGroupId,
-  Value<String?> defaultSupplierId,
-  Value<int?> manualSalePriceCents,
-  Value<DateTime> createdAt,
-  Value<int> rowid,
-});
+typedef $$ArticlesTableCreateCompanionBuilder =
+    ArticlesCompanion Function({
+      required String id,
+      required String companyId,
+      required String name,
+      Value<String?> unit,
+      Value<String?> articleGroupId,
+      Value<String?> defaultSupplierId,
+      Value<int?> manualSalePriceCents,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$ArticlesTableUpdateCompanionBuilder =
+    ArticlesCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> name,
+      Value<String?> unit,
+      Value<String?> articleGroupId,
+      Value<String?> defaultSupplierId,
+      Value<int?> manualSalePriceCents,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
 
 final class $$ArticlesTableReferences
     extends BaseReferences<_$AppDatabase, $ArticlesTable, Article> {
@@ -14695,37 +15370,43 @@ class $$ArticlesTableTableManager
                         >
                       >(state) {
                         if (companyId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.companyId,
-                            referencedTable: $$ArticlesTableReferences
-                                ._companyIdTable(db),
-                            referencedColumn: $$ArticlesTableReferences
-                                ._companyIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$ArticlesTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn: $$ArticlesTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
                         if (articleGroupId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.articleGroupId,
-                            referencedTable: $$ArticlesTableReferences
-                                ._articleGroupIdTable(db),
-                            referencedColumn: $$ArticlesTableReferences
-                                ._articleGroupIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.articleGroupId,
+                                    referencedTable: $$ArticlesTableReferences
+                                        ._articleGroupIdTable(db),
+                                    referencedColumn: $$ArticlesTableReferences
+                                        ._articleGroupIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
                         if (defaultSupplierId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.defaultSupplierId,
-                            referencedTable: $$ArticlesTableReferences
-                                ._defaultSupplierIdTable(db),
-                            referencedColumn: $$ArticlesTableReferences
-                                ._defaultSupplierIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.defaultSupplierId,
+                                    referencedTable: $$ArticlesTableReferences
+                                        ._defaultSupplierIdTable(db),
+                                    referencedColumn: $$ArticlesTableReferences
+                                        ._defaultSupplierIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
 
                         return state;
@@ -15201,26 +15882,34 @@ class $$ArticleSupplierPricesTableTableManager
                     >
                   >(state) {
                     if (articleId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.articleId,
-                        referencedTable: $$ArticleSupplierPricesTableReferences
-                            ._articleIdTable(db),
-                        referencedColumn: $$ArticleSupplierPricesTableReferences
-                            ._articleIdTable(db)
-                            .id,
-                      ) as T;
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.articleId,
+                                referencedTable:
+                                    $$ArticleSupplierPricesTableReferences
+                                        ._articleIdTable(db),
+                                referencedColumn:
+                                    $$ArticleSupplierPricesTableReferences
+                                        ._articleIdTable(db)
+                                        .id,
+                              )
+                              as T;
                     }
                     if (supplierId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.supplierId,
-                        referencedTable: $$ArticleSupplierPricesTableReferences
-                            ._supplierIdTable(db),
-                        referencedColumn: $$ArticleSupplierPricesTableReferences
-                            ._supplierIdTable(db)
-                            .id,
-                      ) as T;
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.supplierId,
+                                referencedTable:
+                                    $$ArticleSupplierPricesTableReferences
+                                        ._supplierIdTable(db),
+                                referencedColumn:
+                                    $$ArticleSupplierPricesTableReferences
+                                        ._supplierIdTable(db)
+                                        .id,
+                              )
+                              as T;
                     }
 
                     return state;
@@ -15248,26 +15937,28 @@ typedef $$ArticleSupplierPricesTableProcessedTableManager =
       ArticleSupplierPrice,
       PrefetchHooks Function({bool articleId, bool supplierId})
     >;
-typedef $$ProjectsTableCreateCompanionBuilder = ProjectsCompanion Function({
-  required String id,
-  required String companyId,
-  required String name,
-  Value<String?> customerId,
-  Value<String?> notes,
-  Value<ProjectStatus> status,
-  required DateTime createdAt,
-  Value<int> rowid,
-});
-typedef $$ProjectsTableUpdateCompanionBuilder = ProjectsCompanion Function({
-  Value<String> id,
-  Value<String> companyId,
-  Value<String> name,
-  Value<String?> customerId,
-  Value<String?> notes,
-  Value<ProjectStatus> status,
-  Value<DateTime> createdAt,
-  Value<int> rowid,
-});
+typedef $$ProjectsTableCreateCompanionBuilder =
+    ProjectsCompanion Function({
+      required String id,
+      required String companyId,
+      required String name,
+      Value<String?> customerId,
+      Value<String?> notes,
+      Value<ProjectStatus> status,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$ProjectsTableUpdateCompanionBuilder =
+    ProjectsCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> name,
+      Value<String?> customerId,
+      Value<String?> notes,
+      Value<ProjectStatus> status,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
 
 final class $$ProjectsTableReferences
     extends BaseReferences<_$AppDatabase, $ProjectsTable, Project> {
@@ -15792,26 +16483,30 @@ class $$ProjectsTableTableManager
                         >
                       >(state) {
                         if (companyId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.companyId,
-                            referencedTable: $$ProjectsTableReferences
-                                ._companyIdTable(db),
-                            referencedColumn: $$ProjectsTableReferences
-                                ._companyIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$ProjectsTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn: $$ProjectsTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
                         if (customerId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.customerId,
-                            referencedTable: $$ProjectsTableReferences
-                                ._customerIdTable(db),
-                            referencedColumn: $$ProjectsTableReferences
-                                ._customerIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.customerId,
+                                    referencedTable: $$ProjectsTableReferences
+                                        ._customerIdTable(db),
+                                    referencedColumn: $$ProjectsTableReferences
+                                        ._customerIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
 
                         return state;
@@ -15887,74 +16582,76 @@ typedef $$ProjectsTableProcessedTableManager =
         bool vehicleCostEntriesRefs,
       })
     >;
-typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
-  required String id,
-  required String companyId,
-  required String customerId,
-  Value<DocumentKind> kind,
-  required InvoiceStatus status,
-  Value<String?> invoiceNumber,
-  Value<int?> numberYear,
-  required DateTime issueDate,
-  required DateTime serviceDate,
-  Value<String?> paymentTerms,
-  Value<String?> notes,
-  Value<String?> customerSnapshotName,
-  Value<String?> customerSnapshotAddress,
-  Value<String?> customerSnapshotVatId,
-  Value<String?> companySnapshotName,
-  Value<String?> companySnapshotAddress,
-  Value<String?> companySnapshotTaxNumber,
-  Value<String?> companySnapshotVatId,
-  Value<String?> companySnapshotIban,
-  Value<String?> pdfIntroTextSnapshot,
-  Value<String?> pdfClosingTextSnapshot,
-  Value<String?> pdfFooterTextSnapshot,
-  Value<DateTime?> finalizedAt,
-  required DateTime createdAt,
-  required DateTime updatedAt,
-  Value<String?> convertedFromId,
-  Value<String?> projectId,
-  Value<bool> isAdvancePayment,
-  Value<DateTime?> dueDate,
-  Value<PaymentStatus> paymentStatus,
-  Value<DateTime?> paidAt,
-  Value<int> rowid,
-});
-typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
-  Value<String> id,
-  Value<String> companyId,
-  Value<String> customerId,
-  Value<DocumentKind> kind,
-  Value<InvoiceStatus> status,
-  Value<String?> invoiceNumber,
-  Value<int?> numberYear,
-  Value<DateTime> issueDate,
-  Value<DateTime> serviceDate,
-  Value<String?> paymentTerms,
-  Value<String?> notes,
-  Value<String?> customerSnapshotName,
-  Value<String?> customerSnapshotAddress,
-  Value<String?> customerSnapshotVatId,
-  Value<String?> companySnapshotName,
-  Value<String?> companySnapshotAddress,
-  Value<String?> companySnapshotTaxNumber,
-  Value<String?> companySnapshotVatId,
-  Value<String?> companySnapshotIban,
-  Value<String?> pdfIntroTextSnapshot,
-  Value<String?> pdfClosingTextSnapshot,
-  Value<String?> pdfFooterTextSnapshot,
-  Value<DateTime?> finalizedAt,
-  Value<DateTime> createdAt,
-  Value<DateTime> updatedAt,
-  Value<String?> convertedFromId,
-  Value<String?> projectId,
-  Value<bool> isAdvancePayment,
-  Value<DateTime?> dueDate,
-  Value<PaymentStatus> paymentStatus,
-  Value<DateTime?> paidAt,
-  Value<int> rowid,
-});
+typedef $$InvoicesTableCreateCompanionBuilder =
+    InvoicesCompanion Function({
+      required String id,
+      required String companyId,
+      required String customerId,
+      Value<DocumentKind> kind,
+      required InvoiceStatus status,
+      Value<String?> invoiceNumber,
+      Value<int?> numberYear,
+      required DateTime issueDate,
+      required DateTime serviceDate,
+      Value<String?> paymentTerms,
+      Value<String?> notes,
+      Value<String?> customerSnapshotName,
+      Value<String?> customerSnapshotAddress,
+      Value<String?> customerSnapshotVatId,
+      Value<String?> companySnapshotName,
+      Value<String?> companySnapshotAddress,
+      Value<String?> companySnapshotTaxNumber,
+      Value<String?> companySnapshotVatId,
+      Value<String?> companySnapshotIban,
+      Value<String?> pdfIntroTextSnapshot,
+      Value<String?> pdfClosingTextSnapshot,
+      Value<String?> pdfFooterTextSnapshot,
+      Value<DateTime?> finalizedAt,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<String?> convertedFromId,
+      Value<String?> projectId,
+      Value<bool> isAdvancePayment,
+      Value<DateTime?> dueDate,
+      Value<PaymentStatus> paymentStatus,
+      Value<DateTime?> paidAt,
+      Value<int> rowid,
+    });
+typedef $$InvoicesTableUpdateCompanionBuilder =
+    InvoicesCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> customerId,
+      Value<DocumentKind> kind,
+      Value<InvoiceStatus> status,
+      Value<String?> invoiceNumber,
+      Value<int?> numberYear,
+      Value<DateTime> issueDate,
+      Value<DateTime> serviceDate,
+      Value<String?> paymentTerms,
+      Value<String?> notes,
+      Value<String?> customerSnapshotName,
+      Value<String?> customerSnapshotAddress,
+      Value<String?> customerSnapshotVatId,
+      Value<String?> companySnapshotName,
+      Value<String?> companySnapshotAddress,
+      Value<String?> companySnapshotTaxNumber,
+      Value<String?> companySnapshotVatId,
+      Value<String?> companySnapshotIban,
+      Value<String?> pdfIntroTextSnapshot,
+      Value<String?> pdfClosingTextSnapshot,
+      Value<String?> pdfFooterTextSnapshot,
+      Value<DateTime?> finalizedAt,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<String?> convertedFromId,
+      Value<String?> projectId,
+      Value<bool> isAdvancePayment,
+      Value<DateTime?> dueDate,
+      Value<PaymentStatus> paymentStatus,
+      Value<DateTime?> paidAt,
+      Value<int> rowid,
+    });
 
 final class $$InvoicesTableReferences
     extends BaseReferences<_$AppDatabase, $InvoicesTable, Invoice> {
@@ -17000,48 +17697,56 @@ class $$InvoicesTableTableManager
                         >
                       >(state) {
                         if (companyId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.companyId,
-                            referencedTable: $$InvoicesTableReferences
-                                ._companyIdTable(db),
-                            referencedColumn: $$InvoicesTableReferences
-                                ._companyIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$InvoicesTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn: $$InvoicesTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
                         if (customerId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.customerId,
-                            referencedTable: $$InvoicesTableReferences
-                                ._customerIdTable(db),
-                            referencedColumn: $$InvoicesTableReferences
-                                ._customerIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.customerId,
+                                    referencedTable: $$InvoicesTableReferences
+                                        ._customerIdTable(db),
+                                    referencedColumn: $$InvoicesTableReferences
+                                        ._customerIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
                         if (convertedFromId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.convertedFromId,
-                            referencedTable: $$InvoicesTableReferences
-                                ._convertedFromIdTable(db),
-                            referencedColumn: $$InvoicesTableReferences
-                                ._convertedFromIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.convertedFromId,
+                                    referencedTable: $$InvoicesTableReferences
+                                        ._convertedFromIdTable(db),
+                                    referencedColumn: $$InvoicesTableReferences
+                                        ._convertedFromIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
                         if (projectId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.projectId,
-                            referencedTable: $$InvoicesTableReferences
-                                ._projectIdTable(db),
-                            referencedColumn: $$InvoicesTableReferences
-                                ._projectIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.projectId,
+                                    referencedTable: $$InvoicesTableReferences
+                                        ._projectIdTable(db),
+                                    referencedColumn: $$InvoicesTableReferences
+                                        ._projectIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
 
                         return state;
@@ -17593,26 +18298,30 @@ class $$InvoiceItemsTableTableManager
                     >
                   >(state) {
                     if (invoiceId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.invoiceId,
-                        referencedTable: $$InvoiceItemsTableReferences
-                            ._invoiceIdTable(db),
-                        referencedColumn: $$InvoiceItemsTableReferences
-                            ._invoiceIdTable(db)
-                            .id,
-                      ) as T;
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.invoiceId,
+                                referencedTable: $$InvoiceItemsTableReferences
+                                    ._invoiceIdTable(db),
+                                referencedColumn: $$InvoiceItemsTableReferences
+                                    ._invoiceIdTable(db)
+                                    .id,
+                              )
+                              as T;
                     }
                     if (articleId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.articleId,
-                        referencedTable: $$InvoiceItemsTableReferences
-                            ._articleIdTable(db),
-                        referencedColumn: $$InvoiceItemsTableReferences
-                            ._articleIdTable(db)
-                            .id,
-                      ) as T;
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.articleId,
+                                referencedTable: $$InvoiceItemsTableReferences
+                                    ._articleIdTable(db),
+                                referencedColumn: $$InvoiceItemsTableReferences
+                                    ._articleIdTable(db)
+                                    .id,
+                              )
+                              as T;
                     }
 
                     return state;
@@ -17911,15 +18620,19 @@ class $$NumberSequencesTableTableManager
                     >
                   >(state) {
                     if (companyId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.companyId,
-                        referencedTable: $$NumberSequencesTableReferences
-                            ._companyIdTable(db),
-                        referencedColumn: $$NumberSequencesTableReferences
-                            ._companyIdTable(db)
-                            .id,
-                      ) as T;
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.companyId,
+                                referencedTable:
+                                    $$NumberSequencesTableReferences
+                                        ._companyIdTable(db),
+                                referencedColumn:
+                                    $$NumberSequencesTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                              )
+                              as T;
                     }
 
                     return state;
@@ -17947,28 +18660,30 @@ typedef $$NumberSequencesTableProcessedTableManager =
       NumberSequence,
       PrefetchHooks Function({bool companyId})
     >;
-typedef $$VehiclesTableCreateCompanionBuilder = VehiclesCompanion Function({
-  required String id,
-  required String companyId,
-  required String name,
-  Value<String?> licensePlate,
-  Value<String?> notes,
-  Value<DateTime?> nextInspectionDate,
-  Value<bool> active,
-  required DateTime createdAt,
-  Value<int> rowid,
-});
-typedef $$VehiclesTableUpdateCompanionBuilder = VehiclesCompanion Function({
-  Value<String> id,
-  Value<String> companyId,
-  Value<String> name,
-  Value<String?> licensePlate,
-  Value<String?> notes,
-  Value<DateTime?> nextInspectionDate,
-  Value<bool> active,
-  Value<DateTime> createdAt,
-  Value<int> rowid,
-});
+typedef $$VehiclesTableCreateCompanionBuilder =
+    VehiclesCompanion Function({
+      required String id,
+      required String companyId,
+      required String name,
+      Value<String?> licensePlate,
+      Value<String?> notes,
+      Value<DateTime?> nextInspectionDate,
+      Value<bool> active,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$VehiclesTableUpdateCompanionBuilder =
+    VehiclesCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> name,
+      Value<String?> licensePlate,
+      Value<String?> notes,
+      Value<DateTime?> nextInspectionDate,
+      Value<bool> active,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
 
 final class $$VehiclesTableReferences
     extends BaseReferences<_$AppDatabase, $VehiclesTable, Vehicle> {
@@ -18360,15 +19075,17 @@ class $$VehiclesTableTableManager
                         >
                       >(state) {
                         if (companyId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.companyId,
-                            referencedTable: $$VehiclesTableReferences
-                                ._companyIdTable(db),
-                            referencedColumn: $$VehiclesTableReferences
-                                ._companyIdTable(db)
-                                .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$VehiclesTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn: $$VehiclesTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
                         }
 
                         return state;
@@ -18949,40 +19666,49 @@ class $$VehicleCostEntriesTableTableManager
                         >
                       >(state) {
                         if (companyId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.companyId,
-                            referencedTable: $$VehicleCostEntriesTableReferences
-                                ._companyIdTable(db),
-                            referencedColumn:
-                                $$VehicleCostEntriesTableReferences
-                                    ._companyIdTable(db)
-                                    .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable:
+                                        $$VehicleCostEntriesTableReferences
+                                            ._companyIdTable(db),
+                                    referencedColumn:
+                                        $$VehicleCostEntriesTableReferences
+                                            ._companyIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
                         }
                         if (vehicleId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.vehicleId,
-                            referencedTable: $$VehicleCostEntriesTableReferences
-                                ._vehicleIdTable(db),
-                            referencedColumn:
-                                $$VehicleCostEntriesTableReferences
-                                    ._vehicleIdTable(db)
-                                    .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.vehicleId,
+                                    referencedTable:
+                                        $$VehicleCostEntriesTableReferences
+                                            ._vehicleIdTable(db),
+                                    referencedColumn:
+                                        $$VehicleCostEntriesTableReferences
+                                            ._vehicleIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
                         }
                         if (projectId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.projectId,
-                            referencedTable: $$VehicleCostEntriesTableReferences
-                                ._projectIdTable(db),
-                            referencedColumn:
-                                $$VehicleCostEntriesTableReferences
-                                    ._projectIdTable(db)
-                                    .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.projectId,
+                                    referencedTable:
+                                        $$VehicleCostEntriesTableReferences
+                                            ._projectIdTable(db),
+                                    referencedColumn:
+                                        $$VehicleCostEntriesTableReferences
+                                            ._projectIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
                         }
 
                         return state;
@@ -19090,11 +19816,13 @@ final class $$RecurringInvoiceTemplatesTableReferences
     $RecurringInvoiceTemplateItemsTable,
     List<RecurringInvoiceTemplateItem>
   >
-  _recurringInvoiceTemplateItemsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.recurringInvoiceTemplateItems,
-        aliasName: 'recurring_invoice_templates__id__recurring_invoice_template_items__template_id',
-      );
+  _recurringInvoiceTemplateItemsRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.recurringInvoiceTemplateItems,
+    aliasName:
+        'recurring_invoice_templates__id__recurring_invoice_template_items__template_id',
+  );
 
   $$RecurringInvoiceTemplateItemsTableProcessedTableManager
   get recurringInvoiceTemplateItemsRefs {
@@ -19583,30 +20311,34 @@ class $$RecurringInvoiceTemplatesTableTableManager
                         >
                       >(state) {
                         if (companyId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.companyId,
-                            referencedTable:
-                                $$RecurringInvoiceTemplatesTableReferences
-                                    ._companyIdTable(db),
-                            referencedColumn:
-                                $$RecurringInvoiceTemplatesTableReferences
-                                    ._companyIdTable(db)
-                                    .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable:
+                                        $$RecurringInvoiceTemplatesTableReferences
+                                            ._companyIdTable(db),
+                                    referencedColumn:
+                                        $$RecurringInvoiceTemplatesTableReferences
+                                            ._companyIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
                         }
                         if (customerId) {
-                          state = state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.customerId,
-                            referencedTable:
-                                $$RecurringInvoiceTemplatesTableReferences
-                                    ._customerIdTable(db),
-                            referencedColumn:
-                                $$RecurringInvoiceTemplatesTableReferences
-                                    ._customerIdTable(db)
-                                    .id,
-                          ) as T;
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.customerId,
+                                    referencedTable:
+                                        $$RecurringInvoiceTemplatesTableReferences
+                                            ._customerIdTable(db),
+                                    referencedColumn:
+                                        $$RecurringInvoiceTemplatesTableReferences
+                                            ._customerIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
                         }
 
                         return state;
@@ -19707,10 +20439,11 @@ final class $$RecurringInvoiceTemplateItemsTableReferences
     super.$_typedResult,
   );
 
-  static $RecurringInvoiceTemplatesTable _templateIdTable(_$AppDatabase db) =>
-      db.recurringInvoiceTemplates.createAlias(
-        'recurring_invoice_template_items__template_id__recurring_invoice_templates__id',
-      );
+  static $RecurringInvoiceTemplatesTable _templateIdTable(
+    _$AppDatabase db,
+  ) => db.recurringInvoiceTemplates.createAlias(
+    'recurring_invoice_template_items__template_id__recurring_invoice_templates__id',
+  );
 
   $$RecurringInvoiceTemplatesTableProcessedTableManager get templateId {
     final $_column = $_itemColumn<String>('template_id')!;
@@ -20190,30 +20923,34 @@ class $$RecurringInvoiceTemplateItemsTableTableManager
                     >
                   >(state) {
                     if (templateId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.templateId,
-                        referencedTable:
-                            $$RecurringInvoiceTemplateItemsTableReferences
-                                ._templateIdTable(db),
-                        referencedColumn:
-                            $$RecurringInvoiceTemplateItemsTableReferences
-                                ._templateIdTable(db)
-                                .id,
-                      ) as T;
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.templateId,
+                                referencedTable:
+                                    $$RecurringInvoiceTemplateItemsTableReferences
+                                        ._templateIdTable(db),
+                                referencedColumn:
+                                    $$RecurringInvoiceTemplateItemsTableReferences
+                                        ._templateIdTable(db)
+                                        .id,
+                              )
+                              as T;
                     }
                     if (articleId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.articleId,
-                        referencedTable:
-                            $$RecurringInvoiceTemplateItemsTableReferences
-                                ._articleIdTable(db),
-                        referencedColumn:
-                            $$RecurringInvoiceTemplateItemsTableReferences
-                                ._articleIdTable(db)
-                                .id,
-                      ) as T;
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.articleId,
+                                referencedTable:
+                                    $$RecurringInvoiceTemplateItemsTableReferences
+                                        ._articleIdTable(db),
+                                referencedColumn:
+                                    $$RecurringInvoiceTemplateItemsTableReferences
+                                        ._articleIdTable(db)
+                                        .id,
+                              )
+                              as T;
                     }
 
                     return state;

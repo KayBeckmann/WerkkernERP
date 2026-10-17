@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/database/tables.dart';
 import '../../data/repositories/company_repository.dart';
+import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/theme_preference_service.dart';
 import '../widgets/section_label.dart';
@@ -39,6 +40,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final Map<DocumentKind, TextEditingController> _closingCtrls;
   late final TextEditingController _footerCtrl;
 
+  // C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17: "Wo stelle
+  // ich die Gebühren und die Fristen ein?"). Mahnschreiben-Texte folgen
+  // demselben Muster wie die Dokumentart-Texte oben, sind aber nicht an
+  // einen DocumentKind gebunden (siehe Doc-Kommentar bei
+  // `Companies.pdfIntroTextDunning` in tables.dart).
+  late final TextEditingController _dunningIntroCtrl;
+  late final TextEditingController _dunningClosingCtrl;
+  late final TextEditingController _dunningReminder2DaysCtrl;
+  late final TextEditingController _dunningReminder3DaysCtrl;
+  late final TextEditingController _dunningFeeLevel1Ctrl;
+  late final TextEditingController _dunningFeeLevel2Ctrl;
+  late final TextEditingController _dunningFeeLevel3Ctrl;
+  late final TextEditingController _dunningInterestRateCtrl;
+  bool _dunningSettingsSaving = false;
+
   @override
   void initState() {
     super.initState();
@@ -58,7 +74,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
       DocumentKind.proforma: TextEditingController(text: company?.pdfClosingTextProforma),
     };
     _footerCtrl = TextEditingController(text: company?.pdfFooterText);
+    _dunningIntroCtrl = TextEditingController(text: company?.pdfIntroTextDunning);
+    _dunningClosingCtrl = TextEditingController(text: company?.pdfClosingTextDunning);
+    _dunningReminder2DaysCtrl =
+        TextEditingController(text: (company?.dunningReminder2AfterDays ?? 14).toString());
+    _dunningReminder3DaysCtrl =
+        TextEditingController(text: (company?.dunningReminder3AfterDays ?? 28).toString());
+    _dunningFeeLevel1Ctrl =
+        TextEditingController(text: _centsToEuroText(company?.dunningFeeLevel1Cents ?? 0));
+    _dunningFeeLevel2Ctrl =
+        TextEditingController(text: _centsToEuroText(company?.dunningFeeLevel2Cents ?? 0));
+    _dunningFeeLevel3Ctrl =
+        TextEditingController(text: _centsToEuroText(company?.dunningFeeLevel3Cents ?? 0));
+    _dunningInterestRateCtrl =
+        TextEditingController(text: (company?.dunningInterestRatePercent ?? 0).toString());
   }
+
+  static String _centsToEuroText(int cents) => (cents / 100).toStringAsFixed(2);
 
   @override
   void dispose() {
@@ -69,6 +101,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       c.dispose();
     }
     _footerCtrl.dispose();
+    _dunningIntroCtrl.dispose();
+    _dunningClosingCtrl.dispose();
+    _dunningReminder2DaysCtrl.dispose();
+    _dunningReminder3DaysCtrl.dispose();
+    _dunningFeeLevel1Ctrl.dispose();
+    _dunningFeeLevel2Ctrl.dispose();
+    _dunningFeeLevel3Ctrl.dispose();
+    _dunningInterestRateCtrl.dispose();
     super.dispose();
   }
 
@@ -131,6 +171,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               pdfIntroTextProforma: Value(_textOrNull(_introCtrls[DocumentKind.proforma]!)),
               pdfClosingTextProforma: Value(_textOrNull(_closingCtrls[DocumentKind.proforma]!)),
               pdfFooterText: Value(_textOrNull(_footerCtrl)),
+              pdfIntroTextDunning: Value(_textOrNull(_dunningIntroCtrl)),
+              pdfClosingTextDunning: Value(_textOrNull(_dunningClosingCtrl)),
             ),
           );
       await service.refreshActive();
@@ -141,6 +183,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } finally {
       if (mounted) setState(() => _textsSaving = false);
+    }
+  }
+
+  /// C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17): Fristen/
+  /// Gebühren/Zins sind Kays eigene Werte, siehe ausführlichen Doc-
+  /// Kommentar bei `DunningConfig` in `domain/services/dunning_service.dart`.
+  /// Ungültige Eingaben werden nicht stillschweigend auf 0 gesetzt,
+  /// sondern lehnen das Speichern mit einer Fehlermeldung ab — sonst
+  /// könnte ein Tippfehler unbemerkt eine Gebühr auf 0 € zurücksetzen.
+  Future<void> _saveDunningSettings() async {
+    final reminder2Days = int.tryParse(_dunningReminder2DaysCtrl.text.trim());
+    final reminder3Days = int.tryParse(_dunningReminder3DaysCtrl.text.trim());
+    final interestRate =
+        double.tryParse(_dunningInterestRateCtrl.text.trim().replaceAll(',', '.'));
+    Money? fee1;
+    Money? fee2;
+    Money? fee3;
+    try {
+      fee1 = Money.fromEuroString(_dunningFeeLevel1Ctrl.text.trim());
+      fee2 = Money.fromEuroString(_dunningFeeLevel2Ctrl.text.trim());
+      fee3 = Money.fromEuroString(_dunningFeeLevel3Ctrl.text.trim());
+    } catch (_) {
+      fee1 = null;
+    }
+    if (reminder2Days == null ||
+        reminder3Days == null ||
+        interestRate == null ||
+        fee1 == null ||
+        fee2 == null ||
+        fee3 == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte gültige Zahlen für Fristen/Gebühren/Zins eingeben.')),
+      );
+      return;
+    }
+    final service = context.read<ActiveCompanyService>();
+    final company = service.active;
+    if (company == null) return;
+    setState(() => _dunningSettingsSaving = true);
+    try {
+      await context.read<CompanyRepository>().update(
+            company.copyWith(
+              dunningReminder2AfterDays: reminder2Days,
+              dunningReminder3AfterDays: reminder3Days,
+              dunningFeeLevel1Cents: fee1.cents,
+              dunningFeeLevel2Cents: fee2.cents,
+              dunningFeeLevel3Cents: fee3.cents,
+              dunningInterestRatePercent: interestRate,
+            ),
+          );
+      await service.refreshActive();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Mahnwesen-Einstellungen gespeichert.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _dunningSettingsSaving = false);
     }
   }
 
@@ -340,6 +440,120 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
+        // C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17: "Wo
+        // stelle ich die Gebühren und die Fristen ein?"). Eigene Sektion
+        // statt in "Dokumenttexte", da hier auch Zahlenwerte (Fristen/
+        // Gebühren/Zins) dazukommen, nicht nur Texte.
+        if (company.dunningEnabled) ...[
+          const SectionLabel('Mahnwesen'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Eigene Angaben — keine Rechtsprüfung, ob Frist/Gebühr/Zins im '
+                      'Einzelfall zulässig sind (siehe Roadmap C12).',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _dunningReminder2DaysCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: '2. Mahnstufe ab (Tage)'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _dunningReminder3DaysCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: '3. Mahnstufe ab (Tage)'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _dunningFeeLevel1Ctrl,
+                            decoration: const InputDecoration(labelText: 'Mahngebühr 1. Stufe (€)'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _dunningFeeLevel2Ctrl,
+                            decoration: const InputDecoration(labelText: 'Mahngebühr 2. Stufe (€)'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _dunningFeeLevel3Ctrl,
+                            decoration: const InputDecoration(labelText: 'Mahngebühr 3. Stufe (€)'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _dunningInterestRateCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Verzugszins (% pro Jahr, 0 = ohne Zins)',
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Mahnschreiben',
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _dunningIntroCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Einleitungstext (Mahnschreiben)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _dunningClosingCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Schlusstext (Mahnschreiben)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton(
+                        onPressed: _dunningSettingsSaving ? null : _saveDunningSettings,
+                        child: _dunningSettingsSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Speichern'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
         const SectionLabel('Daten & Sicherung'),
         const BackupScreen(),
       ],
