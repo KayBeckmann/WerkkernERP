@@ -2,6 +2,7 @@ import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
 import '../../domain/services/invoice_totals_service.dart';
 import '../database/database.dart';
@@ -129,6 +130,10 @@ class InvoiceRepository {
     // Zuordnung — die erste Rechnung bleibt ausdrücklich projektfrei
     // möglich (Brainstorming).
     String? projectId,
+    // C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
+    // nur bei kind == invoice sinnvoll, sonst ignoriert — siehe Doc-
+    // Kommentar bei `Invoices.isAdvancePayment`.
+    bool isAdvancePayment = false,
     List<InvoiceItemInput> items = const [],
   }) async {
     _validateItemsForKind(kind, items);
@@ -147,6 +152,7 @@ class InvoiceRepository {
               paymentTerms: Value(paymentTerms),
               notes: Value(notes),
               projectId: Value(projectId),
+              isAdvancePayment: Value(isAdvancePayment),
               createdAt: now,
               updatedAt: now,
             ),
@@ -192,6 +198,7 @@ class InvoiceRepository {
     // übrigen Felder hier braucht die Projektzuordnung ein echtes
     // "wieder entfernen", kein reines "überschreiben oder unverändert".
     Value<String?> projectId = const Value.absent(),
+    bool? isAdvancePayment,
     List<InvoiceItemInput>? items,
   }) async {
     return _db.transaction(() async {
@@ -207,6 +214,7 @@ class InvoiceRepository {
           paymentTerms: Value(paymentTerms ?? existing.paymentTerms),
           notes: Value(notes ?? existing.notes),
           projectId: projectId,
+          isAdvancePayment: Value(isAdvancePayment ?? existing.isAdvancePayment),
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -379,6 +387,26 @@ class InvoiceRepository {
             ..where((i) => i.companyId.equals(companyId) & i.projectId.equals(projectId))
             ..orderBy([(i) => OrderingTerm.desc(i.updatedAt)]))
           .get();
+
+  /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
+  /// Summe aller **finalisierten** Abschlagsrechnungen, die per
+  /// [convertTo] aus demselben Quelldokument (typischerweise ein Auftrag)
+  /// wie [orderId] entstanden sind — für die Abzugszeile in einer
+  /// Schlussrechnung. Arbeitsvorgabe (siehe Doc-Kommentar bei
+  /// `Invoices.isAdvancePayment`): die Summe enthält die volle USt der
+  /// jeweiligen Abschlagsrechnung, keine Nettobetrachtung.
+  Future<Money> sumAdvancePaymentsForOrder(String orderId) async {
+    final converted = await listConvertedFrom(orderId);
+    var sum = Money.zero();
+    for (final doc in converted) {
+      if (doc.kind == DocumentKind.invoice &&
+          doc.isAdvancePayment &&
+          doc.status == InvoiceStatus.finalized) {
+        sum = sum + (await totalsFor(doc.id)).totalGross;
+      }
+    }
+    return sum;
+  }
 
   Future<bool> deleteDraft({required String companyId, required String id}) async {
     final existing = await findById(companyId: companyId, id: id);

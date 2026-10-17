@@ -44,6 +44,12 @@ class Companies extends Table {
   /// Default aus — siehe [RecurringInvoiceTemplates].
   BoolColumn get recurringInvoicesEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
+  /// schaltet nur den "Ist eine Abschlagsrechnung"-Schalter im
+  /// Rechnungseditor und die Abschlags-Abrechnung in der Schlussrechnung
+  /// frei — keine eigene Tabelle/Liste, siehe `Invoices.isAdvancePayment`.
+  BoolColumn get advancePaymentInvoicesEnabled => boolean().withDefault(const Constant(false))();
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -291,6 +297,19 @@ class Invoices extends Table {
   /// mitlöschen, nur die Zuordnung entfällt.
   TextColumn get projectId =>
       text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
+
+  /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
+  /// markiert eine Rechnung als Abschlags-/Anzahlungsrechnung statt einer
+  /// regulären (Schluss-)Rechnung. **Arbeitsvorgabe, keine Rechtsprüfung**
+  /// (analog zu F1/F2 — siehe Roadmap C13): nach gängiger deutscher
+  /// Rechnungspraxis weist eine Abschlagsrechnung ihre eigene USt
+  /// vollständig aus (keine aufgeschobene Steuer bis zur Schlussrechnung);
+  /// die Schlussrechnung rechnet den Gesamtwert ab und zieht bereits
+  /// gestellte, finalisierte Abschläge **inklusive** ihrer USt wieder ab
+  /// (siehe `InvoiceRepository.sumAdvancePaymentsForOrder()`). Nur bei
+  /// `kind == invoice` sinnvoll — Angebot/Auftrag/Lieferschein/Proforma
+  /// kennen dieses Feld, setzen es aber nie.
+  BoolColumn get isAdvancePayment => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};

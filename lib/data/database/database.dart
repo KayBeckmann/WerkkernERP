@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -136,6 +136,12 @@ class AppDatabase extends _$AppDatabase {
             await migrator.createTable(recurringInvoiceTemplates);
             await migrator.createTable(recurringInvoiceTemplateItems);
             await migrator.addColumn(companies, companies.recurringInvoicesEnabled);
+          }
+          if (from < 13) {
+            // C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung
+            // 2026-10-17).
+            await migrator.addColumn(invoices, invoices.isAdvancePayment);
+            await migrator.addColumn(companies, companies.advancePaymentInvoicesEnabled);
           }
         },
       );
