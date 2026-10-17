@@ -20,6 +20,7 @@ part 'database.g.dart';
     Invoices,
     InvoiceItems,
     NumberSequences,
+    Projects,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -29,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -92,6 +93,14 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.proformaEnabled);
             await migrator.addColumn(companies, companies.pdfIntroTextProforma);
             await migrator.addColumn(companies, companies.pdfClosingTextProforma);
+          }
+          if (from < 9) {
+            // C1 Projekte (Kay-Priorisierungsentscheidung 2026-10-17).
+            // Neue Tabelle zuerst anlegen, DANACH die auf sie
+            // verweisende Spalte ergänzen (Invoices.projectId).
+            await migrator.createTable(projects);
+            await migrator.addColumn(companies, companies.projectsEnabled);
+            await migrator.addColumn(invoices, invoices.projectId);
           }
         },
       );

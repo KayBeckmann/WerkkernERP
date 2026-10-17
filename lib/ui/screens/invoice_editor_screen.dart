@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,7 @@ import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
+import '../../data/repositories/project_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/invoice_totals_service.dart';
@@ -132,6 +134,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   List<Article> _articles = [];
   Invoice? _currentInvoice;
 
+  // C1 Projekte (Kay-Priorisierungsentscheidung 2026-10-17): optionale
+  // Zuordnung, nur sichtbar wenn die Firma das Modul aktiviert hat.
+  List<Project> _projects = [];
+  String? _projectId;
+  bool _projectsEnabled = false;
+
   bool get _isFinalized => _currentInvoice?.status == InvoiceStatus.finalized;
   DocumentKind get _kind => _currentInvoice?.kind ?? widget.kind;
 
@@ -144,10 +152,16 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   }
 
   Future<void> _init() async {
-    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final company = context.read<ActiveCompanyService>().active!;
+    final companyId = company.id;
     final articleRepo = context.read<ArticleRepository>();
     final invoiceRepo = context.read<InvoiceRepository>();
+    final projectRepo = context.read<ProjectRepository>();
     _articles = await articleRepo.listForCompany(companyId);
+    _projectsEnabled = company.projectsEnabled;
+    if (_projectsEnabled) {
+      _projects = await projectRepo.listForCompany(companyId);
+    }
 
     final invoice = widget.invoice;
     _currentInvoice = invoice;
@@ -156,6 +170,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _serviceDate = invoice.serviceDate;
       _notesCtrl.text = invoice.notes ?? '';
       _paymentTermsCtrl.text = invoice.paymentTerms ?? '';
+      _projectId = invoice.projectId;
       final items = await invoiceRepo.itemsFor(invoice.id);
       _items.addAll([
         for (final item in items)
@@ -282,6 +297,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           serviceDate: _serviceDate,
           paymentTerms: _paymentTermsCtrl.text.trim().isEmpty ? null : _paymentTermsCtrl.text.trim(),
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+          projectId: _projectId,
           items: items,
         );
       } else {
@@ -292,6 +308,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           serviceDate: _serviceDate,
           paymentTerms: _paymentTermsCtrl.text.trim().isEmpty ? null : _paymentTermsCtrl.text.trim(),
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+          projectId: Value(_projectId),
           items: items,
         );
       }
@@ -653,6 +670,26 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             decoration: const InputDecoration(labelText: 'Notizen'),
             maxLines: 2,
           ),
+          if (_projectsEnabled) ...[
+            const SizedBox(height: 8),
+            if (isFinalized)
+              Text(
+                'Projekt: ${_projects.where((p) => p.id == _projectId).firstOrNull?.name ?? 'Ohne Projekt'}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              )
+            else
+              DropdownButtonFormField<String?>(
+                isExpanded: true,
+                initialValue: _projectId,
+                decoration: const InputDecoration(labelText: 'Projekt (optional)'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Ohne Projekt')),
+                  for (final project in _projects)
+                    DropdownMenuItem(value: project.id, child: Text(project.name)),
+                ],
+                onChanged: (value) => setState(() => _projectId = value),
+              ),
+          ],
           const SizedBox(height: 16),
           for (final key in orderedKeys) ...[
             Padding(

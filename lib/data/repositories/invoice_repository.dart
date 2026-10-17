@@ -124,6 +124,10 @@ class InvoiceRepository {
     DocumentKind kind = DocumentKind.invoice,
     String? paymentTerms,
     String? notes,
+    // C1 Projekte (Kay-Priorisierungsentscheidung 2026-10-17): optionale
+    // Zuordnung — die erste Rechnung bleibt ausdrücklich projektfrei
+    // möglich (Brainstorming).
+    String? projectId,
     List<InvoiceItemInput> items = const [],
   }) async {
     _validateItemsForKind(kind, items);
@@ -141,6 +145,7 @@ class InvoiceRepository {
               serviceDate: serviceDate,
               paymentTerms: Value(paymentTerms),
               notes: Value(notes),
+              projectId: Value(projectId),
               createdAt: now,
               updatedAt: now,
             ),
@@ -160,6 +165,11 @@ class InvoiceRepository {
     DateTime? serviceDate,
     String? paymentTerms,
     String? notes,
+    // C1 Projekte: `Value.absent()` = unverändert lassen, `Value(null)` =
+    // Zuordnung entfernen, `Value(id)` = (neu) zuordnen — anders als die
+    // übrigen Felder hier braucht die Projektzuordnung ein echtes
+    // "wieder entfernen", kein reines "überschreiben oder unverändert".
+    Value<String?> projectId = const Value.absent(),
     List<InvoiceItemInput>? items,
   }) async {
     return _db.transaction(() async {
@@ -174,6 +184,7 @@ class InvoiceRepository {
           serviceDate: serviceDate == null ? const Value.absent() : Value(serviceDate),
           paymentTerms: Value(paymentTerms ?? existing.paymentTerms),
           notes: Value(notes ?? existing.notes),
+          projectId: projectId,
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -311,6 +322,10 @@ class InvoiceRepository {
               serviceDate: source.serviceDate,
               paymentTerms: Value(source.paymentTerms),
               notes: Value(source.notes),
+              // C1 Projekte: Umwandlung bleibt im selben Projektkontext —
+              // der Nutzer kann die Zuordnung danach wie jedes andere
+              // Entwurfsfeld ändern.
+              projectId: Value(source.projectId),
               convertedFromId: Value(sourceId),
               createdAt: now,
               updatedAt: now,
@@ -325,6 +340,16 @@ class InvoiceRepository {
   /// — für die Anzeige "Daraus erstellt: ..." auf dem Quelldokument.
   Future<List<Invoice>> listConvertedFrom(String sourceId) =>
       (_db.select(_db.invoices)..where((i) => i.convertedFromId.equals(sourceId))).get();
+
+  /// Alle einem Projekt zugeordneten Dokumente, **über alle
+  /// [DocumentKind]s hinweg** (C1) — die Projektansicht zeigt bewusst
+  /// Angebot/Auftrag/Rechnung/Lieferschein/Proforma gemeinsam, nicht nur
+  /// Rechnungen.
+  Future<List<Invoice>> listForProject({required String companyId, required String projectId}) =>
+      (_db.select(_db.invoices)
+            ..where((i) => i.companyId.equals(companyId) & i.projectId.equals(projectId))
+            ..orderBy([(i) => OrderingTerm.desc(i.updatedAt)]))
+          .get();
 
   Future<bool> deleteDraft({required String companyId, required String id}) async {
     final existing = await findById(companyId: companyId, id: id);

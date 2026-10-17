@@ -14,7 +14,10 @@ void main() {
   testWidgets(
     'Dokumenttexte in den Einstellungen werden gespeichert und bleiben nach erneutem Öffnen erhalten',
     (tester) async {
-      tester.view.physicalSize = const Size(1200, 1000);
+      // C10/C1 (Kay-Priorisierungsentscheidung 2026-10-17) fügten zwei
+      // weitere Modul-Schalter hinzu — mehr Höhe nötig, damit "Speichern"
+      // innerhalb des Testviewports bleibt (sonst Tap-Miss).
+      tester.view.physicalSize = const Size(1200, 1800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 

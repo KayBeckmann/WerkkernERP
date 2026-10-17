@@ -9,6 +9,7 @@ import 'data/repositories/company_repository.dart';
 import 'data/repositories/customer_repository.dart';
 import 'data/repositories/invoice_repository.dart';
 import 'data/repositories/number_sequence_repository.dart';
+import 'data/repositories/project_repository.dart';
 import 'data/repositories/supplier_repository.dart';
 import 'domain/services/active_company_service.dart';
 import 'domain/services/theme_preference_service.dart';
@@ -60,6 +61,9 @@ class WerkkernErpApp extends StatelessWidget {
         ),
         Provider<BackupService>(
           create: (context) => BackupService(context.read<AppDatabase>()),
+        ),
+        Provider<ProjectRepository>(
+          create: (context) => ProjectRepository(context.read<AppDatabase>()),
         ),
         ChangeNotifierProvider<ActiveCompanyService>(
           create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),

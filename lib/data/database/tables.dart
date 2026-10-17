@@ -29,6 +29,11 @@ class Companies extends Table {
   /// Lieferschein ein pro Firma ein-/ausblendbares Modul, Default aus.
   BoolColumn get proformaEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C1 Projekte (Kay-Priorisierungsentscheidung 2026-10-17): ebenfalls
+  /// ein pro Firma ein-/ausblendbares Modul, Default aus — siehe
+  /// [Projects].
+  BoolColumn get projectsEnabled => boolean().withDefault(const Constant(false))();
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -256,6 +261,13 @@ class Invoices extends Table {
   TextColumn get convertedFromId =>
       text().nullable().references(Invoices, #id, onDelete: KeyAction.setNull)();
 
+  /// C1 Projekte — optionale Zuordnung zu einem Projekt, über alle
+  /// [DocumentKind]s hinweg nutzbar. `onDelete: setNull` statt cascade:
+  /// ein gelöschtes Projekt darf keine bereits finalisierten Dokumente
+  /// mitlöschen, nur die Zuordnung entfällt.
+  TextColumn get projectId =>
+      text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -291,6 +303,41 @@ class InvoiceItems extends Table {
   /// Artikelgruppe im Stamm. `null` = ungruppierte Position.
   TextColumn get groupLabel => text().nullable()();
   IntColumn get sortOrder => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Status eines Projekts (C1). `archived` blendet es aus Auswahllisten
+/// aus, ohne seine bereits zugeordneten Dokumente zu verändern — gleiches
+/// Prinzip wie die Modul-Schalter ("Deaktivieren löscht keine Daten").
+enum ProjectStatus { active, archived }
+
+/// C1 Projekte (Kay-Priorisierungsentscheidung 2026-10-17, Brainstorming:
+/// "Angebote, Aufträge, Rechnungen und weitere Vorgänge einem Projekt
+/// zuordnen"). **Dies ist der C1-Kern**, bewusst ohne die in der Roadmap
+/// als offen markierte Projekt-GuV und Stunden-Soll/Ist-Auswertung — die
+/// brauchen eigene fachliche Entscheidungen (Erlös-/Kostenzeitpunkt,
+/// interne Stundensätze, Gemeinkosten-/Fahrzeugumlage, Finanzrechte), die
+/// laut Roadmap ausdrücklich noch mit Kay zu klären sind, nicht hier
+/// vorweggenommen. Der Kern deckt die Grundanforderung ab: Dokumente
+/// einem Projekt zuordnen und wiederfinden, ohne dass die erste
+/// projektfreie Rechnung dadurch Pflicht wird (Brainstorming: "Erste
+/// Rechnung bleibt projektfrei möglich").
+class Projects extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+
+  /// Optionaler Kundenbezug — ein Projekt kann, muss aber nicht genau
+  /// einem Kunden zugeordnet sein (Brainstorming lässt das offen).
+  TextColumn get customerId =>
+      text().nullable().references(Customers, #id, onDelete: KeyAction.setNull)();
+  TextColumn get notes => text().nullable()();
+  TextColumn get status =>
+      textEnum<ProjectStatus>().withDefault(Constant(ProjectStatus.active.name))();
+  DateTimeColumn get createdAt => dateTime()();
 
   @override
   Set<Column> get primaryKey => {id};
