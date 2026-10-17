@@ -106,6 +106,7 @@ class _EmailSendDialogState extends State<_EmailSendDialog> {
     });
     try {
       final password = await widget.credentialStore.readPassword(widget.companyId);
+      if (!mounted) return;
       if (password == null) {
         setState(() {
           _errorMessage =

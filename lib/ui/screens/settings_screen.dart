@@ -357,8 +357,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _smtpPasswordSaving = true);
     try {
       await context.read<SmtpCredentialStore>().writePassword(company.id, password);
-      _smtpPasswordCtrl.clear();
       if (mounted) {
+        // Controller erst nach dem mounted-Check anfassen — ein schon
+        // verworfener Controller wirft bei jedem Zugriff (siehe
+        // email_send_dialog.dart für denselben Fehlerklasse-Fund).
+        _smtpPasswordCtrl.clear();
         setState(() => _smtpHasPassword = true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('SMTP-Passwort gespeichert.')),
