@@ -155,9 +155,30 @@ class InvoiceRepository {
     });
   }
 
-  /// Aktualisiert einen **Entwurf** (finalisierte Rechnungen sind über
-  /// diesen Pfad nicht änderbar, siehe [update]s Status-Guard — die
-  /// eigentliche Finalisierungs-Transaktion kommt mit A3).
+  /// Ob ein Dokument noch über [update] bearbeitet werden darf.
+  ///
+  /// Kay-Entscheidung 2026-10-17 (siehe `Abweichungen.md` Abschnitt 1,
+  /// Vault): "Ein intern 'finalisiertes' Angebot ist nicht automatisch
+  /// derselbe unveränderliche Zustand wie eine finalisierte Rechnung."
+  /// Ein Entwurf ist immer editierbar. Ein **finalisiertes** Dokument
+  /// einer Art, die laut [allowedConversionTargets] überhaupt als Quelle
+  /// einer Umwandlung dienen kann (aktuell Angebot/Auftrag/Proforma),
+  /// bleibt editierbar, **solange noch keine Umwandlung daraus
+  /// entstanden ist**. Rechnung und Lieferschein sind keine Quellen und
+  /// bleiben deshalb wie bisher ab Finalisierung sofort unveränderlich.
+  /// Nummer, Jahr, Status und Schnappschuss-Felder ändert [update]
+  /// ohnehin nie — nur Felder/Positionen.
+  Future<bool> isEditable(Invoice invoice) async {
+    if (invoice.status == InvoiceStatus.draft) return true;
+    if (!allowedConversionTargets.containsKey(invoice.kind)) return false;
+    final converted = await listConvertedFrom(invoice.id);
+    return converted.isEmpty;
+  }
+
+  /// Aktualisiert ein Dokument — siehe [isEditable] für die genaue Regel,
+  /// wann das noch erlaubt ist. Finalisierungsdaten (Nummer, Jahr,
+  /// Status, Schnappschüsse) bleiben davon unberührt; nur Felder/
+  /// Positionen ändern sich.
   Future<Invoice?> update({
     required String companyId,
     required String id,
@@ -174,7 +195,7 @@ class InvoiceRepository {
   }) async {
     return _db.transaction(() async {
       final existing = await findById(companyId: companyId, id: id);
-      if (existing == null || existing.status != InvoiceStatus.draft) return null;
+      if (existing == null || !(await isEditable(existing))) return null;
       if (items != null) _validateItemsForKind(existing.kind, items);
 
       await (_db.update(_db.invoices)..where((i) => i.id.equals(id)))

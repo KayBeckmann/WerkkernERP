@@ -140,8 +140,22 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   String? _projectId;
   bool _projectsEnabled = false;
 
+  // Kay-Entscheidung 2026-10-17 (Abweichungen.md Abschnitt 1): ein
+  // finalisiertes Angebot/Auftrag/Proforma bleibt bearbeitbar, bis
+  // daraus eine Umwandlung entstanden ist — erst DANACH gesperrt.
+  // Rechnung/Lieferschein sind keine Umwandlungs-Quellen und bleiben
+  // wie bisher ab Finalisierung sofort gesperrt (siehe `_isLocked`).
+  bool _hasBeenConverted = false;
+
   bool get _isFinalized => _currentInvoice?.status == InvoiceStatus.finalized;
   DocumentKind get _kind => _currentInvoice?.kind ?? widget.kind;
+
+  /// Echte Bearbeitungssperre — anders als [_isFinalized] (zeigt nur,
+  /// ob eine Nummer existiert) entscheidet dies, ob Felder/Positionen
+  /// noch geändert werden dürfen. Siehe `InvoiceRepository.isEditable`
+  /// für dieselbe Regel auf Repository-Ebene.
+  bool get _isLocked =>
+      _isFinalized && (!allowedConversionTargets.containsKey(_kind) || _hasBeenConverted);
 
   @override
   void initState() {
@@ -171,6 +185,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _notesCtrl.text = invoice.notes ?? '';
       _paymentTermsCtrl.text = invoice.paymentTerms ?? '';
       _projectId = invoice.projectId;
+      if (invoice.status == InvoiceStatus.finalized) {
+        _hasBeenConverted = (await invoiceRepo.listConvertedFrom(invoice.id)).isNotEmpty;
+      }
       final items = await invoiceRepo.itemsFor(invoice.id);
       _items.addAll([
         for (final item in items)
@@ -313,9 +330,17 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         );
       }
       if (mounted) {
+        if (saved == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Speichern nicht möglich (bereits umgewandelt?).')),
+          );
+          return;
+        }
         setState(() => _currentInvoice = saved);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Entwurf gespeichert.')),
+          SnackBar(
+            content: Text(_isFinalized ? 'Änderungen gespeichert.' : 'Entwurf gespeichert.'),
+          ),
         );
       }
     } finally {
@@ -339,6 +364,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         sourceId: invoice.id,
         targetKind: targetKind,
       );
+      // Kay-Entscheidung 2026-10-17: ab der ersten Umwandlung ist DIESES
+      // Dokument gesperrt — sofort hier setzen, kein erneutes Nachladen
+      // nötig.
+      if (mounted) setState(() => _hasBeenConverted = true);
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute(
@@ -509,11 +538,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   /// (Kay-Nachtrag 2026-10-16: Vergleich mit RechnungsFee, "Es fehlen
   /// Details") — Einheit neben der Menge, Steuersatz und Gesamtbetrag
   /// klar als eigene Zeile, Rabatt als eigene Detailzeile wenn gesetzt.
-  Widget _buildItemCard(_EditableItem item, bool isFinalized) {
+  Widget _buildItemCard(_EditableItem item, bool isLocked) {
     final quantityLabel = item.unit == null ? '${item.quantity}' : '${item.quantity} ${item.unit}';
     return Card(
       child: InkWell(
-        onTap: isFinalized ? null : () => _editItem(item),
+        onTap: isLocked ? null : () => _editItem(item),
         borderRadius: BorderRadius.circular(10),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
@@ -527,7 +556,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   Expanded(
                     child: Text(item.description, style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
-                  if (!isFinalized)
+                  if (!isLocked)
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 20),
                       onPressed: () => setState(() => _items.remove(item)),
@@ -594,6 +623,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final totals = _totals;
 
     final isFinalized = _isFinalized;
+    final isLocked = _isLocked;
 
     return Scaffold(
       appBar: AppBar(
@@ -622,28 +652,35 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               ],
               onSelected: _convertTo,
             ),
-          if (!isFinalized) ...[
+          // Vorschau (ENTWURF-Wasserzeichen) macht nur vor der ersten
+          // Finalisierung Sinn — danach existiert bereits ein echtes PDF
+          // über "PDF teilen".
+          if (!isFinalized)
             IconButton(
               icon: const Icon(Icons.visibility_outlined),
               tooltip: 'Vorschau (unverbindlich)',
               onPressed: _items.isEmpty ? null : _previewDraft,
             ),
+          // Speichern bleibt verfügbar, solange das Dokument laut
+          // Kay-Entscheidung 2026-10-17 editierbar ist — das schließt ein
+          // finalisiertes, noch nicht umgewandeltes Angebot/Auftrag/
+          // Proforma ein, nicht nur echte Entwürfe.
+          if (!isLocked)
             IconButton(
               icon: _saving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.save_outlined),
-              tooltip: 'Entwurf speichern',
+              tooltip: isFinalized ? 'Änderungen speichern' : 'Entwurf speichern',
               onPressed: _saving ? null : _save,
             ),
-            if (_currentInvoice != null)
-              IconButton(
-                icon: _finalizing
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.check_circle_outline),
-                tooltip: 'Finalisieren',
-                onPressed: _finalizing ? null : _finalize,
-              ),
-          ],
+          if (!isFinalized && _currentInvoice != null)
+            IconButton(
+              icon: _finalizing
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.check_circle_outline),
+              tooltip: 'Finalisieren',
+              onPressed: _finalizing ? null : _finalize,
+            ),
         ],
       ),
       body: ListView(
@@ -654,25 +691,25 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
                 'Finalisiert am ${_currentInvoice!.finalizedAt!.toLocal().toString().split('.').first} — '
-                'nicht mehr änderbar.',
+                '${isLocked ? 'nicht mehr änderbar.' : 'noch bearbeitbar, bis daraus ein Folgedokument erzeugt wird.'}',
                 style: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
             ),
           TextField(
             controller: _paymentTermsCtrl,
-            readOnly: isFinalized,
+            readOnly: isLocked,
             decoration: const InputDecoration(labelText: 'Zahlungsbedingungen'),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _notesCtrl,
-            readOnly: isFinalized,
+            readOnly: isLocked,
             decoration: const InputDecoration(labelText: 'Notizen'),
             maxLines: 2,
           ),
           if (_projectsEnabled) ...[
             const SizedBox(height: 8),
-            if (isFinalized)
+            if (isLocked)
               Text(
                 'Projekt: ${_projects.where((p) => p.id == _projectId).firstOrNull?.name ?? 'Ohne Projekt'}',
                 style: Theme.of(context).textTheme.bodyMedium,
@@ -699,7 +736,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
-            for (final item in groups[key]!) _buildItemCard(item, isFinalized),
+            for (final item in groups[key]!) _buildItemCard(item, isLocked),
             // Summe pro Gruppe (Kay-Nachtrag 2026-10-16) — derselbe
             // Rechenkern wie die Gesamtsumme, nur auf die Positionen
             // dieser Gruppe beschränkt statt eine eigene Berechnung
@@ -739,7 +776,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           ),
         ],
       ),
-      floatingActionButton: isFinalized
+      floatingActionButton: isLocked
           ? null
           : FloatingActionButton.extended(
               heroTag: 'invoice-editor-fab',

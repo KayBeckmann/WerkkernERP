@@ -347,6 +347,128 @@ void main() {
     },
   );
 
+  // Kay-Entscheidung 2026-10-17 (Abweichungen.md Abschnitt 1): finalisierte
+  // Angebote/Aufträge/Proforma bleiben editierbar, bis sie umgewandelt
+  // wurden — erst danach gesperrt. Rechnung/Lieferschein bleiben wie bisher
+  // ab Finalisierung sofort unveränderlich.
+
+  test(
+    'isEditable(): ein finalisiertes, noch nicht umgewandeltes Angebot ist weiterhin '
+    'editierbar — anders als eine finalisierte Rechnung',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final quoteDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.quote,
+        items: [textItem('Beratung')],
+      );
+      final quoteFinal = await invoices.finalize(companyId: company.id, id: quoteDraft.id);
+      expect(await invoices.isEditable(quoteFinal!), isTrue);
+
+      final updated = await invoices.update(
+        companyId: company.id,
+        id: quoteFinal.id,
+        notes: 'Nachträglich ergänzt',
+        items: [textItem('Beratung'), textItem('Zusatzleistung')],
+      );
+      expect(updated, isNotNull);
+      expect(updated!.notes, 'Nachträglich ergänzt');
+      expect(updated.invoiceNumber, quoteFinal.invoiceNumber, reason: 'Nummer bleibt unverändert');
+      expect(await invoices.itemsFor(quoteFinal.id), hasLength(2));
+    },
+  );
+
+  test(
+    'isEditable(): sobald ein Angebot umgewandelt wurde, ist es über update() nicht mehr '
+    'änderbar — die Quelle wird gesperrt',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final quoteDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.quote,
+        items: [textItem('Beratung')],
+      );
+      final quoteFinal = await invoices.finalize(companyId: company.id, id: quoteDraft.id);
+      await invoices.convertTo(
+        companyId: company.id,
+        sourceId: quoteFinal!.id,
+        targetKind: DocumentKind.order,
+      );
+
+      expect(await invoices.isEditable(quoteFinal), isFalse);
+      final result = await invoices.update(
+        companyId: company.id,
+        id: quoteFinal.id,
+        notes: 'Darf nicht mehr ankommen',
+      );
+      expect(result, isNull);
+    },
+  );
+
+  test(
+    'isEditable(): eine finalisierte Rechnung und ein finalisierter Lieferschein bleiben '
+    'wie bisher sofort unveränderlich (keine Umwandlungs-Quellen)',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+
+      final invoiceDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        items: [textItem('Material')],
+      );
+      final invoiceFinal = await invoices.finalize(companyId: company.id, id: invoiceDraft.id);
+      expect(await invoices.isEditable(invoiceFinal!), isFalse);
+
+      final deliveryDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.deliveryNote,
+        items: [textItem('Material')],
+      );
+      final deliveryFinal = await invoices.finalize(companyId: company.id, id: deliveryDraft.id);
+      expect(await invoices.isEditable(deliveryFinal!), isFalse);
+    },
+  );
+
+  test(
+    'isEditable(): finalisierte Proforma bleibt editierbar, bis sie in eine Rechnung '
+    'umgewandelt wurde',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final proformaDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.proforma,
+        items: [textItem('Anzahlung')],
+      );
+      final proformaFinal = await invoices.finalize(companyId: company.id, id: proformaDraft.id);
+      expect(await invoices.isEditable(proformaFinal!), isTrue);
+
+      await invoices.convertTo(
+        companyId: company.id,
+        sourceId: proformaFinal.id,
+        targetKind: DocumentKind.invoice,
+      );
+      expect(await invoices.isEditable(proformaFinal), isFalse);
+    },
+  );
+
   test('convertTo(): eine Proforma-Rechnung selbst ist kein gültiges Umwandlungsziel', () async {
     final company = await companies.create(name: 'Firma A');
     final customer = await customers.create(companyId: company.id, name: 'Kunde');
