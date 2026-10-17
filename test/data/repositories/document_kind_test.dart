@@ -128,6 +128,7 @@ void main() {
         recurringInvoicesEnabled: false,
         advancePaymentInvoicesEnabled: false,
         dunningEnabled: false,
+        smtpEnabled: false,
       );
       final quoteDraft = await draftWithOneItem(company.id, customer.id, kind: DocumentKind.quote);
       await invoices.finalize(companyId: company.id, id: quoteDraft.id);
@@ -144,6 +145,7 @@ void main() {
         recurringInvoicesEnabled: false,
         advancePaymentInvoicesEnabled: false,
         dunningEnabled: false,
+        smtpEnabled: false,
       );
       expect(disabled.quotesEnabled, isFalse);
 

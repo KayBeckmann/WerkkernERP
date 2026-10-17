@@ -105,6 +105,33 @@ class Companies extends Table {
   TextColumn get pdfClosingTextProforma => text().nullable()();
   TextColumn get pdfFooterText => text().nullable()();
 
+  /// C7a SMTP-Versand (Kay-Nachfrage 2026-10-17: "Gibt es schon den SMTP
+  /// Versand? Wo konfiguriere ich den Betreff und den Body der Mail?").
+  /// Modul-Schalter wie bei den übrigen optionalen Bereichen, Default
+  /// aus. Das SMTP-**Passwort** steht bewusst NICHT hier — die lokale
+  /// SQLite-Datei ist (noch) unverschlüsselt (siehe F4-Hinweis in
+  /// `connection.dart`) und wird 1:1 ins Backup-Zip gepackt; das Passwort
+  /// liegt stattdessen in `flutter_secure_storage`
+  /// (`domain/services/smtp_credential_store.dart`), referenziert über
+  /// die Firmen-ID, nie über eine Spalte in dieser Tabelle.
+  BoolColumn get smtpEnabled => boolean().withDefault(const Constant(false))();
+  TextColumn get smtpHost => text().nullable()();
+  IntColumn get smtpPort => integer().withDefault(const Constant(587))();
+  TextColumn get smtpUsername => text().nullable()();
+  TextColumn get smtpFromAddress => text().nullable()();
+  TextColumn get smtpFromName => text().nullable()();
+  BoolColumn get smtpUseTls => boolean().withDefault(const Constant(true))();
+
+  /// Betreff/Text je Versandanlass — Kays ausdrückliche Nachfrage, wo das
+  /// konfigurierbar ist. Freitext mit einfachen Platzhaltern
+  /// (`{{kunde}}`, `{{nummer}}`, `{{firma}}`), ersetzt beim Öffnen des
+  /// Versanddialogs (siehe `EmailSendDialog`) — danach im Dialog noch
+  /// frei editierbar, nie stillschweigend unverändert versendet.
+  TextColumn get smtpInvoiceSubjectTemplate => text().nullable()();
+  TextColumn get smtpInvoiceBodyTemplate => text().nullable()();
+  TextColumn get smtpDunningSubjectTemplate => text().nullable()();
+  TextColumn get smtpDunningBodyTemplate => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

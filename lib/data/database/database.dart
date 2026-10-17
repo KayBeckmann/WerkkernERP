@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -161,6 +161,22 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.dunningInterestRatePercent);
             await migrator.addColumn(companies, companies.pdfIntroTextDunning);
             await migrator.addColumn(companies, companies.pdfClosingTextDunning);
+          }
+          if (from < 16) {
+            // C7a SMTP-Versand (Kay-Nachfrage 2026-10-17: "Gibt es schon
+            // den SMTP Versand?"). Das Passwort ist bewusst keine Spalte
+            // hier — siehe Doc-Kommentar bei `Companies.smtpEnabled`.
+            await migrator.addColumn(companies, companies.smtpEnabled);
+            await migrator.addColumn(companies, companies.smtpHost);
+            await migrator.addColumn(companies, companies.smtpPort);
+            await migrator.addColumn(companies, companies.smtpUsername);
+            await migrator.addColumn(companies, companies.smtpFromAddress);
+            await migrator.addColumn(companies, companies.smtpFromName);
+            await migrator.addColumn(companies, companies.smtpUseTls);
+            await migrator.addColumn(companies, companies.smtpInvoiceSubjectTemplate);
+            await migrator.addColumn(companies, companies.smtpInvoiceBodyTemplate);
+            await migrator.addColumn(companies, companies.smtpDunningSubjectTemplate);
+            await migrator.addColumn(companies, companies.smtpDunningBodyTemplate);
           }
         },
       );
