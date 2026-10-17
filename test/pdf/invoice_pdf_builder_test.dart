@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/data/database/tables.dart';
+import 'package:werkkernerp/domain/models/money.dart';
 import 'package:werkkernerp/pdf/invoice_pdf_builder.dart';
 
 void main() {
@@ -11,7 +12,12 @@ void main() {
   // (nicht testWidgets()).
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  Invoice draftInvoice({String? invoiceNumber, DocumentKind kind = DocumentKind.invoice}) => Invoice(
+  Invoice draftInvoice({
+    String? invoiceNumber,
+    DocumentKind kind = DocumentKind.invoice,
+    bool isAdvancePayment = false,
+  }) =>
+      Invoice(
         id: 'inv-1',
         companyId: 'company-1',
         customerId: 'customer-1',
@@ -34,6 +40,7 @@ void main() {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         convertedFromId: null,
+        isAdvancePayment: isAdvancePayment,
       );
 
   Company testCompany({String? pdfIntroText, String? pdfClosingText, String? pdfFooterText}) => Company(
@@ -53,6 +60,7 @@ void main() {
         projectsEnabled: false,
         fleetEnabled: false,
         recurringInvoicesEnabled: false,
+        advancePaymentInvoicesEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,
@@ -204,6 +212,36 @@ void main() {
           item(description: 'Vorbereitung', quantity: '2', unit: 'h'),
         ],
         company: testCompany(),
+      );
+      expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
+      expect(bytes.length, greaterThan(1000));
+    },
+  );
+
+  test(
+    'C13: Abschlagsrechnung-PDF wird ohne Fehler erzeugt (eigener Titel statt "Rechnung")',
+    () async {
+      final invoice = draftInvoice(invoiceNumber: 'R-26005', isAdvancePayment: true);
+      final bytes = await buildInvoicePdf(
+        invoice: invoice,
+        items: [item(description: 'Anzahlung')],
+        company: testCompany(),
+      );
+      expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
+      expect(bytes.length, greaterThan(1000));
+    },
+  );
+
+  test(
+    'C13: Schlussrechnung-PDF mit Abzugszeile für bereits erhaltene Abschlagszahlungen wird '
+    'ohne Fehler erzeugt',
+    () async {
+      final invoice = draftInvoice(invoiceNumber: 'R-26006');
+      final bytes = await buildInvoicePdf(
+        invoice: invoice,
+        items: [item(description: 'Gesamtleistung', price: 100000)],
+        company: testCompany(),
+        priorAdvancePaymentsGross: Money.fromCents(30000),
       );
       expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
       expect(bytes.length, greaterThan(1000));

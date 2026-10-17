@@ -158,6 +158,13 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   // wie bisher ab Finalisierung sofort gesperrt (siehe `_isLocked`).
   bool _hasBeenConverted = false;
 
+  // C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
+  // nur bei kind == invoice relevant und nur sichtbar, wenn die Firma das
+  // Modul aktiviert hat.
+  bool _advancePaymentInvoicesEnabled = false;
+  bool _isAdvancePayment = false;
+  Money _priorAdvancePaymentsGross = Money.zero();
+
   bool get _isFinalized => _currentInvoice?.status == InvoiceStatus.finalized;
   DocumentKind get _kind => _currentInvoice?.kind ?? widget.kind;
 
@@ -187,6 +194,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     if (_projectsEnabled) {
       _projects = await projectRepo.listForCompany(companyId);
     }
+    _advancePaymentInvoicesEnabled = company.advancePaymentInvoicesEnabled;
 
     final invoice = widget.invoice;
     _currentInvoice = invoice;
@@ -196,8 +204,20 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _notesCtrl.text = invoice.notes ?? '';
       _paymentTermsCtrl.text = invoice.paymentTerms ?? '';
       _projectId = invoice.projectId;
+      _isAdvancePayment = invoice.isAdvancePayment;
       if (invoice.status == InvoiceStatus.finalized) {
         _hasBeenConverted = (await invoiceRepo.listConvertedFrom(invoice.id)).isNotEmpty;
+      }
+      // C13: eine Rechnung, die aus einem Angebot/Auftrag umgewandelt
+      // wurde, könnte eine Schlussrechnung sein — bereits gestellte
+      // Abschläge zum selben Quelldokument abziehen (siehe Doc-Kommentar
+      // bei `InvoiceRepository.sumAdvancePaymentsForOrder`).
+      if (_advancePaymentInvoicesEnabled &&
+          invoice.kind == DocumentKind.invoice &&
+          !invoice.isAdvancePayment &&
+          invoice.convertedFromId != null) {
+        _priorAdvancePaymentsGross =
+            await invoiceRepo.sumAdvancePaymentsForOrder(invoice.convertedFromId!);
       }
       final items = await invoiceRepo.itemsFor(invoice.id);
       _items.addAll([
@@ -326,6 +346,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           paymentTerms: _paymentTermsCtrl.text.trim().isEmpty ? null : _paymentTermsCtrl.text.trim(),
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           projectId: _projectId,
+          isAdvancePayment: _isAdvancePayment,
           items: items,
         );
       } else {
@@ -337,6 +358,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           paymentTerms: _paymentTermsCtrl.text.trim().isEmpty ? null : _paymentTermsCtrl.text.trim(),
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           projectId: Value(_projectId),
+          isAdvancePayment: _isAdvancePayment,
           items: items,
         );
       }
@@ -451,7 +473,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       final items = await repo.itemsFor(invoice.id);
       if (!mounted) return;
       final company = context.read<ActiveCompanyService>().active!;
-      final bytes = await buildInvoicePdf(invoice: invoice, items: items, company: company);
+      final bytes = await buildInvoicePdf(
+        invoice: invoice,
+        items: items,
+        company: company,
+        priorAdvancePaymentsGross: _priorAdvancePaymentsGross,
+      );
       await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
     } catch (_) {
       // A3 Punkt 4: ein PDF-Fehler darf nie wie ein erfolgreich erstelltes
@@ -505,6 +532,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       finalizedAt: null,
       createdAt: now,
       updatedAt: now,
+      isAdvancePayment: _isAdvancePayment,
     );
     final previewItems = [
       for (var i = 0; i < _items.length; i++)
@@ -740,6 +768,25 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 onChanged: (value) => setState(() => _projectId = value),
               ),
           ],
+          // C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung
+          // 2026-10-17) — nur bei Rechnungen sinnvoll, nur im Entwurf
+          // umschaltbar.
+          if (_advancePaymentInvoicesEnabled && _kind == DocumentKind.invoice) ...[
+            const SizedBox(height: 4),
+            if (isLocked)
+              if (_isAdvancePayment)
+                Text('Abschlagsrechnung', style: Theme.of(context).textTheme.bodyMedium)
+              else
+                const SizedBox.shrink()
+            else
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text('Ist eine Abschlagsrechnung'),
+                value: _isAdvancePayment,
+                onChanged: (value) => setState(() => _isAdvancePayment = value ?? false),
+              ),
+          ],
           const SizedBox(height: 16),
           for (final key in orderedKeys) ...[
             Padding(
@@ -783,6 +830,22 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                     'Gesamt: ${totals.totalGross}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
+                  // C13 Abschlagsrechnungen: Abzugszeile nur, wenn diese
+                  // Rechnung aus einem Angebot/Auftrag entstanden ist UND
+                  // bereits finalisierte Abschlagsrechnungen dazu existieren
+                  // (siehe `InvoiceRepository.sumAdvancePaymentsForOrder`).
+                  if (_priorAdvancePaymentsGross.cents > 0) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Bereits erhaltene Abschlagszahlungen: −$_priorAdvancePaymentsGross',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const Divider(),
+                    Text(
+                      'Restbetrag: ${totals.totalGross - _priorAdvancePaymentsGross}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ],
                 ],
               ),
             ),

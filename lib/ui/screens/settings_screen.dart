@@ -80,6 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? projectsEnabled,
     bool? fleetEnabled,
     bool? recurringInvoicesEnabled,
+    bool? advancePaymentInvoicesEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -95,6 +96,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             projectsEnabled: projectsEnabled ?? company.projectsEnabled,
             fleetEnabled: fleetEnabled ?? company.fleetEnabled,
             recurringInvoicesEnabled: recurringInvoicesEnabled ?? company.recurringInvoicesEnabled,
+            advancePaymentInvoicesEnabled:
+                advancePaymentInvoicesEnabled ?? company.advancePaymentInvoicesEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -271,6 +274,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Wiederkehrende Rechnungen'),
                     value: company.recurringInvoicesEnabled,
                     onChanged: _busy ? null : (value) => _setModule(recurringInvoicesEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Abschlagsrechnungen'),
+                    value: company.advancePaymentInvoicesEnabled,
+                    onChanged: _busy
+                        ? null
+                        : (value) => _setModule(advancePaymentInvoicesEnabled: value),
                   ),
                 ],
               ),

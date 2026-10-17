@@ -29,11 +29,23 @@ Future<Uint8List> buildInvoicePdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
   required Company company,
+  // C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
+  // Summe bereits finalisierter Abschlagsrechnungen zum selben
+  // Quelldokument (siehe `InvoiceRepository.sumAdvancePaymentsForOrder`)
+  // — `null`/`Money.zero()` zeigt keine Abzugszeile. Arbeitsvorgabe statt
+  // Rechtsprüfung: die Summe enthält die volle USt der Abschläge.
+  Money? priorAdvancePaymentsGross,
 }) async {
   if (invoice.status != InvoiceStatus.finalized || invoice.invoiceNumber == null) {
     throw StateError('PDF kann nur für eine finalisierte Rechnung erzeugt werden.');
   }
-  return _buildPdf(invoice: invoice, items: items, company: company, isPreview: false);
+  return _buildPdf(
+    invoice: invoice,
+    items: items,
+    company: company,
+    isPreview: false,
+    priorAdvancePaymentsGross: priorAdvancePaymentsGross,
+  );
 }
 
 /// Unverbindliche In-App-Vorschau eines **noch nicht finalisierten**
@@ -62,6 +74,7 @@ Future<Uint8List> _buildPdf({
   required List<InvoiceItem> items,
   required Company company,
   required bool isPreview,
+  Money? priorAdvancePaymentsGross,
 }) async {
   final totals = calculateInvoiceTotals([
     for (final item in items)
@@ -146,7 +159,8 @@ Future<Uint8List> _buildPdf({
         for (final key in orderedKeys)
           ..._buildGroup(key, groups[key]!, showPrices: invoice.kind != DocumentKind.deliveryNote),
         pw.SizedBox(height: 16),
-        if (invoice.kind != DocumentKind.deliveryNote) _buildTotals(totals),
+        if (invoice.kind != DocumentKind.deliveryNote)
+          _buildTotals(totals, priorAdvancePaymentsGross: priorAdvancePaymentsGross),
         if (invoice.paymentTerms != null) ...[
           pw.SizedBox(height: 16),
           pw.Text(invoice.paymentTerms!, style: const pw.TextStyle(fontSize: 10)),
@@ -188,7 +202,10 @@ String _dateLabel(DocumentKind kind) => switch (kind) {
     };
 
 pw.Widget _buildHeader(Invoice invoice, {required bool isPreview}) {
-  final title = _title(invoice.kind);
+  // C13 Abschlagsrechnungen: eigener Titel statt "Rechnung", damit sie
+  // optisch klar von einer regulären (Schluss-)Rechnung unterscheidbar
+  // ist — bleibt trotzdem derselbe DocumentKind/Nummernkreis.
+  final title = invoice.isAdvancePayment ? 'Abschlagsrechnung' : _title(invoice.kind);
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
@@ -387,7 +404,12 @@ Money _groupTotal(List<InvoiceItem> items) => calculateInvoiceTotals([
         ),
     ]).totalGross;
 
-pw.Widget _buildTotals(InvoiceTotals totals) {
+pw.Widget _buildTotals(InvoiceTotals totals, {Money? priorAdvancePaymentsGross}) {
+  // C13 Abschlagsrechnungen: nur eine Abzugszeile zeigen, wenn tatsächlich
+  // etwas abzuziehen ist — sonst bleibt das Layout wie bisher.
+  final hasAdvancePayments = priorAdvancePaymentsGross != null && priorAdvancePaymentsGross.cents > 0;
+  final remaining = hasAdvancePayments ? totals.totalGross - priorAdvancePaymentsGross : null;
+
   return pw.Align(
     alignment: pw.Alignment.centerRight,
     child: pw.SizedBox(
@@ -428,6 +450,26 @@ pw.Widget _buildTotals(InvoiceTotals totals) {
               ),
             ],
           ),
+          if (hasAdvancePayments) ...[
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 2),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Bereits erhaltene Abschlagszahlungen', style: const pw.TextStyle(fontSize: 9)),
+                  pw.Text('− $priorAdvancePaymentsGross', style: const pw.TextStyle(fontSize: 9)),
+                ],
+              ),
+            ),
+            pw.Divider(),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Restbetrag', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text(remaining!.toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              ],
+            ),
+          ],
         ],
       ),
     ),
