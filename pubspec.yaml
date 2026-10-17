@@ -19,7 +19,15 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.13.4
+  # Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 4/5): `^3.13.4`
+  # war der von `flutter create` automatisch eingetragene Stand der
+  # genau zu diesem Zeitpunkt lokal installierten SDK, keine bewusste
+  # Mindestanforderung an eine konkrete Dart-3.13-Sprachfunktion. Das
+  # blockierte `flutter pub get` bereits bei einem nur eine Nebenversion
+  # älteren Flutter-Stable (3.47.4 brachte Dart 3.13.3). Großzügigere,
+  # weiterhin konservative Untergrenze statt der exakten lokalen
+  # Patch-Version.
+  sdk: '>=3.8.0 <4.0.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
