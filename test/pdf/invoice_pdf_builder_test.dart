@@ -51,6 +51,7 @@ void main() {
         deliveryNotesEnabled: false,
         proformaEnabled: false,
         projectsEnabled: false,
+        fleetEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,
