@@ -117,12 +117,17 @@ void main() {
       await tester.tap(find.text('Elektro Beckmann'));
       await tester.pumpAndSettle();
 
-      // Direkt nach dem (simulierten) App-Start ist die Rechnungsliste
-      // der Startpunkt — die fällige Vorlage hat bereits beim ersten
-      // Laden einen Entwurf erzeugt, erkennbar am neuen Listeneintrag
-      // (die Hinweis-Snackbar selbst ist zeitkritisch und wird hier
-      // bewusst nicht geprüft, um keine Flakiness durch deren Timer
-      // gegenüber `pumpAndSettle()` zu riskieren).
+      // Seit Kays Dashboard-Anfrage (2026-10-17) ist NICHT mehr die
+      // Rechnungsliste der Startpunkt, sondern das Dashboard — die
+      // Rechnungsliste wird trotzdem bereits beim ersten Laden gebaut
+      // (IndexedStack hält alle Tabs gleichzeitig gemountet, siehe A5),
+      // die fällige Vorlage hat also schon einen Entwurf erzeugt (die
+      // Hinweis-Snackbar selbst ist zeitkritisch und wird hier bewusst
+      // nicht geprüft, um keine Flakiness gegenüber `pumpAndSettle()`
+      // zu riskieren) — nur noch der sichtbare Tab muss gewechselt
+      // werden, um den neuen Listeneintrag zu sehen.
+      await tester.tap(find.widgetWithText(SidebarNavItem, 'Rechnungen'));
+      await tester.pumpAndSettle();
       expect(find.text('Testkunde'), findsOneWidget);
 
       await db.close();
