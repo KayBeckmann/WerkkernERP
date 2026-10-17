@@ -444,6 +444,136 @@ class $CompaniesTable extends Companies
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _smtpEnabledMeta = const VerificationMeta(
+    'smtpEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> smtpEnabled = GeneratedColumn<bool>(
+    'smtp_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("smtp_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _smtpHostMeta = const VerificationMeta(
+    'smtpHost',
+  );
+  @override
+  late final GeneratedColumn<String> smtpHost = GeneratedColumn<String>(
+    'smtp_host',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _smtpPortMeta = const VerificationMeta(
+    'smtpPort',
+  );
+  @override
+  late final GeneratedColumn<int> smtpPort = GeneratedColumn<int>(
+    'smtp_port',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(587),
+  );
+  static const VerificationMeta _smtpUsernameMeta = const VerificationMeta(
+    'smtpUsername',
+  );
+  @override
+  late final GeneratedColumn<String> smtpUsername = GeneratedColumn<String>(
+    'smtp_username',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _smtpFromAddressMeta = const VerificationMeta(
+    'smtpFromAddress',
+  );
+  @override
+  late final GeneratedColumn<String> smtpFromAddress = GeneratedColumn<String>(
+    'smtp_from_address',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _smtpFromNameMeta = const VerificationMeta(
+    'smtpFromName',
+  );
+  @override
+  late final GeneratedColumn<String> smtpFromName = GeneratedColumn<String>(
+    'smtp_from_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _smtpUseTlsMeta = const VerificationMeta(
+    'smtpUseTls',
+  );
+  @override
+  late final GeneratedColumn<bool> smtpUseTls = GeneratedColumn<bool>(
+    'smtp_use_tls',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("smtp_use_tls" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _smtpInvoiceSubjectTemplateMeta =
+      const VerificationMeta('smtpInvoiceSubjectTemplate');
+  @override
+  late final GeneratedColumn<String> smtpInvoiceSubjectTemplate =
+      GeneratedColumn<String>(
+        'smtp_invoice_subject_template',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _smtpInvoiceBodyTemplateMeta =
+      const VerificationMeta('smtpInvoiceBodyTemplate');
+  @override
+  late final GeneratedColumn<String> smtpInvoiceBodyTemplate =
+      GeneratedColumn<String>(
+        'smtp_invoice_body_template',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _smtpDunningSubjectTemplateMeta =
+      const VerificationMeta('smtpDunningSubjectTemplate');
+  @override
+  late final GeneratedColumn<String> smtpDunningSubjectTemplate =
+      GeneratedColumn<String>(
+        'smtp_dunning_subject_template',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _smtpDunningBodyTemplateMeta =
+      const VerificationMeta('smtpDunningBodyTemplate');
+  @override
+  late final GeneratedColumn<String> smtpDunningBodyTemplate =
+      GeneratedColumn<String>(
+        'smtp_dunning_body_template',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -483,6 +613,17 @@ class $CompaniesTable extends Companies
     pdfIntroTextProforma,
     pdfClosingTextProforma,
     pdfFooterText,
+    smtpEnabled,
+    smtpHost,
+    smtpPort,
+    smtpUsername,
+    smtpFromAddress,
+    smtpFromName,
+    smtpUseTls,
+    smtpInvoiceSubjectTemplate,
+    smtpInvoiceBodyTemplate,
+    smtpDunningSubjectTemplate,
+    smtpDunningBodyTemplate,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -805,6 +946,99 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('smtp_enabled')) {
+      context.handle(
+        _smtpEnabledMeta,
+        smtpEnabled.isAcceptableOrUnknown(
+          data['smtp_enabled']!,
+          _smtpEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('smtp_host')) {
+      context.handle(
+        _smtpHostMeta,
+        smtpHost.isAcceptableOrUnknown(data['smtp_host']!, _smtpHostMeta),
+      );
+    }
+    if (data.containsKey('smtp_port')) {
+      context.handle(
+        _smtpPortMeta,
+        smtpPort.isAcceptableOrUnknown(data['smtp_port']!, _smtpPortMeta),
+      );
+    }
+    if (data.containsKey('smtp_username')) {
+      context.handle(
+        _smtpUsernameMeta,
+        smtpUsername.isAcceptableOrUnknown(
+          data['smtp_username']!,
+          _smtpUsernameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('smtp_from_address')) {
+      context.handle(
+        _smtpFromAddressMeta,
+        smtpFromAddress.isAcceptableOrUnknown(
+          data['smtp_from_address']!,
+          _smtpFromAddressMeta,
+        ),
+      );
+    }
+    if (data.containsKey('smtp_from_name')) {
+      context.handle(
+        _smtpFromNameMeta,
+        smtpFromName.isAcceptableOrUnknown(
+          data['smtp_from_name']!,
+          _smtpFromNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('smtp_use_tls')) {
+      context.handle(
+        _smtpUseTlsMeta,
+        smtpUseTls.isAcceptableOrUnknown(
+          data['smtp_use_tls']!,
+          _smtpUseTlsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('smtp_invoice_subject_template')) {
+      context.handle(
+        _smtpInvoiceSubjectTemplateMeta,
+        smtpInvoiceSubjectTemplate.isAcceptableOrUnknown(
+          data['smtp_invoice_subject_template']!,
+          _smtpInvoiceSubjectTemplateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('smtp_invoice_body_template')) {
+      context.handle(
+        _smtpInvoiceBodyTemplateMeta,
+        smtpInvoiceBodyTemplate.isAcceptableOrUnknown(
+          data['smtp_invoice_body_template']!,
+          _smtpInvoiceBodyTemplateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('smtp_dunning_subject_template')) {
+      context.handle(
+        _smtpDunningSubjectTemplateMeta,
+        smtpDunningSubjectTemplate.isAcceptableOrUnknown(
+          data['smtp_dunning_subject_template']!,
+          _smtpDunningSubjectTemplateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('smtp_dunning_body_template')) {
+      context.handle(
+        _smtpDunningBodyTemplateMeta,
+        smtpDunningBodyTemplate.isAcceptableOrUnknown(
+          data['smtp_dunning_body_template']!,
+          _smtpDunningBodyTemplateMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -962,6 +1196,50 @@ class $CompaniesTable extends Companies
         DriftSqlType.string,
         data['${effectivePrefix}pdf_footer_text'],
       ),
+      smtpEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}smtp_enabled'],
+      )!,
+      smtpHost: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}smtp_host'],
+      ),
+      smtpPort: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}smtp_port'],
+      )!,
+      smtpUsername: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}smtp_username'],
+      ),
+      smtpFromAddress: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}smtp_from_address'],
+      ),
+      smtpFromName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}smtp_from_name'],
+      ),
+      smtpUseTls: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}smtp_use_tls'],
+      )!,
+      smtpInvoiceSubjectTemplate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}smtp_invoice_subject_template'],
+      ),
+      smtpInvoiceBodyTemplate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}smtp_invoice_body_template'],
+      ),
+      smtpDunningSubjectTemplate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}smtp_dunning_subject_template'],
+      ),
+      smtpDunningBodyTemplate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}smtp_dunning_body_template'],
+      ),
     );
   }
 
@@ -1070,6 +1348,33 @@ class Company extends DataClass implements Insertable<Company> {
   final String? pdfIntroTextProforma;
   final String? pdfClosingTextProforma;
   final String? pdfFooterText;
+
+  /// C7a SMTP-Versand (Kay-Nachfrage 2026-10-17: "Gibt es schon den SMTP
+  /// Versand? Wo konfiguriere ich den Betreff und den Body der Mail?").
+  /// Modul-Schalter wie bei den übrigen optionalen Bereichen, Default
+  /// aus. Das SMTP-**Passwort** steht bewusst NICHT hier — die lokale
+  /// SQLite-Datei ist (noch) unverschlüsselt (siehe F4-Hinweis in
+  /// `connection.dart`) und wird 1:1 ins Backup-Zip gepackt; das Passwort
+  /// liegt stattdessen in `flutter_secure_storage`
+  /// (`domain/services/smtp_credential_store.dart`), referenziert über
+  /// die Firmen-ID, nie über eine Spalte in dieser Tabelle.
+  final bool smtpEnabled;
+  final String? smtpHost;
+  final int smtpPort;
+  final String? smtpUsername;
+  final String? smtpFromAddress;
+  final String? smtpFromName;
+  final bool smtpUseTls;
+
+  /// Betreff/Text je Versandanlass — Kays ausdrückliche Nachfrage, wo das
+  /// konfigurierbar ist. Freitext mit einfachen Platzhaltern
+  /// (`{{kunde}}`, `{{nummer}}`, `{{firma}}`), ersetzt beim Öffnen des
+  /// Versanddialogs (siehe `EmailSendDialog`) — danach im Dialog noch
+  /// frei editierbar, nie stillschweigend unverändert versendet.
+  final String? smtpInvoiceSubjectTemplate;
+  final String? smtpInvoiceBodyTemplate;
+  final String? smtpDunningSubjectTemplate;
+  final String? smtpDunningBodyTemplate;
   const Company({
     required this.id,
     required this.name,
@@ -1108,6 +1413,17 @@ class Company extends DataClass implements Insertable<Company> {
     this.pdfIntroTextProforma,
     this.pdfClosingTextProforma,
     this.pdfFooterText,
+    required this.smtpEnabled,
+    this.smtpHost,
+    required this.smtpPort,
+    this.smtpUsername,
+    this.smtpFromAddress,
+    this.smtpFromName,
+    required this.smtpUseTls,
+    this.smtpInvoiceSubjectTemplate,
+    this.smtpInvoiceBodyTemplate,
+    this.smtpDunningSubjectTemplate,
+    this.smtpDunningBodyTemplate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1203,6 +1519,41 @@ class Company extends DataClass implements Insertable<Company> {
     if (!nullToAbsent || pdfFooterText != null) {
       map['pdf_footer_text'] = Variable<String>(pdfFooterText);
     }
+    map['smtp_enabled'] = Variable<bool>(smtpEnabled);
+    if (!nullToAbsent || smtpHost != null) {
+      map['smtp_host'] = Variable<String>(smtpHost);
+    }
+    map['smtp_port'] = Variable<int>(smtpPort);
+    if (!nullToAbsent || smtpUsername != null) {
+      map['smtp_username'] = Variable<String>(smtpUsername);
+    }
+    if (!nullToAbsent || smtpFromAddress != null) {
+      map['smtp_from_address'] = Variable<String>(smtpFromAddress);
+    }
+    if (!nullToAbsent || smtpFromName != null) {
+      map['smtp_from_name'] = Variable<String>(smtpFromName);
+    }
+    map['smtp_use_tls'] = Variable<bool>(smtpUseTls);
+    if (!nullToAbsent || smtpInvoiceSubjectTemplate != null) {
+      map['smtp_invoice_subject_template'] = Variable<String>(
+        smtpInvoiceSubjectTemplate,
+      );
+    }
+    if (!nullToAbsent || smtpInvoiceBodyTemplate != null) {
+      map['smtp_invoice_body_template'] = Variable<String>(
+        smtpInvoiceBodyTemplate,
+      );
+    }
+    if (!nullToAbsent || smtpDunningSubjectTemplate != null) {
+      map['smtp_dunning_subject_template'] = Variable<String>(
+        smtpDunningSubjectTemplate,
+      );
+    }
+    if (!nullToAbsent || smtpDunningBodyTemplate != null) {
+      map['smtp_dunning_body_template'] = Variable<String>(
+        smtpDunningBodyTemplate,
+      );
+    }
     return map;
   }
 
@@ -1282,6 +1633,35 @@ class Company extends DataClass implements Insertable<Company> {
       pdfFooterText: pdfFooterText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfFooterText),
+      smtpEnabled: Value(smtpEnabled),
+      smtpHost: smtpHost == null && nullToAbsent
+          ? const Value.absent()
+          : Value(smtpHost),
+      smtpPort: Value(smtpPort),
+      smtpUsername: smtpUsername == null && nullToAbsent
+          ? const Value.absent()
+          : Value(smtpUsername),
+      smtpFromAddress: smtpFromAddress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(smtpFromAddress),
+      smtpFromName: smtpFromName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(smtpFromName),
+      smtpUseTls: Value(smtpUseTls),
+      smtpInvoiceSubjectTemplate:
+          smtpInvoiceSubjectTemplate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(smtpInvoiceSubjectTemplate),
+      smtpInvoiceBodyTemplate: smtpInvoiceBodyTemplate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(smtpInvoiceBodyTemplate),
+      smtpDunningSubjectTemplate:
+          smtpDunningSubjectTemplate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(smtpDunningSubjectTemplate),
+      smtpDunningBodyTemplate: smtpDunningBodyTemplate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(smtpDunningBodyTemplate),
     );
   }
 
@@ -1366,6 +1746,25 @@ class Company extends DataClass implements Insertable<Company> {
         json['pdfClosingTextProforma'],
       ),
       pdfFooterText: serializer.fromJson<String?>(json['pdfFooterText']),
+      smtpEnabled: serializer.fromJson<bool>(json['smtpEnabled']),
+      smtpHost: serializer.fromJson<String?>(json['smtpHost']),
+      smtpPort: serializer.fromJson<int>(json['smtpPort']),
+      smtpUsername: serializer.fromJson<String?>(json['smtpUsername']),
+      smtpFromAddress: serializer.fromJson<String?>(json['smtpFromAddress']),
+      smtpFromName: serializer.fromJson<String?>(json['smtpFromName']),
+      smtpUseTls: serializer.fromJson<bool>(json['smtpUseTls']),
+      smtpInvoiceSubjectTemplate: serializer.fromJson<String?>(
+        json['smtpInvoiceSubjectTemplate'],
+      ),
+      smtpInvoiceBodyTemplate: serializer.fromJson<String?>(
+        json['smtpInvoiceBodyTemplate'],
+      ),
+      smtpDunningSubjectTemplate: serializer.fromJson<String?>(
+        json['smtpDunningSubjectTemplate'],
+      ),
+      smtpDunningBodyTemplate: serializer.fromJson<String?>(
+        json['smtpDunningBodyTemplate'],
+      ),
     );
   }
   @override
@@ -1427,6 +1826,25 @@ class Company extends DataClass implements Insertable<Company> {
         pdfClosingTextProforma,
       ),
       'pdfFooterText': serializer.toJson<String?>(pdfFooterText),
+      'smtpEnabled': serializer.toJson<bool>(smtpEnabled),
+      'smtpHost': serializer.toJson<String?>(smtpHost),
+      'smtpPort': serializer.toJson<int>(smtpPort),
+      'smtpUsername': serializer.toJson<String?>(smtpUsername),
+      'smtpFromAddress': serializer.toJson<String?>(smtpFromAddress),
+      'smtpFromName': serializer.toJson<String?>(smtpFromName),
+      'smtpUseTls': serializer.toJson<bool>(smtpUseTls),
+      'smtpInvoiceSubjectTemplate': serializer.toJson<String?>(
+        smtpInvoiceSubjectTemplate,
+      ),
+      'smtpInvoiceBodyTemplate': serializer.toJson<String?>(
+        smtpInvoiceBodyTemplate,
+      ),
+      'smtpDunningSubjectTemplate': serializer.toJson<String?>(
+        smtpDunningSubjectTemplate,
+      ),
+      'smtpDunningBodyTemplate': serializer.toJson<String?>(
+        smtpDunningBodyTemplate,
+      ),
     };
   }
 
@@ -1468,6 +1886,17 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> pdfIntroTextProforma = const Value.absent(),
     Value<String?> pdfClosingTextProforma = const Value.absent(),
     Value<String?> pdfFooterText = const Value.absent(),
+    bool? smtpEnabled,
+    Value<String?> smtpHost = const Value.absent(),
+    int? smtpPort,
+    Value<String?> smtpUsername = const Value.absent(),
+    Value<String?> smtpFromAddress = const Value.absent(),
+    Value<String?> smtpFromName = const Value.absent(),
+    bool? smtpUseTls,
+    Value<String?> smtpInvoiceSubjectTemplate = const Value.absent(),
+    Value<String?> smtpInvoiceBodyTemplate = const Value.absent(),
+    Value<String?> smtpDunningSubjectTemplate = const Value.absent(),
+    Value<String?> smtpDunningBodyTemplate = const Value.absent(),
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -1535,6 +1964,27 @@ class Company extends DataClass implements Insertable<Company> {
     pdfFooterText: pdfFooterText.present
         ? pdfFooterText.value
         : this.pdfFooterText,
+    smtpEnabled: smtpEnabled ?? this.smtpEnabled,
+    smtpHost: smtpHost.present ? smtpHost.value : this.smtpHost,
+    smtpPort: smtpPort ?? this.smtpPort,
+    smtpUsername: smtpUsername.present ? smtpUsername.value : this.smtpUsername,
+    smtpFromAddress: smtpFromAddress.present
+        ? smtpFromAddress.value
+        : this.smtpFromAddress,
+    smtpFromName: smtpFromName.present ? smtpFromName.value : this.smtpFromName,
+    smtpUseTls: smtpUseTls ?? this.smtpUseTls,
+    smtpInvoiceSubjectTemplate: smtpInvoiceSubjectTemplate.present
+        ? smtpInvoiceSubjectTemplate.value
+        : this.smtpInvoiceSubjectTemplate,
+    smtpInvoiceBodyTemplate: smtpInvoiceBodyTemplate.present
+        ? smtpInvoiceBodyTemplate.value
+        : this.smtpInvoiceBodyTemplate,
+    smtpDunningSubjectTemplate: smtpDunningSubjectTemplate.present
+        ? smtpDunningSubjectTemplate.value
+        : this.smtpDunningSubjectTemplate,
+    smtpDunningBodyTemplate: smtpDunningBodyTemplate.present
+        ? smtpDunningBodyTemplate.value
+        : this.smtpDunningBodyTemplate,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -1631,6 +2081,35 @@ class Company extends DataClass implements Insertable<Company> {
       pdfFooterText: data.pdfFooterText.present
           ? data.pdfFooterText.value
           : this.pdfFooterText,
+      smtpEnabled: data.smtpEnabled.present
+          ? data.smtpEnabled.value
+          : this.smtpEnabled,
+      smtpHost: data.smtpHost.present ? data.smtpHost.value : this.smtpHost,
+      smtpPort: data.smtpPort.present ? data.smtpPort.value : this.smtpPort,
+      smtpUsername: data.smtpUsername.present
+          ? data.smtpUsername.value
+          : this.smtpUsername,
+      smtpFromAddress: data.smtpFromAddress.present
+          ? data.smtpFromAddress.value
+          : this.smtpFromAddress,
+      smtpFromName: data.smtpFromName.present
+          ? data.smtpFromName.value
+          : this.smtpFromName,
+      smtpUseTls: data.smtpUseTls.present
+          ? data.smtpUseTls.value
+          : this.smtpUseTls,
+      smtpInvoiceSubjectTemplate: data.smtpInvoiceSubjectTemplate.present
+          ? data.smtpInvoiceSubjectTemplate.value
+          : this.smtpInvoiceSubjectTemplate,
+      smtpInvoiceBodyTemplate: data.smtpInvoiceBodyTemplate.present
+          ? data.smtpInvoiceBodyTemplate.value
+          : this.smtpInvoiceBodyTemplate,
+      smtpDunningSubjectTemplate: data.smtpDunningSubjectTemplate.present
+          ? data.smtpDunningSubjectTemplate.value
+          : this.smtpDunningSubjectTemplate,
+      smtpDunningBodyTemplate: data.smtpDunningBodyTemplate.present
+          ? data.smtpDunningBodyTemplate.value
+          : this.smtpDunningBodyTemplate,
     );
   }
 
@@ -1675,7 +2154,18 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('pdfClosingTextDeliveryNote: $pdfClosingTextDeliveryNote, ')
           ..write('pdfIntroTextProforma: $pdfIntroTextProforma, ')
           ..write('pdfClosingTextProforma: $pdfClosingTextProforma, ')
-          ..write('pdfFooterText: $pdfFooterText')
+          ..write('pdfFooterText: $pdfFooterText, ')
+          ..write('smtpEnabled: $smtpEnabled, ')
+          ..write('smtpHost: $smtpHost, ')
+          ..write('smtpPort: $smtpPort, ')
+          ..write('smtpUsername: $smtpUsername, ')
+          ..write('smtpFromAddress: $smtpFromAddress, ')
+          ..write('smtpFromName: $smtpFromName, ')
+          ..write('smtpUseTls: $smtpUseTls, ')
+          ..write('smtpInvoiceSubjectTemplate: $smtpInvoiceSubjectTemplate, ')
+          ..write('smtpInvoiceBodyTemplate: $smtpInvoiceBodyTemplate, ')
+          ..write('smtpDunningSubjectTemplate: $smtpDunningSubjectTemplate, ')
+          ..write('smtpDunningBodyTemplate: $smtpDunningBodyTemplate')
           ..write(')'))
         .toString();
   }
@@ -1719,6 +2209,17 @@ class Company extends DataClass implements Insertable<Company> {
     pdfIntroTextProforma,
     pdfClosingTextProforma,
     pdfFooterText,
+    smtpEnabled,
+    smtpHost,
+    smtpPort,
+    smtpUsername,
+    smtpFromAddress,
+    smtpFromName,
+    smtpUseTls,
+    smtpInvoiceSubjectTemplate,
+    smtpInvoiceBodyTemplate,
+    smtpDunningSubjectTemplate,
+    smtpDunningBodyTemplate,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -1761,7 +2262,18 @@ class Company extends DataClass implements Insertable<Company> {
           other.pdfClosingTextDeliveryNote == this.pdfClosingTextDeliveryNote &&
           other.pdfIntroTextProforma == this.pdfIntroTextProforma &&
           other.pdfClosingTextProforma == this.pdfClosingTextProforma &&
-          other.pdfFooterText == this.pdfFooterText);
+          other.pdfFooterText == this.pdfFooterText &&
+          other.smtpEnabled == this.smtpEnabled &&
+          other.smtpHost == this.smtpHost &&
+          other.smtpPort == this.smtpPort &&
+          other.smtpUsername == this.smtpUsername &&
+          other.smtpFromAddress == this.smtpFromAddress &&
+          other.smtpFromName == this.smtpFromName &&
+          other.smtpUseTls == this.smtpUseTls &&
+          other.smtpInvoiceSubjectTemplate == this.smtpInvoiceSubjectTemplate &&
+          other.smtpInvoiceBodyTemplate == this.smtpInvoiceBodyTemplate &&
+          other.smtpDunningSubjectTemplate == this.smtpDunningSubjectTemplate &&
+          other.smtpDunningBodyTemplate == this.smtpDunningBodyTemplate);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -1802,6 +2314,17 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> pdfIntroTextProforma;
   final Value<String?> pdfClosingTextProforma;
   final Value<String?> pdfFooterText;
+  final Value<bool> smtpEnabled;
+  final Value<String?> smtpHost;
+  final Value<int> smtpPort;
+  final Value<String?> smtpUsername;
+  final Value<String?> smtpFromAddress;
+  final Value<String?> smtpFromName;
+  final Value<bool> smtpUseTls;
+  final Value<String?> smtpInvoiceSubjectTemplate;
+  final Value<String?> smtpInvoiceBodyTemplate;
+  final Value<String?> smtpDunningSubjectTemplate;
+  final Value<String?> smtpDunningBodyTemplate;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -1841,6 +2364,17 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.pdfIntroTextProforma = const Value.absent(),
     this.pdfClosingTextProforma = const Value.absent(),
     this.pdfFooterText = const Value.absent(),
+    this.smtpEnabled = const Value.absent(),
+    this.smtpHost = const Value.absent(),
+    this.smtpPort = const Value.absent(),
+    this.smtpUsername = const Value.absent(),
+    this.smtpFromAddress = const Value.absent(),
+    this.smtpFromName = const Value.absent(),
+    this.smtpUseTls = const Value.absent(),
+    this.smtpInvoiceSubjectTemplate = const Value.absent(),
+    this.smtpInvoiceBodyTemplate = const Value.absent(),
+    this.smtpDunningSubjectTemplate = const Value.absent(),
+    this.smtpDunningBodyTemplate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -1881,6 +2415,17 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.pdfIntroTextProforma = const Value.absent(),
     this.pdfClosingTextProforma = const Value.absent(),
     this.pdfFooterText = const Value.absent(),
+    this.smtpEnabled = const Value.absent(),
+    this.smtpHost = const Value.absent(),
+    this.smtpPort = const Value.absent(),
+    this.smtpUsername = const Value.absent(),
+    this.smtpFromAddress = const Value.absent(),
+    this.smtpFromName = const Value.absent(),
+    this.smtpUseTls = const Value.absent(),
+    this.smtpInvoiceSubjectTemplate = const Value.absent(),
+    this.smtpInvoiceBodyTemplate = const Value.absent(),
+    this.smtpDunningSubjectTemplate = const Value.absent(),
+    this.smtpDunningBodyTemplate = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -1923,6 +2468,17 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? pdfIntroTextProforma,
     Expression<String>? pdfClosingTextProforma,
     Expression<String>? pdfFooterText,
+    Expression<bool>? smtpEnabled,
+    Expression<String>? smtpHost,
+    Expression<int>? smtpPort,
+    Expression<String>? smtpUsername,
+    Expression<String>? smtpFromAddress,
+    Expression<String>? smtpFromName,
+    Expression<bool>? smtpUseTls,
+    Expression<String>? smtpInvoiceSubjectTemplate,
+    Expression<String>? smtpInvoiceBodyTemplate,
+    Expression<String>? smtpDunningSubjectTemplate,
+    Expression<String>? smtpDunningBodyTemplate,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1980,6 +2536,21 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (pdfClosingTextProforma != null)
         'pdf_closing_text_proforma': pdfClosingTextProforma,
       if (pdfFooterText != null) 'pdf_footer_text': pdfFooterText,
+      if (smtpEnabled != null) 'smtp_enabled': smtpEnabled,
+      if (smtpHost != null) 'smtp_host': smtpHost,
+      if (smtpPort != null) 'smtp_port': smtpPort,
+      if (smtpUsername != null) 'smtp_username': smtpUsername,
+      if (smtpFromAddress != null) 'smtp_from_address': smtpFromAddress,
+      if (smtpFromName != null) 'smtp_from_name': smtpFromName,
+      if (smtpUseTls != null) 'smtp_use_tls': smtpUseTls,
+      if (smtpInvoiceSubjectTemplate != null)
+        'smtp_invoice_subject_template': smtpInvoiceSubjectTemplate,
+      if (smtpInvoiceBodyTemplate != null)
+        'smtp_invoice_body_template': smtpInvoiceBodyTemplate,
+      if (smtpDunningSubjectTemplate != null)
+        'smtp_dunning_subject_template': smtpDunningSubjectTemplate,
+      if (smtpDunningBodyTemplate != null)
+        'smtp_dunning_body_template': smtpDunningBodyTemplate,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2022,6 +2593,17 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? pdfIntroTextProforma,
     Value<String?>? pdfClosingTextProforma,
     Value<String?>? pdfFooterText,
+    Value<bool>? smtpEnabled,
+    Value<String?>? smtpHost,
+    Value<int>? smtpPort,
+    Value<String?>? smtpUsername,
+    Value<String?>? smtpFromAddress,
+    Value<String?>? smtpFromName,
+    Value<bool>? smtpUseTls,
+    Value<String?>? smtpInvoiceSubjectTemplate,
+    Value<String?>? smtpInvoiceBodyTemplate,
+    Value<String?>? smtpDunningSubjectTemplate,
+    Value<String?>? smtpDunningBodyTemplate,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -2074,6 +2656,21 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       pdfClosingTextProforma:
           pdfClosingTextProforma ?? this.pdfClosingTextProforma,
       pdfFooterText: pdfFooterText ?? this.pdfFooterText,
+      smtpEnabled: smtpEnabled ?? this.smtpEnabled,
+      smtpHost: smtpHost ?? this.smtpHost,
+      smtpPort: smtpPort ?? this.smtpPort,
+      smtpUsername: smtpUsername ?? this.smtpUsername,
+      smtpFromAddress: smtpFromAddress ?? this.smtpFromAddress,
+      smtpFromName: smtpFromName ?? this.smtpFromName,
+      smtpUseTls: smtpUseTls ?? this.smtpUseTls,
+      smtpInvoiceSubjectTemplate:
+          smtpInvoiceSubjectTemplate ?? this.smtpInvoiceSubjectTemplate,
+      smtpInvoiceBodyTemplate:
+          smtpInvoiceBodyTemplate ?? this.smtpInvoiceBodyTemplate,
+      smtpDunningSubjectTemplate:
+          smtpDunningSubjectTemplate ?? this.smtpDunningSubjectTemplate,
+      smtpDunningBodyTemplate:
+          smtpDunningBodyTemplate ?? this.smtpDunningBodyTemplate,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2226,6 +2823,47 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (pdfFooterText.present) {
       map['pdf_footer_text'] = Variable<String>(pdfFooterText.value);
     }
+    if (smtpEnabled.present) {
+      map['smtp_enabled'] = Variable<bool>(smtpEnabled.value);
+    }
+    if (smtpHost.present) {
+      map['smtp_host'] = Variable<String>(smtpHost.value);
+    }
+    if (smtpPort.present) {
+      map['smtp_port'] = Variable<int>(smtpPort.value);
+    }
+    if (smtpUsername.present) {
+      map['smtp_username'] = Variable<String>(smtpUsername.value);
+    }
+    if (smtpFromAddress.present) {
+      map['smtp_from_address'] = Variable<String>(smtpFromAddress.value);
+    }
+    if (smtpFromName.present) {
+      map['smtp_from_name'] = Variable<String>(smtpFromName.value);
+    }
+    if (smtpUseTls.present) {
+      map['smtp_use_tls'] = Variable<bool>(smtpUseTls.value);
+    }
+    if (smtpInvoiceSubjectTemplate.present) {
+      map['smtp_invoice_subject_template'] = Variable<String>(
+        smtpInvoiceSubjectTemplate.value,
+      );
+    }
+    if (smtpInvoiceBodyTemplate.present) {
+      map['smtp_invoice_body_template'] = Variable<String>(
+        smtpInvoiceBodyTemplate.value,
+      );
+    }
+    if (smtpDunningSubjectTemplate.present) {
+      map['smtp_dunning_subject_template'] = Variable<String>(
+        smtpDunningSubjectTemplate.value,
+      );
+    }
+    if (smtpDunningBodyTemplate.present) {
+      map['smtp_dunning_body_template'] = Variable<String>(
+        smtpDunningBodyTemplate.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2274,6 +2912,17 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('pdfIntroTextProforma: $pdfIntroTextProforma, ')
           ..write('pdfClosingTextProforma: $pdfClosingTextProforma, ')
           ..write('pdfFooterText: $pdfFooterText, ')
+          ..write('smtpEnabled: $smtpEnabled, ')
+          ..write('smtpHost: $smtpHost, ')
+          ..write('smtpPort: $smtpPort, ')
+          ..write('smtpUsername: $smtpUsername, ')
+          ..write('smtpFromAddress: $smtpFromAddress, ')
+          ..write('smtpFromName: $smtpFromName, ')
+          ..write('smtpUseTls: $smtpUseTls, ')
+          ..write('smtpInvoiceSubjectTemplate: $smtpInvoiceSubjectTemplate, ')
+          ..write('smtpInvoiceBodyTemplate: $smtpInvoiceBodyTemplate, ')
+          ..write('smtpDunningSubjectTemplate: $smtpDunningSubjectTemplate, ')
+          ..write('smtpDunningBodyTemplate: $smtpDunningBodyTemplate, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11089,6 +11738,17 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String?> pdfIntroTextProforma,
       Value<String?> pdfClosingTextProforma,
       Value<String?> pdfFooterText,
+      Value<bool> smtpEnabled,
+      Value<String?> smtpHost,
+      Value<int> smtpPort,
+      Value<String?> smtpUsername,
+      Value<String?> smtpFromAddress,
+      Value<String?> smtpFromName,
+      Value<bool> smtpUseTls,
+      Value<String?> smtpInvoiceSubjectTemplate,
+      Value<String?> smtpInvoiceBodyTemplate,
+      Value<String?> smtpDunningSubjectTemplate,
+      Value<String?> smtpDunningBodyTemplate,
       Value<int> rowid,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
@@ -11130,6 +11790,17 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String?> pdfIntroTextProforma,
       Value<String?> pdfClosingTextProforma,
       Value<String?> pdfFooterText,
+      Value<bool> smtpEnabled,
+      Value<String?> smtpHost,
+      Value<int> smtpPort,
+      Value<String?> smtpUsername,
+      Value<String?> smtpFromAddress,
+      Value<String?> smtpFromName,
+      Value<bool> smtpUseTls,
+      Value<String?> smtpInvoiceSubjectTemplate,
+      Value<String?> smtpInvoiceBodyTemplate,
+      Value<String?> smtpDunningSubjectTemplate,
+      Value<String?> smtpDunningBodyTemplate,
       Value<int> rowid,
     });
 
@@ -11525,6 +12196,61 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<String> get pdfFooterText => $composableBuilder(
     column: $table.pdfFooterText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get smtpEnabled => $composableBuilder(
+    column: $table.smtpEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get smtpHost => $composableBuilder(
+    column: $table.smtpHost,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get smtpPort => $composableBuilder(
+    column: $table.smtpPort,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get smtpUsername => $composableBuilder(
+    column: $table.smtpUsername,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get smtpFromAddress => $composableBuilder(
+    column: $table.smtpFromAddress,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get smtpFromName => $composableBuilder(
+    column: $table.smtpFromName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get smtpUseTls => $composableBuilder(
+    column: $table.smtpUseTls,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get smtpInvoiceSubjectTemplate => $composableBuilder(
+    column: $table.smtpInvoiceSubjectTemplate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get smtpInvoiceBodyTemplate => $composableBuilder(
+    column: $table.smtpInvoiceBodyTemplate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get smtpDunningSubjectTemplate => $composableBuilder(
+    column: $table.smtpDunningSubjectTemplate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get smtpDunningBodyTemplate => $composableBuilder(
+    column: $table.smtpDunningBodyTemplate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11974,6 +12700,61 @@ class $$CompaniesTableOrderingComposer
     column: $table.pdfFooterText,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get smtpEnabled => $composableBuilder(
+    column: $table.smtpEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get smtpHost => $composableBuilder(
+    column: $table.smtpHost,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get smtpPort => $composableBuilder(
+    column: $table.smtpPort,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get smtpUsername => $composableBuilder(
+    column: $table.smtpUsername,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get smtpFromAddress => $composableBuilder(
+    column: $table.smtpFromAddress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get smtpFromName => $composableBuilder(
+    column: $table.smtpFromName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get smtpUseTls => $composableBuilder(
+    column: $table.smtpUseTls,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get smtpInvoiceSubjectTemplate => $composableBuilder(
+    column: $table.smtpInvoiceSubjectTemplate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get smtpInvoiceBodyTemplate => $composableBuilder(
+    column: $table.smtpInvoiceBodyTemplate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get smtpDunningSubjectTemplate => $composableBuilder(
+    column: $table.smtpDunningSubjectTemplate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get smtpDunningBodyTemplate => $composableBuilder(
+    column: $table.smtpDunningBodyTemplate,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -12149,6 +12930,57 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<String> get pdfFooterText => $composableBuilder(
     column: $table.pdfFooterText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get smtpEnabled => $composableBuilder(
+    column: $table.smtpEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get smtpHost =>
+      $composableBuilder(column: $table.smtpHost, builder: (column) => column);
+
+  GeneratedColumn<int> get smtpPort =>
+      $composableBuilder(column: $table.smtpPort, builder: (column) => column);
+
+  GeneratedColumn<String> get smtpUsername => $composableBuilder(
+    column: $table.smtpUsername,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get smtpFromAddress => $composableBuilder(
+    column: $table.smtpFromAddress,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get smtpFromName => $composableBuilder(
+    column: $table.smtpFromName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get smtpUseTls => $composableBuilder(
+    column: $table.smtpUseTls,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get smtpInvoiceSubjectTemplate => $composableBuilder(
+    column: $table.smtpInvoiceSubjectTemplate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get smtpInvoiceBodyTemplate => $composableBuilder(
+    column: $table.smtpInvoiceBodyTemplate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get smtpDunningSubjectTemplate => $composableBuilder(
+    column: $table.smtpDunningSubjectTemplate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get smtpDunningBodyTemplate => $composableBuilder(
+    column: $table.smtpDunningBodyTemplate,
     builder: (column) => column,
   );
 
@@ -12484,6 +13316,19 @@ class $$CompaniesTableTableManager
                 Value<String?> pdfIntroTextProforma = const Value.absent(),
                 Value<String?> pdfClosingTextProforma = const Value.absent(),
                 Value<String?> pdfFooterText = const Value.absent(),
+                Value<bool> smtpEnabled = const Value.absent(),
+                Value<String?> smtpHost = const Value.absent(),
+                Value<int> smtpPort = const Value.absent(),
+                Value<String?> smtpUsername = const Value.absent(),
+                Value<String?> smtpFromAddress = const Value.absent(),
+                Value<String?> smtpFromName = const Value.absent(),
+                Value<bool> smtpUseTls = const Value.absent(),
+                Value<String?> smtpInvoiceSubjectTemplate =
+                    const Value.absent(),
+                Value<String?> smtpInvoiceBodyTemplate = const Value.absent(),
+                Value<String?> smtpDunningSubjectTemplate =
+                    const Value.absent(),
+                Value<String?> smtpDunningBodyTemplate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -12523,6 +13368,17 @@ class $$CompaniesTableTableManager
                 pdfIntroTextProforma: pdfIntroTextProforma,
                 pdfClosingTextProforma: pdfClosingTextProforma,
                 pdfFooterText: pdfFooterText,
+                smtpEnabled: smtpEnabled,
+                smtpHost: smtpHost,
+                smtpPort: smtpPort,
+                smtpUsername: smtpUsername,
+                smtpFromAddress: smtpFromAddress,
+                smtpFromName: smtpFromName,
+                smtpUseTls: smtpUseTls,
+                smtpInvoiceSubjectTemplate: smtpInvoiceSubjectTemplate,
+                smtpInvoiceBodyTemplate: smtpInvoiceBodyTemplate,
+                smtpDunningSubjectTemplate: smtpDunningSubjectTemplate,
+                smtpDunningBodyTemplate: smtpDunningBodyTemplate,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -12566,6 +13422,19 @@ class $$CompaniesTableTableManager
                 Value<String?> pdfIntroTextProforma = const Value.absent(),
                 Value<String?> pdfClosingTextProforma = const Value.absent(),
                 Value<String?> pdfFooterText = const Value.absent(),
+                Value<bool> smtpEnabled = const Value.absent(),
+                Value<String?> smtpHost = const Value.absent(),
+                Value<int> smtpPort = const Value.absent(),
+                Value<String?> smtpUsername = const Value.absent(),
+                Value<String?> smtpFromAddress = const Value.absent(),
+                Value<String?> smtpFromName = const Value.absent(),
+                Value<bool> smtpUseTls = const Value.absent(),
+                Value<String?> smtpInvoiceSubjectTemplate =
+                    const Value.absent(),
+                Value<String?> smtpInvoiceBodyTemplate = const Value.absent(),
+                Value<String?> smtpDunningSubjectTemplate =
+                    const Value.absent(),
+                Value<String?> smtpDunningBodyTemplate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -12605,6 +13474,17 @@ class $$CompaniesTableTableManager
                 pdfIntroTextProforma: pdfIntroTextProforma,
                 pdfClosingTextProforma: pdfClosingTextProforma,
                 pdfFooterText: pdfFooterText,
+                smtpEnabled: smtpEnabled,
+                smtpHost: smtpHost,
+                smtpPort: smtpPort,
+                smtpUsername: smtpUsername,
+                smtpFromAddress: smtpFromAddress,
+                smtpFromName: smtpFromName,
+                smtpUseTls: smtpUseTls,
+                smtpInvoiceSubjectTemplate: smtpInvoiceSubjectTemplate,
+                smtpInvoiceBodyTemplate: smtpInvoiceBodyTemplate,
+                smtpDunningSubjectTemplate: smtpDunningSubjectTemplate,
+                smtpDunningBodyTemplate: smtpDunningBodyTemplate,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

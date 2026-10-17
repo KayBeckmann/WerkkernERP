@@ -13,8 +13,11 @@ import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/dunning_service.dart';
 import '../../domain/services/invoice_totals_service.dart';
+import '../../domain/services/smtp_config.dart';
+import '../../domain/services/smtp_credential_store.dart';
 import '../../pdf/dunning_letter_pdf_builder.dart';
 import '../../pdf/invoice_pdf_builder.dart';
+import '../widgets/email_send_dialog.dart';
 import '../widgets/invoice_item_dialog.dart';
 import 'invoices_screen.dart' show DocumentLabels;
 
@@ -185,6 +188,19 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   );
   bool _generatingDunningLetter = false;
 
+  // C7a SMTP-Versand (Kay-Nachfrage 2026-10-17): nur sichtbar, wenn die
+  // Firma das Modul aktiviert hat — genau wie bei den übrigen
+  // optionalen Bereichen.
+  bool _smtpEnabled = false;
+  SmtpConfig _smtpConfig = const SmtpConfig(
+    host: null,
+    port: 587,
+    username: null,
+    fromAddress: null,
+    fromName: null,
+    useTls: true,
+  );
+
   bool get _isFinalized => _currentInvoice?.status == InvoiceStatus.finalized;
   DocumentKind get _kind => _currentInvoice?.kind ?? widget.kind;
 
@@ -217,6 +233,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _advancePaymentInvoicesEnabled = company.advancePaymentInvoicesEnabled;
     _dunningEnabled = company.dunningEnabled;
     _dunningConfig = DunningConfig.fromCompany(company);
+    _smtpEnabled = company.smtpEnabled;
+    _smtpConfig = SmtpConfig.fromCompany(company);
 
     final invoice = widget.invoice;
     _currentInvoice = invoice;
@@ -490,6 +508,54 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
   }
 
+  /// C7a SMTP-Versand fürs Mahnschreiben — gleiches Muster wie
+  /// [_sendInvoiceByEmail], eigenes Platzhalter-Textpaar
+  /// (`smtpDunningSubjectTemplate`/`...BodyTemplate`), weil ein
+  /// Mahnschreiben einen anderen Ton braucht als eine normale
+  /// Rechnungs-Mail.
+  Future<void> _sendDunningLetterByEmail(DunningLevel level) async {
+    final invoice = _currentInvoice;
+    if (invoice == null) return;
+    final company = context.read<ActiveCompanyService>().active!;
+    final repo = context.read<InvoiceRepository>();
+    final credentialStore = context.read<SmtpCredentialStore>();
+    final subjectTemplate =
+        company.smtpDunningSubjectTemplate ?? '${dunningLetterTitle(level)}: {{nummer}}';
+    final bodyTemplate = company.smtpDunningBodyTemplate ??
+        'Guten Tag {{kunde}},\n\nanbei erhalten Sie unser Mahnschreiben zur Rechnung '
+            '{{nummer}}.\n\nMit freundlichen Grüßen\n{{firma}}';
+    await showEmailSendDialog(
+      context: context,
+      config: _smtpConfig,
+      credentialStore: credentialStore,
+      companyId: company.id,
+      initialTo: widget.customer.email ?? '',
+      initialSubject: applyEmailTemplatePlaceholders(
+        template: subjectTemplate,
+        customerName: widget.customer.name,
+        documentNumber: invoice.invoiceNumber ?? '',
+        companyName: company.name,
+      ),
+      initialBody: applyEmailTemplatePlaceholders(
+        template: bodyTemplate,
+        customerName: widget.customer.name,
+        documentNumber: invoice.invoiceNumber ?? '',
+        companyName: company.name,
+      ),
+      attachmentFilename: '${invoice.invoiceNumber}-${dunningLetterTitle(level)}.pdf',
+      buildAttachment: () async {
+        final invoiceGross = (await repo.totalsFor(invoice.id)).totalGross;
+        return buildDunningLetterPdf(
+          invoice: invoice,
+          company: company,
+          level: level,
+          config: _dunningConfig,
+          invoiceGross: invoiceGross,
+        );
+      },
+    );
+  }
+
   /// Wandelt das aktuelle (finalisierte) Dokument in einen neuen Entwurf
   /// einer anderen Dokumentart um (Kay-Nachtrag 2026-10-16) und öffnet
   /// diesen sofort zur Durchsicht — bewusst **kein** automatisches
@@ -602,6 +668,52 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         );
       }
     }
+  }
+
+  /// C7a SMTP-Versand (Kay-Nachfrage 2026-10-17): öffnet den Versand-
+  /// dialog mit vorausgefülltem, aber frei editierbarem Empfänger/
+  /// Betreff/Text — das eigentliche PDF wird erst beim tatsächlichen
+  /// Versand-Klick im Dialog gebaut (`buildAttachment`), nicht schon
+  /// hier, damit ein Abbrechen keine unnötige PDF-Erzeugung auslöst.
+  Future<void> _sendInvoiceByEmail() async {
+    final invoice = _currentInvoice;
+    if (invoice == null || invoice.status != InvoiceStatus.finalized) return;
+    final company = context.read<ActiveCompanyService>().active!;
+    final repo = context.read<InvoiceRepository>();
+    final credentialStore = context.read<SmtpCredentialStore>();
+    final subjectTemplate = company.smtpInvoiceSubjectTemplate ?? '{{firma}}: {{nummer}}';
+    final bodyTemplate = company.smtpInvoiceBodyTemplate ??
+        'Guten Tag {{kunde}},\n\nanbei erhalten Sie das Dokument {{nummer}}.\n\n'
+            'Mit freundlichen Grüßen\n{{firma}}';
+    await showEmailSendDialog(
+      context: context,
+      config: _smtpConfig,
+      credentialStore: credentialStore,
+      companyId: company.id,
+      initialTo: widget.customer.email ?? '',
+      initialSubject: applyEmailTemplatePlaceholders(
+        template: subjectTemplate,
+        customerName: widget.customer.name,
+        documentNumber: invoice.invoiceNumber ?? '',
+        companyName: company.name,
+      ),
+      initialBody: applyEmailTemplatePlaceholders(
+        template: bodyTemplate,
+        customerName: widget.customer.name,
+        documentNumber: invoice.invoiceNumber ?? '',
+        companyName: company.name,
+      ),
+      attachmentFilename: '${invoice.invoiceNumber}.pdf',
+      buildAttachment: () async {
+        final items = await repo.itemsFor(invoice.id);
+        return buildInvoicePdf(
+          invoice: invoice,
+          items: items,
+          company: company,
+          priorAdvancePaymentsGross: _priorAdvancePaymentsGross,
+        );
+      },
+    );
   }
 
   /// Unverbindliche In-App-Vorschau des aktuellen Entwurfs — direkt aus
@@ -791,6 +903,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               tooltip: 'PDF teilen',
               onPressed: _sharePdf,
             ),
+          if (isFinalized && _smtpEnabled)
+            IconButton(
+              icon: const Icon(Icons.mail_outline),
+              tooltip: 'Per E-Mail senden',
+              onPressed: _sendInvoiceByEmail,
+            ),
           if (isFinalized && (allowedConversionTargets[_kind]?.isNotEmpty ?? false))
             PopupMenuButton<DocumentKind>(
               icon: const Icon(Icons.sync_alt_outlined),
@@ -959,6 +1077,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                           onPressed: _generatingDunningLetter ? null : () => _generateDunningLetter(level),
                           child: Text('${dunningLetterTitle(level)} erzeugen'),
                         ),
+                        if (_smtpEnabled)
+                          IconButton(
+                            icon: const Icon(Icons.mail_outline),
+                            tooltip: '${dunningLetterTitle(level)} per E-Mail senden',
+                            onPressed: () => _sendDunningLetterByEmail(level),
+                          ),
                       ],
                     ),
                   );

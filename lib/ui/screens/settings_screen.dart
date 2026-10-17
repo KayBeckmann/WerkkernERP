@@ -6,6 +6,7 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/company_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/smtp_credential_store.dart';
 import '../../domain/services/theme_preference_service.dart';
 import '../widgets/section_label.dart';
 import 'backup_screen.dart';
@@ -55,6 +56,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _dunningInterestRateCtrl;
   bool _dunningSettingsSaving = false;
 
+  // C7a SMTP-Versand (Kay-Nachfrage 2026-10-17: "Gibt es schon den SMTP
+  // Versand? Wo konfiguriere ich den Betreff und den Body der Mail?").
+  // Das Passwort steht bewusst NICHT in einem dieser Controller — es
+  // wird getrennt über `SmtpCredentialStore` gelesen/geschrieben (siehe
+  // Doc-Kommentar dort) und hier nur über `_smtpHasPassword`
+  // (asynchron geladen) angezeigt.
+  late final TextEditingController _smtpHostCtrl;
+  late final TextEditingController _smtpPortCtrl;
+  late final TextEditingController _smtpUsernameCtrl;
+  late final TextEditingController _smtpFromAddressCtrl;
+  late final TextEditingController _smtpFromNameCtrl;
+  late final TextEditingController _smtpPasswordCtrl;
+  late final TextEditingController _smtpInvoiceSubjectCtrl;
+  late final TextEditingController _smtpInvoiceBodyCtrl;
+  late final TextEditingController _smtpDunningSubjectCtrl;
+  late final TextEditingController _smtpDunningBodyCtrl;
+  bool _smtpUseTls = true;
+  bool _smtpSettingsSaving = false;
+  bool _smtpPasswordSaving = false;
+  bool? _smtpHasPassword;
+
   @override
   void initState() {
     super.initState();
@@ -88,6 +110,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
         TextEditingController(text: _centsToEuroText(company?.dunningFeeLevel3Cents ?? 0));
     _dunningInterestRateCtrl =
         TextEditingController(text: (company?.dunningInterestRatePercent ?? 0).toString());
+    _smtpHostCtrl = TextEditingController(text: company?.smtpHost);
+    _smtpPortCtrl = TextEditingController(text: (company?.smtpPort ?? 587).toString());
+    _smtpUsernameCtrl = TextEditingController(text: company?.smtpUsername);
+    _smtpFromAddressCtrl = TextEditingController(text: company?.smtpFromAddress);
+    _smtpFromNameCtrl = TextEditingController(text: company?.smtpFromName);
+    _smtpPasswordCtrl = TextEditingController();
+    _smtpInvoiceSubjectCtrl = TextEditingController(text: company?.smtpInvoiceSubjectTemplate);
+    _smtpInvoiceBodyCtrl = TextEditingController(text: company?.smtpInvoiceBodyTemplate);
+    _smtpDunningSubjectCtrl = TextEditingController(text: company?.smtpDunningSubjectTemplate);
+    _smtpDunningBodyCtrl = TextEditingController(text: company?.smtpDunningBodyTemplate);
+    _smtpUseTls = company?.smtpUseTls ?? true;
+    if (company != null) {
+      // Lesen aus dem Secure Storage ist asynchron — erst nach dem
+      // ersten Frame nachladen, nicht den synchronen initState
+      // blockieren.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadSmtpPasswordState(company.id));
+    }
+  }
+
+  Future<void> _loadSmtpPasswordState(String companyId) async {
+    try {
+      final hasPassword = await context.read<SmtpCredentialStore>().hasPassword(companyId);
+      if (mounted) setState(() => _smtpHasPassword = hasPassword);
+    } catch (_) {
+      // Secure Storage kann auf manchen Plattformen/Testumgebungen ohne
+      // registrierten Platform-Channel fehlschlagen — dann bleibt der
+      // Zustand unbekannt (`null`, von der UI bereits als "nicht
+      // anzeigen" behandelt) statt die ganze Einstellungsseite
+      // abstürzen zu lassen.
+    }
   }
 
   static String _centsToEuroText(int cents) => (cents / 100).toStringAsFixed(2);
@@ -109,6 +161,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _dunningFeeLevel2Ctrl.dispose();
     _dunningFeeLevel3Ctrl.dispose();
     _dunningInterestRateCtrl.dispose();
+    _smtpHostCtrl.dispose();
+    _smtpPortCtrl.dispose();
+    _smtpUsernameCtrl.dispose();
+    _smtpFromAddressCtrl.dispose();
+    _smtpFromNameCtrl.dispose();
+    _smtpPasswordCtrl.dispose();
+    _smtpInvoiceSubjectCtrl.dispose();
+    _smtpInvoiceBodyCtrl.dispose();
+    _smtpDunningSubjectCtrl.dispose();
+    _smtpDunningBodyCtrl.dispose();
     super.dispose();
   }
 
@@ -122,6 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? recurringInvoicesEnabled,
     bool? advancePaymentInvoicesEnabled,
     bool? dunningEnabled,
+    bool? smtpEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -140,6 +203,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             advancePaymentInvoicesEnabled:
                 advancePaymentInvoicesEnabled ?? company.advancePaymentInvoicesEnabled,
             dunningEnabled: dunningEnabled ?? company.dunningEnabled,
+            smtpEnabled: smtpEnabled ?? company.smtpEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -241,6 +305,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } finally {
       if (mounted) setState(() => _dunningSettingsSaving = false);
+    }
+  }
+
+  /// C7a SMTP-Versand (Kay-Nachfrage 2026-10-17). Speichert Verbindungs-
+  /// daten + Betreff-/Text-Vorlagen — **nicht** das Passwort, das läuft
+  /// getrennt über [_setSmtpPassword]/[_clearSmtpPassword].
+  Future<void> _saveSmtpSettings() async {
+    final port = int.tryParse(_smtpPortCtrl.text.trim());
+    if (port == null || port <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte einen gültigen Port eingeben.')),
+      );
+      return;
+    }
+    final service = context.read<ActiveCompanyService>();
+    final company = service.active;
+    if (company == null) return;
+    setState(() => _smtpSettingsSaving = true);
+    try {
+      await context.read<CompanyRepository>().update(
+            company.copyWith(
+              smtpHost: Value(_textOrNull(_smtpHostCtrl)),
+              smtpPort: port,
+              smtpUsername: Value(_textOrNull(_smtpUsernameCtrl)),
+              smtpFromAddress: Value(_textOrNull(_smtpFromAddressCtrl)),
+              smtpFromName: Value(_textOrNull(_smtpFromNameCtrl)),
+              smtpUseTls: _smtpUseTls,
+              smtpInvoiceSubjectTemplate: Value(_textOrNull(_smtpInvoiceSubjectCtrl)),
+              smtpInvoiceBodyTemplate: Value(_textOrNull(_smtpInvoiceBodyCtrl)),
+              smtpDunningSubjectTemplate: Value(_textOrNull(_smtpDunningSubjectCtrl)),
+              smtpDunningBodyTemplate: Value(_textOrNull(_smtpDunningBodyCtrl)),
+            ),
+          );
+      await service.refreshActive();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('SMTP-Einstellungen gespeichert.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _smtpSettingsSaving = false);
+    }
+  }
+
+  Future<void> _setSmtpPassword() async {
+    final password = _smtpPasswordCtrl.text;
+    if (password.isEmpty) return;
+    final company = context.read<ActiveCompanyService>().active;
+    if (company == null) return;
+    setState(() => _smtpPasswordSaving = true);
+    try {
+      await context.read<SmtpCredentialStore>().writePassword(company.id, password);
+      _smtpPasswordCtrl.clear();
+      if (mounted) {
+        setState(() => _smtpHasPassword = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('SMTP-Passwort gespeichert.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('SMTP-Passwort konnte nicht gespeichert werden.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _smtpPasswordSaving = false);
+    }
+  }
+
+  Future<void> _clearSmtpPassword() async {
+    final company = context.read<ActiveCompanyService>().active;
+    if (company == null) return;
+    setState(() => _smtpPasswordSaving = true);
+    try {
+      await context.read<SmtpCredentialStore>().deletePassword(company.id);
+      if (mounted) {
+        setState(() => _smtpHasPassword = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('SMTP-Passwort gelöscht.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('SMTP-Passwort konnte nicht gelöscht werden.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _smtpPasswordSaving = false);
     }
   }
 
@@ -391,6 +545,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: company.dunningEnabled,
                     onChanged: _busy ? null : (value) => _setModule(dunningEnabled: value),
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Versand (SMTP)'),
+                    value: company.smtpEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(smtpEnabled: value),
+                  ),
                 ],
               ),
             ),
@@ -540,6 +700,171 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: FilledButton(
                         onPressed: _dunningSettingsSaving ? null : _saveDunningSettings,
                         child: _dunningSettingsSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Speichern'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+        // C7a SMTP-Versand (Kay-Nachfrage 2026-10-17: "Gibt es schon den
+        // SMTP Versand? Wo konfiguriere ich den Betreff und den Body der
+        // Mail?").
+        if (company.smtpEnabled) ...[
+          const SectionLabel('Versand (SMTP)'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Auf Android wird per echtem SMTP versendet. Im Web-Build ist das aus '
+                      'technischen Gründen (kein Rohsocket-Zugriff im Browser) nicht möglich — '
+                      'dort bleibt nur PDF herunterladen/teilen.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextField(
+                            controller: _smtpHostCtrl,
+                            decoration: const InputDecoration(labelText: 'SMTP-Server'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _smtpPortCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: 'Port'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _smtpUsernameCtrl,
+                      decoration: const InputDecoration(labelText: 'Benutzername'),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _smtpFromAddressCtrl,
+                            decoration: const InputDecoration(labelText: 'Absenderadresse'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _smtpFromNameCtrl,
+                            decoration: const InputDecoration(labelText: 'Absendername (optional)'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Verschlüsselte Verbindung (STARTTLS/SSL)'),
+                      value: _smtpUseTls,
+                      onChanged: (value) => setState(() => _smtpUseTls = value),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _smtpPasswordCtrl,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              labelText: 'Passwort',
+                              helperText: _smtpHasPassword == null
+                                  ? null
+                                  : (_smtpHasPassword!
+                                      ? 'Ein Passwort ist gespeichert.'
+                                      : 'Kein Passwort gespeichert.'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        TextButton(
+                          onPressed: _smtpPasswordSaving ? null : _setSmtpPassword,
+                          child: const Text('Speichern'),
+                        ),
+                        if (_smtpHasPassword == true)
+                          TextButton(
+                            onPressed: _smtpPasswordSaving ? null : _clearSmtpPassword,
+                            child: const Text('Löschen'),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Betreff/Text je Anlass — Platzhalter {{kunde}}, {{nummer}}, {{firma}} '
+                      'werden beim Öffnen des Versanddialogs ersetzt, dort aber noch frei '
+                      'editierbar.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text('Rechnung/Angebot/Auftrag', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _smtpInvoiceSubjectCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Betreff',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _smtpInvoiceBodyCtrl,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Text',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    if (company.dunningEnabled) ...[
+                      const SizedBox(height: 16),
+                      Text('Mahnschreiben', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _smtpDunningSubjectCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Betreff',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _smtpDunningBodyCtrl,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Text',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton(
+                        onPressed: _smtpSettingsSaving ? null : _saveSmtpSettings,
+                        child: _smtpSettingsSaving
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
