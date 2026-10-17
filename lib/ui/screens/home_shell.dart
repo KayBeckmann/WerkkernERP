@@ -11,6 +11,7 @@ import 'articles_screen.dart';
 import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
 import 'invoices_screen.dart';
+import 'projects_screen.dart';
 import 'settings_screen.dart';
 import 'suppliers_screen.dart';
 
@@ -24,7 +25,18 @@ import 'suppliers_screen.dart';
 /// Einstellungen von Index 4 auf Index 5 rutschte). Die ID bleibt
 /// stabil, die tatsächliche Listenposition wird bei jedem Build neu
 /// aufgelöst.
-enum _TabId { invoice, quote, order, deliveryNote, proforma, customers, articles, suppliers, settings }
+enum _TabId {
+  invoice,
+  quote,
+  order,
+  deliveryNote,
+  proforma,
+  customers,
+  articles,
+  suppliers,
+  projects,
+  settings,
+}
 
 /// Ein Navigationseintrag der Shell. Angebot/Auftrag (A5) sind nur
 /// Instanzen von [InvoicesScreen] mit anderer [DocumentKind] — die
@@ -151,6 +163,15 @@ class _HomeShellState extends State<HomeShell> {
           screen: SuppliersScreen(),
           section: _Section.stammdaten,
         ),
+        // C1 Projekte (Kay-Priorisierungsentscheidung 2026-10-17).
+        if (company.projectsEnabled)
+          const _Tab(
+            id: _TabId.projects,
+            icon: Icons.folder_outlined,
+            title: 'Projekte',
+            screen: ProjectsScreen(),
+            section: _Section.stammdaten,
+          ),
         const _Tab(
           id: _TabId.settings,
           icon: Icons.settings_outlined,

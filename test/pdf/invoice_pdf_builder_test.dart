@@ -50,6 +50,7 @@ void main() {
         ordersEnabled: false,
         deliveryNotesEnabled: false,
         proformaEnabled: false,
+        projectsEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

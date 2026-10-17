@@ -7,7 +7,9 @@ import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/data/repositories/customer_repository.dart';
 import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
+import 'package:werkkernerp/data/repositories/project_repository.dart';
 import 'package:werkkernerp/domain/models/money.dart';
+import 'package:drift/drift.dart' show Value;
 
 void main() {
   late AppDatabase db;
@@ -228,4 +230,63 @@ void main() {
     expect(await invoices.listDraftsForCompany(companyA.id), hasLength(1));
     expect(await invoices.listDraftsForCompany(companyB.id), hasLength(1));
   });
+
+  // C1 Projekte (Kay-Priorisierungsentscheidung 2026-10-17).
+
+  test(
+    'C1: eine Rechnung kann einem Projekt zugeordnet, später geändert und wieder entfernt '
+    'werden — listForProject() findet sie entsprechend',
+    () async {
+      final projects = ProjectRepository(db);
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final projectA = await projects.create(companyId: company.id, name: 'Projekt A');
+      final projectB = await projects.create(companyId: company.id, name: 'Projekt B');
+
+      final draft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        projectId: projectA.id,
+      );
+      expect(draft.projectId, projectA.id);
+      expect(
+        await invoices.listForProject(companyId: company.id, projectId: projectA.id),
+        hasLength(1),
+      );
+
+      // Projekt wechseln ...
+      await invoices.update(companyId: company.id, id: draft.id, projectId: Value(projectB.id));
+      expect(
+        await invoices.listForProject(companyId: company.id, projectId: projectA.id),
+        isEmpty,
+      );
+      expect(
+        await invoices.listForProject(companyId: company.id, projectId: projectB.id),
+        hasLength(1),
+      );
+
+      // ... und wieder entfernen (Value(null), nicht einfach weglassen).
+      final unassigned =
+          await invoices.update(companyId: company.id, id: draft.id, projectId: const Value(null));
+      expect(unassigned!.projectId, isNull);
+    },
+  );
+
+  test(
+    'C1: die erste Rechnung bleibt ausdrücklich projektfrei möglich (Brainstorming) — '
+    'projectId ist beim Anlegen optional',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final draft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+      );
+      expect(draft.projectId, isNull);
+    },
+  );
 }

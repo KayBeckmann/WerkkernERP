@@ -16,7 +16,7 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte; v4→v5:
 /// Lieferschein + Dokumentumwandlung; v5→v6: Einheit + Rabatt pro
 /// Position; v6→v7: PDF-Texte pro Dokumentart; v7→v8: C10
-/// Proforma-Rechnungen). Statt das Spaltentyp-/
+/// Proforma-Rechnungen; v8→v9: C1 Projekte). Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
 /// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
@@ -39,10 +39,10 @@ void main() {
   });
 
   test(
-    'Migration v1→v8 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
-    'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen): '
-    'Bestandsdaten bekommen automatisch die neuen Default-Werte — ohne Datenverlust an '
-    'bestehenden Spalten',
+    'Migration v1→v9 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
+    'C1 Projekte): Bestandsdaten bekommen automatisch die neuen Default-Werte — ohne '
+    'Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -116,6 +116,13 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN proforma_enabled;');
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_proforma;');
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_proforma;');
+      // v8 -> v9 (C1 Projekte): die Invoices-Spalte zuerst entfernen,
+      // DANACH die Tabelle, auf die sie verweist (umgekehrte Reihenfolge
+      // der Migration selbst — beim Rückbau muss die FK-Spalte weg, bevor
+      // ihr Ziel verschwindet).
+      raw.execute('ALTER TABLE invoices DROP COLUMN project_id;');
+      raw.execute('ALTER TABLE companies DROP COLUMN projects_enabled;');
+      raw.execute('DROP TABLE projects;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -143,6 +150,7 @@ void main() {
         expect(migratedCompany.proformaEnabled, isFalse);
         expect(migratedCompany.pdfIntroTextProforma, isNull);
         expect(migratedCompany.pdfClosingTextProforma, isNull);
+        expect(migratedCompany.projectsEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -151,6 +159,22 @@ void main() {
         expect(migratedInvoice.customerId, customer.id, reason: 'Bestandsdaten dürfen nicht verändert werden');
         expect(migratedInvoice.customerSnapshotVatId, isNull);
         expect(migratedInvoice.convertedFromId, isNull);
+        expect(migratedInvoice.projectId, isNull);
+
+        // Projects-Tabelle existiert nach der Migration und ist nutzbar
+        // (nicht nur die Spalte auf Invoices).
+        await db.into(db.projects).insert(
+              ProjectsCompanion.insert(
+                id: 'project-nach-migration',
+                companyId: company.id,
+                name: 'Testprojekt nach Migration',
+                createdAt: DateTime.now(),
+              ),
+            );
+        final createdProject = await (db.select(db.projects)
+              ..where((p) => p.id.equals('project-nach-migration')))
+            .getSingle();
+        expect(createdProject.status, ProjectStatus.active);
 
         final migratedCustomer =
             await (db.select(db.customers)..where((c) => c.id.equals(customer.id))).getSingle();
