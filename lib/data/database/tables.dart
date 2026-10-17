@@ -24,6 +24,11 @@ class Companies extends Table {
   BoolColumn get ordersEnabled => boolean().withDefault(const Constant(false))();
   BoolColumn get deliveryNotesEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C10 Proforma-Rechnungen (Kay-Priorisierungsentscheidung 2026-10-17,
+  /// Lücke aus dem RechnungsFee-Funktionsabgleich): wie Angebot/Auftrag/
+  /// Lieferschein ein pro Firma ein-/ausblendbares Modul, Default aus.
+  BoolColumn get proformaEnabled => boolean().withDefault(const Constant(false))();
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -45,6 +50,11 @@ class Companies extends Table {
   TextColumn get pdfClosingTextOrder => text().nullable()();
   TextColumn get pdfIntroTextDeliveryNote => text().nullable()();
   TextColumn get pdfClosingTextDeliveryNote => text().nullable()();
+
+  /// C10 Proforma-Rechnungen — eigenes Textpaar wie die übrigen drei
+  /// optionalen Dokumentarten (gleiches Muster, siehe oben).
+  TextColumn get pdfIntroTextProforma => text().nullable()();
+  TextColumn get pdfClosingTextProforma => text().nullable()();
   TextColumn get pdfFooterText => text().nullable()();
 
   @override
@@ -172,7 +182,15 @@ enum InvoiceStatus { draft, finalized }
 /// in `InvoiceRepository.createDraft()`/`update()`, nicht nur in der
 /// UI. Konvertierung Angebot→Auftrag/Lieferschein/Rechnung und
 /// Auftrag→Lieferschein/Rechnung über `InvoiceRepository.convertTo()`.
-enum DocumentKind { invoice, quote, order, deliveryNote }
+///
+/// Proforma ("PF") kam mit C10 (Kay-Priorisierungsentscheidung
+/// 2026-10-17, Roadmap-Lücke aus dem RechnungsFee-Funktionsabgleich)
+/// dazu — anders als der Lieferschein zeigt sie **alle** Positionstypen
+/// inkl. Stunden und vollständige Preise/Steuern wie eine Rechnung,
+/// ist aber **keine Rechnung im umsatzsteuerrechtlichen Sinne** (eigener
+/// Nummernkreis, nicht GoBD-/Umsatz-relevant). Finalisierte Proforma ist
+/// per `convertTo()` in eine echte Rechnung umwandelbar.
+enum DocumentKind { invoice, quote, order, deliveryNote, proforma }
 
 class Invoices extends Table {
   TextColumn get id => text()();

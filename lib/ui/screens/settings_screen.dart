@@ -48,12 +48,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       DocumentKind.quote: TextEditingController(text: company?.pdfIntroTextQuote),
       DocumentKind.order: TextEditingController(text: company?.pdfIntroTextOrder),
       DocumentKind.deliveryNote: TextEditingController(text: company?.pdfIntroTextDeliveryNote),
+      DocumentKind.proforma: TextEditingController(text: company?.pdfIntroTextProforma),
     };
     _closingCtrls = {
       DocumentKind.invoice: TextEditingController(text: company?.pdfClosingText),
       DocumentKind.quote: TextEditingController(text: company?.pdfClosingTextQuote),
       DocumentKind.order: TextEditingController(text: company?.pdfClosingTextOrder),
       DocumentKind.deliveryNote: TextEditingController(text: company?.pdfClosingTextDeliveryNote),
+      DocumentKind.proforma: TextEditingController(text: company?.pdfClosingTextProforma),
     };
     _footerCtrl = TextEditingController(text: company?.pdfFooterText);
   }
@@ -74,6 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? quotesEnabled,
     bool? ordersEnabled,
     bool? deliveryNotesEnabled,
+    bool? proformaEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -85,6 +88,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             quotesEnabled: quotesEnabled ?? company.quotesEnabled,
             ordersEnabled: ordersEnabled ?? company.ordersEnabled,
             deliveryNotesEnabled: deliveryNotesEnabled ?? company.deliveryNotesEnabled,
+            proformaEnabled: proformaEnabled ?? company.proformaEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -113,6 +117,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               pdfClosingTextOrder: Value(_textOrNull(_closingCtrls[DocumentKind.order]!)),
               pdfIntroTextDeliveryNote: Value(_textOrNull(_introCtrls[DocumentKind.deliveryNote]!)),
               pdfClosingTextDeliveryNote: Value(_textOrNull(_closingCtrls[DocumentKind.deliveryNote]!)),
+              pdfIntroTextProforma: Value(_textOrNull(_introCtrls[DocumentKind.proforma]!)),
+              pdfClosingTextProforma: Value(_textOrNull(_closingCtrls[DocumentKind.proforma]!)),
               pdfFooterText: Value(_textOrNull(_footerCtrl)),
             ),
           );
@@ -169,6 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (company.quotesEnabled) DocumentKind.quote,
       if (company.ordersEnabled) DocumentKind.order,
       if (company.deliveryNotesEnabled) DocumentKind.deliveryNote,
+      if (company.proformaEnabled) DocumentKind.proforma,
     ];
 
     return ListView(
@@ -234,6 +241,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Lieferscheine'),
                     value: company.deliveryNotesEnabled,
                     onChanged: _busy ? null : (value) => _setModule(deliveryNotesEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Proforma-Rechnungen'),
+                    value: company.proformaEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(proformaEnabled: value),
                   ),
                 ],
               ),

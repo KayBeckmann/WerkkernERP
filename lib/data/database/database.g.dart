@@ -140,6 +140,21 @@ class $CompaniesTable extends Companies
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _proformaEnabledMeta = const VerificationMeta(
+    'proformaEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> proformaEnabled = GeneratedColumn<bool>(
+    'proforma_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("proforma_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _pdfIntroTextMeta = const VerificationMeta(
     'pdfIntroText',
   );
@@ -230,6 +245,28 @@ class $CompaniesTable extends Companies
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _pdfIntroTextProformaMeta =
+      const VerificationMeta('pdfIntroTextProforma');
+  @override
+  late final GeneratedColumn<String> pdfIntroTextProforma =
+      GeneratedColumn<String>(
+        'pdf_intro_text_proforma',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfClosingTextProformaMeta =
+      const VerificationMeta('pdfClosingTextProforma');
+  @override
+  late final GeneratedColumn<String> pdfClosingTextProforma =
+      GeneratedColumn<String>(
+        'pdf_closing_text_proforma',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _pdfFooterTextMeta = const VerificationMeta(
     'pdfFooterText',
   );
@@ -255,6 +292,7 @@ class $CompaniesTable extends Companies
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
+    proformaEnabled,
     pdfIntroText,
     pdfClosingText,
     pdfIntroTextQuote,
@@ -263,6 +301,8 @@ class $CompaniesTable extends Companies
     pdfClosingTextOrder,
     pdfIntroTextDeliveryNote,
     pdfClosingTextDeliveryNote,
+    pdfIntroTextProforma,
+    pdfClosingTextProforma,
     pdfFooterText,
   ];
   @override
@@ -361,6 +401,15 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('proforma_enabled')) {
+      context.handle(
+        _proformaEnabledMeta,
+        proformaEnabled.isAcceptableOrUnknown(
+          data['proforma_enabled']!,
+          _proformaEnabledMeta,
+        ),
+      );
+    }
     if (data.containsKey('pdf_intro_text')) {
       context.handle(
         _pdfIntroTextMeta,
@@ -433,6 +482,24 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('pdf_intro_text_proforma')) {
+      context.handle(
+        _pdfIntroTextProformaMeta,
+        pdfIntroTextProforma.isAcceptableOrUnknown(
+          data['pdf_intro_text_proforma']!,
+          _pdfIntroTextProformaMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text_proforma')) {
+      context.handle(
+        _pdfClosingTextProformaMeta,
+        pdfClosingTextProforma.isAcceptableOrUnknown(
+          data['pdf_closing_text_proforma']!,
+          _pdfClosingTextProformaMeta,
+        ),
+      );
+    }
     if (data.containsKey('pdf_footer_text')) {
       context.handle(
         _pdfFooterTextMeta,
@@ -499,6 +566,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}delivery_notes_enabled'],
       )!,
+      proformaEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}proforma_enabled'],
+      )!,
       pdfIntroText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_intro_text'],
@@ -530,6 +601,14 @@ class $CompaniesTable extends Companies
       pdfClosingTextDeliveryNote: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_closing_text_delivery_note'],
+      ),
+      pdfIntroTextProforma: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text_proforma'],
+      ),
+      pdfClosingTextProforma: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text_proforma'],
       ),
       pdfFooterText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -563,6 +642,11 @@ class Company extends DataClass implements Insertable<Company> {
   final bool ordersEnabled;
   final bool deliveryNotesEnabled;
 
+  /// C10 Proforma-Rechnungen (Kay-Priorisierungsentscheidung 2026-10-17,
+  /// Lücke aus dem RechnungsFee-Funktionsabgleich): wie Angebot/Auftrag/
+  /// Lieferschein ein pro Firma ein-/ausblendbares Modul, Default aus.
+  final bool proformaEnabled;
+
   /// Anpassbare PDF-Texte (Kay-Nachtrag 2026-10-16: "Rechtstexte,
   /// Fußzeile und Kopfzeile in Dokumenten anpassbar machen"). Ursprünglich
   /// EIN gemeinsamer Satz für alle Dokumentarten — zweiter Nachtrag
@@ -584,6 +668,11 @@ class Company extends DataClass implements Insertable<Company> {
   final String? pdfClosingTextOrder;
   final String? pdfIntroTextDeliveryNote;
   final String? pdfClosingTextDeliveryNote;
+
+  /// C10 Proforma-Rechnungen — eigenes Textpaar wie die übrigen drei
+  /// optionalen Dokumentarten (gleiches Muster, siehe oben).
+  final String? pdfIntroTextProforma;
+  final String? pdfClosingTextProforma;
   final String? pdfFooterText;
   const Company({
     required this.id,
@@ -598,6 +687,7 @@ class Company extends DataClass implements Insertable<Company> {
     required this.quotesEnabled,
     required this.ordersEnabled,
     required this.deliveryNotesEnabled,
+    required this.proformaEnabled,
     this.pdfIntroText,
     this.pdfClosingText,
     this.pdfIntroTextQuote,
@@ -606,6 +696,8 @@ class Company extends DataClass implements Insertable<Company> {
     this.pdfClosingTextOrder,
     this.pdfIntroTextDeliveryNote,
     this.pdfClosingTextDeliveryNote,
+    this.pdfIntroTextProforma,
+    this.pdfClosingTextProforma,
     this.pdfFooterText,
   });
   @override
@@ -635,6 +727,7 @@ class Company extends DataClass implements Insertable<Company> {
     map['quotes_enabled'] = Variable<bool>(quotesEnabled);
     map['orders_enabled'] = Variable<bool>(ordersEnabled);
     map['delivery_notes_enabled'] = Variable<bool>(deliveryNotesEnabled);
+    map['proforma_enabled'] = Variable<bool>(proformaEnabled);
     if (!nullToAbsent || pdfIntroText != null) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText);
     }
@@ -661,6 +754,14 @@ class Company extends DataClass implements Insertable<Company> {
     if (!nullToAbsent || pdfClosingTextDeliveryNote != null) {
       map['pdf_closing_text_delivery_note'] = Variable<String>(
         pdfClosingTextDeliveryNote,
+      );
+    }
+    if (!nullToAbsent || pdfIntroTextProforma != null) {
+      map['pdf_intro_text_proforma'] = Variable<String>(pdfIntroTextProforma);
+    }
+    if (!nullToAbsent || pdfClosingTextProforma != null) {
+      map['pdf_closing_text_proforma'] = Variable<String>(
+        pdfClosingTextProforma,
       );
     }
     if (!nullToAbsent || pdfFooterText != null) {
@@ -693,6 +794,7 @@ class Company extends DataClass implements Insertable<Company> {
       quotesEnabled: Value(quotesEnabled),
       ordersEnabled: Value(ordersEnabled),
       deliveryNotesEnabled: Value(deliveryNotesEnabled),
+      proformaEnabled: Value(proformaEnabled),
       pdfIntroText: pdfIntroText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfIntroText),
@@ -718,6 +820,12 @@ class Company extends DataClass implements Insertable<Company> {
           pdfClosingTextDeliveryNote == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfClosingTextDeliveryNote),
+      pdfIntroTextProforma: pdfIntroTextProforma == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroTextProforma),
+      pdfClosingTextProforma: pdfClosingTextProforma == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingTextProforma),
       pdfFooterText: pdfFooterText == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfFooterText),
@@ -744,6 +852,7 @@ class Company extends DataClass implements Insertable<Company> {
       deliveryNotesEnabled: serializer.fromJson<bool>(
         json['deliveryNotesEnabled'],
       ),
+      proformaEnabled: serializer.fromJson<bool>(json['proformaEnabled']),
       pdfIntroText: serializer.fromJson<String?>(json['pdfIntroText']),
       pdfClosingText: serializer.fromJson<String?>(json['pdfClosingText']),
       pdfIntroTextQuote: serializer.fromJson<String?>(
@@ -764,6 +873,12 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingTextDeliveryNote: serializer.fromJson<String?>(
         json['pdfClosingTextDeliveryNote'],
       ),
+      pdfIntroTextProforma: serializer.fromJson<String?>(
+        json['pdfIntroTextProforma'],
+      ),
+      pdfClosingTextProforma: serializer.fromJson<String?>(
+        json['pdfClosingTextProforma'],
+      ),
       pdfFooterText: serializer.fromJson<String?>(json['pdfFooterText']),
     );
   }
@@ -783,6 +898,7 @@ class Company extends DataClass implements Insertable<Company> {
       'quotesEnabled': serializer.toJson<bool>(quotesEnabled),
       'ordersEnabled': serializer.toJson<bool>(ordersEnabled),
       'deliveryNotesEnabled': serializer.toJson<bool>(deliveryNotesEnabled),
+      'proformaEnabled': serializer.toJson<bool>(proformaEnabled),
       'pdfIntroText': serializer.toJson<String?>(pdfIntroText),
       'pdfClosingText': serializer.toJson<String?>(pdfClosingText),
       'pdfIntroTextQuote': serializer.toJson<String?>(pdfIntroTextQuote),
@@ -794,6 +910,10 @@ class Company extends DataClass implements Insertable<Company> {
       ),
       'pdfClosingTextDeliveryNote': serializer.toJson<String?>(
         pdfClosingTextDeliveryNote,
+      ),
+      'pdfIntroTextProforma': serializer.toJson<String?>(pdfIntroTextProforma),
+      'pdfClosingTextProforma': serializer.toJson<String?>(
+        pdfClosingTextProforma,
       ),
       'pdfFooterText': serializer.toJson<String?>(pdfFooterText),
     };
@@ -812,6 +932,7 @@ class Company extends DataClass implements Insertable<Company> {
     bool? quotesEnabled,
     bool? ordersEnabled,
     bool? deliveryNotesEnabled,
+    bool? proformaEnabled,
     Value<String?> pdfIntroText = const Value.absent(),
     Value<String?> pdfClosingText = const Value.absent(),
     Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -820,6 +941,8 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> pdfClosingTextOrder = const Value.absent(),
     Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
     Value<String?> pdfClosingTextDeliveryNote = const Value.absent(),
+    Value<String?> pdfIntroTextProforma = const Value.absent(),
+    Value<String?> pdfClosingTextProforma = const Value.absent(),
     Value<String?> pdfFooterText = const Value.absent(),
   }) => Company(
     id: id ?? this.id,
@@ -834,6 +957,7 @@ class Company extends DataClass implements Insertable<Company> {
     quotesEnabled: quotesEnabled ?? this.quotesEnabled,
     ordersEnabled: ordersEnabled ?? this.ordersEnabled,
     deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
+    proformaEnabled: proformaEnabled ?? this.proformaEnabled,
     pdfIntroText: pdfIntroText.present ? pdfIntroText.value : this.pdfIntroText,
     pdfClosingText: pdfClosingText.present
         ? pdfClosingText.value
@@ -856,6 +980,12 @@ class Company extends DataClass implements Insertable<Company> {
     pdfClosingTextDeliveryNote: pdfClosingTextDeliveryNote.present
         ? pdfClosingTextDeliveryNote.value
         : this.pdfClosingTextDeliveryNote,
+    pdfIntroTextProforma: pdfIntroTextProforma.present
+        ? pdfIntroTextProforma.value
+        : this.pdfIntroTextProforma,
+    pdfClosingTextProforma: pdfClosingTextProforma.present
+        ? pdfClosingTextProforma.value
+        : this.pdfClosingTextProforma,
     pdfFooterText: pdfFooterText.present
         ? pdfFooterText.value
         : this.pdfFooterText,
@@ -880,6 +1010,9 @@ class Company extends DataClass implements Insertable<Company> {
       deliveryNotesEnabled: data.deliveryNotesEnabled.present
           ? data.deliveryNotesEnabled.value
           : this.deliveryNotesEnabled,
+      proformaEnabled: data.proformaEnabled.present
+          ? data.proformaEnabled.value
+          : this.proformaEnabled,
       pdfIntroText: data.pdfIntroText.present
           ? data.pdfIntroText.value
           : this.pdfIntroText,
@@ -904,6 +1037,12 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingTextDeliveryNote: data.pdfClosingTextDeliveryNote.present
           ? data.pdfClosingTextDeliveryNote.value
           : this.pdfClosingTextDeliveryNote,
+      pdfIntroTextProforma: data.pdfIntroTextProforma.present
+          ? data.pdfIntroTextProforma.value
+          : this.pdfIntroTextProforma,
+      pdfClosingTextProforma: data.pdfClosingTextProforma.present
+          ? data.pdfClosingTextProforma.value
+          : this.pdfClosingTextProforma,
       pdfFooterText: data.pdfFooterText.present
           ? data.pdfFooterText.value
           : this.pdfFooterText,
@@ -925,6 +1064,7 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
+          ..write('proformaEnabled: $proformaEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
@@ -933,6 +1073,8 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('pdfClosingTextOrder: $pdfClosingTextOrder, ')
           ..write('pdfIntroTextDeliveryNote: $pdfIntroTextDeliveryNote, ')
           ..write('pdfClosingTextDeliveryNote: $pdfClosingTextDeliveryNote, ')
+          ..write('pdfIntroTextProforma: $pdfIntroTextProforma, ')
+          ..write('pdfClosingTextProforma: $pdfClosingTextProforma, ')
           ..write('pdfFooterText: $pdfFooterText')
           ..write(')'))
         .toString();
@@ -952,6 +1094,7 @@ class Company extends DataClass implements Insertable<Company> {
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
+    proformaEnabled,
     pdfIntroText,
     pdfClosingText,
     pdfIntroTextQuote,
@@ -960,6 +1103,8 @@ class Company extends DataClass implements Insertable<Company> {
     pdfClosingTextOrder,
     pdfIntroTextDeliveryNote,
     pdfClosingTextDeliveryNote,
+    pdfIntroTextProforma,
+    pdfClosingTextProforma,
     pdfFooterText,
   ]);
   @override
@@ -978,6 +1123,7 @@ class Company extends DataClass implements Insertable<Company> {
           other.quotesEnabled == this.quotesEnabled &&
           other.ordersEnabled == this.ordersEnabled &&
           other.deliveryNotesEnabled == this.deliveryNotesEnabled &&
+          other.proformaEnabled == this.proformaEnabled &&
           other.pdfIntroText == this.pdfIntroText &&
           other.pdfClosingText == this.pdfClosingText &&
           other.pdfIntroTextQuote == this.pdfIntroTextQuote &&
@@ -986,6 +1132,8 @@ class Company extends DataClass implements Insertable<Company> {
           other.pdfClosingTextOrder == this.pdfClosingTextOrder &&
           other.pdfIntroTextDeliveryNote == this.pdfIntroTextDeliveryNote &&
           other.pdfClosingTextDeliveryNote == this.pdfClosingTextDeliveryNote &&
+          other.pdfIntroTextProforma == this.pdfIntroTextProforma &&
+          other.pdfClosingTextProforma == this.pdfClosingTextProforma &&
           other.pdfFooterText == this.pdfFooterText);
 }
 
@@ -1002,6 +1150,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<bool> quotesEnabled;
   final Value<bool> ordersEnabled;
   final Value<bool> deliveryNotesEnabled;
+  final Value<bool> proformaEnabled;
   final Value<String?> pdfIntroText;
   final Value<String?> pdfClosingText;
   final Value<String?> pdfIntroTextQuote;
@@ -1010,6 +1159,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> pdfClosingTextOrder;
   final Value<String?> pdfIntroTextDeliveryNote;
   final Value<String?> pdfClosingTextDeliveryNote;
+  final Value<String?> pdfIntroTextProforma;
+  final Value<String?> pdfClosingTextProforma;
   final Value<String?> pdfFooterText;
   final Value<int> rowid;
   const CompaniesCompanion({
@@ -1025,6 +1176,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
+    this.proformaEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfIntroTextQuote = const Value.absent(),
@@ -1033,6 +1185,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.pdfClosingTextOrder = const Value.absent(),
     this.pdfIntroTextDeliveryNote = const Value.absent(),
     this.pdfClosingTextDeliveryNote = const Value.absent(),
+    this.pdfIntroTextProforma = const Value.absent(),
+    this.pdfClosingTextProforma = const Value.absent(),
     this.pdfFooterText = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -1049,6 +1203,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
+    this.proformaEnabled = const Value.absent(),
     this.pdfIntroText = const Value.absent(),
     this.pdfClosingText = const Value.absent(),
     this.pdfIntroTextQuote = const Value.absent(),
@@ -1057,6 +1212,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.pdfClosingTextOrder = const Value.absent(),
     this.pdfIntroTextDeliveryNote = const Value.absent(),
     this.pdfClosingTextDeliveryNote = const Value.absent(),
+    this.pdfIntroTextProforma = const Value.absent(),
+    this.pdfClosingTextProforma = const Value.absent(),
     this.pdfFooterText = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -1075,6 +1232,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<bool>? quotesEnabled,
     Expression<bool>? ordersEnabled,
     Expression<bool>? deliveryNotesEnabled,
+    Expression<bool>? proformaEnabled,
     Expression<String>? pdfIntroText,
     Expression<String>? pdfClosingText,
     Expression<String>? pdfIntroTextQuote,
@@ -1083,6 +1241,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? pdfClosingTextOrder,
     Expression<String>? pdfIntroTextDeliveryNote,
     Expression<String>? pdfClosingTextDeliveryNote,
+    Expression<String>? pdfIntroTextProforma,
+    Expression<String>? pdfClosingTextProforma,
     Expression<String>? pdfFooterText,
     Expression<int>? rowid,
   }) {
@@ -1100,6 +1260,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (ordersEnabled != null) 'orders_enabled': ordersEnabled,
       if (deliveryNotesEnabled != null)
         'delivery_notes_enabled': deliveryNotesEnabled,
+      if (proformaEnabled != null) 'proforma_enabled': proformaEnabled,
       if (pdfIntroText != null) 'pdf_intro_text': pdfIntroText,
       if (pdfClosingText != null) 'pdf_closing_text': pdfClosingText,
       if (pdfIntroTextQuote != null) 'pdf_intro_text_quote': pdfIntroTextQuote,
@@ -1112,6 +1273,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         'pdf_intro_text_delivery_note': pdfIntroTextDeliveryNote,
       if (pdfClosingTextDeliveryNote != null)
         'pdf_closing_text_delivery_note': pdfClosingTextDeliveryNote,
+      if (pdfIntroTextProforma != null)
+        'pdf_intro_text_proforma': pdfIntroTextProforma,
+      if (pdfClosingTextProforma != null)
+        'pdf_closing_text_proforma': pdfClosingTextProforma,
       if (pdfFooterText != null) 'pdf_footer_text': pdfFooterText,
       if (rowid != null) 'rowid': rowid,
     });
@@ -1130,6 +1295,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<bool>? quotesEnabled,
     Value<bool>? ordersEnabled,
     Value<bool>? deliveryNotesEnabled,
+    Value<bool>? proformaEnabled,
     Value<String?>? pdfIntroText,
     Value<String?>? pdfClosingText,
     Value<String?>? pdfIntroTextQuote,
@@ -1138,6 +1304,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? pdfClosingTextOrder,
     Value<String?>? pdfIntroTextDeliveryNote,
     Value<String?>? pdfClosingTextDeliveryNote,
+    Value<String?>? pdfIntroTextProforma,
+    Value<String?>? pdfClosingTextProforma,
     Value<String?>? pdfFooterText,
     Value<int>? rowid,
   }) {
@@ -1154,6 +1322,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       quotesEnabled: quotesEnabled ?? this.quotesEnabled,
       ordersEnabled: ordersEnabled ?? this.ordersEnabled,
       deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
+      proformaEnabled: proformaEnabled ?? this.proformaEnabled,
       pdfIntroText: pdfIntroText ?? this.pdfIntroText,
       pdfClosingText: pdfClosingText ?? this.pdfClosingText,
       pdfIntroTextQuote: pdfIntroTextQuote ?? this.pdfIntroTextQuote,
@@ -1164,6 +1333,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           pdfIntroTextDeliveryNote ?? this.pdfIntroTextDeliveryNote,
       pdfClosingTextDeliveryNote:
           pdfClosingTextDeliveryNote ?? this.pdfClosingTextDeliveryNote,
+      pdfIntroTextProforma: pdfIntroTextProforma ?? this.pdfIntroTextProforma,
+      pdfClosingTextProforma:
+          pdfClosingTextProforma ?? this.pdfClosingTextProforma,
       pdfFooterText: pdfFooterText ?? this.pdfFooterText,
       rowid: rowid ?? this.rowid,
     );
@@ -1210,6 +1382,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         deliveryNotesEnabled.value,
       );
     }
+    if (proformaEnabled.present) {
+      map['proforma_enabled'] = Variable<bool>(proformaEnabled.value);
+    }
     if (pdfIntroText.present) {
       map['pdf_intro_text'] = Variable<String>(pdfIntroText.value);
     }
@@ -1242,6 +1417,16 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         pdfClosingTextDeliveryNote.value,
       );
     }
+    if (pdfIntroTextProforma.present) {
+      map['pdf_intro_text_proforma'] = Variable<String>(
+        pdfIntroTextProforma.value,
+      );
+    }
+    if (pdfClosingTextProforma.present) {
+      map['pdf_closing_text_proforma'] = Variable<String>(
+        pdfClosingTextProforma.value,
+      );
+    }
     if (pdfFooterText.present) {
       map['pdf_footer_text'] = Variable<String>(pdfFooterText.value);
     }
@@ -1266,6 +1451,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
+          ..write('proformaEnabled: $proformaEnabled, ')
           ..write('pdfIntroText: $pdfIntroText, ')
           ..write('pdfClosingText: $pdfClosingText, ')
           ..write('pdfIntroTextQuote: $pdfIntroTextQuote, ')
@@ -1274,6 +1460,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('pdfClosingTextOrder: $pdfClosingTextOrder, ')
           ..write('pdfIntroTextDeliveryNote: $pdfIntroTextDeliveryNote, ')
           ..write('pdfClosingTextDeliveryNote: $pdfClosingTextDeliveryNote, ')
+          ..write('pdfIntroTextProforma: $pdfIntroTextProforma, ')
+          ..write('pdfClosingTextProforma: $pdfClosingTextProforma, ')
           ..write('pdfFooterText: $pdfFooterText, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -6477,6 +6665,7 @@ typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
   Value<bool> quotesEnabled,
   Value<bool> ordersEnabled,
   Value<bool> deliveryNotesEnabled,
+  Value<bool> proformaEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
   Value<String?> pdfIntroTextQuote,
@@ -6485,6 +6674,8 @@ typedef $$CompaniesTableCreateCompanionBuilder = CompaniesCompanion Function({
   Value<String?> pdfClosingTextOrder,
   Value<String?> pdfIntroTextDeliveryNote,
   Value<String?> pdfClosingTextDeliveryNote,
+  Value<String?> pdfIntroTextProforma,
+  Value<String?> pdfClosingTextProforma,
   Value<String?> pdfFooterText,
   Value<int> rowid,
 });
@@ -6501,6 +6692,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
   Value<bool> quotesEnabled,
   Value<bool> ordersEnabled,
   Value<bool> deliveryNotesEnabled,
+  Value<bool> proformaEnabled,
   Value<String?> pdfIntroText,
   Value<String?> pdfClosingText,
   Value<String?> pdfIntroTextQuote,
@@ -6509,6 +6701,8 @@ typedef $$CompaniesTableUpdateCompanionBuilder = CompaniesCompanion Function({
   Value<String?> pdfClosingTextOrder,
   Value<String?> pdfIntroTextDeliveryNote,
   Value<String?> pdfClosingTextDeliveryNote,
+  Value<String?> pdfIntroTextProforma,
+  Value<String?> pdfClosingTextProforma,
   Value<String?> pdfFooterText,
   Value<int> rowid,
 });
@@ -6699,6 +6893,11 @@ class $$CompaniesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get proformaEnabled => $composableBuilder(
+    column: $table.proformaEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get pdfIntroText => $composableBuilder(
     column: $table.pdfIntroText,
     builder: (column) => ColumnFilters(column),
@@ -6736,6 +6935,16 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<String> get pdfClosingTextDeliveryNote => $composableBuilder(
     column: $table.pdfClosingTextDeliveryNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroTextProforma => $composableBuilder(
+    column: $table.pdfIntroTextProforma,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingTextProforma => $composableBuilder(
+    column: $table.pdfClosingTextProforma,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6964,6 +7173,11 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get proformaEnabled => $composableBuilder(
+    column: $table.proformaEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get pdfIntroText => $composableBuilder(
     column: $table.pdfIntroText,
     builder: (column) => ColumnOrderings(column),
@@ -7001,6 +7215,16 @@ class $$CompaniesTableOrderingComposer
 
   ColumnOrderings<String> get pdfClosingTextDeliveryNote => $composableBuilder(
     column: $table.pdfClosingTextDeliveryNote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfIntroTextProforma => $composableBuilder(
+    column: $table.pdfIntroTextProforma,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingTextProforma => $composableBuilder(
+    column: $table.pdfClosingTextProforma,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7061,6 +7285,11 @@ class $$CompaniesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get proformaEnabled => $composableBuilder(
+    column: $table.proformaEnabled,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get pdfIntroText => $composableBuilder(
     column: $table.pdfIntroText,
     builder: (column) => column,
@@ -7098,6 +7327,16 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<String> get pdfClosingTextDeliveryNote => $composableBuilder(
     column: $table.pdfClosingTextDeliveryNote,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfIntroTextProforma => $composableBuilder(
+    column: $table.pdfIntroTextProforma,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingTextProforma => $composableBuilder(
+    column: $table.pdfClosingTextProforma,
     builder: (column) => column,
   );
 
@@ -7304,6 +7543,7 @@ class $$CompaniesTableTableManager
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
+                Value<bool> proformaEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -7313,6 +7553,8 @@ class $$CompaniesTableTableManager
                 Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
                 Value<String?> pdfClosingTextDeliveryNote =
                     const Value.absent(),
+                Value<String?> pdfIntroTextProforma = const Value.absent(),
+                Value<String?> pdfClosingTextProforma = const Value.absent(),
                 Value<String?> pdfFooterText = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
@@ -7328,6 +7570,7 @@ class $$CompaniesTableTableManager
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
+                proformaEnabled: proformaEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfIntroTextQuote: pdfIntroTextQuote,
@@ -7336,6 +7579,8 @@ class $$CompaniesTableTableManager
                 pdfClosingTextOrder: pdfClosingTextOrder,
                 pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote,
                 pdfClosingTextDeliveryNote: pdfClosingTextDeliveryNote,
+                pdfIntroTextProforma: pdfIntroTextProforma,
+                pdfClosingTextProforma: pdfClosingTextProforma,
                 pdfFooterText: pdfFooterText,
                 rowid: rowid,
               ),
@@ -7353,6 +7598,7 @@ class $$CompaniesTableTableManager
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
+                Value<bool> proformaEnabled = const Value.absent(),
                 Value<String?> pdfIntroText = const Value.absent(),
                 Value<String?> pdfClosingText = const Value.absent(),
                 Value<String?> pdfIntroTextQuote = const Value.absent(),
@@ -7362,6 +7608,8 @@ class $$CompaniesTableTableManager
                 Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
                 Value<String?> pdfClosingTextDeliveryNote =
                     const Value.absent(),
+                Value<String?> pdfIntroTextProforma = const Value.absent(),
+                Value<String?> pdfClosingTextProforma = const Value.absent(),
                 Value<String?> pdfFooterText = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
@@ -7377,6 +7625,7 @@ class $$CompaniesTableTableManager
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
+                proformaEnabled: proformaEnabled,
                 pdfIntroText: pdfIntroText,
                 pdfClosingText: pdfClosingText,
                 pdfIntroTextQuote: pdfIntroTextQuote,
@@ -7385,6 +7634,8 @@ class $$CompaniesTableTableManager
                 pdfClosingTextOrder: pdfClosingTextOrder,
                 pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote,
                 pdfClosingTextDeliveryNote: pdfClosingTextDeliveryNote,
+                pdfIntroTextProforma: pdfIntroTextProforma,
+                pdfClosingTextProforma: pdfClosingTextProforma,
                 pdfFooterText: pdfFooterText,
                 rowid: rowid,
               ),

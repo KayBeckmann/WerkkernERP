@@ -49,6 +49,7 @@ void main() {
         quotesEnabled: false,
         ordersEnabled: false,
         deliveryNotesEnabled: false,
+        proformaEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,
@@ -180,6 +181,24 @@ void main() {
         items: [
           item(description: 'Kabel NYM-J 3x1,5', quantity: '50', price: 150),
           item(description: 'Steckdose', quantity: '4', price: 850),
+        ],
+        company: testCompany(),
+      );
+      expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
+      expect(bytes.length, greaterThan(1000));
+    },
+  );
+
+  test(
+    'C10: Proforma-PDF wird ohne Fehler erzeugt, inklusive Stunden-Position (anders als '
+    'Lieferschein) und mit vollständigen Preisen/Summen wie eine Rechnung',
+    () async {
+      final invoice = draftInvoice(invoiceNumber: 'PF-26001', kind: DocumentKind.proforma);
+      final bytes = await buildInvoicePdf(
+        invoice: invoice,
+        items: [
+          item(description: 'Anzahlung Material'),
+          item(description: 'Vorbereitung', quantity: '2', unit: 'h'),
         ],
         company: testCompany(),
       );

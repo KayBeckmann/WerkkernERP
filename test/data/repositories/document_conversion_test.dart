@@ -273,4 +273,99 @@ void main() {
       expect(convertedDocs.map((i) => i.id).toSet(), {order.id, deliveryNote.id});
     },
   );
+
+  // C10 Proforma-Rechnungen (Kay-Priorisierungsentscheidung 2026-10-17).
+
+  test(
+    'C10-Abnahme: Proforma hat eigenen Nummernkreis mit Präfix PF, unabhängig von R/An/A/LS',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final yy = (DateTime.now().year % 100).toString().padLeft(2, '0');
+
+      final draft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.proforma,
+        items: [textItem('Anzahlung')],
+      );
+      final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+      expect(finalized!.invoiceNumber, 'PF-$yy' '001');
+    },
+  );
+
+  test(
+    'C10: anders als der Lieferschein darf eine Proforma-Rechnung Stunden-Positionen '
+    'enthalten — sie zeigt vollständige Preise/Steuern wie eine Rechnung',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+
+      final draft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.proforma,
+        items: [textItem('Material'), hoursItem('Montage')],
+      );
+      expect(draft.id, isNotEmpty);
+      final items = await invoices.itemsFor(draft.id);
+      expect(items, hasLength(2));
+    },
+  );
+
+  test(
+    'convertTo(): finalisierte Proforma wird zu einem neuen Rechnungs-Entwurf, Stunden-'
+    'Positionen bleiben dabei (anders als bei der Umwandlung in einen Lieferschein) erhalten',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final proformaDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.proforma,
+        items: [textItem('Material'), hoursItem('Montage')],
+      );
+      final proformaFinal = await invoices.finalize(companyId: company.id, id: proformaDraft.id);
+
+      final invoiceDraft = await invoices.convertTo(
+        companyId: company.id,
+        sourceId: proformaFinal!.id,
+        targetKind: DocumentKind.invoice,
+      );
+
+      expect(invoiceDraft.kind, DocumentKind.invoice);
+      expect(invoiceDraft.status, InvoiceStatus.draft);
+      expect(invoiceDraft.convertedFromId, proformaFinal.id);
+      final items = await invoices.itemsFor(invoiceDraft.id);
+      expect(items.map((i) => i.description).toSet(), {'Material', 'Montage'});
+    },
+  );
+
+  test('convertTo(): eine Proforma-Rechnung selbst ist kein gültiges Umwandlungsziel', () async {
+    final company = await companies.create(name: 'Firma A');
+    final customer = await customers.create(companyId: company.id, name: 'Kunde');
+    final invoiceDraft = await invoices.createDraft(
+      companyId: company.id,
+      customerId: customer.id,
+      issueDate: DateTime.now(),
+      serviceDate: DateTime.now(),
+      items: [textItem('Material')],
+    );
+    final invoiceFinal = await invoices.finalize(companyId: company.id, id: invoiceDraft.id);
+
+    expect(
+      () => invoices.convertTo(
+        companyId: company.id,
+        sourceId: invoiceFinal!.id,
+        targetKind: DocumentKind.proforma,
+      ),
+      throwsArgumentError,
+    );
+  });
 }

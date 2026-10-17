@@ -15,7 +15,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// Migrationen dieser App (v1→v2 A5: Angebot/Auftrag; v2→v3: erweiterte
 /// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte; v4→v5:
 /// Lieferschein + Dokumentumwandlung; v5→v6: Einheit + Rabatt pro
-/// Position; v6→v7: PDF-Texte pro Dokumentart). Statt das Spaltentyp-/
+/// Position; v6→v7: PDF-Texte pro Dokumentart; v7→v8: C10
+/// Proforma-Rechnungen). Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
 /// dann über `ALTER TABLE ... DROP COLUMN` mechanisch auf den exakten
@@ -38,9 +39,10 @@ void main() {
   });
 
   test(
-    'Migration v1→v7 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
-    'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart): Bestandsdaten bekommen '
-    'automatisch die neuen Default-Werte — ohne Datenverlust an bestehenden Spalten',
+    'Migration v1→v8 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen): '
+    'Bestandsdaten bekommen automatisch die neuen Default-Werte — ohne Datenverlust an '
+    'bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
       // (reales onCreate, drifts eigene DDL).
@@ -110,6 +112,10 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_order;');
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_delivery_note;');
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_delivery_note;');
+      // v7 -> v8 (C10 Proforma-Rechnungen):
+      raw.execute('ALTER TABLE companies DROP COLUMN proforma_enabled;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_proforma;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_proforma;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -134,6 +140,9 @@ void main() {
         expect(migratedCompany.pdfClosingTextOrder, isNull);
         expect(migratedCompany.pdfIntroTextDeliveryNote, isNull);
         expect(migratedCompany.pdfClosingTextDeliveryNote, isNull);
+        expect(migratedCompany.proformaEnabled, isFalse);
+        expect(migratedCompany.pdfIntroTextProforma, isNull);
+        expect(migratedCompany.pdfClosingTextProforma, isNull);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =

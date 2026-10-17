@@ -170,6 +170,7 @@ String? _introTextFor(Company company, DocumentKind kind) => switch (kind) {
       DocumentKind.quote => company.pdfIntroTextQuote,
       DocumentKind.order => company.pdfIntroTextOrder,
       DocumentKind.deliveryNote => company.pdfIntroTextDeliveryNote,
+      DocumentKind.proforma => company.pdfIntroTextProforma,
     };
 
 String? _closingTextFor(Company company, DocumentKind kind) => switch (kind) {
@@ -177,6 +178,7 @@ String? _closingTextFor(Company company, DocumentKind kind) => switch (kind) {
       DocumentKind.quote => company.pdfClosingTextQuote,
       DocumentKind.order => company.pdfClosingTextOrder,
       DocumentKind.deliveryNote => company.pdfClosingTextDeliveryNote,
+      DocumentKind.proforma => company.pdfClosingTextProforma,
     };
 
 /// Titel je Dokumentart.
@@ -185,6 +187,7 @@ String _title(DocumentKind kind) => switch (kind) {
       DocumentKind.quote => 'Angebot',
       DocumentKind.order => 'Auftrag',
       DocumentKind.deliveryNote => 'Lieferschein',
+      DocumentKind.proforma => 'Proforma-Rechnung',
     };
 
 /// "Rechnungsdatum"/"Angebotsdatum"/"Auftragsdatum"/"Lieferscheindatum"
@@ -192,6 +195,7 @@ String _title(DocumentKind kind) => switch (kind) {
 /// Fugen-s), daher eine eigene Funktion statt `'${_title(kind)}sdatum'`.
 String _dateLabel(DocumentKind kind) => switch (kind) {
       DocumentKind.deliveryNote => 'Lieferscheindatum',
+      DocumentKind.proforma => 'Datum',
       _ => '${_title(kind)}sdatum',
     };
 
@@ -210,6 +214,27 @@ pw.Widget _buildHeader(Invoice invoice, {required bool isPreview}) {
             child: pw.Text(
               'ENTWURF — unverbindliche Vorschau, kein gültiges Dokument',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.red900, fontSize: 11),
+            ),
+          ),
+        ),
+      // C10 (Kay-Priorisierungsentscheidung 2026-10-17): fester, nicht
+      // entfernbarer Rechtshinweis zusätzlich zum normalen editierbaren
+      // Einleitungstext — der Hinweis darf nicht versehentlich durch
+      // einen frei editierten Text verdrängt werden können (siehe
+      // Roadmap-Begründung bei C10). Keine Rechtsprüfung, nur üblicher
+      // Marktstandard für Proforma-Dokumente.
+      if (invoice.kind == DocumentKind.proforma)
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.symmetric(vertical: 4),
+          margin: const pw.EdgeInsets.only(bottom: 8),
+          decoration: const pw.BoxDecoration(color: PdfColors.amber100),
+          child: pw.Center(
+            child: pw.Text(
+              'Diese Proforma-Rechnung ist keine Rechnung im umsatzsteuerrechtlichen Sinne '
+              'und keine Zahlungsaufforderung mit eigenem, umsatzsteuerlich relevantem Nummernkreis.',
+              textAlign: pw.TextAlign.center,
+              style: const pw.TextStyle(color: PdfColors.brown800, fontSize: 8),
             ),
           ),
         ),
