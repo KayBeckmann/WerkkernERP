@@ -53,6 +53,18 @@ void main() {
   ExpenseCategory categoryWith({required String id, required String label, String? skr03Account}) =>
       ExpenseCategory(id: id, companyId: 'company-1', label: label, skr03Account: skr03Account, createdAt: DateTime.now());
 
+  VehicleCostEntry vehicleCostWith({required DateTime date, required int cents}) => VehicleCostEntry(
+        id: 'cost-${date.toIso8601String()}-$cents',
+        companyId: 'company-1',
+        vehicleId: 'vehicle-1',
+        date: date,
+        amountCents: cents,
+        category: VehicleCostCategory.fuel,
+        description: null,
+        projectId: null,
+        createdAt: date,
+      );
+
   test('nur Einnahmen/Ausgaben innerhalb des Zeitraums werden berücksichtigt', () {
     final summary = computeEuerSummary(
       allFinalizedInvoices: [
@@ -113,6 +125,55 @@ void main() {
     expect(summary.expensesByCategory.single.categoryLabel, 'Ohne Kategorie');
     expect(summary.expensesByCategory.single.total, Money.fromCents(1500));
   });
+
+  test(
+    'Kay-Entscheidung 2026-10-19 ("Fuhrpark wird auf Gemeinkosten gerechnet, nicht auf die '
+    'Projekte"): Fahrzeugkosten erscheinen als eigene Kategorie "Fuhrpark (Gemeinkosten)" ohne '
+    'SKR03-Konto, zusätzlich zu den Belege-Kategorien',
+    () {
+      final categoryById = {
+        'material': categoryWith(id: 'material', label: 'Material', skr03Account: '4200'),
+      };
+      final summary = computeEuerSummary(
+        allFinalizedInvoices: const [],
+        allExpenses: [
+          expenseWith(date: DateTime(2026, 10, 1), cents: 1000, categoryId: 'material'),
+        ],
+        categoryById: categoryById,
+        periodStart: DateTime(2026, 10, 1),
+        periodEnd: DateTime(2026, 10, 31),
+        allVehicleCostEntries: [
+          vehicleCostWith(date: DateTime(2026, 10, 5), cents: 5000),
+          vehicleCostWith(date: DateTime(2026, 10, 15), cents: 2500),
+          // außerhalb des Zeitraums -> wird ignoriert.
+          vehicleCostWith(date: DateTime(2026, 11, 1), cents: 99999),
+        ],
+      );
+
+      expect(summary.expensesByCategory.length, 2);
+      final fleet = summary.expensesByCategory.firstWhere((c) => c.categoryLabel == 'Fuhrpark (Gemeinkosten)');
+      expect(fleet.total, Money.fromCents(7500));
+      expect(fleet.skr03Account, isNull);
+      expect(summary.totalExpenses, Money.fromCents(8500), reason: '1000 Beleg + 7500 Fuhrpark');
+    },
+  );
+
+  test(
+    'Ohne Fuhrpark-Kostenbuchungen (Modul deaktiviert, leere Liste) bleibt das Verhalten '
+    'unverändert — keine zusätzliche Kategorie',
+    () {
+      final summary = computeEuerSummary(
+        allFinalizedInvoices: const [],
+        allExpenses: [expenseWith(date: DateTime(2026, 10, 1), cents: 1000, categoryId: 'material')],
+        categoryById: {'material': categoryWith(id: 'material', label: 'Material')},
+        periodStart: DateTime(2026, 10, 1),
+        periodEnd: DateTime(2026, 10, 31),
+      );
+
+      expect(summary.expensesByCategory.length, 1);
+      expect(summary.expensesByCategory.single.categoryLabel, 'Material');
+    },
+  );
 
   test('surplus kann negativ sein, wenn Ausgaben die Einnahmen übersteigen', () {
     final summary = computeEuerSummary(

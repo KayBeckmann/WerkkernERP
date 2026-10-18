@@ -8,6 +8,7 @@ import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/data/repositories/customer_repository.dart';
 import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
+import 'package:werkkernerp/data/repositories/vehicle_repository.dart';
 import 'package:werkkernerp/main.dart';
 import 'package:werkkernerp/ui/widgets/sidebar_nav_item.dart';
 
@@ -83,6 +84,51 @@ void main() {
       expect(find.text('119,00 €'), findsOneWidget);
       expect(find.text('59,50 €'), findsWidgets);
       expect(find.text('Ohne Kategorie'), findsOneWidget);
+
+      await db.close();
+    },
+  );
+
+  testWidgets(
+    'Kay-Entscheidung 2026-10-19 ("Fuhrpark wird auf Gemeinkosten gerechnet, nicht auf die '
+    'Projekte"): aktiviertes Fuhrpark-Modul zeigt Fahrzeugkosten als eigene Kategorie '
+    '"Fuhrpark (Gemeinkosten)" in der EÜR-Übersicht',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final db = AppDatabase.forTesting(
+        NativeDatabase.memory(setup: (rawDb) => rawDb.execute('PRAGMA foreign_keys = ON;')),
+      );
+      final companyRepo = CompanyRepository(db);
+      final vehicleRepo = VehicleRepository(db);
+
+      final company = await companyRepo.create(name: 'Elektro Beckmann');
+      await companyRepo.update(company.copyWith(buchhaltungEnabled: true, fleetEnabled: true));
+      final vehicle = await vehicleRepo.create(companyId: company.id, name: 'Transporter 1');
+      await vehicleRepo.addCostEntry(
+        companyId: company.id,
+        vehicleId: vehicle.id,
+        date: DateTime.now(),
+        amountCents: 4500,
+        category: VehicleCostCategory.fuel,
+      );
+
+      await tester.pumpWidget(WerkkernErpApp(database: db));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Elektro Beckmann'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(_sidebarItem('EÜR-Übersicht'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Aktualisieren'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fuhrpark (Gemeinkosten)'), findsOneWidget);
+      expect(find.text('45,00 €'), findsWidgets, reason: 'Gesamtausgaben + Kategoriezeile');
+      // Keine SKR03-Kontozeile für die Fuhrpark-Kategorie (null).
+      expect(find.textContaining('SKR03-Konto'), findsNothing);
 
       await db.close();
     },

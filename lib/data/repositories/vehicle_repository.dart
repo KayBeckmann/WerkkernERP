@@ -69,6 +69,17 @@ class VehicleRepository {
             ..orderBy([(c) => OrderingTerm.desc(c.date)]))
           .get();
 
+  /// Alle Kostenbuchungen einer Firma, über ALLE Fahrzeuge hinweg — für
+  /// die C14.3 EÜR-Übersicht (Kay-Entscheidung 2026-10-19: "Fuhrpark
+  /// wird auf Gemeinkosten gerechnet, nicht auf die Projekte"). Bewusst
+  /// ohne Projektfilter — [VehicleCostEntry.projectId] bleibt reine
+  /// Markierung, siehe Doc-Kommentar bei [Vehicles] in tables.dart.
+  Future<List<VehicleCostEntry>> listAllCostsForCompany(String companyId) =>
+      (_db.select(_db.vehicleCostEntries)
+            ..where((c) => c.companyId.equals(companyId))
+            ..orderBy([(c) => OrderingTerm.desc(c.date)]))
+          .get();
+
   Future<VehicleCostEntry> addCostEntry({
     required String companyId,
     required String vehicleId,

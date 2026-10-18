@@ -54,12 +54,22 @@ bool _withinPeriod(DateTime date, DateTime start, DateTime end) =>
 /// Filtert UND aggregiert in einem Schritt — bewusst die vollen Listen
 /// übergeben (nicht vorgefiltert), damit die UI den Zeitraum wechseln
 /// kann, ohne erneut aus der Datenbank laden zu müssen.
+///
+/// [allVehicleCostEntries] ist optional (leere Liste, wenn C6 Fuhrpark
+/// nicht aktiviert ist) — Kay-Entscheidung 2026-10-19: "Fuhrpark wird
+/// auf Gemeinkosten gerechnet, nicht auf die Projekte." Die Kosten
+/// fließen deshalb als eigene Gemeinkosten-Kategorie "Fuhrpark
+/// (Gemeinkosten)" in die Ausgaben ein, **ohne** Verteilungsschlüssel
+/// auf Projekte — [VehicleCostEntry.projectId] bleibt dafür bewusst
+/// unberücksichtigt (reine Markierung, siehe Doc-Kommentar bei
+/// [Vehicles] in tables.dart).
 EuerSummary computeEuerSummary({
   required List<InvoiceWithGross> allFinalizedInvoices,
   required List<Expense> allExpenses,
   required Map<String, ExpenseCategory> categoryById,
   required DateTime periodStart,
   required DateTime periodEnd,
+  List<VehicleCostEntry> allVehicleCostEntries = const [],
 }) {
   var totalIncome = Money.zero();
   for (final entry in allFinalizedInvoices) {
@@ -75,11 +85,22 @@ EuerSummary computeEuerSummary({
     byCategory[key] = (byCategory[key] ?? Money.zero()) + Money.fromCents(expense.amountGrossCents);
   }
 
+  // Fuhrparkkosten als eigene Gemeinkosten-Kategorie, nicht als Beleg
+  // erfasst — eigener Sentinel-Schlüssel, der nie mit einer echten
+  // Expense-Kategorie-UUID kollidiert.
+  const fleetCategoryKey = '__fleet_overhead__';
+  for (final cost in allVehicleCostEntries) {
+    if (!_withinPeriod(cost.date, periodStart, periodEnd)) continue;
+    byCategory[fleetCategoryKey] = (byCategory[fleetCategoryKey] ?? Money.zero()) + Money.fromCents(cost.amountCents);
+  }
+
   final categoryTotals = [
     for (final entry in byCategory.entries)
       EuerCategoryTotal(
-        categoryLabel: categoryById[entry.key]?.label ?? 'Ohne Kategorie',
-        skr03Account: categoryById[entry.key]?.skr03Account,
+        categoryLabel: entry.key == fleetCategoryKey
+            ? 'Fuhrpark (Gemeinkosten)'
+            : categoryById[entry.key]?.label ?? 'Ohne Kategorie',
+        skr03Account: entry.key == fleetCategoryKey ? null : categoryById[entry.key]?.skr03Account,
         total: entry.value,
       ),
   ]..sort((a, b) => b.total.cents.compareTo(a.total.cents));
