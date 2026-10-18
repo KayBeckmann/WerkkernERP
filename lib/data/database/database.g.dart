@@ -588,6 +588,102 @@ class $CompaniesTable extends Companies
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _bankCsvDelimiterMeta = const VerificationMeta(
+    'bankCsvDelimiter',
+  );
+  @override
+  late final GeneratedColumn<String> bankCsvDelimiter = GeneratedColumn<String>(
+    'bank_csv_delimiter',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(';'),
+  );
+  static const VerificationMeta _bankCsvHasHeaderRowMeta =
+      const VerificationMeta('bankCsvHasHeaderRow');
+  @override
+  late final GeneratedColumn<bool> bankCsvHasHeaderRow = GeneratedColumn<bool>(
+    'bank_csv_has_header_row',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("bank_csv_has_header_row" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _bankCsvDateColumnMeta = const VerificationMeta(
+    'bankCsvDateColumn',
+  );
+  @override
+  late final GeneratedColumn<String> bankCsvDateColumn =
+      GeneratedColumn<String>(
+        'bank_csv_date_column',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _bankCsvAmountColumnMeta =
+      const VerificationMeta('bankCsvAmountColumn');
+  @override
+  late final GeneratedColumn<String> bankCsvAmountColumn =
+      GeneratedColumn<String>(
+        'bank_csv_amount_column',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _bankCsvPurposeColumnMeta =
+      const VerificationMeta('bankCsvPurposeColumn');
+  @override
+  late final GeneratedColumn<String> bankCsvPurposeColumn =
+      GeneratedColumn<String>(
+        'bank_csv_purpose_column',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _bankCsvCounterpartyColumnMeta =
+      const VerificationMeta('bankCsvCounterpartyColumn');
+  @override
+  late final GeneratedColumn<String> bankCsvCounterpartyColumn =
+      GeneratedColumn<String>(
+        'bank_csv_counterparty_column',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _bankCsvDateFormatMeta = const VerificationMeta(
+    'bankCsvDateFormat',
+  );
+  @override
+  late final GeneratedColumn<String> bankCsvDateFormat =
+      GeneratedColumn<String>(
+        'bank_csv_date_format',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('dd.MM.yyyy'),
+      );
+  static const VerificationMeta _bankCsvDecimalSeparatorMeta =
+      const VerificationMeta('bankCsvDecimalSeparator');
+  @override
+  late final GeneratedColumn<String> bankCsvDecimalSeparator =
+      GeneratedColumn<String>(
+        'bank_csv_decimal_separator',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(','),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -639,6 +735,14 @@ class $CompaniesTable extends Companies
     smtpDunningSubjectTemplate,
     smtpDunningBodyTemplate,
     buchhaltungEnabled,
+    bankCsvDelimiter,
+    bankCsvHasHeaderRow,
+    bankCsvDateColumn,
+    bankCsvAmountColumn,
+    bankCsvPurposeColumn,
+    bankCsvCounterpartyColumn,
+    bankCsvDateFormat,
+    bankCsvDecimalSeparator,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1063,6 +1167,78 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('bank_csv_delimiter')) {
+      context.handle(
+        _bankCsvDelimiterMeta,
+        bankCsvDelimiter.isAcceptableOrUnknown(
+          data['bank_csv_delimiter']!,
+          _bankCsvDelimiterMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_csv_has_header_row')) {
+      context.handle(
+        _bankCsvHasHeaderRowMeta,
+        bankCsvHasHeaderRow.isAcceptableOrUnknown(
+          data['bank_csv_has_header_row']!,
+          _bankCsvHasHeaderRowMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_csv_date_column')) {
+      context.handle(
+        _bankCsvDateColumnMeta,
+        bankCsvDateColumn.isAcceptableOrUnknown(
+          data['bank_csv_date_column']!,
+          _bankCsvDateColumnMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_csv_amount_column')) {
+      context.handle(
+        _bankCsvAmountColumnMeta,
+        bankCsvAmountColumn.isAcceptableOrUnknown(
+          data['bank_csv_amount_column']!,
+          _bankCsvAmountColumnMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_csv_purpose_column')) {
+      context.handle(
+        _bankCsvPurposeColumnMeta,
+        bankCsvPurposeColumn.isAcceptableOrUnknown(
+          data['bank_csv_purpose_column']!,
+          _bankCsvPurposeColumnMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_csv_counterparty_column')) {
+      context.handle(
+        _bankCsvCounterpartyColumnMeta,
+        bankCsvCounterpartyColumn.isAcceptableOrUnknown(
+          data['bank_csv_counterparty_column']!,
+          _bankCsvCounterpartyColumnMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_csv_date_format')) {
+      context.handle(
+        _bankCsvDateFormatMeta,
+        bankCsvDateFormat.isAcceptableOrUnknown(
+          data['bank_csv_date_format']!,
+          _bankCsvDateFormatMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bank_csv_decimal_separator')) {
+      context.handle(
+        _bankCsvDecimalSeparatorMeta,
+        bankCsvDecimalSeparator.isAcceptableOrUnknown(
+          data['bank_csv_decimal_separator']!,
+          _bankCsvDecimalSeparatorMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1268,6 +1444,38 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}buchhaltung_enabled'],
       )!,
+      bankCsvDelimiter: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_csv_delimiter'],
+      )!,
+      bankCsvHasHeaderRow: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}bank_csv_has_header_row'],
+      )!,
+      bankCsvDateColumn: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_csv_date_column'],
+      ),
+      bankCsvAmountColumn: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_csv_amount_column'],
+      ),
+      bankCsvPurposeColumn: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_csv_purpose_column'],
+      ),
+      bankCsvCounterpartyColumn: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_csv_counterparty_column'],
+      ),
+      bankCsvDateFormat: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_csv_date_format'],
+      )!,
+      bankCsvDecimalSeparator: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bank_csv_decimal_separator'],
+      )!,
     );
   }
 
@@ -1412,6 +1620,29 @@ class Company extends DataClass implements Insertable<Company> {
   /// sie als ein zusammenhängendes Modul angefragt hat, nicht als
   /// unabhängige Funktionen.
   final bool buchhaltungEnabled;
+
+  /// C14.4 Bankabgleich per CSV (Kay-Priorisierungsentscheidung
+  /// 2026-10-18: CSV statt MT940, trotz des höheren Aufwands bewusst so
+  /// gewählt — jede Bank hat ein eigenes CSV-Spaltenschema, deshalb
+  /// konfigurierbare Spaltenzuordnung statt eines bankspezifischen
+  /// Parsers). `bankCsvDateColumn`/`bankCsvAmountColumn`/... sind je
+  /// nach `bankCsvHasHeaderRow` entweder Spaltenüberschriften (Text)
+  /// oder nullbasierte Spaltenindizes (als Text gespeichert, z. B.
+  /// "2") — beides Freitext, damit kein zweites Spaltenpaar für die
+  /// beiden Fälle nötig ist.
+  final String bankCsvDelimiter;
+  final bool bankCsvHasHeaderRow;
+  final String? bankCsvDateColumn;
+  final String? bankCsvAmountColumn;
+  final String? bankCsvPurposeColumn;
+  final String? bankCsvCounterpartyColumn;
+
+  /// `intl`-Musterformat, z. B. `dd.MM.yyyy` oder `yyyy-MM-dd`.
+  final String bankCsvDateFormat;
+
+  /// `,` (deutsch, Standard) oder `.` (englisch/US) als Dezimaltrenner
+  /// im Betragsfeld der CSV-Datei.
+  final String bankCsvDecimalSeparator;
   const Company({
     required this.id,
     required this.name,
@@ -1462,6 +1693,14 @@ class Company extends DataClass implements Insertable<Company> {
     this.smtpDunningSubjectTemplate,
     this.smtpDunningBodyTemplate,
     required this.buchhaltungEnabled,
+    required this.bankCsvDelimiter,
+    required this.bankCsvHasHeaderRow,
+    this.bankCsvDateColumn,
+    this.bankCsvAmountColumn,
+    this.bankCsvPurposeColumn,
+    this.bankCsvCounterpartyColumn,
+    required this.bankCsvDateFormat,
+    required this.bankCsvDecimalSeparator,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1593,6 +1832,26 @@ class Company extends DataClass implements Insertable<Company> {
       );
     }
     map['buchhaltung_enabled'] = Variable<bool>(buchhaltungEnabled);
+    map['bank_csv_delimiter'] = Variable<String>(bankCsvDelimiter);
+    map['bank_csv_has_header_row'] = Variable<bool>(bankCsvHasHeaderRow);
+    if (!nullToAbsent || bankCsvDateColumn != null) {
+      map['bank_csv_date_column'] = Variable<String>(bankCsvDateColumn);
+    }
+    if (!nullToAbsent || bankCsvAmountColumn != null) {
+      map['bank_csv_amount_column'] = Variable<String>(bankCsvAmountColumn);
+    }
+    if (!nullToAbsent || bankCsvPurposeColumn != null) {
+      map['bank_csv_purpose_column'] = Variable<String>(bankCsvPurposeColumn);
+    }
+    if (!nullToAbsent || bankCsvCounterpartyColumn != null) {
+      map['bank_csv_counterparty_column'] = Variable<String>(
+        bankCsvCounterpartyColumn,
+      );
+    }
+    map['bank_csv_date_format'] = Variable<String>(bankCsvDateFormat);
+    map['bank_csv_decimal_separator'] = Variable<String>(
+      bankCsvDecimalSeparator,
+    );
     return map;
   }
 
@@ -1702,6 +1961,23 @@ class Company extends DataClass implements Insertable<Company> {
           ? const Value.absent()
           : Value(smtpDunningBodyTemplate),
       buchhaltungEnabled: Value(buchhaltungEnabled),
+      bankCsvDelimiter: Value(bankCsvDelimiter),
+      bankCsvHasHeaderRow: Value(bankCsvHasHeaderRow),
+      bankCsvDateColumn: bankCsvDateColumn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankCsvDateColumn),
+      bankCsvAmountColumn: bankCsvAmountColumn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankCsvAmountColumn),
+      bankCsvPurposeColumn: bankCsvPurposeColumn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankCsvPurposeColumn),
+      bankCsvCounterpartyColumn:
+          bankCsvCounterpartyColumn == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankCsvCounterpartyColumn),
+      bankCsvDateFormat: Value(bankCsvDateFormat),
+      bankCsvDecimalSeparator: Value(bankCsvDecimalSeparator),
     );
   }
 
@@ -1806,6 +2082,26 @@ class Company extends DataClass implements Insertable<Company> {
         json['smtpDunningBodyTemplate'],
       ),
       buchhaltungEnabled: serializer.fromJson<bool>(json['buchhaltungEnabled']),
+      bankCsvDelimiter: serializer.fromJson<String>(json['bankCsvDelimiter']),
+      bankCsvHasHeaderRow: serializer.fromJson<bool>(
+        json['bankCsvHasHeaderRow'],
+      ),
+      bankCsvDateColumn: serializer.fromJson<String?>(
+        json['bankCsvDateColumn'],
+      ),
+      bankCsvAmountColumn: serializer.fromJson<String?>(
+        json['bankCsvAmountColumn'],
+      ),
+      bankCsvPurposeColumn: serializer.fromJson<String?>(
+        json['bankCsvPurposeColumn'],
+      ),
+      bankCsvCounterpartyColumn: serializer.fromJson<String?>(
+        json['bankCsvCounterpartyColumn'],
+      ),
+      bankCsvDateFormat: serializer.fromJson<String>(json['bankCsvDateFormat']),
+      bankCsvDecimalSeparator: serializer.fromJson<String>(
+        json['bankCsvDecimalSeparator'],
+      ),
     );
   }
   @override
@@ -1887,6 +2183,18 @@ class Company extends DataClass implements Insertable<Company> {
         smtpDunningBodyTemplate,
       ),
       'buchhaltungEnabled': serializer.toJson<bool>(buchhaltungEnabled),
+      'bankCsvDelimiter': serializer.toJson<String>(bankCsvDelimiter),
+      'bankCsvHasHeaderRow': serializer.toJson<bool>(bankCsvHasHeaderRow),
+      'bankCsvDateColumn': serializer.toJson<String?>(bankCsvDateColumn),
+      'bankCsvAmountColumn': serializer.toJson<String?>(bankCsvAmountColumn),
+      'bankCsvPurposeColumn': serializer.toJson<String?>(bankCsvPurposeColumn),
+      'bankCsvCounterpartyColumn': serializer.toJson<String?>(
+        bankCsvCounterpartyColumn,
+      ),
+      'bankCsvDateFormat': serializer.toJson<String>(bankCsvDateFormat),
+      'bankCsvDecimalSeparator': serializer.toJson<String>(
+        bankCsvDecimalSeparator,
+      ),
     };
   }
 
@@ -1940,6 +2248,14 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> smtpDunningSubjectTemplate = const Value.absent(),
     Value<String?> smtpDunningBodyTemplate = const Value.absent(),
     bool? buchhaltungEnabled,
+    String? bankCsvDelimiter,
+    bool? bankCsvHasHeaderRow,
+    Value<String?> bankCsvDateColumn = const Value.absent(),
+    Value<String?> bankCsvAmountColumn = const Value.absent(),
+    Value<String?> bankCsvPurposeColumn = const Value.absent(),
+    Value<String?> bankCsvCounterpartyColumn = const Value.absent(),
+    String? bankCsvDateFormat,
+    String? bankCsvDecimalSeparator,
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2029,6 +2345,23 @@ class Company extends DataClass implements Insertable<Company> {
         ? smtpDunningBodyTemplate.value
         : this.smtpDunningBodyTemplate,
     buchhaltungEnabled: buchhaltungEnabled ?? this.buchhaltungEnabled,
+    bankCsvDelimiter: bankCsvDelimiter ?? this.bankCsvDelimiter,
+    bankCsvHasHeaderRow: bankCsvHasHeaderRow ?? this.bankCsvHasHeaderRow,
+    bankCsvDateColumn: bankCsvDateColumn.present
+        ? bankCsvDateColumn.value
+        : this.bankCsvDateColumn,
+    bankCsvAmountColumn: bankCsvAmountColumn.present
+        ? bankCsvAmountColumn.value
+        : this.bankCsvAmountColumn,
+    bankCsvPurposeColumn: bankCsvPurposeColumn.present
+        ? bankCsvPurposeColumn.value
+        : this.bankCsvPurposeColumn,
+    bankCsvCounterpartyColumn: bankCsvCounterpartyColumn.present
+        ? bankCsvCounterpartyColumn.value
+        : this.bankCsvCounterpartyColumn,
+    bankCsvDateFormat: bankCsvDateFormat ?? this.bankCsvDateFormat,
+    bankCsvDecimalSeparator:
+        bankCsvDecimalSeparator ?? this.bankCsvDecimalSeparator,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -2157,6 +2490,30 @@ class Company extends DataClass implements Insertable<Company> {
       buchhaltungEnabled: data.buchhaltungEnabled.present
           ? data.buchhaltungEnabled.value
           : this.buchhaltungEnabled,
+      bankCsvDelimiter: data.bankCsvDelimiter.present
+          ? data.bankCsvDelimiter.value
+          : this.bankCsvDelimiter,
+      bankCsvHasHeaderRow: data.bankCsvHasHeaderRow.present
+          ? data.bankCsvHasHeaderRow.value
+          : this.bankCsvHasHeaderRow,
+      bankCsvDateColumn: data.bankCsvDateColumn.present
+          ? data.bankCsvDateColumn.value
+          : this.bankCsvDateColumn,
+      bankCsvAmountColumn: data.bankCsvAmountColumn.present
+          ? data.bankCsvAmountColumn.value
+          : this.bankCsvAmountColumn,
+      bankCsvPurposeColumn: data.bankCsvPurposeColumn.present
+          ? data.bankCsvPurposeColumn.value
+          : this.bankCsvPurposeColumn,
+      bankCsvCounterpartyColumn: data.bankCsvCounterpartyColumn.present
+          ? data.bankCsvCounterpartyColumn.value
+          : this.bankCsvCounterpartyColumn,
+      bankCsvDateFormat: data.bankCsvDateFormat.present
+          ? data.bankCsvDateFormat.value
+          : this.bankCsvDateFormat,
+      bankCsvDecimalSeparator: data.bankCsvDecimalSeparator.present
+          ? data.bankCsvDecimalSeparator.value
+          : this.bankCsvDecimalSeparator,
     );
   }
 
@@ -2213,7 +2570,15 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('smtpInvoiceBodyTemplate: $smtpInvoiceBodyTemplate, ')
           ..write('smtpDunningSubjectTemplate: $smtpDunningSubjectTemplate, ')
           ..write('smtpDunningBodyTemplate: $smtpDunningBodyTemplate, ')
-          ..write('buchhaltungEnabled: $buchhaltungEnabled')
+          ..write('buchhaltungEnabled: $buchhaltungEnabled, ')
+          ..write('bankCsvDelimiter: $bankCsvDelimiter, ')
+          ..write('bankCsvHasHeaderRow: $bankCsvHasHeaderRow, ')
+          ..write('bankCsvDateColumn: $bankCsvDateColumn, ')
+          ..write('bankCsvAmountColumn: $bankCsvAmountColumn, ')
+          ..write('bankCsvPurposeColumn: $bankCsvPurposeColumn, ')
+          ..write('bankCsvCounterpartyColumn: $bankCsvCounterpartyColumn, ')
+          ..write('bankCsvDateFormat: $bankCsvDateFormat, ')
+          ..write('bankCsvDecimalSeparator: $bankCsvDecimalSeparator')
           ..write(')'))
         .toString();
   }
@@ -2269,6 +2634,14 @@ class Company extends DataClass implements Insertable<Company> {
     smtpDunningSubjectTemplate,
     smtpDunningBodyTemplate,
     buchhaltungEnabled,
+    bankCsvDelimiter,
+    bankCsvHasHeaderRow,
+    bankCsvDateColumn,
+    bankCsvAmountColumn,
+    bankCsvPurposeColumn,
+    bankCsvCounterpartyColumn,
+    bankCsvDateFormat,
+    bankCsvDecimalSeparator,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2323,7 +2696,15 @@ class Company extends DataClass implements Insertable<Company> {
           other.smtpInvoiceBodyTemplate == this.smtpInvoiceBodyTemplate &&
           other.smtpDunningSubjectTemplate == this.smtpDunningSubjectTemplate &&
           other.smtpDunningBodyTemplate == this.smtpDunningBodyTemplate &&
-          other.buchhaltungEnabled == this.buchhaltungEnabled);
+          other.buchhaltungEnabled == this.buchhaltungEnabled &&
+          other.bankCsvDelimiter == this.bankCsvDelimiter &&
+          other.bankCsvHasHeaderRow == this.bankCsvHasHeaderRow &&
+          other.bankCsvDateColumn == this.bankCsvDateColumn &&
+          other.bankCsvAmountColumn == this.bankCsvAmountColumn &&
+          other.bankCsvPurposeColumn == this.bankCsvPurposeColumn &&
+          other.bankCsvCounterpartyColumn == this.bankCsvCounterpartyColumn &&
+          other.bankCsvDateFormat == this.bankCsvDateFormat &&
+          other.bankCsvDecimalSeparator == this.bankCsvDecimalSeparator);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -2376,6 +2757,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> smtpDunningSubjectTemplate;
   final Value<String?> smtpDunningBodyTemplate;
   final Value<bool> buchhaltungEnabled;
+  final Value<String> bankCsvDelimiter;
+  final Value<bool> bankCsvHasHeaderRow;
+  final Value<String?> bankCsvDateColumn;
+  final Value<String?> bankCsvAmountColumn;
+  final Value<String?> bankCsvPurposeColumn;
+  final Value<String?> bankCsvCounterpartyColumn;
+  final Value<String> bankCsvDateFormat;
+  final Value<String> bankCsvDecimalSeparator;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -2427,6 +2816,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.smtpDunningSubjectTemplate = const Value.absent(),
     this.smtpDunningBodyTemplate = const Value.absent(),
     this.buchhaltungEnabled = const Value.absent(),
+    this.bankCsvDelimiter = const Value.absent(),
+    this.bankCsvHasHeaderRow = const Value.absent(),
+    this.bankCsvDateColumn = const Value.absent(),
+    this.bankCsvAmountColumn = const Value.absent(),
+    this.bankCsvPurposeColumn = const Value.absent(),
+    this.bankCsvCounterpartyColumn = const Value.absent(),
+    this.bankCsvDateFormat = const Value.absent(),
+    this.bankCsvDecimalSeparator = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -2479,6 +2876,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.smtpDunningSubjectTemplate = const Value.absent(),
     this.smtpDunningBodyTemplate = const Value.absent(),
     this.buchhaltungEnabled = const Value.absent(),
+    this.bankCsvDelimiter = const Value.absent(),
+    this.bankCsvHasHeaderRow = const Value.absent(),
+    this.bankCsvDateColumn = const Value.absent(),
+    this.bankCsvAmountColumn = const Value.absent(),
+    this.bankCsvPurposeColumn = const Value.absent(),
+    this.bankCsvCounterpartyColumn = const Value.absent(),
+    this.bankCsvDateFormat = const Value.absent(),
+    this.bankCsvDecimalSeparator = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -2533,6 +2938,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? smtpDunningSubjectTemplate,
     Expression<String>? smtpDunningBodyTemplate,
     Expression<bool>? buchhaltungEnabled,
+    Expression<String>? bankCsvDelimiter,
+    Expression<bool>? bankCsvHasHeaderRow,
+    Expression<String>? bankCsvDateColumn,
+    Expression<String>? bankCsvAmountColumn,
+    Expression<String>? bankCsvPurposeColumn,
+    Expression<String>? bankCsvCounterpartyColumn,
+    Expression<String>? bankCsvDateFormat,
+    Expression<String>? bankCsvDecimalSeparator,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2606,6 +3019,19 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (smtpDunningBodyTemplate != null)
         'smtp_dunning_body_template': smtpDunningBodyTemplate,
       if (buchhaltungEnabled != null) 'buchhaltung_enabled': buchhaltungEnabled,
+      if (bankCsvDelimiter != null) 'bank_csv_delimiter': bankCsvDelimiter,
+      if (bankCsvHasHeaderRow != null)
+        'bank_csv_has_header_row': bankCsvHasHeaderRow,
+      if (bankCsvDateColumn != null) 'bank_csv_date_column': bankCsvDateColumn,
+      if (bankCsvAmountColumn != null)
+        'bank_csv_amount_column': bankCsvAmountColumn,
+      if (bankCsvPurposeColumn != null)
+        'bank_csv_purpose_column': bankCsvPurposeColumn,
+      if (bankCsvCounterpartyColumn != null)
+        'bank_csv_counterparty_column': bankCsvCounterpartyColumn,
+      if (bankCsvDateFormat != null) 'bank_csv_date_format': bankCsvDateFormat,
+      if (bankCsvDecimalSeparator != null)
+        'bank_csv_decimal_separator': bankCsvDecimalSeparator,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2660,6 +3086,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? smtpDunningSubjectTemplate,
     Value<String?>? smtpDunningBodyTemplate,
     Value<bool>? buchhaltungEnabled,
+    Value<String>? bankCsvDelimiter,
+    Value<bool>? bankCsvHasHeaderRow,
+    Value<String?>? bankCsvDateColumn,
+    Value<String?>? bankCsvAmountColumn,
+    Value<String?>? bankCsvPurposeColumn,
+    Value<String?>? bankCsvCounterpartyColumn,
+    Value<String>? bankCsvDateFormat,
+    Value<String>? bankCsvDecimalSeparator,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -2728,6 +3162,16 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       smtpDunningBodyTemplate:
           smtpDunningBodyTemplate ?? this.smtpDunningBodyTemplate,
       buchhaltungEnabled: buchhaltungEnabled ?? this.buchhaltungEnabled,
+      bankCsvDelimiter: bankCsvDelimiter ?? this.bankCsvDelimiter,
+      bankCsvHasHeaderRow: bankCsvHasHeaderRow ?? this.bankCsvHasHeaderRow,
+      bankCsvDateColumn: bankCsvDateColumn ?? this.bankCsvDateColumn,
+      bankCsvAmountColumn: bankCsvAmountColumn ?? this.bankCsvAmountColumn,
+      bankCsvPurposeColumn: bankCsvPurposeColumn ?? this.bankCsvPurposeColumn,
+      bankCsvCounterpartyColumn:
+          bankCsvCounterpartyColumn ?? this.bankCsvCounterpartyColumn,
+      bankCsvDateFormat: bankCsvDateFormat ?? this.bankCsvDateFormat,
+      bankCsvDecimalSeparator:
+          bankCsvDecimalSeparator ?? this.bankCsvDecimalSeparator,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2924,6 +3368,40 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (buchhaltungEnabled.present) {
       map['buchhaltung_enabled'] = Variable<bool>(buchhaltungEnabled.value);
     }
+    if (bankCsvDelimiter.present) {
+      map['bank_csv_delimiter'] = Variable<String>(bankCsvDelimiter.value);
+    }
+    if (bankCsvHasHeaderRow.present) {
+      map['bank_csv_has_header_row'] = Variable<bool>(
+        bankCsvHasHeaderRow.value,
+      );
+    }
+    if (bankCsvDateColumn.present) {
+      map['bank_csv_date_column'] = Variable<String>(bankCsvDateColumn.value);
+    }
+    if (bankCsvAmountColumn.present) {
+      map['bank_csv_amount_column'] = Variable<String>(
+        bankCsvAmountColumn.value,
+      );
+    }
+    if (bankCsvPurposeColumn.present) {
+      map['bank_csv_purpose_column'] = Variable<String>(
+        bankCsvPurposeColumn.value,
+      );
+    }
+    if (bankCsvCounterpartyColumn.present) {
+      map['bank_csv_counterparty_column'] = Variable<String>(
+        bankCsvCounterpartyColumn.value,
+      );
+    }
+    if (bankCsvDateFormat.present) {
+      map['bank_csv_date_format'] = Variable<String>(bankCsvDateFormat.value);
+    }
+    if (bankCsvDecimalSeparator.present) {
+      map['bank_csv_decimal_separator'] = Variable<String>(
+        bankCsvDecimalSeparator.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2984,6 +3462,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('smtpDunningSubjectTemplate: $smtpDunningSubjectTemplate, ')
           ..write('smtpDunningBodyTemplate: $smtpDunningBodyTemplate, ')
           ..write('buchhaltungEnabled: $buchhaltungEnabled, ')
+          ..write('bankCsvDelimiter: $bankCsvDelimiter, ')
+          ..write('bankCsvHasHeaderRow: $bankCsvHasHeaderRow, ')
+          ..write('bankCsvDateColumn: $bankCsvDateColumn, ')
+          ..write('bankCsvAmountColumn: $bankCsvAmountColumn, ')
+          ..write('bankCsvPurposeColumn: $bankCsvPurposeColumn, ')
+          ..write('bankCsvCounterpartyColumn: $bankCsvCounterpartyColumn, ')
+          ..write('bankCsvDateFormat: $bankCsvDateFormat, ')
+          ..write('bankCsvDecimalSeparator: $bankCsvDecimalSeparator, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12560,6 +13046,602 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   }
 }
 
+class $BankTransactionsTable extends BankTransactions
+    with TableInfo<$BankTransactionsTable, BankTransaction> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BankTransactionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES companies (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountCentsMeta = const VerificationMeta(
+    'amountCents',
+  );
+  @override
+  late final GeneratedColumn<int> amountCents = GeneratedColumn<int>(
+    'amount_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _purposeMeta = const VerificationMeta(
+    'purpose',
+  );
+  @override
+  late final GeneratedColumn<String> purpose = GeneratedColumn<String>(
+    'purpose',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _counterpartyMeta = const VerificationMeta(
+    'counterparty',
+  );
+  @override
+  late final GeneratedColumn<String> counterparty = GeneratedColumn<String>(
+    'counterparty',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _matchedInvoiceIdMeta = const VerificationMeta(
+    'matchedInvoiceId',
+  );
+  @override
+  late final GeneratedColumn<String> matchedInvoiceId = GeneratedColumn<String>(
+    'matched_invoice_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES invoices (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _importHashMeta = const VerificationMeta(
+    'importHash',
+  );
+  @override
+  late final GeneratedColumn<String> importHash = GeneratedColumn<String>(
+    'import_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _importedAtMeta = const VerificationMeta(
+    'importedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> importedAt = GeneratedColumn<DateTime>(
+    'imported_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    companyId,
+    date,
+    amountCents,
+    purpose,
+    counterparty,
+    matchedInvoiceId,
+    importHash,
+    importedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'bank_transactions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BankTransaction> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('amount_cents')) {
+      context.handle(
+        _amountCentsMeta,
+        amountCents.isAcceptableOrUnknown(
+          data['amount_cents']!,
+          _amountCentsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_amountCentsMeta);
+    }
+    if (data.containsKey('purpose')) {
+      context.handle(
+        _purposeMeta,
+        purpose.isAcceptableOrUnknown(data['purpose']!, _purposeMeta),
+      );
+    }
+    if (data.containsKey('counterparty')) {
+      context.handle(
+        _counterpartyMeta,
+        counterparty.isAcceptableOrUnknown(
+          data['counterparty']!,
+          _counterpartyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('matched_invoice_id')) {
+      context.handle(
+        _matchedInvoiceIdMeta,
+        matchedInvoiceId.isAcceptableOrUnknown(
+          data['matched_invoice_id']!,
+          _matchedInvoiceIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('import_hash')) {
+      context.handle(
+        _importHashMeta,
+        importHash.isAcceptableOrUnknown(data['import_hash']!, _importHashMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_importHashMeta);
+    }
+    if (data.containsKey('imported_at')) {
+      context.handle(
+        _importedAtMeta,
+        importedAt.isAcceptableOrUnknown(data['imported_at']!, _importedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_importedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BankTransaction map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BankTransaction(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_id'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      amountCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount_cents'],
+      )!,
+      purpose: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}purpose'],
+      ),
+      counterparty: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}counterparty'],
+      ),
+      matchedInvoiceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}matched_invoice_id'],
+      ),
+      importHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}import_hash'],
+      )!,
+      importedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}imported_at'],
+      )!,
+    );
+  }
+
+  @override
+  $BankTransactionsTable createAlias(String alias) {
+    return $BankTransactionsTable(attachedDatabase, alias);
+  }
+}
+
+class BankTransaction extends DataClass implements Insertable<BankTransaction> {
+  final String id;
+  final String companyId;
+  final DateTime date;
+  final int amountCents;
+  final String? purpose;
+  final String? counterparty;
+
+  /// `onDelete: setNull` — eine gelöschte Rechnung darf keine bereits
+  /// importierte Bank-Zeile mitreißen (gleiches Prinzip wie überall in
+  /// diesem Schema).
+  final String? matchedInvoiceId;
+
+  /// Hash aus Datum+Betrag+Verwendungszweck+Auftraggeber — verhindert,
+  /// dass ein erneuter Import derselben Export-Datei (z. B. mit
+  /// überlappendem Zeitraum) doppelte Zeilen anlegt.
+  final String importHash;
+  final DateTime importedAt;
+  const BankTransaction({
+    required this.id,
+    required this.companyId,
+    required this.date,
+    required this.amountCents,
+    this.purpose,
+    this.counterparty,
+    this.matchedInvoiceId,
+    required this.importHash,
+    required this.importedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['company_id'] = Variable<String>(companyId);
+    map['date'] = Variable<DateTime>(date);
+    map['amount_cents'] = Variable<int>(amountCents);
+    if (!nullToAbsent || purpose != null) {
+      map['purpose'] = Variable<String>(purpose);
+    }
+    if (!nullToAbsent || counterparty != null) {
+      map['counterparty'] = Variable<String>(counterparty);
+    }
+    if (!nullToAbsent || matchedInvoiceId != null) {
+      map['matched_invoice_id'] = Variable<String>(matchedInvoiceId);
+    }
+    map['import_hash'] = Variable<String>(importHash);
+    map['imported_at'] = Variable<DateTime>(importedAt);
+    return map;
+  }
+
+  BankTransactionsCompanion toCompanion(bool nullToAbsent) {
+    return BankTransactionsCompanion(
+      id: Value(id),
+      companyId: Value(companyId),
+      date: Value(date),
+      amountCents: Value(amountCents),
+      purpose: purpose == null && nullToAbsent
+          ? const Value.absent()
+          : Value(purpose),
+      counterparty: counterparty == null && nullToAbsent
+          ? const Value.absent()
+          : Value(counterparty),
+      matchedInvoiceId: matchedInvoiceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(matchedInvoiceId),
+      importHash: Value(importHash),
+      importedAt: Value(importedAt),
+    );
+  }
+
+  factory BankTransaction.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BankTransaction(
+      id: serializer.fromJson<String>(json['id']),
+      companyId: serializer.fromJson<String>(json['companyId']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      amountCents: serializer.fromJson<int>(json['amountCents']),
+      purpose: serializer.fromJson<String?>(json['purpose']),
+      counterparty: serializer.fromJson<String?>(json['counterparty']),
+      matchedInvoiceId: serializer.fromJson<String?>(json['matchedInvoiceId']),
+      importHash: serializer.fromJson<String>(json['importHash']),
+      importedAt: serializer.fromJson<DateTime>(json['importedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'companyId': serializer.toJson<String>(companyId),
+      'date': serializer.toJson<DateTime>(date),
+      'amountCents': serializer.toJson<int>(amountCents),
+      'purpose': serializer.toJson<String?>(purpose),
+      'counterparty': serializer.toJson<String?>(counterparty),
+      'matchedInvoiceId': serializer.toJson<String?>(matchedInvoiceId),
+      'importHash': serializer.toJson<String>(importHash),
+      'importedAt': serializer.toJson<DateTime>(importedAt),
+    };
+  }
+
+  BankTransaction copyWith({
+    String? id,
+    String? companyId,
+    DateTime? date,
+    int? amountCents,
+    Value<String?> purpose = const Value.absent(),
+    Value<String?> counterparty = const Value.absent(),
+    Value<String?> matchedInvoiceId = const Value.absent(),
+    String? importHash,
+    DateTime? importedAt,
+  }) => BankTransaction(
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    date: date ?? this.date,
+    amountCents: amountCents ?? this.amountCents,
+    purpose: purpose.present ? purpose.value : this.purpose,
+    counterparty: counterparty.present ? counterparty.value : this.counterparty,
+    matchedInvoiceId: matchedInvoiceId.present
+        ? matchedInvoiceId.value
+        : this.matchedInvoiceId,
+    importHash: importHash ?? this.importHash,
+    importedAt: importedAt ?? this.importedAt,
+  );
+  BankTransaction copyWithCompanion(BankTransactionsCompanion data) {
+    return BankTransaction(
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      date: data.date.present ? data.date.value : this.date,
+      amountCents: data.amountCents.present
+          ? data.amountCents.value
+          : this.amountCents,
+      purpose: data.purpose.present ? data.purpose.value : this.purpose,
+      counterparty: data.counterparty.present
+          ? data.counterparty.value
+          : this.counterparty,
+      matchedInvoiceId: data.matchedInvoiceId.present
+          ? data.matchedInvoiceId.value
+          : this.matchedInvoiceId,
+      importHash: data.importHash.present
+          ? data.importHash.value
+          : this.importHash,
+      importedAt: data.importedAt.present
+          ? data.importedAt.value
+          : this.importedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BankTransaction(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('date: $date, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('purpose: $purpose, ')
+          ..write('counterparty: $counterparty, ')
+          ..write('matchedInvoiceId: $matchedInvoiceId, ')
+          ..write('importHash: $importHash, ')
+          ..write('importedAt: $importedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    date,
+    amountCents,
+    purpose,
+    counterparty,
+    matchedInvoiceId,
+    importHash,
+    importedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BankTransaction &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.date == this.date &&
+          other.amountCents == this.amountCents &&
+          other.purpose == this.purpose &&
+          other.counterparty == this.counterparty &&
+          other.matchedInvoiceId == this.matchedInvoiceId &&
+          other.importHash == this.importHash &&
+          other.importedAt == this.importedAt);
+}
+
+class BankTransactionsCompanion extends UpdateCompanion<BankTransaction> {
+  final Value<String> id;
+  final Value<String> companyId;
+  final Value<DateTime> date;
+  final Value<int> amountCents;
+  final Value<String?> purpose;
+  final Value<String?> counterparty;
+  final Value<String?> matchedInvoiceId;
+  final Value<String> importHash;
+  final Value<DateTime> importedAt;
+  final Value<int> rowid;
+  const BankTransactionsCompanion({
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.date = const Value.absent(),
+    this.amountCents = const Value.absent(),
+    this.purpose = const Value.absent(),
+    this.counterparty = const Value.absent(),
+    this.matchedInvoiceId = const Value.absent(),
+    this.importHash = const Value.absent(),
+    this.importedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BankTransactionsCompanion.insert({
+    required String id,
+    required String companyId,
+    required DateTime date,
+    required int amountCents,
+    this.purpose = const Value.absent(),
+    this.counterparty = const Value.absent(),
+    this.matchedInvoiceId = const Value.absent(),
+    required String importHash,
+    required DateTime importedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       companyId = Value(companyId),
+       date = Value(date),
+       amountCents = Value(amountCents),
+       importHash = Value(importHash),
+       importedAt = Value(importedAt);
+  static Insertable<BankTransaction> custom({
+    Expression<String>? id,
+    Expression<String>? companyId,
+    Expression<DateTime>? date,
+    Expression<int>? amountCents,
+    Expression<String>? purpose,
+    Expression<String>? counterparty,
+    Expression<String>? matchedInvoiceId,
+    Expression<String>? importHash,
+    Expression<DateTime>? importedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (date != null) 'date': date,
+      if (amountCents != null) 'amount_cents': amountCents,
+      if (purpose != null) 'purpose': purpose,
+      if (counterparty != null) 'counterparty': counterparty,
+      if (matchedInvoiceId != null) 'matched_invoice_id': matchedInvoiceId,
+      if (importHash != null) 'import_hash': importHash,
+      if (importedAt != null) 'imported_at': importedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BankTransactionsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? companyId,
+    Value<DateTime>? date,
+    Value<int>? amountCents,
+    Value<String?>? purpose,
+    Value<String?>? counterparty,
+    Value<String?>? matchedInvoiceId,
+    Value<String>? importHash,
+    Value<DateTime>? importedAt,
+    Value<int>? rowid,
+  }) {
+    return BankTransactionsCompanion(
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      date: date ?? this.date,
+      amountCents: amountCents ?? this.amountCents,
+      purpose: purpose ?? this.purpose,
+      counterparty: counterparty ?? this.counterparty,
+      matchedInvoiceId: matchedInvoiceId ?? this.matchedInvoiceId,
+      importHash: importHash ?? this.importHash,
+      importedAt: importedAt ?? this.importedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<String>(companyId.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (amountCents.present) {
+      map['amount_cents'] = Variable<int>(amountCents.value);
+    }
+    if (purpose.present) {
+      map['purpose'] = Variable<String>(purpose.value);
+    }
+    if (counterparty.present) {
+      map['counterparty'] = Variable<String>(counterparty.value);
+    }
+    if (matchedInvoiceId.present) {
+      map['matched_invoice_id'] = Variable<String>(matchedInvoiceId.value);
+    }
+    if (importHash.present) {
+      map['import_hash'] = Variable<String>(importHash.value);
+    }
+    if (importedAt.present) {
+      map['imported_at'] = Variable<DateTime>(importedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BankTransactionsCompanion(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('date: $date, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('purpose: $purpose, ')
+          ..write('counterparty: $counterparty, ')
+          ..write('matchedInvoiceId: $matchedInvoiceId, ')
+          ..write('importHash: $importHash, ')
+          ..write('importedAt: $importedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -12586,6 +13668,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ExpenseCategoriesTable expenseCategories =
       $ExpenseCategoriesTable(this);
   late final $ExpensesTable expenses = $ExpensesTable(this);
+  late final $BankTransactionsTable bankTransactions = $BankTransactionsTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -12607,6 +13692,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     recurringInvoiceTemplateItems,
     expenseCategories,
     expenses,
+    bankTransactions,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -12804,6 +13890,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ),
       result: [TableUpdate('expenses', kind: UpdateKind.update)],
     ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'companies',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bank_transactions', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'invoices',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bank_transactions', kind: UpdateKind.update)],
+    ),
   ]);
 }
 
@@ -12858,6 +13958,14 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String?> smtpDunningSubjectTemplate,
       Value<String?> smtpDunningBodyTemplate,
       Value<bool> buchhaltungEnabled,
+      Value<String> bankCsvDelimiter,
+      Value<bool> bankCsvHasHeaderRow,
+      Value<String?> bankCsvDateColumn,
+      Value<String?> bankCsvAmountColumn,
+      Value<String?> bankCsvPurposeColumn,
+      Value<String?> bankCsvCounterpartyColumn,
+      Value<String> bankCsvDateFormat,
+      Value<String> bankCsvDecimalSeparator,
       Value<int> rowid,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
@@ -12911,6 +14019,14 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String?> smtpDunningSubjectTemplate,
       Value<String?> smtpDunningBodyTemplate,
       Value<bool> buchhaltungEnabled,
+      Value<String> bankCsvDelimiter,
+      Value<bool> bankCsvHasHeaderRow,
+      Value<String?> bankCsvDateColumn,
+      Value<String?> bankCsvAmountColumn,
+      Value<String?> bankCsvPurposeColumn,
+      Value<String?> bankCsvCounterpartyColumn,
+      Value<String> bankCsvDateFormat,
+      Value<String> bankCsvDecimalSeparator,
       Value<int> rowid,
     });
 
@@ -13149,6 +14265,26 @@ final class $$CompaniesTableReferences
     ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_expensesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$BankTransactionsTable, List<BankTransaction>>
+  _bankTransactionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.bankTransactions,
+    aliasName: 'companies__id__bank_transactions__company_id',
+  );
+
+  $$BankTransactionsTableProcessedTableManager get bankTransactionsRefs {
+    final manager = $$BankTransactionsTableTableManager(
+      $_db,
+      $_db.bankTransactions,
+    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _bankTransactionsRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -13406,6 +14542,46 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<bool> get buchhaltungEnabled => $composableBuilder(
     column: $table.buchhaltungEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankCsvDelimiter => $composableBuilder(
+    column: $table.bankCsvDelimiter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get bankCsvHasHeaderRow => $composableBuilder(
+    column: $table.bankCsvHasHeaderRow,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankCsvDateColumn => $composableBuilder(
+    column: $table.bankCsvDateColumn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankCsvAmountColumn => $composableBuilder(
+    column: $table.bankCsvAmountColumn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankCsvPurposeColumn => $composableBuilder(
+    column: $table.bankCsvPurposeColumn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankCsvCounterpartyColumn => $composableBuilder(
+    column: $table.bankCsvCounterpartyColumn,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankCsvDateFormat => $composableBuilder(
+    column: $table.bankCsvDateFormat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bankCsvDecimalSeparator => $composableBuilder(
+    column: $table.bankCsvDecimalSeparator,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13710,6 +14886,31 @@ class $$CompaniesTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> bankTransactionsRefs(
+    Expression<bool> Function($$BankTransactionsTableFilterComposer f) f,
+  ) {
+    final $$BankTransactionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bankTransactions,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BankTransactionsTableFilterComposer(
+            $db: $db,
+            $table: $db.bankTransactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CompaniesTableOrderingComposer
@@ -13965,6 +15166,46 @@ class $$CompaniesTableOrderingComposer
     column: $table.buchhaltungEnabled,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get bankCsvDelimiter => $composableBuilder(
+    column: $table.bankCsvDelimiter,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get bankCsvHasHeaderRow => $composableBuilder(
+    column: $table.bankCsvHasHeaderRow,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankCsvDateColumn => $composableBuilder(
+    column: $table.bankCsvDateColumn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankCsvAmountColumn => $composableBuilder(
+    column: $table.bankCsvAmountColumn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankCsvPurposeColumn => $composableBuilder(
+    column: $table.bankCsvPurposeColumn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankCsvCounterpartyColumn => $composableBuilder(
+    column: $table.bankCsvCounterpartyColumn,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankCsvDateFormat => $composableBuilder(
+    column: $table.bankCsvDateFormat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bankCsvDecimalSeparator => $composableBuilder(
+    column: $table.bankCsvDecimalSeparator,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -14196,6 +15437,46 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<bool> get buchhaltungEnabled => $composableBuilder(
     column: $table.buchhaltungEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankCsvDelimiter => $composableBuilder(
+    column: $table.bankCsvDelimiter,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get bankCsvHasHeaderRow => $composableBuilder(
+    column: $table.bankCsvHasHeaderRow,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankCsvDateColumn => $composableBuilder(
+    column: $table.bankCsvDateColumn,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankCsvAmountColumn => $composableBuilder(
+    column: $table.bankCsvAmountColumn,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankCsvPurposeColumn => $composableBuilder(
+    column: $table.bankCsvPurposeColumn,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankCsvCounterpartyColumn => $composableBuilder(
+    column: $table.bankCsvCounterpartyColumn,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankCsvDateFormat => $composableBuilder(
+    column: $table.bankCsvDateFormat,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bankCsvDecimalSeparator => $composableBuilder(
+    column: $table.bankCsvDecimalSeparator,
     builder: (column) => column,
   );
 
@@ -14502,6 +15783,31 @@ class $$CompaniesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> bankTransactionsRefs<T extends Object>(
+    Expression<T> Function($$BankTransactionsTableAnnotationComposer a) f,
+  ) {
+    final $$BankTransactionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bankTransactions,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BankTransactionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.bankTransactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CompaniesTableTableManager
@@ -14530,6 +15836,7 @@ class $$CompaniesTableTableManager
             bool recurringInvoiceTemplatesRefs,
             bool expenseCategoriesRefs,
             bool expensesRefs,
+            bool bankTransactionsRefs,
           })
         > {
   $$CompaniesTableTableManager(_$AppDatabase db, $CompaniesTable table)
@@ -14598,6 +15905,14 @@ class $$CompaniesTableTableManager
                     const Value.absent(),
                 Value<String?> smtpDunningBodyTemplate = const Value.absent(),
                 Value<bool> buchhaltungEnabled = const Value.absent(),
+                Value<String> bankCsvDelimiter = const Value.absent(),
+                Value<bool> bankCsvHasHeaderRow = const Value.absent(),
+                Value<String?> bankCsvDateColumn = const Value.absent(),
+                Value<String?> bankCsvAmountColumn = const Value.absent(),
+                Value<String?> bankCsvPurposeColumn = const Value.absent(),
+                Value<String?> bankCsvCounterpartyColumn = const Value.absent(),
+                Value<String> bankCsvDateFormat = const Value.absent(),
+                Value<String> bankCsvDecimalSeparator = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -14649,6 +15964,14 @@ class $$CompaniesTableTableManager
                 smtpDunningSubjectTemplate: smtpDunningSubjectTemplate,
                 smtpDunningBodyTemplate: smtpDunningBodyTemplate,
                 buchhaltungEnabled: buchhaltungEnabled,
+                bankCsvDelimiter: bankCsvDelimiter,
+                bankCsvHasHeaderRow: bankCsvHasHeaderRow,
+                bankCsvDateColumn: bankCsvDateColumn,
+                bankCsvAmountColumn: bankCsvAmountColumn,
+                bankCsvPurposeColumn: bankCsvPurposeColumn,
+                bankCsvCounterpartyColumn: bankCsvCounterpartyColumn,
+                bankCsvDateFormat: bankCsvDateFormat,
+                bankCsvDecimalSeparator: bankCsvDecimalSeparator,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -14706,6 +16029,14 @@ class $$CompaniesTableTableManager
                     const Value.absent(),
                 Value<String?> smtpDunningBodyTemplate = const Value.absent(),
                 Value<bool> buchhaltungEnabled = const Value.absent(),
+                Value<String> bankCsvDelimiter = const Value.absent(),
+                Value<bool> bankCsvHasHeaderRow = const Value.absent(),
+                Value<String?> bankCsvDateColumn = const Value.absent(),
+                Value<String?> bankCsvAmountColumn = const Value.absent(),
+                Value<String?> bankCsvPurposeColumn = const Value.absent(),
+                Value<String?> bankCsvCounterpartyColumn = const Value.absent(),
+                Value<String> bankCsvDateFormat = const Value.absent(),
+                Value<String> bankCsvDecimalSeparator = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -14757,6 +16088,14 @@ class $$CompaniesTableTableManager
                 smtpDunningSubjectTemplate: smtpDunningSubjectTemplate,
                 smtpDunningBodyTemplate: smtpDunningBodyTemplate,
                 buchhaltungEnabled: buchhaltungEnabled,
+                bankCsvDelimiter: bankCsvDelimiter,
+                bankCsvHasHeaderRow: bankCsvHasHeaderRow,
+                bankCsvDateColumn: bankCsvDateColumn,
+                bankCsvAmountColumn: bankCsvAmountColumn,
+                bankCsvPurposeColumn: bankCsvPurposeColumn,
+                bankCsvCounterpartyColumn: bankCsvCounterpartyColumn,
+                bankCsvDateFormat: bankCsvDateFormat,
+                bankCsvDecimalSeparator: bankCsvDecimalSeparator,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -14781,6 +16120,7 @@ class $$CompaniesTableTableManager
                 recurringInvoiceTemplatesRefs = false,
                 expenseCategoriesRefs = false,
                 expensesRefs = false,
+                bankTransactionsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -14798,6 +16138,7 @@ class $$CompaniesTableTableManager
                       db.recurringInvoiceTemplates,
                     if (expenseCategoriesRefs) db.expenseCategories,
                     if (expensesRefs) db.expenses,
+                    if (bankTransactionsRefs) db.bankTransactions,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -15054,6 +16395,27 @@ class $$CompaniesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (bankTransactionsRefs)
+                        await $_getPrefetchedData<
+                          Company,
+                          $CompaniesTable,
+                          BankTransaction
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompaniesTableReferences
+                              ._bankTransactionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompaniesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bankTransactionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.companyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -15087,6 +16449,7 @@ typedef $$CompaniesTableProcessedTableManager =
         bool recurringInvoiceTemplatesRefs,
         bool expenseCategoriesRefs,
         bool expensesRefs,
+        bool bankTransactionsRefs,
       })
     >;
 typedef $$CustomersTableCreateCompanionBuilder =
@@ -18942,6 +20305,26 @@ final class $$InvoicesTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$BankTransactionsTable, List<BankTransaction>>
+  _bankTransactionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.bankTransactions,
+    aliasName: 'invoices__id__bank_transactions__matched_invoice_id',
+  );
+
+  $$BankTransactionsTableProcessedTableManager get bankTransactionsRefs {
+    final manager =
+        $$BankTransactionsTableTableManager($_db, $_db.bankTransactions).filter(
+          (f) => f.matchedInvoiceId.id.sqlEquals($_itemColumn<String>('id')!),
+        );
+
+    final cache = $_typedResult.readTableOrNull(
+      _bankTransactionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$InvoicesTableFilterComposer
@@ -19199,6 +20582,31 @@ class $$InvoicesTableFilterComposer
           }) => $$InvoiceItemsTableFilterComposer(
             $db: $db,
             $table: $db.invoiceItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> bankTransactionsRefs(
+    Expression<bool> Function($$BankTransactionsTableFilterComposer f) f,
+  ) {
+    final $$BankTransactionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bankTransactions,
+      getReferencedColumn: (t) => t.matchedInvoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BankTransactionsTableFilterComposer(
+            $db: $db,
+            $table: $db.bankTransactions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -19689,6 +21097,31 @@ class $$InvoicesTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> bankTransactionsRefs<T extends Object>(
+    Expression<T> Function($$BankTransactionsTableAnnotationComposer a) f,
+  ) {
+    final $$BankTransactionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.bankTransactions,
+      getReferencedColumn: (t) => t.matchedInvoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BankTransactionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.bankTransactions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$InvoicesTableTableManager
@@ -19710,6 +21143,7 @@ class $$InvoicesTableTableManager
             bool convertedFromId,
             bool projectId,
             bool invoiceItemsRefs,
+            bool bankTransactionsRefs,
           })
         > {
   $$InvoicesTableTableManager(_$AppDatabase db, $InvoicesTable table)
@@ -19874,11 +21308,13 @@ class $$InvoicesTableTableManager
                 convertedFromId = false,
                 projectId = false,
                 invoiceItemsRefs = false,
+                bankTransactionsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (invoiceItemsRefs) db.invoiceItems,
+                    if (bankTransactionsRefs) db.bankTransactions,
                   ],
                   addJoins:
                       <
@@ -19974,6 +21410,27 @@ class $$InvoicesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (bankTransactionsRefs)
+                        await $_getPrefetchedData<
+                          Invoice,
+                          $InvoicesTable,
+                          BankTransaction
+                        >(
+                          currentTable: table,
+                          referencedTable: $$InvoicesTableReferences
+                              ._bankTransactionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$InvoicesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).bankTransactionsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.matchedInvoiceId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -20000,6 +21457,7 @@ typedef $$InvoicesTableProcessedTableManager =
         bool convertedFromId,
         bool projectId,
         bool invoiceItemsRefs,
+        bool bankTransactionsRefs,
       })
     >;
 typedef $$InvoiceItemsTableCreateCompanionBuilder =
@@ -24113,6 +25571,505 @@ typedef $$ExpensesTableProcessedTableManager =
       Expense,
       PrefetchHooks Function({bool companyId, bool categoryId})
     >;
+typedef $$BankTransactionsTableCreateCompanionBuilder =
+    BankTransactionsCompanion Function({
+      required String id,
+      required String companyId,
+      required DateTime date,
+      required int amountCents,
+      Value<String?> purpose,
+      Value<String?> counterparty,
+      Value<String?> matchedInvoiceId,
+      required String importHash,
+      required DateTime importedAt,
+      Value<int> rowid,
+    });
+typedef $$BankTransactionsTableUpdateCompanionBuilder =
+    BankTransactionsCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<DateTime> date,
+      Value<int> amountCents,
+      Value<String?> purpose,
+      Value<String?> counterparty,
+      Value<String?> matchedInvoiceId,
+      Value<String> importHash,
+      Value<DateTime> importedAt,
+      Value<int> rowid,
+    });
+
+final class $$BankTransactionsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $BankTransactionsTable, BankTransaction> {
+  $$BankTransactionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CompaniesTable _companyIdTable(_$AppDatabase db) =>
+      db.companies.createAlias('bank_transactions__company_id__companies__id');
+
+  $$CompaniesTableProcessedTableManager get companyId {
+    final $_column = $_itemColumn<String>('company_id')!;
+
+    final manager = $$CompaniesTableTableManager(
+      $_db,
+      $_db.companies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $InvoicesTable _matchedInvoiceIdTable(_$AppDatabase db) => db.invoices
+      .createAlias('bank_transactions__matched_invoice_id__invoices__id');
+
+  $$InvoicesTableProcessedTableManager? get matchedInvoiceId {
+    final $_column = $_itemColumn<String>('matched_invoice_id');
+    if ($_column == null) return null;
+    final manager = $$InvoicesTableTableManager(
+      $_db,
+      $_db.invoices,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_matchedInvoiceIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$BankTransactionsTableFilterComposer
+    extends Composer<_$AppDatabase, $BankTransactionsTable> {
+  $$BankTransactionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get purpose => $composableBuilder(
+    column: $table.purpose,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get counterparty => $composableBuilder(
+    column: $table.counterparty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get importHash => $composableBuilder(
+    column: $table.importHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get importedAt => $composableBuilder(
+    column: $table.importedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CompaniesTableFilterComposer get companyId {
+    final $$CompaniesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableFilterComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$InvoicesTableFilterComposer get matchedInvoiceId {
+    final $$InvoicesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.matchedInvoiceId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableFilterComposer(
+            $db: $db,
+            $table: $db.invoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BankTransactionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BankTransactionsTable> {
+  $$BankTransactionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get purpose => $composableBuilder(
+    column: $table.purpose,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get counterparty => $composableBuilder(
+    column: $table.counterparty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get importHash => $composableBuilder(
+    column: $table.importHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get importedAt => $composableBuilder(
+    column: $table.importedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CompaniesTableOrderingComposer get companyId {
+    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableOrderingComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$InvoicesTableOrderingComposer get matchedInvoiceId {
+    final $$InvoicesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.matchedInvoiceId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableOrderingComposer(
+            $db: $db,
+            $table: $db.invoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BankTransactionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BankTransactionsTable> {
+  $$BankTransactionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get purpose =>
+      $composableBuilder(column: $table.purpose, builder: (column) => column);
+
+  GeneratedColumn<String> get counterparty => $composableBuilder(
+    column: $table.counterparty,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get importHash => $composableBuilder(
+    column: $table.importHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get importedAt => $composableBuilder(
+    column: $table.importedAt,
+    builder: (column) => column,
+  );
+
+  $$CompaniesTableAnnotationComposer get companyId {
+    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$InvoicesTableAnnotationComposer get matchedInvoiceId {
+    final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.matchedInvoiceId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.invoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BankTransactionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BankTransactionsTable,
+          BankTransaction,
+          $$BankTransactionsTableFilterComposer,
+          $$BankTransactionsTableOrderingComposer,
+          $$BankTransactionsTableAnnotationComposer,
+          $$BankTransactionsTableCreateCompanionBuilder,
+          $$BankTransactionsTableUpdateCompanionBuilder,
+          (BankTransaction, $$BankTransactionsTableReferences),
+          BankTransaction,
+          PrefetchHooks Function({bool companyId, bool matchedInvoiceId})
+        > {
+  $$BankTransactionsTableTableManager(
+    _$AppDatabase db,
+    $BankTransactionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BankTransactionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BankTransactionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BankTransactionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> companyId = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<int> amountCents = const Value.absent(),
+                Value<String?> purpose = const Value.absent(),
+                Value<String?> counterparty = const Value.absent(),
+                Value<String?> matchedInvoiceId = const Value.absent(),
+                Value<String> importHash = const Value.absent(),
+                Value<DateTime> importedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BankTransactionsCompanion(
+                id: id,
+                companyId: companyId,
+                date: date,
+                amountCents: amountCents,
+                purpose: purpose,
+                counterparty: counterparty,
+                matchedInvoiceId: matchedInvoiceId,
+                importHash: importHash,
+                importedAt: importedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String companyId,
+                required DateTime date,
+                required int amountCents,
+                Value<String?> purpose = const Value.absent(),
+                Value<String?> counterparty = const Value.absent(),
+                Value<String?> matchedInvoiceId = const Value.absent(),
+                required String importHash,
+                required DateTime importedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => BankTransactionsCompanion.insert(
+                id: id,
+                companyId: companyId,
+                date: date,
+                amountCents: amountCents,
+                purpose: purpose,
+                counterparty: counterparty,
+                matchedInvoiceId: matchedInvoiceId,
+                importHash: importHash,
+                importedAt: importedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$BankTransactionsTable, BankTransaction>(table),
+                  $$BankTransactionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({companyId = false, matchedInvoiceId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (companyId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable:
+                                        $$BankTransactionsTableReferences
+                                            ._companyIdTable(db),
+                                    referencedColumn:
+                                        $$BankTransactionsTableReferences
+                                            ._companyIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (matchedInvoiceId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.matchedInvoiceId,
+                                    referencedTable:
+                                        $$BankTransactionsTableReferences
+                                            ._matchedInvoiceIdTable(db),
+                                    referencedColumn:
+                                        $$BankTransactionsTableReferences
+                                            ._matchedInvoiceIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$BankTransactionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BankTransactionsTable,
+      BankTransaction,
+      $$BankTransactionsTableFilterComposer,
+      $$BankTransactionsTableOrderingComposer,
+      $$BankTransactionsTableAnnotationComposer,
+      $$BankTransactionsTableCreateCompanionBuilder,
+      $$BankTransactionsTableUpdateCompanionBuilder,
+      (BankTransaction, $$BankTransactionsTableReferences),
+      BankTransaction,
+      PrefetchHooks Function({bool companyId, bool matchedInvoiceId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -24156,4 +26113,6 @@ class $AppDatabaseManager {
       $$ExpenseCategoriesTableTableManager(_db, _db.expenseCategories);
   $$ExpensesTableTableManager get expenses =>
       $$ExpensesTableTableManager(_db, _db.expenses);
+  $$BankTransactionsTableTableManager get bankTransactions =>
+      $$BankTransactionsTableTableManager(_db, _db.bankTransactions);
 }

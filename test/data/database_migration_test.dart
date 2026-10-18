@@ -23,7 +23,7 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// C12 Mahnwesen — Nachbesserung (konfigurierbare Fristen/Gebühren/Zins +
 /// Mahnschreiben-Texte, Kay-Feedback 2026-10-17); v15→v16: C7a
 /// SMTP-Versand; v16→v17: C14 Buchhaltung-Modulschalter; v17→v18:
-/// C14.2 Belege/Ausgaben).
+/// C14.2 Belege/Ausgaben; v18→v19: C14.4 Bankabgleich/CSV).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -47,11 +47,12 @@ void main() {
   });
 
   test(
-    'Migration v1→v18 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v19 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
-    'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben): Bestandsdaten '
+    'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
+    'C14.4 Bankabgleich/CSV): Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
     () async {
@@ -183,6 +184,16 @@ void main() {
       // v17 -> v18 (C14.2 Belege/Ausgaben): abhängige Tabelle zuerst.
       raw.execute('DROP TABLE expenses;');
       raw.execute('DROP TABLE expense_categories;');
+      // v18 -> v19 (C14.4 Bankabgleich/CSV):
+      raw.execute('DROP TABLE bank_transactions;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_delimiter;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_has_header_row;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_date_column;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_amount_column;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_purpose_column;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_counterparty_column;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_date_format;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_decimal_separator;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -235,6 +246,14 @@ void main() {
         expect(migratedCompany.smtpDunningSubjectTemplate, isNull);
         expect(migratedCompany.smtpDunningBodyTemplate, isNull);
         expect(migratedCompany.buchhaltungEnabled, isFalse);
+        expect(migratedCompany.bankCsvDelimiter, ';');
+        expect(migratedCompany.bankCsvHasHeaderRow, isTrue);
+        expect(migratedCompany.bankCsvDateColumn, isNull);
+        expect(migratedCompany.bankCsvAmountColumn, isNull);
+        expect(migratedCompany.bankCsvPurposeColumn, isNull);
+        expect(migratedCompany.bankCsvCounterpartyColumn, isNull);
+        expect(migratedCompany.bankCsvDateFormat, 'dd.MM.yyyy');
+        expect(migratedCompany.bankCsvDecimalSeparator, ',');
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -338,6 +357,22 @@ void main() {
               ..where((e) => e.id.equals('expense-nach-migration')))
             .getSingle();
         expect(createdExpense.amountGrossCents, 1190);
+
+        // BankTransactions existiert nach der Migration und ist nutzbar.
+        await db.into(db.bankTransactions).insert(
+              BankTransactionsCompanion.insert(
+                id: 'bank-tx-nach-migration',
+                companyId: company.id,
+                date: DateTime.now(),
+                amountCents: 11900,
+                importHash: 'hash-nach-migration',
+                importedAt: DateTime.now(),
+              ),
+            );
+        final createdBankTransaction = await (db.select(db.bankTransactions)
+              ..where((t) => t.id.equals('bank-tx-nach-migration')))
+            .getSingle();
+        expect(createdBankTransaction.amountCents, 11900);
 
         final migratedCustomer =
             await (db.select(db.customers)..where((c) => c.id.equals(customer.id))).getSingle();
