@@ -31,7 +31,10 @@ part 'database.g.dart';
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(openConnection());
+  /// [encryptionKey] siehe Doc-Kommentar bei `openConnection()` (F4,
+  /// Kay-Entscheidung 2026-10-19) — `null` bleibt unverschlüsselt
+  /// (Standard, Bestandsverhalten).
+  AppDatabase({String? encryptionKey}) : super(openConnection(encryptionKey: encryptionKey));
 
   /// Für Tests: eigene Verbindung injizieren (z. B. in-memory).
   AppDatabase.forTesting(super.executor);
