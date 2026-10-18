@@ -10,6 +10,7 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/company_repository.dart';
 import '../../data/repositories/expense_category_repository.dart';
 import '../../data/repositories/expense_repository.dart';
+import '../../data/repositories/project_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/datev_export_service.dart';
@@ -28,9 +29,18 @@ class ExpensesScreen extends StatefulWidget {
 }
 
 class _ExpensesData {
-  const _ExpensesData({required this.expenses, required this.categories});
+  const _ExpensesData({
+    required this.expenses,
+    required this.categories,
+    required this.projects,
+    required this.projectsEnabled,
+  });
   final List<Expense> expenses;
   final List<ExpenseCategory> categories;
+
+  /// Leer, wenn C1 Projekte nicht aktiviert ist (siehe [projectsEnabled]).
+  final List<Project> projects;
+  final bool projectsEnabled;
 }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
@@ -46,15 +56,25 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     // Provider-Zugriffe VOR dem ersten await abholen — siehe dieselbe
     // Begründung in dashboard_screen.dart (ein inzwischen dispose()ter
     // Context darf nicht mehr synchron verwendet werden).
-    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final company = context.read<ActiveCompanyService>().active!;
     final categoryRepo = context.read<ExpenseCategoryRepository>();
     final expenseRepo = context.read<ExpenseRepository>();
+    final projectRepo = context.read<ProjectRepository>();
     // Lazy seed (siehe Doc-Kommentar bei `seedDefaultsIfNeverSeeded`) —
     // bewusst hier und nicht beim Aktivieren des Modul-Schalters.
-    await categoryRepo.seedDefaultsIfNeverSeeded(companyId);
-    final expenses = await expenseRepo.listForCompany(companyId);
-    final categories = await categoryRepo.listForCompany(companyId);
-    return _ExpensesData(expenses: expenses, categories: categories);
+    await categoryRepo.seedDefaultsIfNeverSeeded(company.id);
+    final expenses = await expenseRepo.listForCompany(company.id);
+    final categories = await categoryRepo.listForCompany(company.id);
+    // C1 Projekte / Projekt-Ergebnisrechnung (Kay-Entscheidung
+    // 2026-10-19) — Belege optional einem Projekt zuordnen, nur wenn
+    // das Modul aktiviert ist.
+    final projects = company.projectsEnabled ? await projectRepo.listForCompany(company.id) : const <Project>[];
+    return _ExpensesData(
+      expenses: expenses,
+      categories: categories,
+      projects: projects,
+      projectsEnabled: company.projectsEnabled,
+    );
   }
 
   // Bewusst ein Block-Body, nicht `setState(() => _future = _load())` —
@@ -63,10 +83,15 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         _future = _load();
       });
 
-  Future<void> _createOrEdit({Expense? existing, required List<ExpenseCategory> categories}) async {
+  Future<void> _createOrEdit({Expense? existing, required _ExpensesData data}) async {
     final result = await showDialog<_ExpenseFormResult>(
       context: context,
-      builder: (context) => _ExpenseFormDialog(categories: categories, existing: existing),
+      builder: (context) => _ExpenseFormDialog(
+        categories: data.categories,
+        projects: data.projects,
+        projectsEnabled: data.projectsEnabled,
+        existing: existing,
+      ),
     );
     if (result == null || !mounted) return;
     final companyId = context.read<ActiveCompanyService>().active!.id;
@@ -80,6 +105,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         vatRatePercent: result.vatRatePercent,
         categoryId: result.categoryId,
         supplierReference: result.supplierReference,
+        projectId: result.projectId,
       );
     } else {
       await repo.update(
@@ -91,6 +117,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         vatRatePercent: result.vatRatePercent,
         categoryId: Value(result.categoryId),
         supplierReference: Value(result.supplierReference),
+        projectId: Value(result.projectId),
       );
     }
     if (mounted) _reload();
@@ -155,6 +182,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           final data = snapshot.data!;
           final categoryLabelById = {for (final c in data.categories) c.id: c.label};
+          final projectNameById = {for (final p in data.projects) p.id: p.name};
 
           if (data.expenses.isEmpty) {
             return const Center(child: Text('Noch keine Belege erfasst.'));
@@ -167,7 +195,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   title: Text(expense.description),
                   subtitle: Text(
                     '${_formatDate(expense.date)}'
-                    '${expense.categoryId != null ? ' — ${categoryLabelById[expense.categoryId] ?? "Kategorie gelöscht"}' : ''}',
+                    '${expense.categoryId != null ? ' — ${categoryLabelById[expense.categoryId] ?? "Kategorie gelöscht"}' : ''}'
+                    '${expense.projectId != null ? ' — ${projectNameById[expense.projectId] ?? "Projekt gelöscht"}' : ''}',
                   ),
                   trailing: Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
@@ -177,7 +206,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       IconButton(
                         icon: const Icon(Icons.edit_outlined),
                         tooltip: 'Bearbeiten',
-                        onPressed: () => _createOrEdit(existing: expense, categories: data.categories),
+                        onPressed: () => _createOrEdit(existing: expense, data: data),
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
@@ -196,9 +225,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         builder: (context, snapshot) => FloatingActionButton.extended(
           icon: const Icon(Icons.add),
           label: const Text('Beleg erfassen'),
-          onPressed: snapshot.hasData
-              ? () => _createOrEdit(categories: snapshot.data!.categories)
-              : null,
+          onPressed: snapshot.hasData ? () => _createOrEdit(data: snapshot.data!) : null,
         ),
       ),
     );
@@ -213,6 +240,7 @@ class _ExpenseFormResult {
     required this.vatRatePercent,
     this.categoryId,
     this.supplierReference,
+    this.projectId,
   });
   final DateTime date;
   final String description;
@@ -220,11 +248,19 @@ class _ExpenseFormResult {
   final double vatRatePercent;
   final String? categoryId;
   final String? supplierReference;
+  final String? projectId;
 }
 
 class _ExpenseFormDialog extends StatefulWidget {
-  const _ExpenseFormDialog({required this.categories, this.existing});
+  const _ExpenseFormDialog({
+    required this.categories,
+    required this.projects,
+    required this.projectsEnabled,
+    this.existing,
+  });
   final List<ExpenseCategory> categories;
+  final List<Project> projects;
+  final bool projectsEnabled;
   final Expense? existing;
 
   @override
@@ -238,6 +274,7 @@ class _ExpenseFormDialogState extends State<_ExpenseFormDialog> {
   late DateTime _date;
   late double _vatRate;
   String? _categoryId;
+  String? _projectId;
 
   @override
   void initState() {
@@ -251,6 +288,7 @@ class _ExpenseFormDialogState extends State<_ExpenseFormDialog> {
     _date = existing?.date ?? DateTime.now();
     _vatRate = existing?.vatRatePercent ?? 19;
     _categoryId = existing?.categoryId;
+    _projectId = existing?.projectId;
   }
 
   @override
@@ -332,6 +370,20 @@ class _ExpenseFormDialogState extends State<_ExpenseFormDialog> {
                 ],
                 onChanged: (value) => setState(() => _categoryId = value),
               ),
+              if (widget.projectsEnabled) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String?>(
+                  isExpanded: true,
+                  initialValue: _projectId,
+                  decoration: const InputDecoration(labelText: 'Projekt (optional)'),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('Ohne Projekt')),
+                    for (final project in widget.projects)
+                      DropdownMenuItem(value: project.id, child: Text(project.name)),
+                  ],
+                  onChanged: (value) => setState(() => _projectId = value),
+                ),
+              ],
               const SizedBox(height: 8),
               TextField(
                 controller: _supplierCtrl,
@@ -363,6 +415,7 @@ class _ExpenseFormDialogState extends State<_ExpenseFormDialog> {
                 categoryId: _categoryId,
                 supplierReference:
                     _supplierCtrl.text.trim().isEmpty ? null : _supplierCtrl.text.trim(),
+                projectId: _projectId,
               ),
             );
           },
