@@ -574,6 +574,20 @@ class $CompaniesTable extends Companies
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _buchhaltungEnabledMeta =
+      const VerificationMeta('buchhaltungEnabled');
+  @override
+  late final GeneratedColumn<bool> buchhaltungEnabled = GeneratedColumn<bool>(
+    'buchhaltung_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("buchhaltung_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -624,6 +638,7 @@ class $CompaniesTable extends Companies
     smtpInvoiceBodyTemplate,
     smtpDunningSubjectTemplate,
     smtpDunningBodyTemplate,
+    buchhaltungEnabled,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1039,6 +1054,15 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('buchhaltung_enabled')) {
+      context.handle(
+        _buchhaltungEnabledMeta,
+        buchhaltungEnabled.isAcceptableOrUnknown(
+          data['buchhaltung_enabled']!,
+          _buchhaltungEnabledMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1240,6 +1264,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.string,
         data['${effectivePrefix}smtp_dunning_body_template'],
       ),
+      buchhaltungEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}buchhaltung_enabled'],
+      )!,
     );
   }
 
@@ -1375,6 +1403,15 @@ class Company extends DataClass implements Insertable<Company> {
   final String? smtpInvoiceBodyTemplate;
   final String? smtpDunningSubjectTemplate;
   final String? smtpDunningBodyTemplate;
+
+  /// C14 Buchhaltung (Kay-Priorisierungsentscheidung 2026-10-18, voller
+  /// Umfang: Offene Posten + Belege/Ausgaben + Bankabgleich + DATEV-
+  /// Export). EIN Modul-Schalter für den gesamten Buchhaltungsbereich
+  /// (nicht pro Unterschritt) — die einzelnen Bausteine (C14.1–C14.5)
+  /// kommen schrittweise dazu, teilen sich aber dasselbe Flag, weil Kay
+  /// sie als ein zusammenhängendes Modul angefragt hat, nicht als
+  /// unabhängige Funktionen.
+  final bool buchhaltungEnabled;
   const Company({
     required this.id,
     required this.name,
@@ -1424,6 +1461,7 @@ class Company extends DataClass implements Insertable<Company> {
     this.smtpInvoiceBodyTemplate,
     this.smtpDunningSubjectTemplate,
     this.smtpDunningBodyTemplate,
+    required this.buchhaltungEnabled,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1554,6 +1592,7 @@ class Company extends DataClass implements Insertable<Company> {
         smtpDunningBodyTemplate,
       );
     }
+    map['buchhaltung_enabled'] = Variable<bool>(buchhaltungEnabled);
     return map;
   }
 
@@ -1662,6 +1701,7 @@ class Company extends DataClass implements Insertable<Company> {
       smtpDunningBodyTemplate: smtpDunningBodyTemplate == null && nullToAbsent
           ? const Value.absent()
           : Value(smtpDunningBodyTemplate),
+      buchhaltungEnabled: Value(buchhaltungEnabled),
     );
   }
 
@@ -1765,6 +1805,7 @@ class Company extends DataClass implements Insertable<Company> {
       smtpDunningBodyTemplate: serializer.fromJson<String?>(
         json['smtpDunningBodyTemplate'],
       ),
+      buchhaltungEnabled: serializer.fromJson<bool>(json['buchhaltungEnabled']),
     );
   }
   @override
@@ -1845,6 +1886,7 @@ class Company extends DataClass implements Insertable<Company> {
       'smtpDunningBodyTemplate': serializer.toJson<String?>(
         smtpDunningBodyTemplate,
       ),
+      'buchhaltungEnabled': serializer.toJson<bool>(buchhaltungEnabled),
     };
   }
 
@@ -1897,6 +1939,7 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> smtpInvoiceBodyTemplate = const Value.absent(),
     Value<String?> smtpDunningSubjectTemplate = const Value.absent(),
     Value<String?> smtpDunningBodyTemplate = const Value.absent(),
+    bool? buchhaltungEnabled,
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -1985,6 +2028,7 @@ class Company extends DataClass implements Insertable<Company> {
     smtpDunningBodyTemplate: smtpDunningBodyTemplate.present
         ? smtpDunningBodyTemplate.value
         : this.smtpDunningBodyTemplate,
+    buchhaltungEnabled: buchhaltungEnabled ?? this.buchhaltungEnabled,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -2110,6 +2154,9 @@ class Company extends DataClass implements Insertable<Company> {
       smtpDunningBodyTemplate: data.smtpDunningBodyTemplate.present
           ? data.smtpDunningBodyTemplate.value
           : this.smtpDunningBodyTemplate,
+      buchhaltungEnabled: data.buchhaltungEnabled.present
+          ? data.buchhaltungEnabled.value
+          : this.buchhaltungEnabled,
     );
   }
 
@@ -2165,7 +2212,8 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('smtpInvoiceSubjectTemplate: $smtpInvoiceSubjectTemplate, ')
           ..write('smtpInvoiceBodyTemplate: $smtpInvoiceBodyTemplate, ')
           ..write('smtpDunningSubjectTemplate: $smtpDunningSubjectTemplate, ')
-          ..write('smtpDunningBodyTemplate: $smtpDunningBodyTemplate')
+          ..write('smtpDunningBodyTemplate: $smtpDunningBodyTemplate, ')
+          ..write('buchhaltungEnabled: $buchhaltungEnabled')
           ..write(')'))
         .toString();
   }
@@ -2220,6 +2268,7 @@ class Company extends DataClass implements Insertable<Company> {
     smtpInvoiceBodyTemplate,
     smtpDunningSubjectTemplate,
     smtpDunningBodyTemplate,
+    buchhaltungEnabled,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2273,7 +2322,8 @@ class Company extends DataClass implements Insertable<Company> {
           other.smtpInvoiceSubjectTemplate == this.smtpInvoiceSubjectTemplate &&
           other.smtpInvoiceBodyTemplate == this.smtpInvoiceBodyTemplate &&
           other.smtpDunningSubjectTemplate == this.smtpDunningSubjectTemplate &&
-          other.smtpDunningBodyTemplate == this.smtpDunningBodyTemplate);
+          other.smtpDunningBodyTemplate == this.smtpDunningBodyTemplate &&
+          other.buchhaltungEnabled == this.buchhaltungEnabled);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -2325,6 +2375,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> smtpInvoiceBodyTemplate;
   final Value<String?> smtpDunningSubjectTemplate;
   final Value<String?> smtpDunningBodyTemplate;
+  final Value<bool> buchhaltungEnabled;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -2375,6 +2426,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.smtpInvoiceBodyTemplate = const Value.absent(),
     this.smtpDunningSubjectTemplate = const Value.absent(),
     this.smtpDunningBodyTemplate = const Value.absent(),
+    this.buchhaltungEnabled = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -2426,6 +2478,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.smtpInvoiceBodyTemplate = const Value.absent(),
     this.smtpDunningSubjectTemplate = const Value.absent(),
     this.smtpDunningBodyTemplate = const Value.absent(),
+    this.buchhaltungEnabled = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -2479,6 +2532,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? smtpInvoiceBodyTemplate,
     Expression<String>? smtpDunningSubjectTemplate,
     Expression<String>? smtpDunningBodyTemplate,
+    Expression<bool>? buchhaltungEnabled,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2551,6 +2605,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         'smtp_dunning_subject_template': smtpDunningSubjectTemplate,
       if (smtpDunningBodyTemplate != null)
         'smtp_dunning_body_template': smtpDunningBodyTemplate,
+      if (buchhaltungEnabled != null) 'buchhaltung_enabled': buchhaltungEnabled,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2604,6 +2659,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? smtpInvoiceBodyTemplate,
     Value<String?>? smtpDunningSubjectTemplate,
     Value<String?>? smtpDunningBodyTemplate,
+    Value<bool>? buchhaltungEnabled,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -2671,6 +2727,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           smtpDunningSubjectTemplate ?? this.smtpDunningSubjectTemplate,
       smtpDunningBodyTemplate:
           smtpDunningBodyTemplate ?? this.smtpDunningBodyTemplate,
+      buchhaltungEnabled: buchhaltungEnabled ?? this.buchhaltungEnabled,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2864,6 +2921,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         smtpDunningBodyTemplate.value,
       );
     }
+    if (buchhaltungEnabled.present) {
+      map['buchhaltung_enabled'] = Variable<bool>(buchhaltungEnabled.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2923,6 +2983,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('smtpInvoiceBodyTemplate: $smtpInvoiceBodyTemplate, ')
           ..write('smtpDunningSubjectTemplate: $smtpDunningSubjectTemplate, ')
           ..write('smtpDunningBodyTemplate: $smtpDunningBodyTemplate, ')
+          ..write('buchhaltungEnabled: $buchhaltungEnabled, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11749,6 +11810,7 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String?> smtpInvoiceBodyTemplate,
       Value<String?> smtpDunningSubjectTemplate,
       Value<String?> smtpDunningBodyTemplate,
+      Value<bool> buchhaltungEnabled,
       Value<int> rowid,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
@@ -11801,6 +11863,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String?> smtpInvoiceBodyTemplate,
       Value<String?> smtpDunningSubjectTemplate,
       Value<String?> smtpDunningBodyTemplate,
+      Value<bool> buchhaltungEnabled,
       Value<int> rowid,
     });
 
@@ -12251,6 +12314,11 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<String> get smtpDunningBodyTemplate => $composableBuilder(
     column: $table.smtpDunningBodyTemplate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get buchhaltungEnabled => $composableBuilder(
+    column: $table.buchhaltungEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12755,6 +12823,11 @@ class $$CompaniesTableOrderingComposer
     column: $table.smtpDunningBodyTemplate,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get buchhaltungEnabled => $composableBuilder(
+    column: $table.buchhaltungEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -12981,6 +13054,11 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<String> get smtpDunningBodyTemplate => $composableBuilder(
     column: $table.smtpDunningBodyTemplate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get buchhaltungEnabled => $composableBuilder(
+    column: $table.buchhaltungEnabled,
     builder: (column) => column,
   );
 
@@ -13329,6 +13407,7 @@ class $$CompaniesTableTableManager
                 Value<String?> smtpDunningSubjectTemplate =
                     const Value.absent(),
                 Value<String?> smtpDunningBodyTemplate = const Value.absent(),
+                Value<bool> buchhaltungEnabled = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -13379,6 +13458,7 @@ class $$CompaniesTableTableManager
                 smtpInvoiceBodyTemplate: smtpInvoiceBodyTemplate,
                 smtpDunningSubjectTemplate: smtpDunningSubjectTemplate,
                 smtpDunningBodyTemplate: smtpDunningBodyTemplate,
+                buchhaltungEnabled: buchhaltungEnabled,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -13435,6 +13515,7 @@ class $$CompaniesTableTableManager
                 Value<String?> smtpDunningSubjectTemplate =
                     const Value.absent(),
                 Value<String?> smtpDunningBodyTemplate = const Value.absent(),
+                Value<bool> buchhaltungEnabled = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -13485,6 +13566,7 @@ class $$CompaniesTableTableManager
                 smtpInvoiceBodyTemplate: smtpInvoiceBodyTemplate,
                 smtpDunningSubjectTemplate: smtpDunningSubjectTemplate,
                 smtpDunningBodyTemplate: smtpDunningBodyTemplate,
+                buchhaltungEnabled: buchhaltungEnabled,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
