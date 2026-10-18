@@ -132,6 +132,15 @@ class Companies extends Table {
   TextColumn get smtpDunningSubjectTemplate => text().nullable()();
   TextColumn get smtpDunningBodyTemplate => text().nullable()();
 
+  /// C14 Buchhaltung (Kay-Priorisierungsentscheidung 2026-10-18, voller
+  /// Umfang: Offene Posten + Belege/Ausgaben + Bankabgleich + DATEV-
+  /// Export). EIN Modul-Schalter für den gesamten Buchhaltungsbereich
+  /// (nicht pro Unterschritt) — die einzelnen Bausteine (C14.1–C14.5)
+  /// kommen schrittweise dazu, teilen sich aber dasselbe Flag, weil Kay
+  /// sie als ein zusammenhängendes Modul angefragt hat, nicht als
+  /// unabhängige Funktionen.
+  BoolColumn get buchhaltungEnabled => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

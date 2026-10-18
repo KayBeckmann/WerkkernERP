@@ -21,7 +21,7 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// v12→v13: C13 Abschlagsrechnungen; v13→v14: C12 Mahnwesen; v14→v15:
 /// C12 Mahnwesen — Nachbesserung (konfigurierbare Fristen/Gebühren/Zins +
 /// Mahnschreiben-Texte, Kay-Feedback 2026-10-17); v15→v16: C7a
-/// SMTP-Versand).
+/// SMTP-Versand; v16→v17: C14 Buchhaltung-Modulschalter).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -45,11 +45,12 @@ void main() {
   });
 
   test(
-    'Migration v1→v16 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v17 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
-    'SMTP-Versand): Bestandsdaten bekommen automatisch die neuen Default-Werte — ohne '
+    'SMTP-Versand + C14 Buchhaltung-Modulschalter): Bestandsdaten bekommen automatisch die '
+    'neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
@@ -174,6 +175,9 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN smtp_invoice_body_template;');
       raw.execute('ALTER TABLE companies DROP COLUMN smtp_dunning_subject_template;');
       raw.execute('ALTER TABLE companies DROP COLUMN smtp_dunning_body_template;');
+      // v16 -> v17 (C14 Buchhaltung, Kay-Priorisierungsentscheidung
+      // 2026-10-18):
+      raw.execute('ALTER TABLE companies DROP COLUMN buchhaltung_enabled;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -225,6 +229,7 @@ void main() {
         expect(migratedCompany.smtpInvoiceBodyTemplate, isNull);
         expect(migratedCompany.smtpDunningSubjectTemplate, isNull);
         expect(migratedCompany.smtpDunningBodyTemplate, isNull);
+        expect(migratedCompany.buchhaltungEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =

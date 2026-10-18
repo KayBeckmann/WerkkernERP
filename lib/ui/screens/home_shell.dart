@@ -12,6 +12,7 @@ import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
 import 'dashboard_screen.dart';
 import 'invoices_screen.dart';
+import 'open_items_screen.dart';
 import 'projects_screen.dart';
 import 'recurring_invoice_templates_screen.dart';
 import 'settings_screen.dart';
@@ -41,6 +42,7 @@ enum _TabId {
   projects,
   vehicles,
   recurringTemplates,
+  openItems,
   settings,
 }
 
@@ -63,7 +65,7 @@ class _Tab {
   final _Section section;
 }
 
-enum _Section { dashboard, fakturierung, stammdaten, einstellungen }
+enum _Section { dashboard, fakturierung, stammdaten, buchhaltung, einstellungen }
 
 /// Navigationsrahmen innerhalb einer gewählten Firma.
 ///
@@ -210,6 +212,16 @@ class _HomeShellState extends State<HomeShell> {
             title: 'Fuhrpark',
             screen: VehiclesScreen(),
             section: _Section.stammdaten,
+          ),
+        // C14.1 Offene-Posten-Übersicht (Kay-Priorisierungsentscheidung
+        // 2026-10-18 — erster Baustein der vollen Buchhaltung).
+        if (company.buchhaltungEnabled)
+          const _Tab(
+            id: _TabId.openItems,
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Offene Posten',
+            screen: OpenItemsScreen(),
+            section: _Section.buchhaltung,
           ),
         const _Tab(
           id: _TabId.settings,
@@ -403,6 +415,8 @@ class _WideShell extends StatelessWidget {
                               children.add(const SectionLabel('Fakturierung'));
                             } else if (tab.section == _Section.stammdaten) {
                               children.add(const SectionLabel('Stammdaten'));
+                            } else if (tab.section == _Section.buchhaltung) {
+                              children.add(const SectionLabel('Buchhaltung'));
                             } else if (tab.section != _Section.dashboard) {
                               // Für Dashboard bewusst KEINE Überschrift/
                               // Trennlinie — es ist der Einstiegspunkt,

@@ -72,6 +72,7 @@ void main() {
         smtpEnabled: false,
         smtpPort: 587,
         smtpUseTls: true,
+        buchhaltungEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

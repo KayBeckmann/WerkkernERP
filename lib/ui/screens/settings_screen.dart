@@ -185,6 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? advancePaymentInvoicesEnabled,
     bool? dunningEnabled,
     bool? smtpEnabled,
+    bool? buchhaltungEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -204,6 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 advancePaymentInvoicesEnabled ?? company.advancePaymentInvoicesEnabled,
             dunningEnabled: dunningEnabled ?? company.dunningEnabled,
             smtpEnabled: smtpEnabled ?? company.smtpEnabled,
+            buchhaltungEnabled: buchhaltungEnabled ?? company.buchhaltungEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -553,6 +555,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Versand (SMTP)'),
                     value: company.smtpEnabled,
                     onChanged: _busy ? null : (value) => _setModule(smtpEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Buchhaltung'),
+                    value: company.buchhaltungEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(buchhaltungEnabled: value),
                   ),
                 ],
               ),

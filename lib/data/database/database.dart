@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -177,6 +177,12 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.smtpInvoiceBodyTemplate);
             await migrator.addColumn(companies, companies.smtpDunningSubjectTemplate);
             await migrator.addColumn(companies, companies.smtpDunningBodyTemplate);
+          }
+          if (from < 17) {
+            // C14 Buchhaltung (Kay-Priorisierungsentscheidung 2026-10-18,
+            // voller Umfang: Offene Posten + Belege + Bankabgleich +
+            // DATEV-Export, SKR03, CSV-Bankimport).
+            await migrator.addColumn(companies, companies.buchhaltungEnabled);
           }
         },
       );
