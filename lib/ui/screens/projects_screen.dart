@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/customer_repository.dart';
+import '../../data/repositories/expense_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../domain/models/money.dart';
@@ -208,13 +209,17 @@ class _ProjectFormDialogState extends State<_ProjectFormDialog> {
 /// Projektdetail: zugeordnete Dokumente **über alle Dokumentarten
 /// hinweg** (C1) plus eine einfache Summe der finalisierten Rechnungen.
 ///
-/// **Bewusst keine Projekt-GuV, kein Stunden-Soll/Ist** — das sind laut
-/// Roadmap eigene, noch mit Kay zu klärende Entscheidungstore (Erlös-/
-/// Kostenzeitpunkt, interne Stundensätze, Gemeinkosten-/Fahrzeugumlage).
-/// Diese Ansicht zeigt nur, *was* einem Projekt zugeordnet ist, nicht was
-/// es *kostet* oder *einbringt* — der Hinweistext macht das für Kay beim
-/// Ansehen klar, damit niemand die reine Rechnungssumme versehentlich mit
-/// einem Deckungsbeitrag verwechselt.
+/// Seit Kay-Entscheidung 2026-10-19 ("Belege bekommen eine optionale
+/// Projektzuordnung") gibt es zusätzlich eine **einfache**
+/// Ergebnisrechnung (Erlöse aus zugeordneten Rechnungen minus direkte
+/// Kosten aus zugeordneten Belegen), sichtbar nur wenn C14 Buchhaltung
+/// aktiviert ist. **Bewusst weiterhin KEIN Stunden-Soll/Ist, kein
+/// interner Stundenkostensatz** — das braucht erst C3 Zeiterfassung
+/// (noch nicht umgesetzt) und bleibt ein eigenes Entscheidungstor.
+/// Fuhrparkkosten fließen hier **nicht** ein (Kay-Entscheidung
+/// 2026-10-19: "Fuhrpark wird auf Gemeinkosten gerechnet, nicht auf die
+/// Projekte" — die laufen stattdessen als eigene Kategorie in die
+/// EÜR-Übersicht, siehe `euer_service.dart`).
 class ProjectDetailScreen extends StatefulWidget {
   const ProjectDetailScreen({super.key, required this.project});
   final Project project;
@@ -234,10 +239,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   }
 
   Future<_ProjectDetailData> _load() async {
-    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final company = context.read<ActiveCompanyService>().active!;
     final invoiceRepo = context.read<InvoiceRepository>();
+    final expenseRepo = context.read<ExpenseRepository>();
     final documents = await invoiceRepo.listForProject(
-      companyId: companyId,
+      companyId: company.id,
       projectId: widget.project.id,
     );
     Money invoiceSum = Money.zero();
@@ -246,7 +252,23 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
         invoiceSum = invoiceSum + (await invoiceRepo.totalsFor(doc.id)).totalGross;
       }
     }
-    return _ProjectDetailData(documents: documents, invoiceSum: invoiceSum);
+    // Einfache Projekt-Ergebnisrechnung (Kay-Entscheidung 2026-10-19:
+    // "Belege bekommen eine optionale Projektzuordnung") — Erlöse aus
+    // zugeordneten Rechnungen minus direkte Kosten aus zugeordneten
+    // Belegen. Nur sinnvoll/angezeigt, wenn C14 Buchhaltung aktiviert
+    // ist (sonst gibt es gar keine Belege). Bewusst OHNE Stunden/
+    // Stundenkostensatz (siehe Kay-Nachfrage 2026-10-19: Zeiterfassung
+    // fehlt noch) — das bleibt ein eigenes Entscheidungstor.
+    final expenses = company.buchhaltungEnabled
+        ? await expenseRepo.listForProject(companyId: company.id, projectId: widget.project.id)
+        : const <Expense>[];
+    final expenseSum = expenses.fold(Money.zero(), (sum, e) => sum + Money.fromCents(e.amountGrossCents));
+    return _ProjectDetailData(
+      documents: documents,
+      invoiceSum: invoiceSum,
+      expenseSum: expenseSum,
+      showResult: company.buchhaltungEnabled,
+    );
   }
 
   Future<void> _toggleArchive(ProjectStatus current) async {
@@ -307,12 +329,35 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
                         'Summe finalisierter Rechnungen: ${data.invoiceSum}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Keine Projekt-Ergebnisrechnung — reine Rechnungssumme ohne Kosten, '
-                        'Stundensätze oder Umlagen (noch zu klärendes Entscheidungstor).',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      if (data.showResult) ...[
+                        const SizedBox(height: 4),
+                        Text('Zugeordnete Belege: ${data.expenseSum}'),
+                        const Divider(),
+                        Text(
+                          'Ergebnis: ${data.invoiceSum - data.expenseSum}',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: (data.invoiceSum - data.expenseSum).cents < 0
+                                    ? Theme.of(context).colorScheme.error
+                                    : null,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Einfache Ergebnisrechnung (Erlöse aus zugeordneten Rechnungen minus '
+                          'direkte Kosten aus zugeordneten Belegen) — ohne Stunden, '
+                          'Stundenkostensatz oder Fuhrpark-Umlage (Fuhrpark läuft als '
+                          'Gemeinkosten, siehe EÜR-Übersicht). Keine Rechtsprüfung.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Keine Projekt-Ergebnisrechnung — reine Rechnungssumme ohne Kosten, '
+                          'Stundensätze oder Umlagen (Buchhaltung-Modul nicht aktiviert).',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -344,7 +389,18 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
 }
 
 class _ProjectDetailData {
-  const _ProjectDetailData({required this.documents, required this.invoiceSum});
+  const _ProjectDetailData({
+    required this.documents,
+    required this.invoiceSum,
+    required this.expenseSum,
+    required this.showResult,
+  });
   final List<Invoice> documents;
   final Money invoiceSum;
+  final Money expenseSum;
+
+  /// Nur true, wenn C14 Buchhaltung aktiviert ist — ohne Belege wäre
+  /// eine "Ergebnisrechnung" nur die reine Rechnungssumme, nicht
+  /// irreführend als Ergebnis bezeichnen.
+  final bool showResult;
 }

@@ -32,6 +32,11 @@ class ExpenseRepository {
     required double vatRatePercent,
     String? categoryId,
     String? supplierReference,
+    // C1 Projekte / Projekt-Ergebnisrechnung (Kay-Entscheidung
+    // 2026-10-19: "Was brauchst du für die Projekt-Ergebnisrechnung?"
+    // -> erster Baustein "Belege bekommen eine optionale
+    // Projektzuordnung") — optional, wie bei allen übrigen Dokumenten.
+    String? projectId,
   }) async {
     final id = _uuid.v4();
     final now = DateTime.now();
@@ -45,6 +50,7 @@ class ExpenseRepository {
             vatRatePercent: vatRatePercent,
             categoryId: Value(categoryId),
             supplierReference: Value(supplierReference),
+            projectId: Value(projectId),
             createdAt: now,
             updatedAt: now,
           ),
@@ -61,6 +67,9 @@ class ExpenseRepository {
     double? vatRatePercent,
     Value<String?> categoryId = const Value.absent(),
     Value<String?> supplierReference = const Value.absent(),
+    // Wie bei categoryId: `Value.absent()` = unverändert, `Value(null)`
+    // = Zuordnung entfernen, `Value(id)` = (neu) zuordnen.
+    Value<String?> projectId = const Value.absent(),
   }) async {
     final rows = await (_db.update(_db.expenses)
           ..where((e) => e.id.equals(id) & e.companyId.equals(companyId)))
@@ -73,6 +82,7 @@ class ExpenseRepository {
         vatRatePercent: vatRatePercent == null ? const Value.absent() : Value(vatRatePercent),
         categoryId: categoryId,
         supplierReference: supplierReference,
+        projectId: projectId,
         updatedAt: Value(DateTime.now()),
       ),
     );
@@ -86,4 +96,14 @@ class ExpenseRepository {
             .go();
     return rows > 0;
   }
+
+  /// Alle einem Projekt zugeordneten Belege — Gegenstück zu
+  /// `InvoiceRepository.listForProject()`, für die einfache
+  /// Projekt-Ergebnisrechnung (Erlöse aus zugeordneten Rechnungen minus
+  /// Kosten aus zugeordneten Belegen).
+  Future<List<Expense>> listForProject({required String companyId, required String projectId}) =>
+      (_db.select(_db.expenses)
+            ..where((e) => e.companyId.equals(companyId) & e.projectId.equals(projectId))
+            ..orderBy([(e) => OrderingTerm.desc(e.date)]))
+          .get();
 }
