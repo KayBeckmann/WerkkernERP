@@ -25,6 +25,8 @@ part 'database.g.dart';
     VehicleCostEntries,
     RecurringInvoiceTemplates,
     RecurringInvoiceTemplateItems,
+    ExpenseCategories,
+    Expenses,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -34,7 +36,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -183,6 +185,11 @@ class AppDatabase extends _$AppDatabase {
             // voller Umfang: Offene Posten + Belege + Bankabgleich +
             // DATEV-Export, SKR03, CSV-Bankimport).
             await migrator.addColumn(companies, companies.buchhaltungEnabled);
+          }
+          if (from < 18) {
+            // C14.2 Belege/Ausgaben (Kern).
+            await migrator.createTable(expenseCategories);
+            await migrator.createTable(expenses);
           }
         },
       );

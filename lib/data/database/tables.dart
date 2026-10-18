@@ -616,3 +616,57 @@ class RecurringInvoiceTemplateItems extends Table {
   @override
   Set<Column> get primaryKey => {id};
 }
+
+/// C14.2 Belege/Ausgaben (Kay-Priorisierungsentscheidung 2026-10-18,
+/// voller Umfang der Buchhaltung — Kontenrahmen SKR03). Die konkreten
+/// SKR03-**Kontonummern** stammen bewusst NICHT aus dieser App — ein
+/// falsch erinnertes Kontonummern-Mapping wäre schlimmer als gar keins,
+/// sobald es in einen DATEV-Export (C14.5) einfließt. Kay (mit seinem
+/// Steuerberater) trägt die tatsächliche Kontonummer je Kategorie
+/// selbst ein; diese App liefert nur die Struktur (eine kleine, editier-
+/// bare Liste typischer Kategorien für ein Elektro-Kleingewerbe,
+/// zunächst ohne Kontonummer).
+class ExpenseCategories extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get label => text()();
+
+  /// SKR03-Kontonummer als Freitext (nicht als Integer — manche Konten-
+  /// bezeichnungen haben führende Nullen oder Unterkonten-Suffixe).
+  /// `null`, bis Kay sie selbst einträgt.
+  TextColumn get skr03Account => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Eine einzelne Ausgabe/ein Beleg. Bewusst als Bruttobetrag + Steuersatz
+/// erfasst (gleiches Muster wie eine Rechnungsposition, siehe F2) statt
+/// Netto+Steuer getrennt einzugeben — ein Beleg zeigt in der Praxis den
+/// Bruttobetrag, nicht den Vorsteuerbetrag.
+class Expenses extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  DateTimeColumn get date => dateTime()();
+  TextColumn get description => text()();
+  IntColumn get amountGrossCents => integer()();
+  RealColumn get vatRatePercent => real()();
+
+  /// `onDelete: setNull` — eine gelöschte/umbenannte Kategorie darf
+  /// keinen bereits erfassten Beleg mitreißen (gleiches Prinzip wie bei
+  /// `VehicleCostEntries.projectId`).
+  TextColumn get categoryId =>
+      text().nullable().references(ExpenseCategories, #id, onDelete: KeyAction.setNull)();
+
+  /// Freitext für Lieferant/Belegnummer — kein eigener Lieferanten-
+  /// Stammdatenbezug, das wäre für diesen Zweck Überkonstruktion.
+  TextColumn get supplierReference => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
