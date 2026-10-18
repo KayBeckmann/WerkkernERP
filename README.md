@@ -36,8 +36,11 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - Geldbeträge durchgängig als Integer-Cent mit kaufmännischer Rundung
   (`package:decimal`), nie als Fließkommazahl.
 - Lokale, schema-versionierte SQLite-Datenbank mit automatischer
-  Migration bei App-Updates (aktuell 16 Schemastufen, keine wird
+  Migration bei App-Updates (aktuell 20 Schemastufen, keine wird
   rückwirkend geändert — nur angehängt).
+- **Dashboard** als Einstiegspunkt nach Firmenwahl: Rechnungssumme
+  Monat/Jahr, offene/überfällige Rechnungen, Fuhrpark-TÜV, aktive
+  Projekte, wiederkehrende Vorlagen — je nach aktiviertem Modul.
 
 **Dokumente**
 - Rechnung, Angebot, Auftrag, Lieferschein und Proforma-Rechnung als
@@ -69,6 +72,16 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - **SMTP-Versand**: Rechnungen, Angebote und Aufträge direkt aus der App
   per E-Mail versenden (Android echt per SMTP; im Web-Build aus
   Browser-Sicherheitsgründen nur als PDF-Download, siehe unten).
+- **Buchhaltung** (Kontenrahmen SKR03): Offene-Posten-Übersicht je
+  Kunde, Belege/Ausgaben-Erfassung mit frei konfigurierbaren
+  Kategorien (SKR03-Kontonummer ist deine eigene Angabe, keine
+  Vorgabe durch die App), interne EÜR-Übersicht (Monat/Jahr,
+  **keine** steuerliche Erklärung nach § 4 Abs. 3 EStG), Bankabgleich
+  per CSV-Import mit konfigurierbarer Spaltenzuordnung (nie
+  automatisches Buchen — jede Zuordnung bestätigst du selbst) und ein
+  DATEV-Export (EXTF-Buchungsstapel) für Belege, bei dem das
+  BU-Schlüssel-Feld bewusst immer leer bleibt und dein Steuerberater
+  es ergänzt.
 
 **Backup & Sicherheit**
 - Transaktional konsistentes Backup (SQLite `VACUUM INTO`, nicht die
@@ -89,8 +102,10 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   noch nicht gebaut.
 - **Gutschrift-/Korrekturbeleg** für finalisierte Rechnungen — eigener
   Dokumenttyp/Nummernkreis, fachlich/steuerlich noch zu klären.
-- **Buchhaltung, Bankabgleich, DATEV/EÜR-Export, E-Rechnung (XRechnung/
-  ZUGFeRD)** — brauchen jeweils eine eigene fachliche/rechtliche Prüfung,
+- **DATEV-Export für Rechnungen/Einnahmen** (nur Belege/Ausgaben sind
+  umgesetzt, siehe oben) und **E-Rechnung (XRechnung/ZUGFeRD)** —
+  brauchen jeweils eine eigene fachliche/rechtliche Prüfung
+  (Personenkonten/Debitoren-Kontierung bzw. E-Rechnungs-Pflichtfelder),
   aktuell nicht Teil der App.
 - **Projekt-Ergebnisrechnung** (kalkulierte vs. tatsächliche Stunden,
   interne GuV, Fahrzeugkosten-Umlage auf Projekte) — Projekte/Fuhrpark
