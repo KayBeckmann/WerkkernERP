@@ -188,6 +188,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   );
   bool _generatingDunningLetter = false;
 
+  // Gutschriften (Kay-Entscheidung 2026-10-19): nur bei kind == invoice
+  // relevant und nur sichtbar, wenn die Firma das Modul aktiviert hat.
+  bool _creditNotesEnabled = false;
+  List<Invoice> _creditNotes = [];
+
   // C7a SMTP-Versand (Kay-Nachfrage 2026-10-17): nur sichtbar, wenn die
   // Firma das Modul aktiviert hat — genau wie bei den übrigen
   // optionalen Bereichen.
@@ -235,6 +240,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _dunningConfig = DunningConfig.fromCompany(company);
     _smtpEnabled = company.smtpEnabled;
     _smtpConfig = SmtpConfig.fromCompany(company);
+    _creditNotesEnabled = company.creditNotesEnabled;
 
     final invoice = widget.invoice;
     _currentInvoice = invoice;
@@ -248,6 +254,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _dueDate = invoice.dueDate;
       if (invoice.status == InvoiceStatus.finalized) {
         _hasBeenConverted = (await invoiceRepo.listConvertedFrom(invoice.id)).isNotEmpty;
+        if (invoice.kind == DocumentKind.invoice && _creditNotesEnabled) {
+          _creditNotes = await invoiceRepo.listCreditNotesForInvoice(invoice.id);
+        }
       }
       // C13: eine Rechnung, die aus einem Angebot/Auftrag umgewandelt
       // wurde, könnte eine Schlussrechnung sein — bereits gestellte
@@ -591,6 +600,41 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
   }
 
+  /// Gutschriften (Kay-Entscheidung 2026-10-19: "Gutschriften bekommen
+  /// einen eigenen Nummernkreis"). Anders als [_convertTo] setzt dies
+  /// **keine** `_hasBeenConverted`-Sperre auf DIESEM Dokument — eine
+  /// finalisierte Rechnung ist ohnehin schon sofort unveränderlich
+  /// (siehe Doc-Kommentar bei `createCreditNoteDraft`), eine Gutschrift
+  /// ändert daran nichts.
+  Future<void> _createCreditNote() async {
+    final invoice = _currentInvoice;
+    if (invoice == null) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final repo = context.read<InvoiceRepository>();
+    try {
+      final draft = await repo.createCreditNoteDraft(companyId: companyId, invoiceId: invoice.id);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => InvoiceEditorScreen(customer: widget.customer, invoice: draft),
+        ),
+      );
+      // Nach Rückkehr (ggf. inzwischen finalisiert) neu laden, damit sie
+      // sofort in "Gutschriften zu diesem Dokument" auftaucht.
+      if (mounted) {
+        setState(() {});
+        final reloaded = await repo.listCreditNotesForInvoice(invoice.id);
+        if (mounted) setState(() => _creditNotes = reloaded);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gutschrift konnte nicht erstellt werden: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _finalize() async {
     final invoice = _currentInvoice;
     if (invoice == null) return;
@@ -639,6 +683,16 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
   }
 
+  /// Gutschriften (Kay-Entscheidung 2026-10-19): Nummer der Rechnung,
+  /// auf die sich [invoice] bezieht — `null` bei allen anderen
+  /// Dokumentarten oder wenn die Quelle nicht (mehr) gefunden wird.
+  Future<String?> _referencedInvoiceNumber(Invoice invoice, InvoiceRepository repo) async {
+    if (invoice.kind != DocumentKind.creditNote || invoice.convertedFromId == null) return null;
+    final company = context.read<ActiveCompanyService>().active!;
+    final source = await repo.findById(companyId: company.id, id: invoice.convertedFromId!);
+    return source?.invoiceNumber;
+  }
+
   Future<void> _sharePdf() async {
     final invoice = _currentInvoice;
     if (invoice == null || invoice.status != InvoiceStatus.finalized) return;
@@ -652,6 +706,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         items: items,
         company: company,
         priorAdvancePaymentsGross: _priorAdvancePaymentsGross,
+        referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
       );
       await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
     } catch (_) {
@@ -711,6 +766,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           items: items,
           company: company,
           priorAdvancePaymentsGross: _priorAdvancePaymentsGross,
+          referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
         );
       },
     );
@@ -922,6 +978,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               ],
               onSelected: _convertTo,
             ),
+          if (isFinalized && _kind == DocumentKind.invoice && _creditNotesEnabled)
+            IconButton(
+              icon: const Icon(Icons.receipt_long_outlined),
+              tooltip: 'Gutschrift erstellen',
+              onPressed: _createCreditNote,
+            ),
           // Vorschau (ENTWURF-Wasserzeichen) macht nur vor der ersten
           // Finalisierung Sinn — danach existiert bereits ein echtes PDF
           // über "PDF teilen".
@@ -1090,6 +1152,34 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               ),
             ],
           ],
+          // Gutschriften (Kay-Entscheidung 2026-10-19): Übersicht bereits
+          // erstellter, finalisierter Gutschriften zu dieser Rechnung —
+          // es gibt bewusst keine eigene "Neue Gutschrift"-Liste (siehe
+          // Doc-Kommentar bei `createCreditNoteDraft`), daher ist das
+          // hier der einzige Weg, eine bereits erstellte Gutschrift
+          // wiederzufinden.
+          if (isFinalized && _kind == DocumentKind.invoice && _creditNotesEnabled && _creditNotes.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Gutschriften zu diesem Dokument', style: Theme.of(context).textTheme.titleSmall),
+                  for (final creditNote in _creditNotes)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.receipt_long_outlined),
+                      title: Text(creditNote.invoiceNumber ?? ''),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              InvoiceEditorScreen(customer: widget.customer, invoice: creditNote),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           const SizedBox(height: 16),
           for (final key in orderedKeys) ...[
             Padding(
