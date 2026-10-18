@@ -7,6 +7,8 @@ import 'data/repositories/article_group_repository.dart';
 import 'data/repositories/article_repository.dart';
 import 'data/repositories/company_repository.dart';
 import 'data/repositories/customer_repository.dart';
+import 'data/repositories/expense_category_repository.dart';
+import 'data/repositories/expense_repository.dart';
 import 'data/repositories/invoice_repository.dart';
 import 'data/repositories/number_sequence_repository.dart';
 import 'data/repositories/project_repository.dart';
@@ -79,6 +81,12 @@ class WerkkernErpApp extends StatelessWidget {
         ),
         Provider<SmtpCredentialStore>(
           create: (_) => SecureSmtpCredentialStore(),
+        ),
+        Provider<ExpenseCategoryRepository>(
+          create: (context) => ExpenseCategoryRepository(context.read<AppDatabase>()),
+        ),
+        Provider<ExpenseRepository>(
+          create: (context) => ExpenseRepository(context.read<AppDatabase>()),
         ),
         ChangeNotifierProvider<ActiveCompanyService>(
           create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),

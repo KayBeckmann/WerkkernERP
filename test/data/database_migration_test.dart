@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:decimal/decimal.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -21,7 +22,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// v12→v13: C13 Abschlagsrechnungen; v13→v14: C12 Mahnwesen; v14→v15:
 /// C12 Mahnwesen — Nachbesserung (konfigurierbare Fristen/Gebühren/Zins +
 /// Mahnschreiben-Texte, Kay-Feedback 2026-10-17); v15→v16: C7a
-/// SMTP-Versand; v16→v17: C14 Buchhaltung-Modulschalter).
+/// SMTP-Versand; v16→v17: C14 Buchhaltung-Modulschalter; v17→v18:
+/// C14.2 Belege/Ausgaben).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -45,12 +47,12 @@ void main() {
   });
 
   test(
-    'Migration v1→v17 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v18 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
-    'SMTP-Versand + C14 Buchhaltung-Modulschalter): Bestandsdaten bekommen automatisch die '
-    'neuen Default-Werte — ohne '
+    'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben): Bestandsdaten '
+    'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
     () async {
       // Schritt 1: Eine echte aktuelle Datenbank mit Nutzdaten anlegen
@@ -178,6 +180,9 @@ void main() {
       // v16 -> v17 (C14 Buchhaltung, Kay-Priorisierungsentscheidung
       // 2026-10-18):
       raw.execute('ALTER TABLE companies DROP COLUMN buchhaltung_enabled;');
+      // v17 -> v18 (C14.2 Belege/Ausgaben): abhängige Tabelle zuerst.
+      raw.execute('DROP TABLE expenses;');
+      raw.execute('DROP TABLE expense_categories;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -305,6 +310,34 @@ void main() {
               ..where((t) => t.id.equals('template-nach-migration')))
             .getSingle();
         expect(createdTemplate.active, isTrue);
+
+        // ExpenseCategories/Expenses existieren nach der Migration und
+        // sind nutzbar.
+        await db.into(db.expenseCategories).insert(
+              ExpenseCategoriesCompanion.insert(
+                id: 'category-nach-migration',
+                companyId: company.id,
+                label: 'Material',
+                createdAt: DateTime.now(),
+              ),
+            );
+        await db.into(db.expenses).insert(
+              ExpensesCompanion.insert(
+                id: 'expense-nach-migration',
+                companyId: company.id,
+                date: DateTime.now(),
+                description: 'Testbeleg',
+                amountGrossCents: 1190,
+                vatRatePercent: 19,
+                categoryId: const Value('category-nach-migration'),
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              ),
+            );
+        final createdExpense = await (db.select(db.expenses)
+              ..where((e) => e.id.equals('expense-nach-migration')))
+            .getSingle();
+        expect(createdExpense.amountGrossCents, 1190);
 
         final migratedCustomer =
             await (db.select(db.customers)..where((c) => c.id.equals(customer.id))).getSingle();

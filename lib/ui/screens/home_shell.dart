@@ -11,6 +11,7 @@ import 'articles_screen.dart';
 import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
 import 'dashboard_screen.dart';
+import 'expenses_screen.dart';
 import 'invoices_screen.dart';
 import 'open_items_screen.dart';
 import 'projects_screen.dart';
@@ -43,6 +44,7 @@ enum _TabId {
   vehicles,
   recurringTemplates,
   openItems,
+  expenses,
   settings,
 }
 
@@ -215,7 +217,7 @@ class _HomeShellState extends State<HomeShell> {
           ),
         // C14.1 Offene-Posten-Übersicht (Kay-Priorisierungsentscheidung
         // 2026-10-18 — erster Baustein der vollen Buchhaltung).
-        if (company.buchhaltungEnabled)
+        if (company.buchhaltungEnabled) ...[
           const _Tab(
             id: _TabId.openItems,
             icon: Icons.account_balance_wallet_outlined,
@@ -223,6 +225,16 @@ class _HomeShellState extends State<HomeShell> {
             screen: OpenItemsScreen(),
             section: _Section.buchhaltung,
           ),
+          // C14.2 Belege/Ausgaben (Kay-Priorisierungsentscheidung
+          // 2026-10-18).
+          const _Tab(
+            id: _TabId.expenses,
+            icon: Icons.receipt_outlined,
+            title: 'Belege',
+            screen: ExpensesScreen(),
+            section: _Section.buchhaltung,
+          ),
+        ],
         const _Tab(
           id: _TabId.settings,
           icon: Icons.settings_outlined,
