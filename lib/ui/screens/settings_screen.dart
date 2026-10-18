@@ -10,6 +10,7 @@ import '../../domain/services/smtp_credential_store.dart';
 import '../../domain/services/theme_preference_service.dart';
 import '../widgets/section_label.dart';
 import 'backup_screen.dart';
+import 'database_encryption_settings_card.dart';
 import 'invoices_screen.dart' show DocumentLabels;
 
 /// Einstellungen der aktiven Firma, thematisch gegliedert (Kay-Nachtrag
@@ -905,6 +906,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
         const SectionLabel('Daten & Sicherung'),
         const BackupScreen(),
+        const SectionLabel('Datenbank-Verschlüsselung'),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Card(child: DatabaseEncryptionSettingsCard()),
+        ),
       ],
     );
   }
