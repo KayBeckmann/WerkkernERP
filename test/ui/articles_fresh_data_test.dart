@@ -13,6 +13,16 @@ import 'package:werkkernerp/main.dart';
 AppDatabase _inMemoryDb() =>
     AppDatabase.forTesting(NativeDatabase.memory(setup: (db) => db.execute('PRAGMA foreign_keys = ON;')));
 
+/// Kay-Feedback 2026-10-19 ("zu voll in der bottom Menüleiste"): nur
+/// Dashboard/Rechnungen/Kunden stehen noch direkt in der schmalen
+/// Bottom-Bar, alles andere (hier: Artikel/Lieferanten) über "Mehr".
+Future<void> _openTab(WidgetTester tester, String label) async {
+  await tester.tap(find.text('Mehr'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets(
     'A1-Regressionstest: ein nach dem ersten Öffnen des Artikel-Tabs über den Lieferanten-Tab '
@@ -28,12 +38,10 @@ void main() {
 
       // Artikel-Tab ZUERST öffnen (lädt die damals noch leere
       // Lieferantenliste) ...
-      await tester.tap(find.text('Artikel'));
-      await tester.pumpAndSettle();
+      await _openTab(tester, 'Artikel');
 
       // ... DANACH erst einen Lieferanten über den eigenen Tab anlegen.
-      await tester.tap(find.text('Lieferanten'));
-      await tester.pumpAndSettle();
+      await _openTab(tester, 'Lieferanten');
       await tester.tap(find.text('Lieferant anlegen'));
       await tester.pumpAndSettle();
       await tester.enterText(find.widgetWithText(TextField, 'Name *'), 'Elektro Großhandel Nord');
@@ -41,8 +49,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Zurück zum (bereits einmal initialisierten) Artikel-Tab.
-      await tester.tap(find.text('Artikel'));
-      await tester.pumpAndSettle();
+      await _openTab(tester, 'Artikel');
       await tester.tap(find.text('Artikel anlegen'));
       await tester.pumpAndSettle();
 

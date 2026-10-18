@@ -64,6 +64,11 @@ void main() {
     await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
 
+    // Kay-Feedback 2026-10-19 ("zu voll in der bottom Menüleiste"):
+    // "Einstellungen" steht in der schmalen Bottom-Bar jetzt unter
+    // "Mehr", nicht mehr direkt.
+    await tester.tap(find.text('Mehr'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Einstellungen'));
     await tester.pumpAndSettle();
 

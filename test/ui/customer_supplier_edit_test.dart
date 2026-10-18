@@ -21,6 +21,16 @@ Future<void> _createCompanyAndEnter(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Kay-Feedback 2026-10-19 ("zu voll in der bottom Menüleiste"): nur
+/// Dashboard/Rechnungen/Kunden stehen noch direkt in der schmalen
+/// Bottom-Bar, "Lieferanten" steht jetzt unter "Mehr".
+Future<void> _openTab(WidgetTester tester, String label) async {
+  await tester.tap(find.text('Mehr'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(label));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('Tippen auf einen Kunden öffnet das Bearbeiten-Formular und speichert Änderungen', (
     tester,
@@ -55,8 +65,7 @@ void main() {
   ) async {
     await _createCompanyAndEnter(tester);
 
-    await tester.tap(find.text('Lieferanten'));
-    await tester.pumpAndSettle();
+    await _openTab(tester, 'Lieferanten');
     await tester.tap(find.text('Lieferant anlegen'));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'Name *'), 'Großhändler Süd');
