@@ -1,0 +1,97 @@
+import '../../data/database/database.dart';
+import '../models/money.dart';
+import 'dashboard_service.dart' show InvoiceWithGross;
+
+/// C14.3 EÜR-Übersicht (Kay-Priorisierungsentscheidung 2026-10-18,
+/// dritter Baustein der vollen Buchhaltung). Reine, datenbankfreie
+/// Aggregationslogik — gleiches Trennungsprinzip wie
+/// `dashboard_service.dart`/`open_items_service.dart`.
+///
+/// **Ausdrücklich KEINE steuerliche Einnahmen-Überschuss-Rechnung nach
+/// § 4 Abs. 3 EStG** — nur eine interne Übersicht aus den in dieser App
+/// erfassten Einnahmen (finalisierte Rechnungen) und Ausgaben (Belege).
+/// Es fehlen z. B. Abschreibungen (AfA), private Kfz-Nutzung,
+/// Rückstellungen und alles, was nicht über diese App läuft. Keine
+/// Rechtsprüfung, keine Zusage, dass das für eine Steuererklärung
+/// ausreicht — analog zu allen anderen "Arbeitsvorgabe statt
+/// Steuerberatung"-Stellen dieser App (F1/F2/C12/C13).
+class EuerCategoryTotal {
+  const EuerCategoryTotal({
+    required this.categoryLabel,
+    required this.skr03Account,
+    required this.total,
+  });
+  final String categoryLabel;
+  final String? skr03Account;
+  final Money total;
+}
+
+class EuerSummary {
+  const EuerSummary({
+    required this.periodStart,
+    required this.periodEnd,
+    required this.totalIncome,
+    required this.totalExpenses,
+    required this.expensesByCategory,
+    required this.surplus,
+  });
+  final DateTime periodStart;
+  final DateTime periodEnd;
+  final Money totalIncome;
+  final Money totalExpenses;
+
+  /// Größte Ausgabenkategorie zuerst.
+  final List<EuerCategoryTotal> expensesByCategory;
+
+  /// Einnahmen minus Ausgaben — "Überschuss" im Sinn dieser (nicht
+  /// steuerlichen) Übersicht.
+  final Money surplus;
+}
+
+bool _withinPeriod(DateTime date, DateTime start, DateTime end) =>
+    !date.isBefore(start) && !date.isAfter(end);
+
+/// Filtert UND aggregiert in einem Schritt — bewusst die vollen Listen
+/// übergeben (nicht vorgefiltert), damit die UI den Zeitraum wechseln
+/// kann, ohne erneut aus der Datenbank laden zu müssen.
+EuerSummary computeEuerSummary({
+  required List<InvoiceWithGross> allFinalizedInvoices,
+  required List<Expense> allExpenses,
+  required Map<String, ExpenseCategory> categoryById,
+  required DateTime periodStart,
+  required DateTime periodEnd,
+}) {
+  var totalIncome = Money.zero();
+  for (final entry in allFinalizedInvoices) {
+    if (_withinPeriod(entry.invoice.issueDate, periodStart, periodEnd)) {
+      totalIncome += entry.gross;
+    }
+  }
+
+  final byCategory = <String, Money>{};
+  for (final expense in allExpenses) {
+    if (!_withinPeriod(expense.date, periodStart, periodEnd)) continue;
+    final key = expense.categoryId ?? '';
+    byCategory[key] = (byCategory[key] ?? Money.zero()) + Money.fromCents(expense.amountGrossCents);
+  }
+
+  final categoryTotals = [
+    for (final entry in byCategory.entries)
+      EuerCategoryTotal(
+        categoryLabel: categoryById[entry.key]?.label ?? 'Ohne Kategorie',
+        skr03Account: categoryById[entry.key]?.skr03Account,
+        total: entry.value,
+      ),
+  ]..sort((a, b) => b.total.cents.compareTo(a.total.cents));
+
+  final totalExpenses = categoryTotals.fold(Money.zero(), (sum, c) => sum + c.total);
+
+  return EuerSummary(
+    periodStart: periodStart,
+    periodEnd: periodEnd,
+    totalIncome: totalIncome,
+    totalExpenses: totalExpenses,
+    expensesByCategory: categoryTotals,
+    surplus: totalIncome - totalExpenses,
+  );
+}

@@ -11,6 +11,7 @@ import 'articles_screen.dart';
 import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
 import 'dashboard_screen.dart';
+import 'euer_screen.dart';
 import 'expenses_screen.dart';
 import 'invoices_screen.dart';
 import 'open_items_screen.dart';
@@ -45,6 +46,7 @@ enum _TabId {
   recurringTemplates,
   openItems,
   expenses,
+  euer,
   settings,
 }
 
@@ -232,6 +234,15 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.receipt_outlined,
             title: 'Belege',
             screen: ExpensesScreen(),
+            section: _Section.buchhaltung,
+          ),
+          // C14.3 EÜR-Übersicht (Kay-Priorisierungsentscheidung
+          // 2026-10-18).
+          const _Tab(
+            id: _TabId.euer,
+            icon: Icons.insights_outlined,
+            title: 'EÜR-Übersicht',
+            screen: EuerScreen(),
             section: _Section.buchhaltung,
           ),
         ],
