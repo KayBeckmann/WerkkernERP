@@ -176,6 +176,14 @@ class Companies extends Table {
   TextColumn get datevBankGegenkonto => text().nullable()();
   IntColumn get datevSachkontenlaenge => integer().withDefault(const Constant(4))();
 
+  /// Gutschriften (Kay-Entscheidung 2026-10-19) — pro Firma ein-/
+  /// ausblendbares Modul wie alle übrigen optionalen Dokumentarten,
+  /// Default aus. Eigenes Einleitungs-/Schlusstext-Paar wie bei den
+  /// übrigen Dokumentarten (siehe `document_text_resolver.dart`).
+  BoolColumn get creditNotesEnabled => boolean().withDefault(const Constant(false))();
+  TextColumn get pdfIntroTextCreditNote => text().nullable()();
+  TextColumn get pdfClosingTextCreditNote => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -309,7 +317,19 @@ enum InvoiceStatus { draft, finalized }
 /// ist aber **keine Rechnung im umsatzsteuerrechtlichen Sinne** (eigener
 /// Nummernkreis, nicht GoBD-/Umsatz-relevant). Finalisierte Proforma ist
 /// per `convertTo()` in eine echte Rechnung umwandelbar.
-enum DocumentKind { invoice, quote, order, deliveryNote, proforma }
+/// `creditNote` (Gutschrift, Kay-Entscheidung 2026-10-19: "Gutschriften
+/// bekommen einen eigenen Nummernkreis") — korrigiert eine bereits
+/// finalisierte, unveränderliche Rechnung nachträglich, OHNE diese
+/// selbst zu ändern (GoBD-Prinzip: niemals eine finalisierte Rechnung
+/// nachträglich bearbeiten). Bewusst **kein** Eintrag in
+/// `allowedConversionTargets` für `invoice` als Quelle — eine
+/// Gutschrift entsteht über die eigenständige
+/// `InvoiceRepository.createCreditNoteDraft()`, nicht über das
+/// generische `convertTo()`, weil `isEditable()` sonst JEDE Rechnung
+/// bis zur ersten Gutschrift wieder editierbar machen würde (siehe
+/// Doc-Kommentar dort) — Rechnungen bleiben wie bisher ab Finalisierung
+/// sofort unveränderlich.
+enum DocumentKind { invoice, quote, order, deliveryNote, proforma, creditNote }
 
 /// C12 Mahnwesen — bewusst binär (offen/bezahlt), keine Teilzahlungen
 /// oder Zahlungseingänge aus einem Bankabgleich (das ist C7).
@@ -699,6 +719,17 @@ class Expenses extends Table {
   /// Freitext für Lieferant/Belegnummer — kein eigener Lieferanten-
   /// Stammdatenbezug, das wäre für diesen Zweck Überkonstruktion.
   TextColumn get supplierReference => text().nullable()();
+
+  /// Projekt-Direktkosten (Kay-Anfrage 2026-10-19: "Was brauchst du für
+  /// die Projekt-Ergebnisrechnung?"). Anders als die inzwischen bewusst
+  /// NICHT mehr projektbezogen gerechneten Fuhrpark-Kosten (Kay-
+  /// Entscheidung: "Fuhrpark wird auf Gemeinkosten gerechnet") zählen
+  /// Belege mit Projektzuordnung ECHT in die Projekt-Ergebnisrechnung
+  /// (Erlöse − direkte Belege-Kosten), siehe `project_result_service.dart`.
+  /// `onDelete: setNull` — ein gelöschtes Projekt reißt keinen bereits
+  /// erfassten Beleg mit (gleiches Prinzip wie überall in diesem Schema).
+  TextColumn get projectId =>
+      text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
