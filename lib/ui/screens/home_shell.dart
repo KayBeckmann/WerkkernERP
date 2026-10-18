@@ -10,6 +10,7 @@ import '../widgets/sidebar_nav_item.dart';
 import 'articles_screen.dart';
 import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
+import 'bank_reconciliation_screen.dart';
 import 'dashboard_screen.dart';
 import 'euer_screen.dart';
 import 'expenses_screen.dart';
@@ -47,6 +48,7 @@ enum _TabId {
   openItems,
   expenses,
   euer,
+  bankReconciliation,
   settings,
 }
 
@@ -243,6 +245,15 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.insights_outlined,
             title: 'EÜR-Übersicht',
             screen: EuerScreen(),
+            section: _Section.buchhaltung,
+          ),
+          // C14.4 Bankabgleich (Kay-Priorisierungsentscheidung
+          // 2026-10-18).
+          const _Tab(
+            id: _TabId.bankReconciliation,
+            icon: Icons.sync_alt_outlined,
+            title: 'Bankabgleich',
+            screen: BankReconciliationScreen(),
             section: _Section.buchhaltung,
           ),
         ],

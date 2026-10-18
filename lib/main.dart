@@ -5,6 +5,7 @@ import 'data/backup/backup_service.dart';
 import 'data/database/database.dart';
 import 'data/repositories/article_group_repository.dart';
 import 'data/repositories/article_repository.dart';
+import 'data/repositories/bank_transaction_repository.dart';
 import 'data/repositories/company_repository.dart';
 import 'data/repositories/customer_repository.dart';
 import 'data/repositories/expense_category_repository.dart';
@@ -87,6 +88,9 @@ class WerkkernErpApp extends StatelessWidget {
         ),
         Provider<ExpenseRepository>(
           create: (context) => ExpenseRepository(context.read<AppDatabase>()),
+        ),
+        Provider<BankTransactionRepository>(
+          create: (context) => BankTransactionRepository(context.read<AppDatabase>()),
         ),
         ChangeNotifierProvider<ActiveCompanyService>(
           create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),

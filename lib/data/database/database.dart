@@ -27,6 +27,7 @@ part 'database.g.dart';
     RecurringInvoiceTemplateItems,
     ExpenseCategories,
     Expenses,
+    BankTransactions,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -36,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -190,6 +191,18 @@ class AppDatabase extends _$AppDatabase {
             // C14.2 Belege/Ausgaben (Kern).
             await migrator.createTable(expenseCategories);
             await migrator.createTable(expenses);
+          }
+          if (from < 19) {
+            // C14.4 Bankabgleich (CSV).
+            await migrator.addColumn(companies, companies.bankCsvDelimiter);
+            await migrator.addColumn(companies, companies.bankCsvHasHeaderRow);
+            await migrator.addColumn(companies, companies.bankCsvDateColumn);
+            await migrator.addColumn(companies, companies.bankCsvAmountColumn);
+            await migrator.addColumn(companies, companies.bankCsvPurposeColumn);
+            await migrator.addColumn(companies, companies.bankCsvCounterpartyColumn);
+            await migrator.addColumn(companies, companies.bankCsvDateFormat);
+            await migrator.addColumn(companies, companies.bankCsvDecimalSeparator);
+            await migrator.createTable(bankTransactions);
           }
         },
       );

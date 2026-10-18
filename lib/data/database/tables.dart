@@ -141,6 +141,29 @@ class Companies extends Table {
   /// unabhängige Funktionen.
   BoolColumn get buchhaltungEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C14.4 Bankabgleich per CSV (Kay-Priorisierungsentscheidung
+  /// 2026-10-18: CSV statt MT940, trotz des höheren Aufwands bewusst so
+  /// gewählt — jede Bank hat ein eigenes CSV-Spaltenschema, deshalb
+  /// konfigurierbare Spaltenzuordnung statt eines bankspezifischen
+  /// Parsers). `bankCsvDateColumn`/`bankCsvAmountColumn`/... sind je
+  /// nach `bankCsvHasHeaderRow` entweder Spaltenüberschriften (Text)
+  /// oder nullbasierte Spaltenindizes (als Text gespeichert, z. B.
+  /// "2") — beides Freitext, damit kein zweites Spaltenpaar für die
+  /// beiden Fälle nötig ist.
+  TextColumn get bankCsvDelimiter => text().withDefault(const Constant(';'))();
+  BoolColumn get bankCsvHasHeaderRow => boolean().withDefault(const Constant(true))();
+  TextColumn get bankCsvDateColumn => text().nullable()();
+  TextColumn get bankCsvAmountColumn => text().nullable()();
+  TextColumn get bankCsvPurposeColumn => text().nullable()();
+  TextColumn get bankCsvCounterpartyColumn => text().nullable()();
+
+  /// `intl`-Musterformat, z. B. `dd.MM.yyyy` oder `yyyy-MM-dd`.
+  TextColumn get bankCsvDateFormat => text().withDefault(const Constant('dd.MM.yyyy'))();
+
+  /// `,` (deutsch, Standard) oder `.` (englisch/US) als Dezimaltrenner
+  /// im Betragsfeld der CSV-Datei.
+  TextColumn get bankCsvDecimalSeparator => text().withDefault(const Constant(','))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -666,6 +689,37 @@ class Expenses extends Table {
   TextColumn get supplierReference => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// C14.4 Bankabgleich (Kay-Priorisierungsentscheidung 2026-10-18,
+/// voller Umfang der Buchhaltung, CSV-Import). Eine importierte
+/// Bank-Zeile — `amountCents` ist vorzeichenbehaftet (positiv =
+/// Eingang, negativ = Ausgang, genau wie im Kontoauszug). **Nie
+/// automatisches Buchen**: `matchedInvoiceId` wird ausschließlich durch
+/// eine bewusste Nutzerbestätigung im Bankabgleich-Bildschirm gesetzt.
+class BankTransactions extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  DateTimeColumn get date => dateTime()();
+  IntColumn get amountCents => integer()();
+  TextColumn get purpose => text().nullable()();
+  TextColumn get counterparty => text().nullable()();
+
+  /// `onDelete: setNull` — eine gelöschte Rechnung darf keine bereits
+  /// importierte Bank-Zeile mitreißen (gleiches Prinzip wie überall in
+  /// diesem Schema).
+  TextColumn get matchedInvoiceId =>
+      text().nullable().references(Invoices, #id, onDelete: KeyAction.setNull)();
+
+  /// Hash aus Datum+Betrag+Verwendungszweck+Auftraggeber — verhindert,
+  /// dass ein erneuter Import derselben Export-Datei (z. B. mit
+  /// überlappendem Zeitraum) doppelte Zeilen anlegt.
+  TextColumn get importHash => text()();
+  DateTimeColumn get importedAt => dateTime()();
 
   @override
   Set<Column> get primaryKey => {id};
