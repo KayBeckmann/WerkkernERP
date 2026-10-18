@@ -19,6 +19,7 @@ String? introTextFor(Company company, DocumentKind kind) => switch (kind) {
       DocumentKind.order => company.pdfIntroTextOrder,
       DocumentKind.deliveryNote => company.pdfIntroTextDeliveryNote,
       DocumentKind.proforma => company.pdfIntroTextProforma,
+      DocumentKind.creditNote => company.pdfIntroTextCreditNote,
     };
 
 String? closingTextFor(Company company, DocumentKind kind) => switch (kind) {
@@ -27,4 +28,5 @@ String? closingTextFor(Company company, DocumentKind kind) => switch (kind) {
       DocumentKind.order => company.pdfClosingTextOrder,
       DocumentKind.deliveryNote => company.pdfClosingTextDeliveryNote,
       DocumentKind.proforma => company.pdfClosingTextProforma,
+      DocumentKind.creditNote => company.pdfClosingTextCreditNote,
     };
