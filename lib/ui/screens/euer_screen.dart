@@ -6,6 +6,7 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/expense_category_repository.dart';
 import '../../data/repositories/expense_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
+import '../../data/repositories/vehicle_repository.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/dashboard_service.dart' show InvoiceWithGross;
 import '../../domain/services/euer_service.dart';
@@ -24,10 +25,18 @@ class EuerScreen extends StatefulWidget {
 enum _Period { thisMonth, thisYear }
 
 class _EuerData {
-  const _EuerData({required this.invoices, required this.expenses, required this.categoryById});
+  const _EuerData({
+    required this.invoices,
+    required this.expenses,
+    required this.categoryById,
+    required this.vehicleCostEntries,
+  });
   final List<InvoiceWithGross> invoices;
   final List<Expense> expenses;
   final Map<String, ExpenseCategory> categoryById;
+
+  /// Leer, wenn C6 Fuhrpark nicht aktiviert ist.
+  final List<VehicleCostEntry> vehicleCostEntries;
 }
 
 class _EuerScreenState extends State<EuerScreen> {
@@ -43,12 +52,13 @@ class _EuerScreenState extends State<EuerScreen> {
   Future<_EuerData> _load() async {
     // Provider-Zugriffe VOR dem ersten await — siehe dieselbe
     // Begründung in dashboard_screen.dart.
-    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final company = context.read<ActiveCompanyService>().active!;
     final invoiceRepo = context.read<InvoiceRepository>();
     final expenseRepo = context.read<ExpenseRepository>();
     final categoryRepo = context.read<ExpenseCategoryRepository>();
+    final vehicleRepo = context.read<VehicleRepository>();
 
-    final allInvoices = await invoiceRepo.listAllForCompany(companyId);
+    final allInvoices = await invoiceRepo.listAllForCompany(company.id);
     final finalized = allInvoices.where((i) => i.status == InvoiceStatus.finalized).toList();
     final withGross = <InvoiceWithGross>[];
     for (final invoice in finalized) {
@@ -56,13 +66,18 @@ class _EuerScreenState extends State<EuerScreen> {
       withGross.add(InvoiceWithGross(invoice: invoice, gross: totals.totalGross));
     }
 
-    final expenses = await expenseRepo.listForCompany(companyId);
-    final categories = await categoryRepo.listForCompany(companyId);
+    final expenses = await expenseRepo.listForCompany(company.id);
+    final categories = await categoryRepo.listForCompany(company.id);
+    // Fuhrpark (Kay-Entscheidung 2026-10-19: "auf Gemeinkosten gerechnet,
+    // nicht auf die Projekte") nur laden, wenn das Modul aktiviert ist.
+    final vehicleCostEntries =
+        company.fleetEnabled ? await vehicleRepo.listAllCostsForCompany(company.id) : const <VehicleCostEntry>[];
 
     return _EuerData(
       invoices: withGross,
       expenses: expenses,
       categoryById: {for (final c in categories) c.id: c},
+      vehicleCostEntries: vehicleCostEntries,
     );
   }
 
@@ -107,6 +122,7 @@ class _EuerScreenState extends State<EuerScreen> {
             categoryById: data.categoryById,
             periodStart: bounds.start,
             periodEnd: bounds.end,
+            allVehicleCostEntries: data.vehicleCostEntries,
           );
 
           return ListView(
