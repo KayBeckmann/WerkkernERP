@@ -23,7 +23,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// C12 Mahnwesen — Nachbesserung (konfigurierbare Fristen/Gebühren/Zins +
 /// Mahnschreiben-Texte, Kay-Feedback 2026-10-17); v15→v16: C7a
 /// SMTP-Versand; v16→v17: C14 Buchhaltung-Modulschalter; v17→v18:
-/// C14.2 Belege/Ausgaben; v18→v19: C14.4 Bankabgleich/CSV).
+/// C14.2 Belege/Ausgaben; v18→v19: C14.4 Bankabgleich/CSV; v19→v20:
+/// C14.5 DATEV-Export).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -47,12 +48,12 @@ void main() {
   });
 
   test(
-    'Migration v1→v19 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v20 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
     'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
-    'C14.4 Bankabgleich/CSV): Bestandsdaten '
+    'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export): Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
     () async {
@@ -194,6 +195,11 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_counterparty_column;');
       raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_date_format;');
       raw.execute('ALTER TABLE companies DROP COLUMN bank_csv_decimal_separator;');
+      // v19 -> v20 (C14.5 DATEV-Export):
+      raw.execute('ALTER TABLE companies DROP COLUMN datev_berater_nummer;');
+      raw.execute('ALTER TABLE companies DROP COLUMN datev_mandant_nummer;');
+      raw.execute('ALTER TABLE companies DROP COLUMN datev_bank_gegenkonto;');
+      raw.execute('ALTER TABLE companies DROP COLUMN datev_sachkontenlaenge;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -254,6 +260,10 @@ void main() {
         expect(migratedCompany.bankCsvCounterpartyColumn, isNull);
         expect(migratedCompany.bankCsvDateFormat, 'dd.MM.yyyy');
         expect(migratedCompany.bankCsvDecimalSeparator, ',');
+        expect(migratedCompany.datevBeraterNummer, isNull);
+        expect(migratedCompany.datevMandantNummer, isNull);
+        expect(migratedCompany.datevBankGegenkonto, isNull);
+        expect(migratedCompany.datevSachkontenlaenge, 4);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =

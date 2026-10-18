@@ -77,6 +77,7 @@ void main() {
         bankCsvHasHeaderRow: true,
         bankCsvDateFormat: 'dd.MM.yyyy',
         bankCsvDecimalSeparator: ',',
+        datevSachkontenlaenge: 4,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

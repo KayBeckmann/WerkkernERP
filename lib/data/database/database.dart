@@ -37,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 20;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -203,6 +203,13 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.bankCsvDateFormat);
             await migrator.addColumn(companies, companies.bankCsvDecimalSeparator);
             await migrator.createTable(bankTransactions);
+          }
+          if (from < 20) {
+            // C14.5 DATEV-Export (SKR03).
+            await migrator.addColumn(companies, companies.datevBeraterNummer);
+            await migrator.addColumn(companies, companies.datevMandantNummer);
+            await migrator.addColumn(companies, companies.datevBankGegenkonto);
+            await migrator.addColumn(companies, companies.datevSachkontenlaenge);
           }
         },
       );
