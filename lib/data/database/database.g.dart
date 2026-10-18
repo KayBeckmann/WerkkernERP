@@ -684,6 +684,50 @@ class $CompaniesTable extends Companies
         requiredDuringInsert: false,
         defaultValue: const Constant(','),
       );
+  static const VerificationMeta _datevBeraterNummerMeta =
+      const VerificationMeta('datevBeraterNummer');
+  @override
+  late final GeneratedColumn<String> datevBeraterNummer =
+      GeneratedColumn<String>(
+        'datev_berater_nummer',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _datevMandantNummerMeta =
+      const VerificationMeta('datevMandantNummer');
+  @override
+  late final GeneratedColumn<String> datevMandantNummer =
+      GeneratedColumn<String>(
+        'datev_mandant_nummer',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _datevBankGegenkontoMeta =
+      const VerificationMeta('datevBankGegenkonto');
+  @override
+  late final GeneratedColumn<String> datevBankGegenkonto =
+      GeneratedColumn<String>(
+        'datev_bank_gegenkonto',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _datevSachkontenlaengeMeta =
+      const VerificationMeta('datevSachkontenlaenge');
+  @override
+  late final GeneratedColumn<int> datevSachkontenlaenge = GeneratedColumn<int>(
+    'datev_sachkontenlaenge',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(4),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -743,6 +787,10 @@ class $CompaniesTable extends Companies
     bankCsvCounterpartyColumn,
     bankCsvDateFormat,
     bankCsvDecimalSeparator,
+    datevBeraterNummer,
+    datevMandantNummer,
+    datevBankGegenkonto,
+    datevSachkontenlaenge,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1239,6 +1287,42 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('datev_berater_nummer')) {
+      context.handle(
+        _datevBeraterNummerMeta,
+        datevBeraterNummer.isAcceptableOrUnknown(
+          data['datev_berater_nummer']!,
+          _datevBeraterNummerMeta,
+        ),
+      );
+    }
+    if (data.containsKey('datev_mandant_nummer')) {
+      context.handle(
+        _datevMandantNummerMeta,
+        datevMandantNummer.isAcceptableOrUnknown(
+          data['datev_mandant_nummer']!,
+          _datevMandantNummerMeta,
+        ),
+      );
+    }
+    if (data.containsKey('datev_bank_gegenkonto')) {
+      context.handle(
+        _datevBankGegenkontoMeta,
+        datevBankGegenkonto.isAcceptableOrUnknown(
+          data['datev_bank_gegenkonto']!,
+          _datevBankGegenkontoMeta,
+        ),
+      );
+    }
+    if (data.containsKey('datev_sachkontenlaenge')) {
+      context.handle(
+        _datevSachkontenlaengeMeta,
+        datevSachkontenlaenge.isAcceptableOrUnknown(
+          data['datev_sachkontenlaenge']!,
+          _datevSachkontenlaengeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1476,6 +1560,22 @@ class $CompaniesTable extends Companies
         DriftSqlType.string,
         data['${effectivePrefix}bank_csv_decimal_separator'],
       )!,
+      datevBeraterNummer: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}datev_berater_nummer'],
+      ),
+      datevMandantNummer: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}datev_mandant_nummer'],
+      ),
+      datevBankGegenkonto: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}datev_bank_gegenkonto'],
+      ),
+      datevSachkontenlaenge: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}datev_sachkontenlaenge'],
+      )!,
     );
   }
 
@@ -1643,6 +1743,18 @@ class Company extends DataClass implements Insertable<Company> {
   /// `,` (deutsch, Standard) oder `.` (englisch/US) als Dezimaltrenner
   /// im Betragsfeld der CSV-Datei.
   final String bankCsvDecimalSeparator;
+
+  /// C14.5 DATEV-Export (Kay-Priorisierungsentscheidung 2026-10-18,
+  /// letzter Baustein der vollen Buchhaltung, Kontenrahmen SKR03).
+  /// Berater-/Mandantennummer sind Kays eigene Angaben von seinem
+  /// Steuerberater/seiner DATEV-Kanzlei — diese App erfindet oder rät
+  /// hier nichts. `datevBankGegenkonto` ist das Konto, gegen das Belege
+  /// gebucht werden (typischerweise das Bank-/Kassenkonto, z. B. 1200
+  /// in SKR03) — ebenfalls Kays eigene Angabe.
+  final String? datevBeraterNummer;
+  final String? datevMandantNummer;
+  final String? datevBankGegenkonto;
+  final int datevSachkontenlaenge;
   const Company({
     required this.id,
     required this.name,
@@ -1701,6 +1813,10 @@ class Company extends DataClass implements Insertable<Company> {
     this.bankCsvCounterpartyColumn,
     required this.bankCsvDateFormat,
     required this.bankCsvDecimalSeparator,
+    this.datevBeraterNummer,
+    this.datevMandantNummer,
+    this.datevBankGegenkonto,
+    required this.datevSachkontenlaenge,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1852,6 +1968,16 @@ class Company extends DataClass implements Insertable<Company> {
     map['bank_csv_decimal_separator'] = Variable<String>(
       bankCsvDecimalSeparator,
     );
+    if (!nullToAbsent || datevBeraterNummer != null) {
+      map['datev_berater_nummer'] = Variable<String>(datevBeraterNummer);
+    }
+    if (!nullToAbsent || datevMandantNummer != null) {
+      map['datev_mandant_nummer'] = Variable<String>(datevMandantNummer);
+    }
+    if (!nullToAbsent || datevBankGegenkonto != null) {
+      map['datev_bank_gegenkonto'] = Variable<String>(datevBankGegenkonto);
+    }
+    map['datev_sachkontenlaenge'] = Variable<int>(datevSachkontenlaenge);
     return map;
   }
 
@@ -1978,6 +2104,16 @@ class Company extends DataClass implements Insertable<Company> {
           : Value(bankCsvCounterpartyColumn),
       bankCsvDateFormat: Value(bankCsvDateFormat),
       bankCsvDecimalSeparator: Value(bankCsvDecimalSeparator),
+      datevBeraterNummer: datevBeraterNummer == null && nullToAbsent
+          ? const Value.absent()
+          : Value(datevBeraterNummer),
+      datevMandantNummer: datevMandantNummer == null && nullToAbsent
+          ? const Value.absent()
+          : Value(datevMandantNummer),
+      datevBankGegenkonto: datevBankGegenkonto == null && nullToAbsent
+          ? const Value.absent()
+          : Value(datevBankGegenkonto),
+      datevSachkontenlaenge: Value(datevSachkontenlaenge),
     );
   }
 
@@ -2102,6 +2238,18 @@ class Company extends DataClass implements Insertable<Company> {
       bankCsvDecimalSeparator: serializer.fromJson<String>(
         json['bankCsvDecimalSeparator'],
       ),
+      datevBeraterNummer: serializer.fromJson<String?>(
+        json['datevBeraterNummer'],
+      ),
+      datevMandantNummer: serializer.fromJson<String?>(
+        json['datevMandantNummer'],
+      ),
+      datevBankGegenkonto: serializer.fromJson<String?>(
+        json['datevBankGegenkonto'],
+      ),
+      datevSachkontenlaenge: serializer.fromJson<int>(
+        json['datevSachkontenlaenge'],
+      ),
     );
   }
   @override
@@ -2195,6 +2343,10 @@ class Company extends DataClass implements Insertable<Company> {
       'bankCsvDecimalSeparator': serializer.toJson<String>(
         bankCsvDecimalSeparator,
       ),
+      'datevBeraterNummer': serializer.toJson<String?>(datevBeraterNummer),
+      'datevMandantNummer': serializer.toJson<String?>(datevMandantNummer),
+      'datevBankGegenkonto': serializer.toJson<String?>(datevBankGegenkonto),
+      'datevSachkontenlaenge': serializer.toJson<int>(datevSachkontenlaenge),
     };
   }
 
@@ -2256,6 +2408,10 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> bankCsvCounterpartyColumn = const Value.absent(),
     String? bankCsvDateFormat,
     String? bankCsvDecimalSeparator,
+    Value<String?> datevBeraterNummer = const Value.absent(),
+    Value<String?> datevMandantNummer = const Value.absent(),
+    Value<String?> datevBankGegenkonto = const Value.absent(),
+    int? datevSachkontenlaenge,
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2362,6 +2518,16 @@ class Company extends DataClass implements Insertable<Company> {
     bankCsvDateFormat: bankCsvDateFormat ?? this.bankCsvDateFormat,
     bankCsvDecimalSeparator:
         bankCsvDecimalSeparator ?? this.bankCsvDecimalSeparator,
+    datevBeraterNummer: datevBeraterNummer.present
+        ? datevBeraterNummer.value
+        : this.datevBeraterNummer,
+    datevMandantNummer: datevMandantNummer.present
+        ? datevMandantNummer.value
+        : this.datevMandantNummer,
+    datevBankGegenkonto: datevBankGegenkonto.present
+        ? datevBankGegenkonto.value
+        : this.datevBankGegenkonto,
+    datevSachkontenlaenge: datevSachkontenlaenge ?? this.datevSachkontenlaenge,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -2514,6 +2680,18 @@ class Company extends DataClass implements Insertable<Company> {
       bankCsvDecimalSeparator: data.bankCsvDecimalSeparator.present
           ? data.bankCsvDecimalSeparator.value
           : this.bankCsvDecimalSeparator,
+      datevBeraterNummer: data.datevBeraterNummer.present
+          ? data.datevBeraterNummer.value
+          : this.datevBeraterNummer,
+      datevMandantNummer: data.datevMandantNummer.present
+          ? data.datevMandantNummer.value
+          : this.datevMandantNummer,
+      datevBankGegenkonto: data.datevBankGegenkonto.present
+          ? data.datevBankGegenkonto.value
+          : this.datevBankGegenkonto,
+      datevSachkontenlaenge: data.datevSachkontenlaenge.present
+          ? data.datevSachkontenlaenge.value
+          : this.datevSachkontenlaenge,
     );
   }
 
@@ -2578,7 +2756,11 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('bankCsvPurposeColumn: $bankCsvPurposeColumn, ')
           ..write('bankCsvCounterpartyColumn: $bankCsvCounterpartyColumn, ')
           ..write('bankCsvDateFormat: $bankCsvDateFormat, ')
-          ..write('bankCsvDecimalSeparator: $bankCsvDecimalSeparator')
+          ..write('bankCsvDecimalSeparator: $bankCsvDecimalSeparator, ')
+          ..write('datevBeraterNummer: $datevBeraterNummer, ')
+          ..write('datevMandantNummer: $datevMandantNummer, ')
+          ..write('datevBankGegenkonto: $datevBankGegenkonto, ')
+          ..write('datevSachkontenlaenge: $datevSachkontenlaenge')
           ..write(')'))
         .toString();
   }
@@ -2642,6 +2824,10 @@ class Company extends DataClass implements Insertable<Company> {
     bankCsvCounterpartyColumn,
     bankCsvDateFormat,
     bankCsvDecimalSeparator,
+    datevBeraterNummer,
+    datevMandantNummer,
+    datevBankGegenkonto,
+    datevSachkontenlaenge,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2704,7 +2890,11 @@ class Company extends DataClass implements Insertable<Company> {
           other.bankCsvPurposeColumn == this.bankCsvPurposeColumn &&
           other.bankCsvCounterpartyColumn == this.bankCsvCounterpartyColumn &&
           other.bankCsvDateFormat == this.bankCsvDateFormat &&
-          other.bankCsvDecimalSeparator == this.bankCsvDecimalSeparator);
+          other.bankCsvDecimalSeparator == this.bankCsvDecimalSeparator &&
+          other.datevBeraterNummer == this.datevBeraterNummer &&
+          other.datevMandantNummer == this.datevMandantNummer &&
+          other.datevBankGegenkonto == this.datevBankGegenkonto &&
+          other.datevSachkontenlaenge == this.datevSachkontenlaenge);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -2765,6 +2955,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> bankCsvCounterpartyColumn;
   final Value<String> bankCsvDateFormat;
   final Value<String> bankCsvDecimalSeparator;
+  final Value<String?> datevBeraterNummer;
+  final Value<String?> datevMandantNummer;
+  final Value<String?> datevBankGegenkonto;
+  final Value<int> datevSachkontenlaenge;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -2824,6 +3018,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.bankCsvCounterpartyColumn = const Value.absent(),
     this.bankCsvDateFormat = const Value.absent(),
     this.bankCsvDecimalSeparator = const Value.absent(),
+    this.datevBeraterNummer = const Value.absent(),
+    this.datevMandantNummer = const Value.absent(),
+    this.datevBankGegenkonto = const Value.absent(),
+    this.datevSachkontenlaenge = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -2884,6 +3082,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.bankCsvCounterpartyColumn = const Value.absent(),
     this.bankCsvDateFormat = const Value.absent(),
     this.bankCsvDecimalSeparator = const Value.absent(),
+    this.datevBeraterNummer = const Value.absent(),
+    this.datevMandantNummer = const Value.absent(),
+    this.datevBankGegenkonto = const Value.absent(),
+    this.datevSachkontenlaenge = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -2946,6 +3148,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? bankCsvCounterpartyColumn,
     Expression<String>? bankCsvDateFormat,
     Expression<String>? bankCsvDecimalSeparator,
+    Expression<String>? datevBeraterNummer,
+    Expression<String>? datevMandantNummer,
+    Expression<String>? datevBankGegenkonto,
+    Expression<int>? datevSachkontenlaenge,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3032,6 +3238,14 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (bankCsvDateFormat != null) 'bank_csv_date_format': bankCsvDateFormat,
       if (bankCsvDecimalSeparator != null)
         'bank_csv_decimal_separator': bankCsvDecimalSeparator,
+      if (datevBeraterNummer != null)
+        'datev_berater_nummer': datevBeraterNummer,
+      if (datevMandantNummer != null)
+        'datev_mandant_nummer': datevMandantNummer,
+      if (datevBankGegenkonto != null)
+        'datev_bank_gegenkonto': datevBankGegenkonto,
+      if (datevSachkontenlaenge != null)
+        'datev_sachkontenlaenge': datevSachkontenlaenge,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3094,6 +3308,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? bankCsvCounterpartyColumn,
     Value<String>? bankCsvDateFormat,
     Value<String>? bankCsvDecimalSeparator,
+    Value<String?>? datevBeraterNummer,
+    Value<String?>? datevMandantNummer,
+    Value<String?>? datevBankGegenkonto,
+    Value<int>? datevSachkontenlaenge,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -3172,6 +3390,11 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       bankCsvDateFormat: bankCsvDateFormat ?? this.bankCsvDateFormat,
       bankCsvDecimalSeparator:
           bankCsvDecimalSeparator ?? this.bankCsvDecimalSeparator,
+      datevBeraterNummer: datevBeraterNummer ?? this.datevBeraterNummer,
+      datevMandantNummer: datevMandantNummer ?? this.datevMandantNummer,
+      datevBankGegenkonto: datevBankGegenkonto ?? this.datevBankGegenkonto,
+      datevSachkontenlaenge:
+          datevSachkontenlaenge ?? this.datevSachkontenlaenge,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3402,6 +3625,22 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         bankCsvDecimalSeparator.value,
       );
     }
+    if (datevBeraterNummer.present) {
+      map['datev_berater_nummer'] = Variable<String>(datevBeraterNummer.value);
+    }
+    if (datevMandantNummer.present) {
+      map['datev_mandant_nummer'] = Variable<String>(datevMandantNummer.value);
+    }
+    if (datevBankGegenkonto.present) {
+      map['datev_bank_gegenkonto'] = Variable<String>(
+        datevBankGegenkonto.value,
+      );
+    }
+    if (datevSachkontenlaenge.present) {
+      map['datev_sachkontenlaenge'] = Variable<int>(
+        datevSachkontenlaenge.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3470,6 +3709,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('bankCsvCounterpartyColumn: $bankCsvCounterpartyColumn, ')
           ..write('bankCsvDateFormat: $bankCsvDateFormat, ')
           ..write('bankCsvDecimalSeparator: $bankCsvDecimalSeparator, ')
+          ..write('datevBeraterNummer: $datevBeraterNummer, ')
+          ..write('datevMandantNummer: $datevMandantNummer, ')
+          ..write('datevBankGegenkonto: $datevBankGegenkonto, ')
+          ..write('datevSachkontenlaenge: $datevSachkontenlaenge, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -13966,6 +14209,10 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String?> bankCsvCounterpartyColumn,
       Value<String> bankCsvDateFormat,
       Value<String> bankCsvDecimalSeparator,
+      Value<String?> datevBeraterNummer,
+      Value<String?> datevMandantNummer,
+      Value<String?> datevBankGegenkonto,
+      Value<int> datevSachkontenlaenge,
       Value<int> rowid,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
@@ -14027,6 +14274,10 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String?> bankCsvCounterpartyColumn,
       Value<String> bankCsvDateFormat,
       Value<String> bankCsvDecimalSeparator,
+      Value<String?> datevBeraterNummer,
+      Value<String?> datevMandantNummer,
+      Value<String?> datevBankGegenkonto,
+      Value<int> datevSachkontenlaenge,
       Value<int> rowid,
     });
 
@@ -14582,6 +14833,26 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<String> get bankCsvDecimalSeparator => $composableBuilder(
     column: $table.bankCsvDecimalSeparator,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get datevBeraterNummer => $composableBuilder(
+    column: $table.datevBeraterNummer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get datevMandantNummer => $composableBuilder(
+    column: $table.datevMandantNummer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get datevBankGegenkonto => $composableBuilder(
+    column: $table.datevBankGegenkonto,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get datevSachkontenlaenge => $composableBuilder(
+    column: $table.datevSachkontenlaenge,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15206,6 +15477,26 @@ class $$CompaniesTableOrderingComposer
     column: $table.bankCsvDecimalSeparator,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get datevBeraterNummer => $composableBuilder(
+    column: $table.datevBeraterNummer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get datevMandantNummer => $composableBuilder(
+    column: $table.datevMandantNummer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get datevBankGegenkonto => $composableBuilder(
+    column: $table.datevBankGegenkonto,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get datevSachkontenlaenge => $composableBuilder(
+    column: $table.datevSachkontenlaenge,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -15477,6 +15768,26 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<String> get bankCsvDecimalSeparator => $composableBuilder(
     column: $table.bankCsvDecimalSeparator,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get datevBeraterNummer => $composableBuilder(
+    column: $table.datevBeraterNummer,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get datevMandantNummer => $composableBuilder(
+    column: $table.datevMandantNummer,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get datevBankGegenkonto => $composableBuilder(
+    column: $table.datevBankGegenkonto,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get datevSachkontenlaenge => $composableBuilder(
+    column: $table.datevSachkontenlaenge,
     builder: (column) => column,
   );
 
@@ -15913,6 +16224,10 @@ class $$CompaniesTableTableManager
                 Value<String?> bankCsvCounterpartyColumn = const Value.absent(),
                 Value<String> bankCsvDateFormat = const Value.absent(),
                 Value<String> bankCsvDecimalSeparator = const Value.absent(),
+                Value<String?> datevBeraterNummer = const Value.absent(),
+                Value<String?> datevMandantNummer = const Value.absent(),
+                Value<String?> datevBankGegenkonto = const Value.absent(),
+                Value<int> datevSachkontenlaenge = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -15972,6 +16287,10 @@ class $$CompaniesTableTableManager
                 bankCsvCounterpartyColumn: bankCsvCounterpartyColumn,
                 bankCsvDateFormat: bankCsvDateFormat,
                 bankCsvDecimalSeparator: bankCsvDecimalSeparator,
+                datevBeraterNummer: datevBeraterNummer,
+                datevMandantNummer: datevMandantNummer,
+                datevBankGegenkonto: datevBankGegenkonto,
+                datevSachkontenlaenge: datevSachkontenlaenge,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -16037,6 +16356,10 @@ class $$CompaniesTableTableManager
                 Value<String?> bankCsvCounterpartyColumn = const Value.absent(),
                 Value<String> bankCsvDateFormat = const Value.absent(),
                 Value<String> bankCsvDecimalSeparator = const Value.absent(),
+                Value<String?> datevBeraterNummer = const Value.absent(),
+                Value<String?> datevMandantNummer = const Value.absent(),
+                Value<String?> datevBankGegenkonto = const Value.absent(),
+                Value<int> datevSachkontenlaenge = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -16096,6 +16419,10 @@ class $$CompaniesTableTableManager
                 bankCsvCounterpartyColumn: bankCsvCounterpartyColumn,
                 bankCsvDateFormat: bankCsvDateFormat,
                 bankCsvDecimalSeparator: bankCsvDecimalSeparator,
+                datevBeraterNummer: datevBeraterNummer,
+                datevMandantNummer: datevMandantNummer,
+                datevBankGegenkonto: datevBankGegenkonto,
+                datevSachkontenlaenge: datevSachkontenlaenge,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

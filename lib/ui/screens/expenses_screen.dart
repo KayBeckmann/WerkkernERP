@@ -1,13 +1,18 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
+import '../../data/repositories/company_repository.dart';
 import '../../data/repositories/expense_category_repository.dart';
 import '../../data/repositories/expense_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/datev_export_service.dart';
 
 /// C14.2 Belege/Ausgaben (Kay-Priorisierungsentscheidung 2026-10-18,
 /// voller Umfang der Buchhaltung). Erfasst Ausgaben als Bruttobetrag +
@@ -105,6 +110,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     if (mounted) _reload();
   }
 
+  Future<void> _exportDatev(_ExpensesData data) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _DatevExportDialog(expenses: data.expenses, categories: data.categories),
+    );
+  }
+
   static String _formatDate(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
 
@@ -120,6 +132,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               icon: const Icon(Icons.category_outlined),
               tooltip: 'Kategorien verwalten',
               onPressed: snapshot.hasData ? () => _manageCategories(snapshot.data!.categories) : null,
+            ),
+          ),
+          FutureBuilder<_ExpensesData>(
+            future: _future,
+            builder: (context, snapshot) => IconButton(
+              icon: const Icon(Icons.description_outlined),
+              tooltip: 'DATEV-Export',
+              onPressed: snapshot.hasData ? () => _exportDatev(snapshot.data!) : null,
             ),
           ),
           IconButton(
@@ -472,6 +492,211 @@ class _CategoryManagerDialogState extends State<_CategoryManagerDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fertig')),
+      ],
+    );
+  }
+}
+
+/// C14.5 DATEV-Export (Kay-Priorisierungsentscheidung 2026-10-18,
+/// letzter Baustein der vollen Buchhaltung). Siehe ausführlichen
+/// Disclaimer in `datev_export_service.dart` — exportiert bewusst nur
+/// Belege/Ausgaben, BU-Schlüssel bleibt immer leer.
+class _DatevExportDialog extends StatefulWidget {
+  const _DatevExportDialog({required this.expenses, required this.categories});
+  final List<Expense> expenses;
+  final List<ExpenseCategory> categories;
+
+  @override
+  State<_DatevExportDialog> createState() => _DatevExportDialogState();
+}
+
+class _DatevExportDialogState extends State<_DatevExportDialog> {
+  late final TextEditingController _beraterCtrl;
+  late final TextEditingController _mandantCtrl;
+  late final TextEditingController _gegenkontoCtrl;
+  late DateTime _periodStart;
+  late DateTime _periodEnd;
+  bool _exporting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final company = context.read<ActiveCompanyService>().active!;
+    _beraterCtrl = TextEditingController(text: company.datevBeraterNummer);
+    _mandantCtrl = TextEditingController(text: company.datevMandantNummer);
+    _gegenkontoCtrl = TextEditingController(text: company.datevBankGegenkonto);
+    final now = DateTime.now();
+    _periodStart = DateTime(now.year, now.month, 1);
+    _periodEnd = DateTime(now.year, now.month + 1, 1).subtract(const Duration(days: 1));
+  }
+
+  @override
+  void dispose() {
+    _beraterCtrl.dispose();
+    _mandantCtrl.dispose();
+    _gegenkontoCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickPeriodStart() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _periodStart,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _periodStart = picked);
+  }
+
+  Future<void> _pickPeriodEnd() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _periodEnd,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _periodEnd = picked);
+  }
+
+  Future<void> _export() async {
+    final beraterNummer = _beraterCtrl.text.trim();
+    final mandantNummer = _mandantCtrl.text.trim();
+    final bankGegenkonto = _gegenkontoCtrl.text.trim();
+    if (beraterNummer.isEmpty || mandantNummer.isEmpty || bankGegenkonto.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bitte Berater-, Mandantennummer und Gegenkonto eintragen.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _exporting = true);
+    try {
+      final service = context.read<ActiveCompanyService>();
+      final company = service.active!;
+      // Eingetragene Nummern gleich für den nächsten Export merken.
+      await context.read<CompanyRepository>().update(
+            company.copyWith(
+              datevBeraterNummer: Value(beraterNummer),
+              datevMandantNummer: Value(mandantNummer),
+              datevBankGegenkonto: Value(bankGegenkonto),
+            ),
+          );
+      await service.refreshActive();
+
+      final expensesInPeriod = widget.expenses
+          .where((e) => !e.date.isBefore(_periodStart) && !e.date.isAfter(_periodEnd))
+          .toList();
+      final result = buildDatevBuchungsstapel(
+        expenses: expensesInPeriod,
+        categoryById: {for (final c in widget.categories) c.id: c},
+        config: DatevExportConfig(
+          beraterNummer: beraterNummer,
+          mandantNummer: mandantNummer,
+          bankGegenkonto: bankGegenkonto,
+          sachkontenlaenge: company.datevSachkontenlaenge,
+          companyName: company.name,
+        ),
+        periodStart: _periodStart,
+        periodEnd: _periodEnd,
+        generatedAt: DateTime.now(),
+      );
+
+      // DATEV EXTF erwartet traditionell Windows-1252/ANSI statt UTF-8
+      // — Latin-1 deckt die in Buchungstexten üblichen deutschen
+      // Zeichen (Umlaute, ß) identisch ab, ist aber keine vollständige
+      // cp1252-Implementierung (z. B. Euro-Zeichen € unterscheidet
+      // sich) - für die hier erzeugten Texte in der Praxis ausreichend.
+      final bytes = latin1.encode(result.csvContent);
+      final timestamp =
+          '${_periodStart.year}${_periodStart.month.toString().padLeft(2, '0')}';
+      final savedUri = await FilePicker.saveFile(
+        fileName: 'EXTF_Buchungsstapel_$timestamp.csv',
+        bytes: bytes,
+        dialogTitle: 'DATEV-Export speichern',
+      );
+      if (!mounted) return;
+      if (savedUri == null) return; // Dialog abgebrochen, kein falscher Erfolg anzeigen.
+
+      final messages = <String>[
+        '${result.exportedCount} Beleg(e) exportiert',
+        if (result.skippedExpenses.isNotEmpty)
+          '${result.skippedExpenses.length} ohne SKR03-Konto übersprungen (in "Kategorien verwalten" ergänzen)',
+      ];
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(messages.join(', '))));
+      Navigator.pop(context);
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  static String _formatDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('DATEV-Export (Belege)'),
+      content: SizedBox(
+        width: 440,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Exportiert Belege als DATEV-Buchungsstapel (SKR03). Keine Rechtsprüfung — '
+                'der BU-Schlüssel bleibt immer leer und muss von deinem Steuerberater ergänzt '
+                'werden. Belege ohne SKR03-Konto werden nicht exportiert.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Von: ${_formatDate(_periodStart)}'),
+                trailing: const Icon(Icons.calendar_today_outlined),
+                onTap: _pickPeriodStart,
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Bis: ${_formatDate(_periodEnd)}'),
+                trailing: const Icon(Icons.calendar_today_outlined),
+                onTap: _pickPeriodEnd,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _beraterCtrl,
+                decoration: const InputDecoration(labelText: 'Beraternummer *'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _mandantCtrl,
+                decoration: const InputDecoration(labelText: 'Mandantennummer *'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _gegenkontoCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Gegenkonto (Bank/Kasse) *',
+                  hintText: 'z. B. 1200',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _exporting ? null : () => Navigator.pop(context),
+          child: const Text('Abbrechen'),
+        ),
+        FilledButton(
+          onPressed: _exporting ? null : _export,
+          child: _exporting
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Exportieren'),
+        ),
       ],
     );
   }

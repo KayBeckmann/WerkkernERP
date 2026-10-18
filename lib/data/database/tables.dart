@@ -164,6 +164,18 @@ class Companies extends Table {
   /// im Betragsfeld der CSV-Datei.
   TextColumn get bankCsvDecimalSeparator => text().withDefault(const Constant(','))();
 
+  /// C14.5 DATEV-Export (Kay-Priorisierungsentscheidung 2026-10-18,
+  /// letzter Baustein der vollen Buchhaltung, Kontenrahmen SKR03).
+  /// Berater-/Mandantennummer sind Kays eigene Angaben von seinem
+  /// Steuerberater/seiner DATEV-Kanzlei — diese App erfindet oder rät
+  /// hier nichts. `datevBankGegenkonto` ist das Konto, gegen das Belege
+  /// gebucht werden (typischerweise das Bank-/Kassenkonto, z. B. 1200
+  /// in SKR03) — ebenfalls Kays eigene Angabe.
+  TextColumn get datevBeraterNummer => text().nullable()();
+  TextColumn get datevMandantNummer => text().nullable()();
+  TextColumn get datevBankGegenkonto => text().nullable()();
+  IntColumn get datevSachkontenlaenge => integer().withDefault(const Constant(4))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
