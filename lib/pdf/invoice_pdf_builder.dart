@@ -35,6 +35,10 @@ Future<Uint8List> buildInvoicePdf({
   // — `null`/`Money.zero()` zeigt keine Abzugszeile. Arbeitsvorgabe statt
   // Rechtsprüfung: die Summe enthält die volle USt der Abschläge.
   Money? priorAdvancePaymentsGross,
+  // Gutschriften (Kay-Entscheidung 2026-10-19): Nummer der Rechnung, auf
+  // die sich eine Gutschrift bezieht — `null` bei allen übrigen
+  // Dokumentarten. Reiner Anzeigetext, keine eigene Berechnung.
+  String? referencedDocumentNumber,
 }) async {
   if (invoice.status != InvoiceStatus.finalized || invoice.invoiceNumber == null) {
     throw StateError('PDF kann nur für eine finalisierte Rechnung erzeugt werden.');
@@ -45,6 +49,7 @@ Future<Uint8List> buildInvoicePdf({
     company: company,
     isPreview: false,
     priorAdvancePaymentsGross: priorAdvancePaymentsGross,
+    referencedDocumentNumber: referencedDocumentNumber,
   );
 }
 
@@ -75,6 +80,7 @@ Future<Uint8List> _buildPdf({
   required Company company,
   required bool isPreview,
   Money? priorAdvancePaymentsGross,
+  String? referencedDocumentNumber,
 }) async {
   final totals = calculateInvoiceTotals([
     for (final item in items)
@@ -121,7 +127,11 @@ Future<Uint8List> _buildPdf({
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(32),
-      header: (context) => _buildHeader(invoice, isPreview: isPreview),
+      header: (context) => _buildHeader(
+        invoice,
+        isPreview: isPreview,
+        referencedDocumentNumber: referencedDocumentNumber,
+      ),
       // Fußzeile (Kay-Nachtrag 2026-10-16: "Fußzeile ... in Dokumenten
       // anpassbar machen") — Firmentext oberhalb, Seitenzahl bleibt
       // immer zusätzlich sichtbar.
@@ -190,6 +200,7 @@ String _title(DocumentKind kind) => switch (kind) {
       DocumentKind.order => 'Auftrag',
       DocumentKind.deliveryNote => 'Lieferschein',
       DocumentKind.proforma => 'Proforma-Rechnung',
+      DocumentKind.creditNote => 'Gutschrift',
     };
 
 /// "Rechnungsdatum"/"Angebotsdatum"/"Auftragsdatum"/"Lieferscheindatum"
@@ -201,7 +212,11 @@ String _dateLabel(DocumentKind kind) => switch (kind) {
       _ => '${_title(kind)}sdatum',
     };
 
-pw.Widget _buildHeader(Invoice invoice, {required bool isPreview}) {
+pw.Widget _buildHeader(
+  Invoice invoice, {
+  required bool isPreview,
+  String? referencedDocumentNumber,
+}) {
   // C13 Abschlagsrechnungen: eigener Titel statt "Rechnung", damit sie
   // optisch klar von einer regulären (Schluss-)Rechnung unterscheidbar
   // ist — bleibt trotzdem derselbe DocumentKind/Nummernkreis.
@@ -270,6 +285,14 @@ pw.Widget _buildHeader(Invoice invoice, {required bool isPreview}) {
               ),
               pw.Text('${_dateLabel(invoice.kind)}: ${_formatDate(invoice.issueDate)}'),
               pw.Text('Leistungsdatum: ${_formatDate(invoice.serviceDate)}'),
+              // Gutschriften (Kay-Entscheidung 2026-10-19): Bezug zur
+              // korrigierten Rechnung direkt sichtbar, auf jeder Seite
+              // (Teil des wiederholten Seitenkopfs).
+              if (referencedDocumentNumber != null)
+                pw.Text(
+                  'Gutschrift zur Rechnung $referencedDocumentNumber',
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
             ],
           ),
         ],

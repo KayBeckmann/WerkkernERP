@@ -78,6 +78,7 @@ void main() {
         bankCsvDateFormat: 'dd.MM.yyyy',
         bankCsvDecimalSeparator: ',',
         datevSachkontenlaenge: 4,
+        creditNotesEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

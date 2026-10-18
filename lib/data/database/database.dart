@@ -37,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 20;
+  int get schemaVersion => 21;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -210,6 +210,23 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.datevMandantNummer);
             await migrator.addColumn(companies, companies.datevBankGegenkonto);
             await migrator.addColumn(companies, companies.datevSachkontenlaenge);
+          }
+          if (from < 21) {
+            // Gutschriften (Kay-Entscheidung 2026-10-19: "Gutschriften
+            // bekommen einen eigenen Nummernkreis") + Projekt-
+            // Direktkosten bei Belegen (Kay-Anfrage 2026-10-19:
+            // Projekt-Ergebnisrechnung).
+            await migrator.addColumn(companies, companies.creditNotesEnabled);
+            await migrator.addColumn(companies, companies.pdfIntroTextCreditNote);
+            await migrator.addColumn(companies, companies.pdfClosingTextCreditNote);
+            // Nur nachträglich hinzufügen, wenn `expenses` schon VOR diesem
+            // Schritt existierte (from >= 18) — sonst hat `createTable`
+            // oben (from < 18) die Tabelle bereits mit dem aktuellen
+            // Schema inkl. project_id angelegt, und ein addColumn hier
+            // würde mit "duplicate column name" fehlschlagen.
+            if (from >= 18) {
+              await migrator.addColumn(expenses, expenses.projectId);
+            }
           }
         },
       );

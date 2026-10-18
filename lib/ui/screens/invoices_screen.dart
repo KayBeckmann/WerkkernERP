@@ -38,6 +38,7 @@ class DocumentLabels {
         DocumentKind.order => 'Auftrag',
         DocumentKind.deliveryNote => 'Lieferschein',
         DocumentKind.proforma => 'Proforma-Rechnung',
+        DocumentKind.creditNote => 'Gutschrift',
       };
 
   static String plural(DocumentKind kind) => switch (kind) {
@@ -46,6 +47,7 @@ class DocumentLabels {
         DocumentKind.order => 'Aufträge',
         DocumentKind.deliveryNote => 'Lieferscheine',
         DocumentKind.proforma => 'Proforma-Rechnungen',
+        DocumentKind.creditNote => 'Gutschriften',
       };
 
   static String emptyListText(DocumentKind kind) => switch (kind) {
@@ -54,6 +56,9 @@ class DocumentLabels {
         DocumentKind.order => 'Noch keine Auftragsentwürfe.',
         DocumentKind.deliveryNote => 'Noch keine Lieferschein-Entwürfe.',
         DocumentKind.proforma => 'Noch keine Proforma-Entwürfe.',
+        DocumentKind.creditNote =>
+          'Noch keine Gutschriften. Eine Gutschrift wird aus der betreffenden Rechnung heraus '
+              'erstellt (Rechnung öffnen → „Gutschrift erstellen").',
       };
 
   static String newFabLabel(DocumentKind kind) => switch (kind) {
@@ -62,6 +67,7 @@ class DocumentLabels {
         DocumentKind.order => 'Neuer Auftrag',
         DocumentKind.deliveryNote => 'Neuer Lieferschein',
         DocumentKind.proforma => 'Neue Proforma-Rechnung',
+        DocumentKind.creditNote => 'Neue Gutschrift',
       };
 
   static String editorDraftTitle(DocumentKind kind) => switch (kind) {
@@ -70,6 +76,7 @@ class DocumentLabels {
         DocumentKind.order => 'Auftrag (Entwurf)',
         DocumentKind.deliveryNote => 'Lieferschein (Entwurf)',
         DocumentKind.proforma => 'Proforma-Rechnung (Entwurf)',
+        DocumentKind.creditNote => 'Gutschrift (Entwurf)',
       };
 
   static String finalizeConfirmSentence(DocumentKind kind) => switch (kind) {
@@ -84,6 +91,8 @@ class DocumentLabels {
         DocumentKind.proforma =>
           'Die Proforma-Rechnung erhält jetzt eine endgültige Nummer (eigener Nummernkreis, keine '
               'umsatzsteuerliche Rechnungsnummer) und kann danach nicht mehr geändert werden.',
+        DocumentKind.creditNote =>
+          'Die Gutschrift erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
       };
 }
 
@@ -339,12 +348,19 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         if (!isWide) {
           return Scaffold(
             body: _buildList(data, isWide: false),
-            floatingActionButton: FloatingActionButton.extended(
-              heroTag: 'invoices-fab-${widget.kind.name}',
-              onPressed: _createNewNarrow,
-              icon: const Icon(Icons.add),
-              label: Text(DocumentLabels.newFabLabel(widget.kind)),
-            ),
+            // Gutschriften (Kay-Entscheidung 2026-10-19): entstehen
+            // ausschließlich aus einer bereits finalisierten Rechnung
+            // heraus (Button im Rechnungseditor), nie "aus dem Nichts"
+            // — kein "Neue Gutschrift"-FAB, sonst könnte eine Gutschrift
+            // ohne Bezugsdokument entstehen.
+            floatingActionButton: widget.kind == DocumentKind.creditNote
+                ? null
+                : FloatingActionButton.extended(
+                    heroTag: 'invoices-fab-${widget.kind.name}',
+                    onPressed: _createNewNarrow,
+                    icon: const Icon(Icons.add),
+                    label: Text(DocumentLabels.newFabLabel(widget.kind)),
+                  ),
           );
         }
 
@@ -359,12 +375,14 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
               width: 360,
               child: Scaffold(
                 body: _buildList(data, isWide: true),
-                floatingActionButton: FloatingActionButton.extended(
-                  heroTag: 'invoices-fab-${widget.kind.name}',
-                  onPressed: _createNewWide,
-                  icon: const Icon(Icons.add),
-                  label: Text(DocumentLabels.newFabLabel(widget.kind)),
-                ),
+                floatingActionButton: widget.kind == DocumentKind.creditNote
+                    ? null
+                    : FloatingActionButton.extended(
+                        heroTag: 'invoices-fab-${widget.kind.name}',
+                        onPressed: _createNewWide,
+                        icon: const Icon(Icons.add),
+                        label: Text(DocumentLabels.newFabLabel(widget.kind)),
+                      ),
               ),
             ),
             VerticalDivider(width: 1, color: Theme.of(context).colorScheme.outlineVariant),

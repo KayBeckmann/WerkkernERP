@@ -39,6 +39,7 @@ enum _TabId {
   order,
   deliveryNote,
   proforma,
+  creditNote,
   customers,
   articles,
   suppliers,
@@ -184,6 +185,18 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.fact_check_outlined,
             title: 'Proforma-Rechnungen',
             screen: InvoicesScreen(kind: DocumentKind.proforma),
+            section: _Section.fakturierung,
+          ),
+        // Gutschriften (Kay-Entscheidung 2026-10-19) — ebenfalls bei
+        // Fakturierung eingruppiert (gleicher Grund wie bei den
+        // Vorlagen unten: direkt neben den übrigen Fakturierung-Tabs,
+        // sonst doppelte Sektionsbeschriftung in der Sidebar).
+        if (company.creditNotesEnabled)
+          const _Tab(
+            id: _TabId.creditNote,
+            icon: Icons.receipt_long_outlined,
+            title: 'Gutschriften',
+            screen: InvoicesScreen(kind: DocumentKind.creditNote),
             section: _Section.fakturierung,
           ),
         // C11 Wiederkehrende Rechnungen (Kay-Priorisierungsentscheidung

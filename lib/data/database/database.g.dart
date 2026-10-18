@@ -728,6 +728,42 @@ class $CompaniesTable extends Companies
     requiredDuringInsert: false,
     defaultValue: const Constant(4),
   );
+  static const VerificationMeta _creditNotesEnabledMeta =
+      const VerificationMeta('creditNotesEnabled');
+  @override
+  late final GeneratedColumn<bool> creditNotesEnabled = GeneratedColumn<bool>(
+    'credit_notes_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("credit_notes_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _pdfIntroTextCreditNoteMeta =
+      const VerificationMeta('pdfIntroTextCreditNote');
+  @override
+  late final GeneratedColumn<String> pdfIntroTextCreditNote =
+      GeneratedColumn<String>(
+        'pdf_intro_text_credit_note',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfClosingTextCreditNoteMeta =
+      const VerificationMeta('pdfClosingTextCreditNote');
+  @override
+  late final GeneratedColumn<String> pdfClosingTextCreditNote =
+      GeneratedColumn<String>(
+        'pdf_closing_text_credit_note',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -791,6 +827,9 @@ class $CompaniesTable extends Companies
     datevMandantNummer,
     datevBankGegenkonto,
     datevSachkontenlaenge,
+    creditNotesEnabled,
+    pdfIntroTextCreditNote,
+    pdfClosingTextCreditNote,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1323,6 +1362,33 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('credit_notes_enabled')) {
+      context.handle(
+        _creditNotesEnabledMeta,
+        creditNotesEnabled.isAcceptableOrUnknown(
+          data['credit_notes_enabled']!,
+          _creditNotesEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_intro_text_credit_note')) {
+      context.handle(
+        _pdfIntroTextCreditNoteMeta,
+        pdfIntroTextCreditNote.isAcceptableOrUnknown(
+          data['pdf_intro_text_credit_note']!,
+          _pdfIntroTextCreditNoteMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text_credit_note')) {
+      context.handle(
+        _pdfClosingTextCreditNoteMeta,
+        pdfClosingTextCreditNote.isAcceptableOrUnknown(
+          data['pdf_closing_text_credit_note']!,
+          _pdfClosingTextCreditNoteMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1576,6 +1642,18 @@ class $CompaniesTable extends Companies
         DriftSqlType.int,
         data['${effectivePrefix}datev_sachkontenlaenge'],
       )!,
+      creditNotesEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}credit_notes_enabled'],
+      )!,
+      pdfIntroTextCreditNote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text_credit_note'],
+      ),
+      pdfClosingTextCreditNote: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text_credit_note'],
+      ),
     );
   }
 
@@ -1755,6 +1833,14 @@ class Company extends DataClass implements Insertable<Company> {
   final String? datevMandantNummer;
   final String? datevBankGegenkonto;
   final int datevSachkontenlaenge;
+
+  /// Gutschriften (Kay-Entscheidung 2026-10-19) — pro Firma ein-/
+  /// ausblendbares Modul wie alle übrigen optionalen Dokumentarten,
+  /// Default aus. Eigenes Einleitungs-/Schlusstext-Paar wie bei den
+  /// übrigen Dokumentarten (siehe `document_text_resolver.dart`).
+  final bool creditNotesEnabled;
+  final String? pdfIntroTextCreditNote;
+  final String? pdfClosingTextCreditNote;
   const Company({
     required this.id,
     required this.name,
@@ -1817,6 +1903,9 @@ class Company extends DataClass implements Insertable<Company> {
     this.datevMandantNummer,
     this.datevBankGegenkonto,
     required this.datevSachkontenlaenge,
+    required this.creditNotesEnabled,
+    this.pdfIntroTextCreditNote,
+    this.pdfClosingTextCreditNote,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1978,6 +2067,17 @@ class Company extends DataClass implements Insertable<Company> {
       map['datev_bank_gegenkonto'] = Variable<String>(datevBankGegenkonto);
     }
     map['datev_sachkontenlaenge'] = Variable<int>(datevSachkontenlaenge);
+    map['credit_notes_enabled'] = Variable<bool>(creditNotesEnabled);
+    if (!nullToAbsent || pdfIntroTextCreditNote != null) {
+      map['pdf_intro_text_credit_note'] = Variable<String>(
+        pdfIntroTextCreditNote,
+      );
+    }
+    if (!nullToAbsent || pdfClosingTextCreditNote != null) {
+      map['pdf_closing_text_credit_note'] = Variable<String>(
+        pdfClosingTextCreditNote,
+      );
+    }
     return map;
   }
 
@@ -2114,6 +2214,13 @@ class Company extends DataClass implements Insertable<Company> {
           ? const Value.absent()
           : Value(datevBankGegenkonto),
       datevSachkontenlaenge: Value(datevSachkontenlaenge),
+      creditNotesEnabled: Value(creditNotesEnabled),
+      pdfIntroTextCreditNote: pdfIntroTextCreditNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroTextCreditNote),
+      pdfClosingTextCreditNote: pdfClosingTextCreditNote == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingTextCreditNote),
     );
   }
 
@@ -2250,6 +2357,13 @@ class Company extends DataClass implements Insertable<Company> {
       datevSachkontenlaenge: serializer.fromJson<int>(
         json['datevSachkontenlaenge'],
       ),
+      creditNotesEnabled: serializer.fromJson<bool>(json['creditNotesEnabled']),
+      pdfIntroTextCreditNote: serializer.fromJson<String?>(
+        json['pdfIntroTextCreditNote'],
+      ),
+      pdfClosingTextCreditNote: serializer.fromJson<String?>(
+        json['pdfClosingTextCreditNote'],
+      ),
     );
   }
   @override
@@ -2347,6 +2461,13 @@ class Company extends DataClass implements Insertable<Company> {
       'datevMandantNummer': serializer.toJson<String?>(datevMandantNummer),
       'datevBankGegenkonto': serializer.toJson<String?>(datevBankGegenkonto),
       'datevSachkontenlaenge': serializer.toJson<int>(datevSachkontenlaenge),
+      'creditNotesEnabled': serializer.toJson<bool>(creditNotesEnabled),
+      'pdfIntroTextCreditNote': serializer.toJson<String?>(
+        pdfIntroTextCreditNote,
+      ),
+      'pdfClosingTextCreditNote': serializer.toJson<String?>(
+        pdfClosingTextCreditNote,
+      ),
     };
   }
 
@@ -2412,6 +2533,9 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> datevMandantNummer = const Value.absent(),
     Value<String?> datevBankGegenkonto = const Value.absent(),
     int? datevSachkontenlaenge,
+    bool? creditNotesEnabled,
+    Value<String?> pdfIntroTextCreditNote = const Value.absent(),
+    Value<String?> pdfClosingTextCreditNote = const Value.absent(),
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2528,6 +2652,13 @@ class Company extends DataClass implements Insertable<Company> {
         ? datevBankGegenkonto.value
         : this.datevBankGegenkonto,
     datevSachkontenlaenge: datevSachkontenlaenge ?? this.datevSachkontenlaenge,
+    creditNotesEnabled: creditNotesEnabled ?? this.creditNotesEnabled,
+    pdfIntroTextCreditNote: pdfIntroTextCreditNote.present
+        ? pdfIntroTextCreditNote.value
+        : this.pdfIntroTextCreditNote,
+    pdfClosingTextCreditNote: pdfClosingTextCreditNote.present
+        ? pdfClosingTextCreditNote.value
+        : this.pdfClosingTextCreditNote,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -2692,6 +2823,15 @@ class Company extends DataClass implements Insertable<Company> {
       datevSachkontenlaenge: data.datevSachkontenlaenge.present
           ? data.datevSachkontenlaenge.value
           : this.datevSachkontenlaenge,
+      creditNotesEnabled: data.creditNotesEnabled.present
+          ? data.creditNotesEnabled.value
+          : this.creditNotesEnabled,
+      pdfIntroTextCreditNote: data.pdfIntroTextCreditNote.present
+          ? data.pdfIntroTextCreditNote.value
+          : this.pdfIntroTextCreditNote,
+      pdfClosingTextCreditNote: data.pdfClosingTextCreditNote.present
+          ? data.pdfClosingTextCreditNote.value
+          : this.pdfClosingTextCreditNote,
     );
   }
 
@@ -2760,7 +2900,10 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('datevBeraterNummer: $datevBeraterNummer, ')
           ..write('datevMandantNummer: $datevMandantNummer, ')
           ..write('datevBankGegenkonto: $datevBankGegenkonto, ')
-          ..write('datevSachkontenlaenge: $datevSachkontenlaenge')
+          ..write('datevSachkontenlaenge: $datevSachkontenlaenge, ')
+          ..write('creditNotesEnabled: $creditNotesEnabled, ')
+          ..write('pdfIntroTextCreditNote: $pdfIntroTextCreditNote, ')
+          ..write('pdfClosingTextCreditNote: $pdfClosingTextCreditNote')
           ..write(')'))
         .toString();
   }
@@ -2828,6 +2971,9 @@ class Company extends DataClass implements Insertable<Company> {
     datevMandantNummer,
     datevBankGegenkonto,
     datevSachkontenlaenge,
+    creditNotesEnabled,
+    pdfIntroTextCreditNote,
+    pdfClosingTextCreditNote,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -2894,7 +3040,10 @@ class Company extends DataClass implements Insertable<Company> {
           other.datevBeraterNummer == this.datevBeraterNummer &&
           other.datevMandantNummer == this.datevMandantNummer &&
           other.datevBankGegenkonto == this.datevBankGegenkonto &&
-          other.datevSachkontenlaenge == this.datevSachkontenlaenge);
+          other.datevSachkontenlaenge == this.datevSachkontenlaenge &&
+          other.creditNotesEnabled == this.creditNotesEnabled &&
+          other.pdfIntroTextCreditNote == this.pdfIntroTextCreditNote &&
+          other.pdfClosingTextCreditNote == this.pdfClosingTextCreditNote);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -2959,6 +3108,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> datevMandantNummer;
   final Value<String?> datevBankGegenkonto;
   final Value<int> datevSachkontenlaenge;
+  final Value<bool> creditNotesEnabled;
+  final Value<String?> pdfIntroTextCreditNote;
+  final Value<String?> pdfClosingTextCreditNote;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -3022,6 +3174,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.datevMandantNummer = const Value.absent(),
     this.datevBankGegenkonto = const Value.absent(),
     this.datevSachkontenlaenge = const Value.absent(),
+    this.creditNotesEnabled = const Value.absent(),
+    this.pdfIntroTextCreditNote = const Value.absent(),
+    this.pdfClosingTextCreditNote = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -3086,6 +3241,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.datevMandantNummer = const Value.absent(),
     this.datevBankGegenkonto = const Value.absent(),
     this.datevSachkontenlaenge = const Value.absent(),
+    this.creditNotesEnabled = const Value.absent(),
+    this.pdfIntroTextCreditNote = const Value.absent(),
+    this.pdfClosingTextCreditNote = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -3152,6 +3310,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? datevMandantNummer,
     Expression<String>? datevBankGegenkonto,
     Expression<int>? datevSachkontenlaenge,
+    Expression<bool>? creditNotesEnabled,
+    Expression<String>? pdfIntroTextCreditNote,
+    Expression<String>? pdfClosingTextCreditNote,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3246,6 +3407,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         'datev_bank_gegenkonto': datevBankGegenkonto,
       if (datevSachkontenlaenge != null)
         'datev_sachkontenlaenge': datevSachkontenlaenge,
+      if (creditNotesEnabled != null)
+        'credit_notes_enabled': creditNotesEnabled,
+      if (pdfIntroTextCreditNote != null)
+        'pdf_intro_text_credit_note': pdfIntroTextCreditNote,
+      if (pdfClosingTextCreditNote != null)
+        'pdf_closing_text_credit_note': pdfClosingTextCreditNote,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3312,6 +3479,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? datevMandantNummer,
     Value<String?>? datevBankGegenkonto,
     Value<int>? datevSachkontenlaenge,
+    Value<bool>? creditNotesEnabled,
+    Value<String?>? pdfIntroTextCreditNote,
+    Value<String?>? pdfClosingTextCreditNote,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -3395,6 +3565,11 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       datevBankGegenkonto: datevBankGegenkonto ?? this.datevBankGegenkonto,
       datevSachkontenlaenge:
           datevSachkontenlaenge ?? this.datevSachkontenlaenge,
+      creditNotesEnabled: creditNotesEnabled ?? this.creditNotesEnabled,
+      pdfIntroTextCreditNote:
+          pdfIntroTextCreditNote ?? this.pdfIntroTextCreditNote,
+      pdfClosingTextCreditNote:
+          pdfClosingTextCreditNote ?? this.pdfClosingTextCreditNote,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3641,6 +3816,19 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         datevSachkontenlaenge.value,
       );
     }
+    if (creditNotesEnabled.present) {
+      map['credit_notes_enabled'] = Variable<bool>(creditNotesEnabled.value);
+    }
+    if (pdfIntroTextCreditNote.present) {
+      map['pdf_intro_text_credit_note'] = Variable<String>(
+        pdfIntroTextCreditNote.value,
+      );
+    }
+    if (pdfClosingTextCreditNote.present) {
+      map['pdf_closing_text_credit_note'] = Variable<String>(
+        pdfClosingTextCreditNote.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3713,6 +3901,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('datevMandantNummer: $datevMandantNummer, ')
           ..write('datevBankGegenkonto: $datevBankGegenkonto, ')
           ..write('datevSachkontenlaenge: $datevSachkontenlaenge, ')
+          ..write('creditNotesEnabled: $creditNotesEnabled, ')
+          ..write('pdfIntroTextCreditNote: $pdfIntroTextCreditNote, ')
+          ..write('pdfClosingTextCreditNote: $pdfClosingTextCreditNote, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12738,6 +12929,20 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES projects (id) ON DELETE SET NULL',
+    ),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -12770,6 +12975,7 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
     vatRatePercent,
     categoryId,
     supplierReference,
+    projectId,
     createdAt,
     updatedAt,
   ];
@@ -12854,6 +13060,12 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         ),
       );
     }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -12911,6 +13123,10 @@ class $ExpensesTable extends Expenses with TableInfo<$ExpensesTable, Expense> {
         DriftSqlType.string,
         data['${effectivePrefix}supplier_reference'],
       ),
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -12944,6 +13160,16 @@ class Expense extends DataClass implements Insertable<Expense> {
   /// Freitext für Lieferant/Belegnummer — kein eigener Lieferanten-
   /// Stammdatenbezug, das wäre für diesen Zweck Überkonstruktion.
   final String? supplierReference;
+
+  /// Projekt-Direktkosten (Kay-Anfrage 2026-10-19: "Was brauchst du für
+  /// die Projekt-Ergebnisrechnung?"). Anders als die inzwischen bewusst
+  /// NICHT mehr projektbezogen gerechneten Fuhrpark-Kosten (Kay-
+  /// Entscheidung: "Fuhrpark wird auf Gemeinkosten gerechnet") zählen
+  /// Belege mit Projektzuordnung ECHT in die Projekt-Ergebnisrechnung
+  /// (Erlöse − direkte Belege-Kosten), siehe `project_result_service.dart`.
+  /// `onDelete: setNull` — ein gelöschtes Projekt reißt keinen bereits
+  /// erfassten Beleg mit (gleiches Prinzip wie überall in diesem Schema).
+  final String? projectId;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Expense({
@@ -12955,6 +13181,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     required this.vatRatePercent,
     this.categoryId,
     this.supplierReference,
+    this.projectId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -12972,6 +13199,9 @@ class Expense extends DataClass implements Insertable<Expense> {
     }
     if (!nullToAbsent || supplierReference != null) {
       map['supplier_reference'] = Variable<String>(supplierReference);
+    }
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -12992,6 +13222,9 @@ class Expense extends DataClass implements Insertable<Expense> {
       supplierReference: supplierReference == null && nullToAbsent
           ? const Value.absent()
           : Value(supplierReference),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -13013,6 +13246,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       supplierReference: serializer.fromJson<String?>(
         json['supplierReference'],
       ),
+      projectId: serializer.fromJson<String?>(json['projectId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -13029,6 +13263,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       'vatRatePercent': serializer.toJson<double>(vatRatePercent),
       'categoryId': serializer.toJson<String?>(categoryId),
       'supplierReference': serializer.toJson<String?>(supplierReference),
+      'projectId': serializer.toJson<String?>(projectId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -13043,6 +13278,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     double? vatRatePercent,
     Value<String?> categoryId = const Value.absent(),
     Value<String?> supplierReference = const Value.absent(),
+    Value<String?> projectId = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Expense(
@@ -13056,6 +13292,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     supplierReference: supplierReference.present
         ? supplierReference.value
         : this.supplierReference,
+    projectId: projectId.present ? projectId.value : this.projectId,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -13079,6 +13316,7 @@ class Expense extends DataClass implements Insertable<Expense> {
       supplierReference: data.supplierReference.present
           ? data.supplierReference.value
           : this.supplierReference,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -13095,6 +13333,7 @@ class Expense extends DataClass implements Insertable<Expense> {
           ..write('vatRatePercent: $vatRatePercent, ')
           ..write('categoryId: $categoryId, ')
           ..write('supplierReference: $supplierReference, ')
+          ..write('projectId: $projectId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -13111,6 +13350,7 @@ class Expense extends DataClass implements Insertable<Expense> {
     vatRatePercent,
     categoryId,
     supplierReference,
+    projectId,
     createdAt,
     updatedAt,
   );
@@ -13126,6 +13366,7 @@ class Expense extends DataClass implements Insertable<Expense> {
           other.vatRatePercent == this.vatRatePercent &&
           other.categoryId == this.categoryId &&
           other.supplierReference == this.supplierReference &&
+          other.projectId == this.projectId &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -13139,6 +13380,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
   final Value<double> vatRatePercent;
   final Value<String?> categoryId;
   final Value<String?> supplierReference;
+  final Value<String?> projectId;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -13151,6 +13393,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     this.vatRatePercent = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.supplierReference = const Value.absent(),
+    this.projectId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -13164,6 +13407,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     required double vatRatePercent,
     this.categoryId = const Value.absent(),
     this.supplierReference = const Value.absent(),
+    this.projectId = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -13184,6 +13428,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Expression<double>? vatRatePercent,
     Expression<String>? categoryId,
     Expression<String>? supplierReference,
+    Expression<String>? projectId,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -13197,6 +13442,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       if (vatRatePercent != null) 'vat_rate_percent': vatRatePercent,
       if (categoryId != null) 'category_id': categoryId,
       if (supplierReference != null) 'supplier_reference': supplierReference,
+      if (projectId != null) 'project_id': projectId,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -13212,6 +13458,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     Value<double>? vatRatePercent,
     Value<String?>? categoryId,
     Value<String?>? supplierReference,
+    Value<String?>? projectId,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -13225,6 +13472,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
       vatRatePercent: vatRatePercent ?? this.vatRatePercent,
       categoryId: categoryId ?? this.categoryId,
       supplierReference: supplierReference ?? this.supplierReference,
+      projectId: projectId ?? this.projectId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -13258,6 +13506,9 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
     if (supplierReference.present) {
       map['supplier_reference'] = Variable<String>(supplierReference.value);
     }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -13281,6 +13532,7 @@ class ExpensesCompanion extends UpdateCompanion<Expense> {
           ..write('vatRatePercent: $vatRatePercent, ')
           ..write('categoryId: $categoryId, ')
           ..write('supplierReference: $supplierReference, ')
+          ..write('projectId: $projectId, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -14135,6 +14387,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
+        'projects',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('expenses', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
         'companies',
         limitUpdateKind: UpdateKind.delete,
       ),
@@ -14213,6 +14472,9 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String?> datevMandantNummer,
       Value<String?> datevBankGegenkonto,
       Value<int> datevSachkontenlaenge,
+      Value<bool> creditNotesEnabled,
+      Value<String?> pdfIntroTextCreditNote,
+      Value<String?> pdfClosingTextCreditNote,
       Value<int> rowid,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
@@ -14278,6 +14540,9 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String?> datevMandantNummer,
       Value<String?> datevBankGegenkonto,
       Value<int> datevSachkontenlaenge,
+      Value<bool> creditNotesEnabled,
+      Value<String?> pdfIntroTextCreditNote,
+      Value<String?> pdfClosingTextCreditNote,
       Value<int> rowid,
     });
 
@@ -14853,6 +15118,21 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<int> get datevSachkontenlaenge => $composableBuilder(
     column: $table.datevSachkontenlaenge,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get creditNotesEnabled => $composableBuilder(
+    column: $table.creditNotesEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroTextCreditNote => $composableBuilder(
+    column: $table.pdfIntroTextCreditNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingTextCreditNote => $composableBuilder(
+    column: $table.pdfClosingTextCreditNote,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15497,6 +15777,21 @@ class $$CompaniesTableOrderingComposer
     column: $table.datevSachkontenlaenge,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get creditNotesEnabled => $composableBuilder(
+    column: $table.creditNotesEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfIntroTextCreditNote => $composableBuilder(
+    column: $table.pdfIntroTextCreditNote,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingTextCreditNote => $composableBuilder(
+    column: $table.pdfClosingTextCreditNote,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -15788,6 +16083,21 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<int> get datevSachkontenlaenge => $composableBuilder(
     column: $table.datevSachkontenlaenge,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get creditNotesEnabled => $composableBuilder(
+    column: $table.creditNotesEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfIntroTextCreditNote => $composableBuilder(
+    column: $table.pdfIntroTextCreditNote,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingTextCreditNote => $composableBuilder(
+    column: $table.pdfClosingTextCreditNote,
     builder: (column) => column,
   );
 
@@ -16228,6 +16538,9 @@ class $$CompaniesTableTableManager
                 Value<String?> datevMandantNummer = const Value.absent(),
                 Value<String?> datevBankGegenkonto = const Value.absent(),
                 Value<int> datevSachkontenlaenge = const Value.absent(),
+                Value<bool> creditNotesEnabled = const Value.absent(),
+                Value<String?> pdfIntroTextCreditNote = const Value.absent(),
+                Value<String?> pdfClosingTextCreditNote = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -16291,6 +16604,9 @@ class $$CompaniesTableTableManager
                 datevMandantNummer: datevMandantNummer,
                 datevBankGegenkonto: datevBankGegenkonto,
                 datevSachkontenlaenge: datevSachkontenlaenge,
+                creditNotesEnabled: creditNotesEnabled,
+                pdfIntroTextCreditNote: pdfIntroTextCreditNote,
+                pdfClosingTextCreditNote: pdfClosingTextCreditNote,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -16360,6 +16676,9 @@ class $$CompaniesTableTableManager
                 Value<String?> datevMandantNummer = const Value.absent(),
                 Value<String?> datevBankGegenkonto = const Value.absent(),
                 Value<int> datevSachkontenlaenge = const Value.absent(),
+                Value<bool> creditNotesEnabled = const Value.absent(),
+                Value<String?> pdfIntroTextCreditNote = const Value.absent(),
+                Value<String?> pdfClosingTextCreditNote = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -16423,6 +16742,9 @@ class $$CompaniesTableTableManager
                 datevMandantNummer: datevMandantNummer,
                 datevBankGegenkonto: datevBankGegenkonto,
                 datevSachkontenlaenge: datevSachkontenlaenge,
+                creditNotesEnabled: creditNotesEnabled,
+                pdfIntroTextCreditNote: pdfIntroTextCreditNote,
+                pdfClosingTextCreditNote: pdfClosingTextCreditNote,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -19927,6 +20249,25 @@ final class $$ProjectsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$ExpensesTable, List<Expense>> _expensesRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.expenses,
+    aliasName: 'projects__id__expenses__project_id',
+  );
+
+  $$ExpensesTableProcessedTableManager get expensesRefs {
+    final manager = $$ExpensesTableTableManager(
+      $_db,
+      $_db.expenses,
+    ).filter((f) => f.projectId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_expensesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ProjectsTableFilterComposer
@@ -20051,6 +20392,31 @@ class $$ProjectsTableFilterComposer
           }) => $$VehicleCostEntriesTableFilterComposer(
             $db: $db,
             $table: $db.vehicleCostEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> expensesRefs(
+    Expression<bool> Function($$ExpensesTableFilterComposer f) f,
+  ) {
+    final $$ExpensesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.expenses,
+      getReferencedColumn: (t) => t.projectId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ExpensesTableFilterComposer(
+            $db: $db,
+            $table: $db.expenses,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -20262,6 +20628,31 @@ class $$ProjectsTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> expensesRefs<T extends Object>(
+    Expression<T> Function($$ExpensesTableAnnotationComposer a) f,
+  ) {
+    final $$ExpensesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.expenses,
+      getReferencedColumn: (t) => t.projectId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ExpensesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.expenses,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ProjectsTableTableManager
@@ -20282,6 +20673,7 @@ class $$ProjectsTableTableManager
             bool customerId,
             bool invoicesRefs,
             bool vehicleCostEntriesRefs,
+            bool expensesRefs,
           })
         > {
   $$ProjectsTableTableManager(_$AppDatabase db, $ProjectsTable table)
@@ -20349,12 +20741,14 @@ class $$ProjectsTableTableManager
                 customerId = false,
                 invoicesRefs = false,
                 vehicleCostEntriesRefs = false,
+                expensesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (invoicesRefs) db.invoices,
                     if (vehicleCostEntriesRefs) db.vehicleCostEntries,
+                    if (expensesRefs) db.expenses,
                   ],
                   addJoins:
                       <
@@ -20445,6 +20839,27 @@ class $$ProjectsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (expensesRefs)
+                        await $_getPrefetchedData<
+                          Project,
+                          $ProjectsTable,
+                          Expense
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProjectsTableReferences
+                              ._expensesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProjectsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).expensesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.projectId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -20470,6 +20885,7 @@ typedef $$ProjectsTableProcessedTableManager =
         bool customerId,
         bool invoicesRefs,
         bool vehicleCostEntriesRefs,
+        bool expensesRefs,
       })
     >;
 typedef $$InvoicesTableCreateCompanionBuilder =
@@ -25400,6 +25816,7 @@ typedef $$ExpensesTableCreateCompanionBuilder =
       required double vatRatePercent,
       Value<String?> categoryId,
       Value<String?> supplierReference,
+      Value<String?> projectId,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -25414,6 +25831,7 @@ typedef $$ExpensesTableUpdateCompanionBuilder =
       Value<double> vatRatePercent,
       Value<String?> categoryId,
       Value<String?> supplierReference,
+      Value<String?> projectId,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -25452,6 +25870,23 @@ final class $$ExpensesTableReferences
       $_db.expenseCategories,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_categoryIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProjectsTable _projectIdTable(_$AppDatabase db) =>
+      db.projects.createAlias('expenses__project_id__projects__id');
+
+  $$ProjectsTableProcessedTableManager? get projectId {
+    final $_column = $_itemColumn<String>('project_id');
+    if ($_column == null) return null;
+    final manager = $$ProjectsTableTableManager(
+      $_db,
+      $_db.projects,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_projectIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -25545,6 +25980,29 @@ class $$ExpensesTableFilterComposer
           }) => $$ExpenseCategoriesTableFilterComposer(
             $db: $db,
             $table: $db.expenseCategories,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProjectsTableFilterComposer get projectId {
+    final $$ProjectsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableFilterComposer(
+            $db: $db,
+            $table: $db.projects,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -25649,6 +26107,29 @@ class $$ExpensesTableOrderingComposer
     );
     return composer;
   }
+
+  $$ProjectsTableOrderingComposer get projectId {
+    final $$ProjectsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableOrderingComposer(
+            $db: $db,
+            $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$ExpensesTableAnnotationComposer
@@ -25738,6 +26219,29 @@ class $$ExpensesTableAnnotationComposer
         );
     return composer;
   }
+
+  $$ProjectsTableAnnotationComposer get projectId {
+    final $$ProjectsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$ExpensesTableTableManager
@@ -25753,7 +26257,11 @@ class $$ExpensesTableTableManager
           $$ExpensesTableUpdateCompanionBuilder,
           (Expense, $$ExpensesTableReferences),
           Expense,
-          PrefetchHooks Function({bool companyId, bool categoryId})
+          PrefetchHooks Function({
+            bool companyId,
+            bool categoryId,
+            bool projectId,
+          })
         > {
   $$ExpensesTableTableManager(_$AppDatabase db, $ExpensesTable table)
     : super(
@@ -25776,6 +26284,7 @@ class $$ExpensesTableTableManager
                 Value<double> vatRatePercent = const Value.absent(),
                 Value<String?> categoryId = const Value.absent(),
                 Value<String?> supplierReference = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -25788,6 +26297,7 @@ class $$ExpensesTableTableManager
                 vatRatePercent: vatRatePercent,
                 categoryId: categoryId,
                 supplierReference: supplierReference,
+                projectId: projectId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -25802,6 +26312,7 @@ class $$ExpensesTableTableManager
                 required double vatRatePercent,
                 Value<String?> categoryId = const Value.absent(),
                 Value<String?> supplierReference = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -25814,6 +26325,7 @@ class $$ExpensesTableTableManager
                 vatRatePercent: vatRatePercent,
                 categoryId: categoryId,
                 supplierReference: supplierReference,
+                projectId: projectId,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -25826,60 +26338,74 @@ class $$ExpensesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({companyId = false, categoryId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (companyId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.companyId,
-                                referencedTable: $$ExpensesTableReferences
-                                    ._companyIdTable(db),
-                                referencedColumn: $$ExpensesTableReferences
-                                    ._companyIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
-                    if (categoryId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.categoryId,
-                                referencedTable: $$ExpensesTableReferences
-                                    ._categoryIdTable(db),
-                                referencedColumn: $$ExpensesTableReferences
-                                    ._categoryIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({companyId = false, categoryId = false, projectId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (companyId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$ExpensesTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn: $$ExpensesTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (categoryId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.categoryId,
+                                    referencedTable: $$ExpensesTableReferences
+                                        ._categoryIdTable(db),
+                                    referencedColumn: $$ExpensesTableReferences
+                                        ._categoryIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+                        if (projectId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.projectId,
+                                    referencedTable: $$ExpensesTableReferences
+                                        ._projectIdTable(db),
+                                    referencedColumn: $$ExpensesTableReferences
+                                        ._projectIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -25896,7 +26422,7 @@ typedef $$ExpensesTableProcessedTableManager =
       $$ExpensesTableUpdateCompanionBuilder,
       (Expense, $$ExpensesTableReferences),
       Expense,
-      PrefetchHooks Function({bool companyId, bool categoryId})
+      PrefetchHooks Function({bool companyId, bool categoryId, bool projectId})
     >;
 typedef $$BankTransactionsTableCreateCompanionBuilder =
     BankTransactionsCompanion Function({

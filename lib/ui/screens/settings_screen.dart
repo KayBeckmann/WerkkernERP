@@ -87,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       DocumentKind.order: TextEditingController(text: company?.pdfIntroTextOrder),
       DocumentKind.deliveryNote: TextEditingController(text: company?.pdfIntroTextDeliveryNote),
       DocumentKind.proforma: TextEditingController(text: company?.pdfIntroTextProforma),
+      DocumentKind.creditNote: TextEditingController(text: company?.pdfIntroTextCreditNote),
     };
     _closingCtrls = {
       DocumentKind.invoice: TextEditingController(text: company?.pdfClosingText),
@@ -94,6 +95,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       DocumentKind.order: TextEditingController(text: company?.pdfClosingTextOrder),
       DocumentKind.deliveryNote: TextEditingController(text: company?.pdfClosingTextDeliveryNote),
       DocumentKind.proforma: TextEditingController(text: company?.pdfClosingTextProforma),
+      DocumentKind.creditNote: TextEditingController(text: company?.pdfClosingTextCreditNote),
     };
     _footerCtrl = TextEditingController(text: company?.pdfFooterText);
     _dunningIntroCtrl = TextEditingController(text: company?.pdfIntroTextDunning);
@@ -186,6 +188,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     bool? dunningEnabled,
     bool? smtpEnabled,
     bool? buchhaltungEnabled,
+    bool? creditNotesEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -206,6 +209,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             dunningEnabled: dunningEnabled ?? company.dunningEnabled,
             smtpEnabled: smtpEnabled ?? company.smtpEnabled,
             buchhaltungEnabled: buchhaltungEnabled ?? company.buchhaltungEnabled,
+            creditNotesEnabled: creditNotesEnabled ?? company.creditNotesEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -236,6 +240,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               pdfClosingTextDeliveryNote: Value(_textOrNull(_closingCtrls[DocumentKind.deliveryNote]!)),
               pdfIntroTextProforma: Value(_textOrNull(_introCtrls[DocumentKind.proforma]!)),
               pdfClosingTextProforma: Value(_textOrNull(_closingCtrls[DocumentKind.proforma]!)),
+              pdfIntroTextCreditNote: Value(_textOrNull(_introCtrls[DocumentKind.creditNote]!)),
+              pdfClosingTextCreditNote: Value(_textOrNull(_closingCtrls[DocumentKind.creditNote]!)),
               pdfFooterText: Value(_textOrNull(_footerCtrl)),
               pdfIntroTextDunning: Value(_textOrNull(_dunningIntroCtrl)),
               pdfClosingTextDunning: Value(_textOrNull(_dunningClosingCtrl)),
@@ -446,6 +452,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (company.ordersEnabled) DocumentKind.order,
       if (company.deliveryNotesEnabled) DocumentKind.deliveryNote,
       if (company.proformaEnabled) DocumentKind.proforma,
+      if (company.creditNotesEnabled) DocumentKind.creditNote,
     ];
 
     return ListView(
@@ -561,6 +568,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Buchhaltung'),
                     value: company.buchhaltungEnabled,
                     onChanged: _busy ? null : (value) => _setModule(buchhaltungEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Gutschriften'),
+                    value: company.creditNotesEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(creditNotesEnabled: value),
                   ),
                 ],
               ),

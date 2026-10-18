@@ -68,6 +68,7 @@ String _prefixFor(DocumentKind kind) => switch (kind) {
       DocumentKind.order => 'A',
       DocumentKind.deliveryNote => 'LS',
       DocumentKind.proforma => 'PF',
+      DocumentKind.creditNote => 'G',
     };
 
 /// `R-JJxxx`/`An-JJxxx`/`A-JJxxx`, z. B. `R-26054` — mindestens drei

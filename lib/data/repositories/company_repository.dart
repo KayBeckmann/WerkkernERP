@@ -62,6 +62,7 @@ class CompanyRepository {
     required bool dunningEnabled,
     required bool smtpEnabled,
     required bool buchhaltungEnabled,
+    required bool creditNotesEnabled,
   }) async {
     final company = await findById(companyId);
     if (company == null) {
@@ -79,6 +80,7 @@ class CompanyRepository {
       dunningEnabled: dunningEnabled,
       smtpEnabled: smtpEnabled,
       buchhaltungEnabled: buchhaltungEnabled,
+      creditNotesEnabled: creditNotesEnabled,
     );
     await update(updated);
     return updated;

@@ -24,7 +24,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// Mahnschreiben-Texte, Kay-Feedback 2026-10-17); v15→v16: C7a
 /// SMTP-Versand; v16→v17: C14 Buchhaltung-Modulschalter; v17→v18:
 /// C14.2 Belege/Ausgaben; v18→v19: C14.4 Bankabgleich/CSV; v19→v20:
-/// C14.5 DATEV-Export).
+/// C14.5 DATEV-Export; v20→v21: Gutschriften mit eigenem Nummernkreis +
+/// optionale Projektzuordnung bei Belegen, Kay-Entscheidung 2026-10-19).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -48,12 +49,13 @@ void main() {
   });
 
   test(
-    'Migration v1→v20 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v21 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
     'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
-    'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export): Bestandsdaten '
+    'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export + Gutschriften/Projektzuordnung '
+    'Belege): Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
     () async {
@@ -183,6 +185,10 @@ void main() {
       // 2026-10-18):
       raw.execute('ALTER TABLE companies DROP COLUMN buchhaltung_enabled;');
       // v17 -> v18 (C14.2 Belege/Ausgaben): abhängige Tabelle zuerst.
+      // Vorher die project_id-Spalte entfernen, die erst bei v20->v21
+      // hinzukam — sonst schlägt DROP TABLE auf einer bereits um diese
+      // Spalte erweiterten Tabelle fehl.
+      raw.execute('ALTER TABLE expenses DROP COLUMN project_id;');
       raw.execute('DROP TABLE expenses;');
       raw.execute('DROP TABLE expense_categories;');
       // v18 -> v19 (C14.4 Bankabgleich/CSV):
@@ -200,6 +206,11 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN datev_mandant_nummer;');
       raw.execute('ALTER TABLE companies DROP COLUMN datev_bank_gegenkonto;');
       raw.execute('ALTER TABLE companies DROP COLUMN datev_sachkontenlaenge;');
+      // v20 -> v21 (Gutschriften eigener Nummernkreis + optionale
+      // Projektzuordnung bei Belegen, Kay-Entscheidung 2026-10-19):
+      raw.execute('ALTER TABLE companies DROP COLUMN credit_notes_enabled;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_credit_note;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_credit_note;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -264,6 +275,9 @@ void main() {
         expect(migratedCompany.datevMandantNummer, isNull);
         expect(migratedCompany.datevBankGegenkonto, isNull);
         expect(migratedCompany.datevSachkontenlaenge, 4);
+        expect(migratedCompany.creditNotesEnabled, isFalse);
+        expect(migratedCompany.pdfIntroTextCreditNote, isNull);
+        expect(migratedCompany.pdfClosingTextCreditNote, isNull);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -359,6 +373,7 @@ void main() {
                 amountGrossCents: 1190,
                 vatRatePercent: 19,
                 categoryId: const Value('category-nach-migration'),
+                projectId: const Value('project-nach-migration'),
                 createdAt: DateTime.now(),
                 updatedAt: DateTime.now(),
               ),
@@ -367,6 +382,11 @@ void main() {
               ..where((e) => e.id.equals('expense-nach-migration')))
             .getSingle();
         expect(createdExpense.amountGrossCents, 1190);
+        expect(
+          createdExpense.projectId,
+          'project-nach-migration',
+          reason: 'C14.2 Belege können seit v21 optional einem Projekt zugeordnet werden (Projekt-Ergebnisrechnung)',
+        );
 
         // BankTransactions existiert nach der Migration und ist nutzbar.
         await db.into(db.bankTransactions).insert(

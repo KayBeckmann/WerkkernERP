@@ -416,6 +416,97 @@ class InvoiceRepository {
     return sum;
   }
 
+  /// Gutschriften (Kay-Entscheidung 2026-10-19: "Gutschriften bekommen
+  /// einen eigenen Nummernkreis"). **Bewusst NICHT über [convertTo]**,
+  /// obwohl die Mechanik (Positionen kopieren, Entwurf mit
+  /// `convertedFromId` anlegen) identisch wäre: [convertTo] setzt
+  /// voraus, dass die Quelle ein Eintrag in [allowedConversionTargets]
+  /// ist, und genau DAS würde [isEditable] für JEDE Rechnung bis zur
+  /// ersten Gutschrift wieder aufschließen (siehe Doc-Kommentar dort) —
+  /// eine finalisierte Rechnung muss aber immer sofort unveränderlich
+  /// bleiben. Deshalb eine eigenständige, schlankere Methode, die
+  /// `invoices.kind` nie in [allowedConversionTargets] einträgt.
+  ///
+  /// Kopiert die Positionen 1:1 (volle Gutschrift) — Kay kann den
+  /// entstandenen Entwurf vor dem Finalisieren wie jeden anderen
+  /// Entwurf auf eine Teil-Gutschrift herunterkürzen. Arbeitsvorgabe
+  /// wie bei C13: volle USt der Originalpositionen, keine
+  /// Nettobetrachtung.
+  Future<Invoice> createCreditNoteDraft({
+    required String companyId,
+    required String invoiceId,
+  }) async {
+    return _db.transaction(() async {
+      final source = await findById(companyId: companyId, id: invoiceId);
+      if (source == null) {
+        throw StateError('Rechnung $invoiceId existiert nicht in Firma $companyId.');
+      }
+      if (source.kind != DocumentKind.invoice) {
+        throw ArgumentError('Eine Gutschrift kann nur zu einer Rechnung erstellt werden.');
+      }
+      if (source.status != InvoiceStatus.finalized) {
+        throw StateError('Nur eine finalisierte Rechnung kann eine Gutschrift erhalten.');
+      }
+
+      final sourceItems = await itemsFor(invoiceId);
+      final newItems = [
+        for (final item in sourceItems)
+          InvoiceItemInput(
+            kind: item.kind,
+            articleId: item.articleId,
+            description: item.description,
+            quantity: Decimal.parse(item.quantity),
+            unitPriceCents: item.unitPriceCents,
+            vatRatePercent: item.vatRatePercent,
+            unit: item.unit,
+            discountPercent: item.discountPercent,
+            groupLabel: item.groupLabel,
+          ),
+      ];
+
+      final id = _uuid.v4();
+      final now = DateTime.now();
+      await _db.into(_db.invoices).insert(
+            InvoicesCompanion.insert(
+              id: id,
+              companyId: companyId,
+              customerId: source.customerId,
+              kind: const Value(DocumentKind.creditNote),
+              status: InvoiceStatus.draft,
+              issueDate: now,
+              serviceDate: source.serviceDate,
+              projectId: Value(source.projectId),
+              convertedFromId: Value(invoiceId),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await _replaceItems(id, newItems);
+      return (await findById(companyId: companyId, id: id))!;
+    });
+  }
+
+  /// Alle **finalisierten** Gutschriften zu einer Rechnung — für die
+  /// Anzeige im Rechnungseditor ("Gutschriften zu diesem Dokument") und
+  /// als Abzug in Offene-Posten/EÜR (siehe `open_items_service.dart`/
+  /// `euer_service.dart`). Arbeitsvorgabe wie bei
+  /// [sumAdvancePaymentsForOrder]: volle USt der Gutschrift.
+  Future<List<Invoice>> listCreditNotesForInvoice(String invoiceId) async {
+    final converted = await listConvertedFrom(invoiceId);
+    return [
+      for (final doc in converted)
+        if (doc.kind == DocumentKind.creditNote && doc.status == InvoiceStatus.finalized) doc,
+    ];
+  }
+
+  Future<Money> sumCreditNotesForInvoice(String invoiceId) async {
+    var sum = Money.zero();
+    for (final doc in await listCreditNotesForInvoice(invoiceId)) {
+      sum = sum + (await totalsFor(doc.id)).totalGross;
+    }
+    return sum;
+  }
+
   /// C12 Mahnwesen: manuell "als bezahlt markieren"/wieder zurücksetzen
   /// — kein Bankabgleich, keine Teilzahlungen (siehe Doc-Kommentar bei
   /// `Invoices.paymentStatus`). Nur für **finalisierte** Dokumente

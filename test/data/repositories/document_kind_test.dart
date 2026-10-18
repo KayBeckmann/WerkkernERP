@@ -130,6 +130,7 @@ void main() {
         dunningEnabled: false,
         smtpEnabled: false,
         buchhaltungEnabled: false,
+        creditNotesEnabled: false,
       );
       final quoteDraft = await draftWithOneItem(company.id, customer.id, kind: DocumentKind.quote);
       await invoices.finalize(companyId: company.id, id: quoteDraft.id);
@@ -148,6 +149,7 @@ void main() {
         dunningEnabled: false,
         smtpEnabled: false,
         buchhaltungEnabled: false,
+        creditNotesEnabled: false,
       );
       expect(disabled.quotesEnabled, isFalse);
 
