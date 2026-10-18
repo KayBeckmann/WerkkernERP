@@ -73,6 +73,26 @@ class _Tab {
 
 enum _Section { dashboard, fakturierung, stammdaten, buchhaltung, einstellungen }
 
+/// Welche Überschrift/Trennlinie vor dem ersten Tab einer [_Section]
+/// steht — gemeinsame Logik für die breite Sidebar und die schmale
+/// "Mehr"-Übersicht ([_MoreOverviewScreen]), damit beide niemals
+/// auseinanderlaufen. `null` = keine Überschrift (Dashboard: der
+/// Einstiegspunkt ist keine Kategorie mit mehreren Einträgen).
+Widget? _sectionHeaderFor(_Section section) {
+  switch (section) {
+    case _Section.fakturierung:
+      return const SectionLabel('Fakturierung');
+    case _Section.stammdaten:
+      return const SectionLabel('Stammdaten');
+    case _Section.buchhaltung:
+      return const SectionLabel('Buchhaltung');
+    case _Section.dashboard:
+      return null;
+    case _Section.einstellungen:
+      return const Divider(height: 24);
+  }
+}
+
 /// Navigationsrahmen innerhalb einer gewählten Firma.
 ///
 /// Adaptiv: auf dem schmalen Android-Smartphone (Roadmap A0 Punkt 4)
@@ -281,6 +301,32 @@ class _HomeShellState extends State<HomeShell> {
     return index == -1 ? 0 : index;
   }
 
+  /// Kay-Feedback 2026-10-19: "Die Menüführung in der Responsiv-Version
+  /// müssen wir auch noch mal überarbeiten. Das wird zu voll in der
+  /// bottom Menüleiste" — mit jedem weiteren optionalen Modul (zuletzt
+  /// die vier Buchhaltung-Tabs) wuchs die `NavigationBar` immer weiter
+  /// und wurde dadurch unübersichtlich (kein Scrollen, nur immer
+  /// schmalere Einträge). Feste, nie wachsende Bottom-Bar: nur die drei
+  /// immer vorhandenen Tabs (Dashboard, Rechnungen, Kunden) plus "Mehr"
+  /// für den Rest — darin exakt dieselbe gruppierte Übersicht wie in
+  /// der breiten Sidebar.
+  static const _pinnedNarrowIds = [_TabId.dashboard, _TabId.invoice, _TabId.customers];
+
+  /// Position in der Bottom-Bar (0–2 = einer der drei angepinnten Tabs,
+  /// 3 = "Mehr" ist aktiv, weil der aktuell gezeigte Tab keiner der drei
+  /// angepinnten ist).
+  int _narrowBarIndex() {
+    final pinnedIndex = _pinnedNarrowIds.indexOf(_narrowId);
+    return pinnedIndex == -1 ? _pinnedNarrowIds.length : pinnedIndex;
+  }
+
+  Future<void> _openMoreOverview(List<_Tab> tabs) async {
+    final selected = await Navigator.of(context).push<_TabId>(
+      MaterialPageRoute(builder: (_) => _MoreOverviewScreen(tabs: tabs, currentId: _narrowId)),
+    );
+    if (selected != null && mounted) setState(() => _narrowId = selected);
+  }
+
   void _selectWide(_TabId id) {
     // Beim Tab-Wechsel zuerst zurück auf die Liste springen, falls z.B.
     // gerade eine Rechnung im Inhaltsbereich geöffnet ist — sonst bliebe
@@ -331,12 +377,62 @@ class _HomeShellState extends State<HomeShell> {
       ),
       body: IndexedStack(index: narrowIndex, children: [for (final tab in tabs) tab.screen]),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: narrowIndex,
-        onDestinationSelected: (index) => setState(() => _narrowId = tabs[index].id),
+        selectedIndex: _narrowBarIndex(),
+        onDestinationSelected: (index) {
+          if (index < _pinnedNarrowIds.length) {
+            setState(() => _narrowId = _pinnedNarrowIds[index]);
+          } else {
+            _openMoreOverview(tabs);
+          }
+        },
         destinations: [
-          for (final tab in tabs) NavigationDestination(icon: Icon(tab.icon), label: tab.title),
+          for (final id in _pinnedNarrowIds)
+            NavigationDestination(
+              icon: Icon(tabs[_positionOf(id, tabs)].icon),
+              label: tabs[_positionOf(id, tabs)].title,
+            ),
+          const NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mehr'),
         ],
       ),
+    );
+  }
+}
+
+/// "Mehr"-Übersicht für die schmale Bottom-Bar (Kay-Feedback
+/// 2026-10-19: "Das wird zu voll in der bottom Menüleiste") — zeigt
+/// ALLE Tabs gruppiert nach Sektion, exakt wie die breite Sidebar
+/// (siehe [_sectionHeaderFor]), als normale Vollbild-Liste statt
+/// einer immer weiter wachsenden Bottom-Bar. Tippt der Nutzer einen
+/// Eintrag an, wird die ID zurückgegeben und der Bildschirm schließt
+/// sich wieder (`Navigator.pop`), statt selbst zu navigieren — die
+/// eigentliche Tab-Umschaltung bleibt Sache von [_HomeShellState].
+class _MoreOverviewScreen extends StatelessWidget {
+  const _MoreOverviewScreen({required this.tabs, required this.currentId});
+  final List<_Tab> tabs;
+  final _TabId currentId;
+
+  @override
+  Widget build(BuildContext context) {
+    final children = <Widget>[];
+    _Section? lastSection;
+    for (final tab in tabs) {
+      if (tab.section != lastSection) {
+        final header = _sectionHeaderFor(tab.section);
+        if (header != null) children.add(header);
+        lastSection = tab.section;
+      }
+      children.add(
+        ListTile(
+          leading: Icon(tab.icon),
+          title: Text(tab.title),
+          selected: tab.id == currentId,
+          onTap: () => Navigator.of(context).pop(tab.id),
+        ),
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(title: const Text('Mehr')),
+      body: ListView(children: children),
     );
   }
 }
@@ -445,18 +541,8 @@ class _WideShell extends StatelessWidget {
                         _Section? lastSection;
                         for (final tab in tabs) {
                           if (tab.section != lastSection) {
-                            if (tab.section == _Section.fakturierung) {
-                              children.add(const SectionLabel('Fakturierung'));
-                            } else if (tab.section == _Section.stammdaten) {
-                              children.add(const SectionLabel('Stammdaten'));
-                            } else if (tab.section == _Section.buchhaltung) {
-                              children.add(const SectionLabel('Buchhaltung'));
-                            } else if (tab.section != _Section.dashboard) {
-                              // Für Dashboard bewusst KEINE Überschrift/
-                              // Trennlinie — es ist der Einstiegspunkt,
-                              // keine Kategorie mit mehreren Einträgen.
-                              children.add(const Divider(height: 24));
-                            }
+                            final header = _sectionHeaderFor(tab.section);
+                            if (header != null) children.add(header);
                             lastSection = tab.section;
                           }
                           children.add(
