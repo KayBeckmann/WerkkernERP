@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
 import '../../domain/services/invoice_totals_service.dart';
+import '../../domain/services/stock_booking_service.dart';
 import '../database/database.dart';
 import '../database/tables.dart';
 import 'number_sequence_repository.dart';
@@ -39,6 +40,23 @@ class InvoiceItemInput {
   /// Rabatt in Prozent auf diese Position — Kay-Nachtrag 2026-10-16.
   final double discountPercent;
   final String? groupLabel;
+}
+
+/// C5.1 Lagerbestand (Nachtrag 2026-10-19) — ein Artikel, der beim
+/// Finalisieren unter 0 Lagerbestand fallen würde. Reine Anzeige-
+/// Information für einen Warnhinweis, kein Blocker (siehe
+/// `InvoiceRepository.checkStockBeforeFinalize`).
+class StockWarning {
+  const StockWarning({
+    required this.articleId,
+    required this.articleName,
+    required this.availableQuantity,
+    required this.requestedQuantity,
+  });
+  final String articleId;
+  final String articleName;
+  final double availableQuantity;
+  final double requestedQuantity;
 }
 
 /// Erlaubte Umwandlungsziele je Quell-Dokumentart (Kay-Nachtrag
@@ -297,8 +315,99 @@ class InvoiceRepository {
           pdfFooterTextSnapshot: Value(company.pdfFooterText),
         ),
       );
+
+      if (company.lagerbestandEnabled) {
+        await _bookStockOnFinalize(invoice: invoice, items: items);
+      }
+
       return findById(companyId: companyId, id: id);
     });
+  }
+
+  Future<DocumentKind?> _predecessorKind(Invoice invoice) async {
+    if (invoice.convertedFromId == null) return null;
+    final predecessor = await (_db.select(_db.invoices)
+          ..where((i) => i.id.equals(invoice.convertedFromId!)))
+        .getSingleOrNull();
+    return predecessor?.kind;
+  }
+
+  /// Nur Positionen vom Typ Artikel (`InvoiceItemKind.article`) mit
+  /// gesetzter `articleId` haben einen Lagerbestand — Stunden/Freitext
+  /// werden ignoriert. Mehrere Positionen desselben Artikels in einem
+  /// Dokument werden aufsummiert (eine Lese-/Schreib-Runde pro Artikel
+  /// statt pro Position).
+  Map<String, Decimal> _aggregateArticleQuantities(List<InvoiceItem> items) {
+    final quantityByArticle = <String, Decimal>{};
+    for (final item in items) {
+      if (item.kind == InvoiceItemKind.article && item.articleId != null) {
+        quantityByArticle[item.articleId!] =
+            (quantityByArticle[item.articleId!] ?? Decimal.zero) + Decimal.parse(item.quantity);
+      }
+    }
+    return quantityByArticle;
+  }
+
+  /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — siehe
+  /// `stock_booking_service.dart` für die Entscheidungsregel, wann
+  /// überhaupt gebucht wird.
+  Future<void> _bookStockOnFinalize({required Invoice invoice, required List<InvoiceItem> items}) async {
+    final predecessorKind = await _predecessorKind(invoice);
+    if (!shouldBookStockOnFinalize(kind: invoice.kind, predecessorKind: predecessorKind)) {
+      return;
+    }
+
+    for (final entry in _aggregateArticleQuantities(items).entries) {
+      final article =
+          await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
+      if (article == null) continue;
+      final newStock = article.stockQuantity - entry.value.toDouble();
+      await (_db.update(_db.articles)..where((a) => a.id.equals(entry.key)))
+          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
+    }
+  }
+
+  /// Prüft **ohne zu buchen**, ob das Finalisieren von [id] einen oder
+  /// mehrere Artikel unter 0 bringen würde — für einen Warnhinweis vor
+  /// dem eigentlichen Finalisieren (Kay-Entscheidung: "Nur warnen,
+  /// trotzdem erlauben", nicht blockieren). Liefert eine leere Liste,
+  /// wenn das Modul aus ist, das Dokument laut
+  /// `shouldBookStockOnFinalize()` ohnehin nicht buchen würde, oder
+  /// überall genug Bestand vorhanden ist.
+  Future<List<StockWarning>> checkStockBeforeFinalize({
+    required String companyId,
+    required String id,
+  }) async {
+    final company =
+        await (_db.select(_db.companies)..where((c) => c.id.equals(companyId))).getSingleOrNull();
+    if (company == null || !company.lagerbestandEnabled) return const [];
+
+    final invoice = await findById(companyId: companyId, id: id);
+    if (invoice == null) return const [];
+    final predecessorKind = await _predecessorKind(invoice);
+    if (!shouldBookStockOnFinalize(kind: invoice.kind, predecessorKind: predecessorKind)) {
+      return const [];
+    }
+
+    final items = await itemsFor(id);
+    final warnings = <StockWarning>[];
+    for (final entry in _aggregateArticleQuantities(items).entries) {
+      final article =
+          await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
+      if (article == null) continue;
+      final requested = entry.value.toDouble();
+      if (article.stockQuantity - requested < 0) {
+        warnings.add(
+          StockWarning(
+            articleId: article.id,
+            articleName: article.name,
+            availableQuantity: article.stockQuantity,
+            requestedQuantity: requested,
+          ),
+        );
+      }
+    }
+    return warnings;
   }
 
   /// Wandelt ein **finalisiertes** Angebot/Auftrag in einen neuen
