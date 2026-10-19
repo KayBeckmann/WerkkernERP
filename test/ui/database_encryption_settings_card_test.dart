@@ -86,10 +86,10 @@ void main() {
 
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Datenbank-Verschlüsselung'));
+      await tester.pumpAndSettle();
 
       expect(store.enabled, isFalse, reason: 'F4 ist standardmäßig aus');
-      await tester.ensureVisible(find.text('Datenbank verschlüsseln'));
-      await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(SwitchListTile, 'Datenbank verschlüsseln'));
       await tester.pumpAndSettle();
@@ -144,7 +144,7 @@ void main() {
 
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Datenbank verschlüsseln'));
+      await tester.tap(find.text('Datenbank-Verschlüsselung'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(SwitchListTile, 'Datenbank verschlüsseln'));

@@ -31,6 +31,8 @@ void main() {
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(SidebarNavItem, 'Lieferscheine'), findsNothing);
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Lieferscheine'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(SidebarNavItem, 'Lieferscheine'), findsOneWidget);
@@ -85,6 +87,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Module'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Angebote'));
       await tester.pumpAndSettle();

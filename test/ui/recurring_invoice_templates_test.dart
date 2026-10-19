@@ -59,6 +59,8 @@ void main() {
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(SidebarNavItem, 'Vorlagen'), findsNothing);
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Wiederkehrende Rechnungen'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(SidebarNavItem, 'Vorlagen'), findsOneWidget);

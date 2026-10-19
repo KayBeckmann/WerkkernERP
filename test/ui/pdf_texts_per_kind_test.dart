@@ -16,12 +16,7 @@ void main() {
   testWidgets(
     'Rechnungs- und Angebots-Texte sind unabhängig voneinander speicherbar',
     (tester) async {
-      // C10 (Kay-Priorisierungsentscheidung 2026-10-17) fügt einen vierten
-      // Modul-Schalter hinzu — die Einstellungen-Seite braucht dadurch
-      // mehr Höhe, um "Speichern" noch innerhalb des Testviewports zu
-      // treffen (sonst Tap-Miss außerhalb des Render-Baums). Nachtrag
-      // 2026-10-18 (Kleinunternehmer-Abschnitt) braucht noch mehr Höhe.
-      tester.view.physicalSize = const Size(1200, 2000);
+      tester.view.physicalSize = const Size(1200, 1000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
@@ -33,12 +28,20 @@ void main() {
       await tester.tap(find.text('Anlegen'));
       await tester.pumpAndSettle();
 
+      // Nachtrag 2026-10-18 ("Die Einstellungen müssen aufgeräumt
+      // werden"): Module und Dokumenttexte sind jetzt getrennte
+      // Unterseiten — Modul zuerst aktivieren, danach auf die
+      // Dokumenttexte-Seite wechseln.
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
-
-      // Angebote-Modul aktivieren -> eigenes Textpaar erscheint.
-      expect(find.widgetWithText(TextField, 'Einleitungstext (Angebot)'), findsNothing);
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Angebote'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Dokumenttexte'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(TextField, 'Einleitungstext (Angebot)'), findsOneWidget);
 
@@ -52,14 +55,33 @@ void main() {
       );
       await tester.tap(find.text('Speichern'));
       await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
 
       // Modul aus- und wieder einschalten -> beide Texte bleiben
-      // unabhängig erhalten (Controller bleiben über Toggle hinweg
-      // bestehen, siehe Doc-Kommentar in SettingsScreen).
+      // unabhängig erhalten (jetzt aus der echten DB geladen, nicht
+      // nur aus einem im Speicher gehaltenen Controller — die
+      // Dokumenttexte-Unterseite baut ihre Controller bei jedem
+      // Öffnen neu aus der Firma auf).
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Angebote'));
       await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dokumenttexte'));
+      await tester.pumpAndSettle();
       expect(find.widgetWithText(TextField, 'Einleitungstext (Angebot)'), findsNothing);
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Angebote'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dokumenttexte'));
       await tester.pumpAndSettle();
 
       expect(find.text('Rechnungstext'), findsOneWidget);

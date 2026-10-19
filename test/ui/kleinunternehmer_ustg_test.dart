@@ -29,6 +29,8 @@ void main() {
 
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Umsatzsteuer'));
+      await tester.pumpAndSettle();
       expect(find.text('Gemäß § 19 Abs. 1 UStG wird keine Umsatzsteuer berechnet.'), findsNothing);
       await tester.tap(find.widgetWithText(SwitchListTile, 'Kleinunternehmer nach § 19 UStG'));
       await tester.pumpAndSettle();

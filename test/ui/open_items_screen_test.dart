@@ -36,6 +36,8 @@ void main() {
       await tester.tap(_sidebarItem('Einstellungen'));
       await tester.pumpAndSettle();
       expect(_sidebarItem('Offene Posten'), findsNothing);
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Buchhaltung'));
       await tester.pumpAndSettle();
       expect(_sidebarItem('Offene Posten'), findsOneWidget);
