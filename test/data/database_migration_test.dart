@@ -27,7 +27,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// C14.2 Belege/Ausgaben; v18→v19: C14.4 Bankabgleich/CSV; v19→v20:
 /// C14.5 DATEV-Export; v20→v21: Gutschriften mit eigenem Nummernkreis +
 /// optionale Projektzuordnung bei Belegen, Kay-Entscheidung 2026-10-19;
-/// v21→v22: Artikel deaktivierbar, Nachtrag 2026-10-18).
+/// v21→v22: Artikel deaktivierbar, Nachtrag 2026-10-18; v22→v23:
+/// Kleinunternehmerregelung §19 UStG, Nachtrag 2026-10-18).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -51,13 +52,13 @@ void main() {
   });
 
   test(
-    'Migration v1→v22 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v23 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
     'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
     'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export + Gutschriften/Projektzuordnung '
-    'Belege + Artikel deaktivierbar): Bestandsdaten '
+    'Belege + Artikel deaktivierbar + Kleinunternehmerregelung): Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
     () async {
@@ -217,6 +218,8 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_credit_note;');
       // v21 -> v22 (Artikel deaktivierbar, Nachtrag 2026-10-18):
       raw.execute('ALTER TABLE articles DROP COLUMN active;');
+      // v22 -> v23 (Kleinunternehmerregelung §19 UStG, Nachtrag 2026-10-18):
+      raw.execute('ALTER TABLE companies DROP COLUMN is_small_business_exempt;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -284,6 +287,7 @@ void main() {
         expect(migratedCompany.creditNotesEnabled, isFalse);
         expect(migratedCompany.pdfIntroTextCreditNote, isNull);
         expect(migratedCompany.pdfClosingTextCreditNote, isNull);
+        expect(migratedCompany.isSmallBusinessExempt, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
