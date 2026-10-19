@@ -193,6 +193,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _creditNotesEnabled = false;
   List<Invoice> _creditNotes = [];
 
+  // Kleinunternehmerregelung §19 UStG (Nachtrag 2026-10-18) — erzwingt
+  // 0 % USt im Positions-Dialog, siehe `invoice_item_dialog.dart`.
+  bool _isSmallBusinessExempt = false;
+
   // C7a SMTP-Versand (Kay-Nachfrage 2026-10-17): nur sichtbar, wenn die
   // Firma das Modul aktiviert hat — genau wie bei den übrigen
   // optionalen Bereichen.
@@ -241,6 +245,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _smtpEnabled = company.smtpEnabled;
     _smtpConfig = SmtpConfig.fromCompany(company);
     _creditNotesEnabled = company.creditNotesEnabled;
+    _isSmallBusinessExempt = company.isSmallBusinessExempt;
 
     final invoice = widget.invoice;
     _currentInvoice = invoice;
@@ -330,6 +335,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       articles: _articles,
       existingGroupLabels: _existingGroupLabels,
       allowHours: _kind != DocumentKind.deliveryNote,
+      forceZeroVat: _isSmallBusinessExempt,
     );
     if (result == null) return;
     setState(() {
@@ -359,6 +365,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       existingGroupLabels: _existingGroupLabels,
       existing: item.toResult(),
       allowHours: _kind != DocumentKind.deliveryNote,
+      forceZeroVat: _isSmallBusinessExempt,
     );
     if (result == null) return;
     setState(() {

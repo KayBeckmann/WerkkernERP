@@ -92,6 +92,10 @@ class _RecurringInvoiceTemplateEditorScreenState extends State<RecurringInvoiceT
   List<Article> _articles = [];
   final List<_TemplateItem> _items = [];
 
+  // Kleinunternehmerregelung §19 UStG (Nachtrag 2026-10-18) — erzwingt
+  // 0 % USt im Positions-Dialog, siehe `invoice_item_dialog.dart`.
+  bool _isSmallBusinessExempt = false;
+
   bool get _isEdit => widget.template != null;
 
   @override
@@ -101,12 +105,14 @@ class _RecurringInvoiceTemplateEditorScreenState extends State<RecurringInvoiceT
   }
 
   Future<void> _init() async {
-    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final company = context.read<ActiveCompanyService>().active!;
+    final companyId = company.id;
     final customerRepo = context.read<CustomerRepository>();
     final articleRepo = context.read<ArticleRepository>();
     final templateRepo = context.read<RecurringInvoiceTemplateRepository>();
     _customers = await customerRepo.listForCompany(companyId);
     _articles = await articleRepo.listForCompany(companyId);
+    _isSmallBusinessExempt = company.isSmallBusinessExempt;
 
     final template = widget.template;
     if (template != null) {
@@ -156,7 +162,11 @@ class _RecurringInvoiceTemplateEditorScreenState extends State<RecurringInvoiceT
   }
 
   Future<void> _addItem() async {
-    final result = await showInvoiceItemDialog(context: context, articles: _articles);
+    final result = await showInvoiceItemDialog(
+      context: context,
+      articles: _articles,
+      forceZeroVat: _isSmallBusinessExempt,
+    );
     if (result == null) return;
     setState(() {
       _items.add(
@@ -180,6 +190,7 @@ class _RecurringInvoiceTemplateEditorScreenState extends State<RecurringInvoiceT
       context: context,
       articles: _articles,
       existing: item.toResult(),
+      forceZeroVat: _isSmallBusinessExempt,
     );
     if (result == null) return;
     setState(() {

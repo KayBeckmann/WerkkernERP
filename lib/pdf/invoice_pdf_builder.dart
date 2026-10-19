@@ -171,6 +171,19 @@ Future<Uint8List> _buildPdf({
         pw.SizedBox(height: 16),
         if (invoice.kind != DocumentKind.deliveryNote)
           _buildTotals(totals, priorAdvancePaymentsGross: priorAdvancePaymentsGross),
+        // Nachtrag 2026-10-18: Kleinunternehmerregelung (§19 UStG) —
+        // bewusst ein fester, nicht editierbarer Hinweis statt im frei
+        // änderbaren Schlusstext, damit er beim Bearbeiten des
+        // Schlusstexts nicht versehentlich verschwindet. Arbeitsvorgabe
+        // (F1: keine Rechtsprüfung) — Kay bestätigt mit seinem
+        // Steuerberater, dass die Regelung tatsächlich zutrifft.
+        if (company.isSmallBusinessExempt && invoice.kind != DocumentKind.deliveryNote) ...[
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Gemäß § 19 Abs. 1 UStG wird keine Umsatzsteuer berechnet.',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+        ],
         if (invoice.paymentTerms != null) ...[
           pw.SizedBox(height: 16),
           pw.Text(invoice.paymentTerms!, style: const pw.TextStyle(fontSize: 10)),

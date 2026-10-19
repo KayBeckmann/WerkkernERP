@@ -21,6 +21,10 @@ Future<InvoiceItemInputResult?> showInvoiceItemDialog({
   List<String> existingGroupLabels = const [],
   InvoiceItemInputResult? existing,
   bool allowHours = true,
+  // Nachtrag 2026-10-18: Kleinunternehmerregelung (§19 UStG) — darf
+  // keine Umsatzsteuer ausweisen. `false` lässt das Verhalten für alle
+  // bestehenden Aufrufer unverändert.
+  bool forceZeroVat = false,
 }) {
   return showDialog<InvoiceItemInputResult>(
     context: context,
@@ -29,6 +33,7 @@ Future<InvoiceItemInputResult?> showInvoiceItemDialog({
       existingGroupLabels: existingGroupLabels,
       existing: existing,
       allowHours: allowHours,
+      forceZeroVat: forceZeroVat,
     ),
   );
 }
@@ -68,6 +73,7 @@ class _InvoiceItemDialog extends StatefulWidget {
     required this.existingGroupLabels,
     this.existing,
     this.allowHours = true,
+    this.forceZeroVat = false,
   });
   final List<Article> articles;
   final List<String> existingGroupLabels;
@@ -77,6 +83,11 @@ class _InvoiceItemDialog extends StatefulWidget {
   /// Stunden enthalten!!!") — blendet das Segment aus statt nur die
   /// Auswahl im Nachhinein abzulehnen.
   final bool allowHours;
+
+  /// Nachtrag 2026-10-18: Kleinunternehmerregelung (§19 UStG) — blendet
+  /// die USt-Auswahl ganz aus statt sie nur zu verstecken, damit sich
+  /// `_vatRate` nicht aus Versehen auf einen anderen Satz ändern kann.
+  final bool forceZeroVat;
 
   bool get isEdit => existing != null;
 
@@ -100,7 +111,8 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
         ? ''
         : widget.existing!.discountPercent.toString(),
   );
-  late double _vatRate = widget.existing?.vatRatePercent ?? 19;
+  late double _vatRate =
+      widget.forceZeroVat ? 0 : (widget.existing?.vatRatePercent ?? 19);
 
   @override
   void initState() {
@@ -218,17 +230,27 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: DropdownButtonFormField<double>(
-                      isExpanded: true,
-                      initialValue: _vatRate,
-                      decoration: const InputDecoration(labelText: 'MwSt.'),
-                      items: const [
-                        DropdownMenuItem(value: 19.0, child: Text('19 %')),
-                        DropdownMenuItem(value: 7.0, child: Text('7 %')),
-                        DropdownMenuItem(value: 0.0, child: Text('0 %')),
-                      ],
-                      onChanged: (value) => setState(() => _vatRate = value ?? 19),
-                    ),
+                    // Kleinunternehmerregelung (§19 UStG, Nachtrag
+                    // 2026-10-18): Dropdown komplett gesperrt statt nur
+                    // versteckt — die Position bleibt sichtbar als
+                    // "0 %", damit nicht der Eindruck entsteht, hier
+                    // fehle etwas.
+                    child: widget.forceZeroVat
+                        ? const TextField(
+                            enabled: false,
+                            decoration: InputDecoration(labelText: 'MwSt.', hintText: '0 % (Kleinunternehmer)'),
+                          )
+                        : DropdownButtonFormField<double>(
+                            isExpanded: true,
+                            initialValue: _vatRate,
+                            decoration: const InputDecoration(labelText: 'MwSt.'),
+                            items: const [
+                              DropdownMenuItem(value: 19.0, child: Text('19 %')),
+                              DropdownMenuItem(value: 7.0, child: Text('7 %')),
+                              DropdownMenuItem(value: 0.0, child: Text('0 %')),
+                            ],
+                            onChanged: (value) => setState(() => _vatRate = value ?? 19),
+                          ),
                   ),
                   const SizedBox(width: 12),
                   // Rabatt pro Position (Kay-Nachtrag 2026-10-16, analog
