@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
+import '../../data/database/tables.dart';
 import '../../data/repositories/article_group_repository.dart';
 import '../../data/repositories/article_repository.dart';
+import '../../data/repositories/inventory_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
@@ -128,23 +130,45 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
   /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — Bestandskorrektur
   /// (Inventur, Anfangsbestand) als eigener, expliziter Vorgang,
-  /// getrennt vom normalen Bearbeiten-Dialog (siehe Doc-Kommentar bei
-  /// `ArticleRepository.setStock()`).
+  /// getrennt vom normalen Bearbeiten-Dialog. Seit C5.3 (Nachtrag
+  /// 2026-10-19: "Das muss alles dokumentiert werden, damit es dem
+  /// Finanzamt sauber gezeigt werden kann") läuft das **nicht** mehr
+  /// über das grundlose `ArticleRepository.setStock()`, sondern über
+  /// `InventoryRepository.correctSingleArticleStock()` — ein Ein-
+  /// Artikel-Inventurlauf mit Pflicht-Grund, der eine unveränderliche
+  /// [StockMovement]-Zeile erzeugt (siehe Doc-Kommentar dort).
   Future<void> _correctStock() async {
-    final result = await showDialog<double>(
+    final result = await showDialog<_StockCorrectionResult>(
       context: context,
       builder: (context) => _StockCorrectionDialog(currentQuantity: _article.stockQuantity),
     );
     if (result == null || !mounted) return;
     final companyId = context.read<ActiveCompanyService>().active!.id;
-    final updated = await context.read<ArticleRepository>().setStock(
+    final updated = await context.read<InventoryRepository>().correctSingleArticleStock(
           companyId: companyId,
-          id: _article.id,
-          newQuantity: result,
+          articleId: _article.id,
+          newQuantity: result.quantity,
+          reason: result.reason,
         );
     if (updated == null || !mounted) return;
     setState(() => _article = updated);
     context.read<StockChangeNotifier>().notifyStockChanged();
+  }
+
+  /// C5.3 (Nachtrag 2026-10-19) — zeigt das Bewegungsprotokoll dieses
+  /// Artikels (siehe `InventoryRepository.movementsForArticle()`), rein
+  /// lesend.
+  Future<void> _showMovements() async {
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final movements = await context.read<InventoryRepository>().movementsForArticle(
+          companyId: companyId,
+          articleId: _article.id,
+        );
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _StockMovementsDialog(articleName: _article.name, movements: movements),
+    );
   }
 
   Future<void> _toggleActive() async {
@@ -224,6 +248,10 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
+                          ),
+                          TextButton(
+                            onPressed: _showMovements,
+                            child: const Text('Bewegungen'),
                           ),
                           TextButton(
                             onPressed: _correctStock,
@@ -353,9 +381,17 @@ class _SetSupplierPriceDialogState extends State<_SetSupplierPriceDialog> {
   }
 }
 
+class _StockCorrectionResult {
+  const _StockCorrectionResult({required this.quantity, required this.reason});
+  final double quantity;
+  final String reason;
+}
+
 /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — setzt den Lagerbestand
-/// absolut neu (Inventur, Anfangsbestand), siehe
-/// `ArticleRepository.setStock()`.
+/// absolut neu (Inventur, Anfangsbestand). Seit C5.3 (Nachtrag
+/// 2026-10-19: "Das muss alles dokumentiert werden") mit **Pflicht-
+/// Grund** — läuft über `InventoryRepository.
+/// correctSingleArticleStock()`, siehe Doc-Kommentar dort.
 class _StockCorrectionDialog extends StatefulWidget {
   const _StockCorrectionDialog({required this.currentQuantity});
   final double currentQuantity;
@@ -366,6 +402,7 @@ class _StockCorrectionDialog extends StatefulWidget {
 
 class _StockCorrectionDialogState extends State<_StockCorrectionDialog> {
   late final TextEditingController _quantityCtrl;
+  final _reasonCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -376,6 +413,7 @@ class _StockCorrectionDialogState extends State<_StockCorrectionDialog> {
   @override
   void dispose() {
     _quantityCtrl.dispose();
+    _reasonCtrl.dispose();
     super.dispose();
   }
 
@@ -391,7 +429,8 @@ class _StockCorrectionDialogState extends State<_StockCorrectionDialog> {
           children: [
             Text(
               'Setzt den Lagerbestand auf den eingegebenen Wert (für Inventur, Anfangsbestand '
-              'oder eine Korrektur außerhalb von Bestellungen/Dokumenten).',
+              'oder eine Korrektur außerhalb von Bestellungen/Dokumenten). Wird mit Grund im '
+              'Bewegungsprotokoll dokumentiert.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -401,6 +440,10 @@ class _StockCorrectionDialogState extends State<_StockCorrectionDialog> {
               decoration: const InputDecoration(labelText: 'Neuer Lagerbestand *'),
               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
             ),
+            TextField(
+              controller: _reasonCtrl,
+              decoration: const InputDecoration(labelText: 'Grund *', hintText: 'z. B. "Inventur 10/2026"'),
+            ),
           ],
         ),
       ),
@@ -409,12 +452,66 @@ class _StockCorrectionDialogState extends State<_StockCorrectionDialog> {
         FilledButton(
           onPressed: () {
             final value = double.tryParse(_quantityCtrl.text.trim().replaceAll(',', '.'));
-            if (value == null) return;
-            Navigator.pop(context, value);
+            final reason = _reasonCtrl.text.trim();
+            if (value == null || reason.isEmpty) return;
+            Navigator.pop(context, _StockCorrectionResult(quantity: value, reason: reason));
           },
           child: const Text('Speichern'),
         ),
       ],
+    );
+  }
+}
+
+/// C5.3 (Nachtrag 2026-10-19) — rein lesende Anzeige des
+/// Bewegungsprotokolls eines Artikels.
+class _StockMovementsDialog extends StatelessWidget {
+  const _StockMovementsDialog({required this.articleName, required this.movements});
+  final String articleName;
+  final List<StockMovement> movements;
+
+  String _typeLabel(StockMovementType type) => switch (type) {
+        StockMovementType.documentBooking => 'Dokument',
+        StockMovementType.purchaseOrderReceipt => 'Wareneingang',
+        StockMovementType.inventoryCorrection => 'Inventur',
+      };
+
+  String _formatDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Bewegungen: $articleName'),
+      content: SizedBox(
+        width: 420,
+        height: 400,
+        child: movements.isEmpty
+            ? const Center(child: Text('Noch keine Bewegungen.'))
+            : ListView.separated(
+                itemCount: movements.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final movement = movements[index];
+                  final sign = movement.quantityDelta >= 0 ? '+' : '';
+                  return ListTile(
+                    dense: true,
+                    title: Text(
+                      '$sign${formatArticleQuantity(movement.quantityDelta)} '
+                      '(${_typeLabel(movement.type)})',
+                    ),
+                    subtitle: Text(
+                      [
+                        _formatDate(movement.createdAt),
+                        if (movement.referenceLabel != null) movement.referenceLabel!,
+                        'Bestand danach: ${formatArticleQuantity(movement.resultingQuantity)}',
+                      ].join(' · '),
+                    ),
+                  );
+                },
+              ),
+      ),
+      actions: [FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Schließen'))],
     );
   }
 }

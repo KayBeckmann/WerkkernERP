@@ -16,6 +16,7 @@ import 'euer_screen.dart';
 import 'expenses_screen.dart';
 import 'invoices_screen.dart';
 import 'open_items_screen.dart';
+import 'inventory_counts_screen.dart';
 import 'projects_screen.dart';
 import 'purchase_orders_screen.dart';
 import 'recurring_invoice_templates_screen.dart';
@@ -47,6 +48,7 @@ enum _TabId {
   projects,
   vehicles,
   purchaseOrders,
+  inventoryCounts,
   recurringTemplates,
   openItems,
   expenses,
@@ -262,6 +264,16 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.shopping_cart_outlined,
             title: 'Bestellungen',
             screen: PurchaseOrdersScreen(),
+            section: _Section.stammdaten,
+          ),
+        // C5.3 Inventur (Nachtrag 2026-10-19) — Unterfunktion des
+        // bestehenden Lagerbestand-Moduls, kein eigener Schalter.
+        if (company.lagerbestandEnabled)
+          const _Tab(
+            id: _TabId.inventoryCounts,
+            icon: Icons.fact_check_outlined,
+            title: 'Inventur',
+            screen: InventoryCountsScreen(),
             section: _Section.stammdaten,
           ),
         // C14.1 Offene-Posten-Übersicht (Kay-Priorisierungsentscheidung

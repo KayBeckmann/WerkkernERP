@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,9 @@ import 'package:provider/provider.dart';
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
+import '../../data/repositories/expense_category_repository.dart';
+import '../../data/repositories/invoice_repository.dart';
+import '../../data/repositories/project_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/stock_change_notifier.dart';
@@ -34,9 +38,39 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   Future<_DetailData> _load() async {
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final repo = context.read<PurchaseOrderRepository>();
+    final projectRepo = context.read<ProjectRepository>();
+    final categoryRepo = context.read<ExpenseCategoryRepository>();
+    final invoiceRepo = context.read<InvoiceRepository>();
+
     final order = await repo.findById(companyId: companyId, id: widget.purchaseOrderId);
     final items = order == null ? <PurchaseOrderItem>[] : await repo.itemsFor(order.id);
-    return _DetailData(order: order, items: items);
+
+    String? projectName;
+    String? categoryLabel;
+    String? relatedDocumentNumber;
+    if (order != null) {
+      if (order.projectId != null) {
+        final project = await projectRepo.findById(companyId: companyId, id: order.projectId!);
+        projectName = project?.name;
+      }
+      if (order.expenseCategoryId != null) {
+        final categories = await categoryRepo.listForCompany(companyId);
+        categoryLabel =
+            categories.where((c) => c.id == order.expenseCategoryId).firstOrNull?.label;
+      }
+      if (order.sourceOrderId != null) {
+        final related = await invoiceRepo.findById(companyId: companyId, id: order.sourceOrderId!);
+        relatedDocumentNumber = related?.invoiceNumber;
+      }
+    }
+
+    return _DetailData(
+      order: order,
+      items: items,
+      projectName: projectName,
+      categoryLabel: categoryLabel,
+      relatedDocumentNumber: relatedDocumentNumber,
+    );
   }
 
   void _reload() => setState(() {
@@ -70,6 +104,52 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
           companyId: companyId,
           id: order.id,
           items: result,
+        );
+    _reload();
+  }
+
+  /// C5.3 (Nachtrag 2026-10-19: "Bestellungen sollen auch Projekten/
+  /// Aufträgen/Rechnungen zugeordnet werden können" + "Bestellungen
+  /// müssen auf die SK-Klassen gebucht werden") — Projekt, SKR03-
+  /// Beleg-Kategorie und ein zugeordnetes Auftrag/Rechnung-Dokument in
+  /// einem Dialog, alle drei optional. Eine Bestellung ohne jede
+  /// Zuordnung gilt automatisch als Lagerbestellung (Kay-Entscheidung
+  /// auf Rückfrage) — kein eigenes Kennzeichen nötig.
+  Future<void> _editAssignment(PurchaseOrder order) async {
+    final company = context.read<ActiveCompanyService>().active!;
+    final companyId = company.id;
+    final projectRepo = context.read<ProjectRepository>();
+    final categoryRepo = context.read<ExpenseCategoryRepository>();
+    final invoiceRepo = context.read<InvoiceRepository>();
+    final purchaseOrderRepo = context.read<PurchaseOrderRepository>();
+
+    final projects = company.projectsEnabled ? await projectRepo.listForCompany(companyId) : const <Project>[];
+    final categories =
+        company.buchhaltungEnabled ? await categoryRepo.listForCompany(companyId) : const <ExpenseCategory>[];
+    final relatedCandidates = [
+      ...await invoiceRepo.listAllForCompany(companyId, kind: DocumentKind.order),
+      ...await invoiceRepo.listAllForCompany(companyId, kind: DocumentKind.invoice),
+    ].where((i) => i.status == InvoiceStatus.finalized).toList();
+    if (!mounted) return;
+
+    final result = await showDialog<_AssignmentResult>(
+      context: context,
+      builder: (context) => _AssignmentDialog(
+        projects: projects,
+        categories: categories,
+        relatedDocuments: relatedCandidates,
+        initialProjectId: order.projectId,
+        initialExpenseCategoryId: order.expenseCategoryId,
+        initialRelatedDocumentId: order.sourceOrderId,
+      ),
+    );
+    if (result == null || !mounted) return;
+    await purchaseOrderRepo.updateDraft(
+          companyId: companyId,
+          id: order.id,
+          projectId: Value(result.projectId),
+          expenseCategoryId: Value(result.expenseCategoryId),
+          relatedDocumentId: Value(result.relatedDocumentId),
         );
     _reload();
   }
@@ -183,7 +263,33 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               Text('${order.supplierSnapshotName ?? ''} · ${_statusLabel(order.status)}'),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      () {
+                        final parts = [
+                          if (snapshot.data!.projectName != null)
+                            'Projekt: ${snapshot.data!.projectName}',
+                          if (snapshot.data!.categoryLabel != null)
+                            'Kategorie: ${snapshot.data!.categoryLabel}',
+                          if (snapshot.data!.relatedDocumentNumber != null)
+                            'Dokument: ${snapshot.data!.relatedDocumentNumber}',
+                        ];
+                        return parts.isEmpty ? 'Keine Zuordnung (Lagerbestellung)' : parts.join(' · ');
+                      }(),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  if (isDraft)
+                    TextButton(
+                      onPressed: () => _editAssignment(order),
+                      child: const Text('Zuordnung bearbeiten'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -241,9 +347,18 @@ String _formatQuantity(double value) =>
     value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
 
 class _DetailData {
-  const _DetailData({required this.order, required this.items});
+  const _DetailData({
+    required this.order,
+    required this.items,
+    this.projectName,
+    this.categoryLabel,
+    this.relatedDocumentNumber,
+  });
   final PurchaseOrder? order;
   final List<PurchaseOrderItem> items;
+  final String? projectName;
+  final String? categoryLabel;
+  final String? relatedDocumentNumber;
 }
 
 /// Dialog zum Erfassen eines Wareneingangs — ein Eingabefeld je Position
@@ -510,6 +625,119 @@ class _PurchaseOrderItemDialogState extends State<_PurchaseOrderItemDialog> {
             );
           },
           child: const Text('Hinzufügen'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AssignmentResult {
+  const _AssignmentResult({this.projectId, this.expenseCategoryId, this.relatedDocumentId});
+  final String? projectId;
+  final String? expenseCategoryId;
+  final String? relatedDocumentId;
+}
+
+/// C5.3 (Nachtrag 2026-10-19) — Projekt/SKR03-Kategorie/Auftrag-Rechnung
+/// in einem Dialog, alle drei unabhängig voneinander optional.
+class _AssignmentDialog extends StatefulWidget {
+  const _AssignmentDialog({
+    required this.projects,
+    required this.categories,
+    required this.relatedDocuments,
+    this.initialProjectId,
+    this.initialExpenseCategoryId,
+    this.initialRelatedDocumentId,
+  });
+  final List<Project> projects;
+  final List<ExpenseCategory> categories;
+  final List<Invoice> relatedDocuments;
+  final String? initialProjectId;
+  final String? initialExpenseCategoryId;
+  final String? initialRelatedDocumentId;
+
+  @override
+  State<_AssignmentDialog> createState() => _AssignmentDialogState();
+}
+
+class _AssignmentDialogState extends State<_AssignmentDialog> {
+  String? _projectId;
+  String? _expenseCategoryId;
+  String? _relatedDocumentId;
+
+  @override
+  void initState() {
+    super.initState();
+    _projectId = widget.initialProjectId;
+    _expenseCategoryId = widget.initialExpenseCategoryId;
+    _relatedDocumentId = widget.initialRelatedDocumentId;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Zuordnung'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.projects.isNotEmpty)
+              DropdownButtonFormField<String?>(
+                isExpanded: true,
+                initialValue: _projectId,
+                decoration: const InputDecoration(labelText: 'Projekt'),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('— keines —')),
+                  for (final project in widget.projects)
+                    DropdownMenuItem(value: project.id, child: Text(project.name)),
+                ],
+                onChanged: (value) => setState(() => _projectId = value),
+              ),
+            if (widget.categories.isNotEmpty)
+              DropdownButtonFormField<String?>(
+                isExpanded: true,
+                initialValue: _expenseCategoryId,
+                decoration: const InputDecoration(labelText: 'Beleg-Kategorie (SKR03)'),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('— ohne Kategorie —')),
+                  for (final category in widget.categories)
+                    DropdownMenuItem(value: category.id, child: Text(category.label)),
+                ],
+                onChanged: (value) => setState(() => _expenseCategoryId = value),
+              ),
+            if (widget.relatedDocuments.isNotEmpty)
+              DropdownButtonFormField<String?>(
+                isExpanded: true,
+                initialValue: _relatedDocumentId,
+                decoration: const InputDecoration(labelText: 'Auftrag/Rechnung'),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('— keines —')),
+                  for (final document in widget.relatedDocuments)
+                    DropdownMenuItem(
+                      value: document.id,
+                      child: Text(document.invoiceNumber ?? document.id),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _relatedDocumentId = value),
+              ),
+            if (widget.projects.isEmpty && widget.categories.isEmpty && widget.relatedDocuments.isEmpty)
+              const Text('Keine Projekte, Beleg-Kategorien oder finalisierten Dokumente vorhanden.'),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: () => Navigator.pop(
+            context,
+            _AssignmentResult(
+              projectId: _projectId,
+              expenseCategoryId: _expenseCategoryId,
+              relatedDocumentId: _relatedDocumentId,
+            ),
+          ),
+          child: const Text('Speichern'),
         ),
       ],
     );
