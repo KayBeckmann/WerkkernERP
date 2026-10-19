@@ -317,7 +317,12 @@ class InvoiceRepository {
       );
 
       if (company.lagerbestandEnabled) {
-        await _bookStockOnFinalize(invoice: invoice, items: items);
+        await _bookStockOnFinalize(
+          companyId: companyId,
+          invoice: invoice,
+          items: items,
+          referenceLabel: invoiceNumber,
+        );
       }
 
       return findById(companyId: companyId, id: id);
@@ -350,8 +355,16 @@ class InvoiceRepository {
 
   /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — siehe
   /// `stock_booking_service.dart` für die Entscheidungsregel, wann
-  /// überhaupt gebucht wird.
-  Future<void> _bookStockOnFinalize({required Invoice invoice, required List<InvoiceItem> items}) async {
+  /// überhaupt gebucht wird. Schreibt seit C5.3 ("Das muss alles
+  /// dokumentiert werden") zusätzlich eine unveränderliche
+  /// [StockMovements]-Zeile je gebuchtem Artikel, in derselben
+  /// Transaktion wie die eigentliche Bestandsänderung.
+  Future<void> _bookStockOnFinalize({
+    required String companyId,
+    required Invoice invoice,
+    required List<InvoiceItem> items,
+    required String referenceLabel,
+  }) async {
     final predecessorKind = await _predecessorKind(invoice);
     if (!shouldBookStockOnFinalize(kind: invoice.kind, predecessorKind: predecessorKind)) {
       return;
@@ -361,9 +374,22 @@ class InvoiceRepository {
       final article =
           await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
       if (article == null) continue;
-      final newStock = article.stockQuantity - entry.value.toDouble();
+      final delta = -entry.value.toDouble();
+      final newStock = article.stockQuantity + delta;
       await (_db.update(_db.articles)..where((a) => a.id.equals(entry.key)))
           .write(ArticlesCompanion(stockQuantity: Value(newStock)));
+      await _db.into(_db.stockMovements).insert(
+            StockMovementsCompanion.insert(
+              id: _uuid.v4(),
+              companyId: companyId,
+              articleId: entry.key,
+              type: StockMovementType.documentBooking,
+              quantityDelta: delta,
+              resultingQuantity: newStock,
+              referenceLabel: Value(referenceLabel),
+              createdAt: DateTime.now(),
+            ),
+          );
     }
   }
 
