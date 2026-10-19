@@ -19,6 +19,7 @@ import 'data/repositories/recurring_invoice_template_repository.dart';
 import 'data/repositories/supplier_repository.dart';
 import 'data/repositories/vehicle_repository.dart';
 import 'domain/services/active_company_service.dart';
+import 'domain/services/stock_change_notifier.dart';
 import 'domain/services/database_encryption_io.dart' show resolveDatabaseFilePath;
 import 'domain/services/database_encryption_service.dart';
 import 'domain/services/smtp_credential_store.dart';
@@ -163,6 +164,9 @@ class WerkkernErpApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<ActiveCompanyService>(
           create: (context) => ActiveCompanyService(context.read<CompanyRepository>()),
+        ),
+        ChangeNotifierProvider<StockChangeNotifier>(
+          create: (_) => StockChangeNotifier(),
         ),
         ChangeNotifierProvider<ThemePreferenceService>(
           create: (_) => ThemePreferenceService()..load(),

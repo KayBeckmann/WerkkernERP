@@ -17,6 +17,7 @@ import '../../domain/services/dunning_service.dart';
 import '../../domain/services/invoice_totals_service.dart';
 import '../../domain/services/smtp_config.dart';
 import '../../domain/services/smtp_credential_store.dart';
+import '../../domain/services/stock_change_notifier.dart';
 import '../../pdf/dunning_letter_pdf_builder.dart';
 import '../../pdf/invoice_pdf_builder.dart';
 import '../widgets/email_send_dialog.dart';
@@ -792,6 +793,13 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       }
       setState(() => _currentInvoice = finalized);
       widget.onChanged?.call(finalized);
+      // Bugfix 2026-10-19 (Kay: "Wenn ich den Bestand aus einer
+      // Bestellung buche, wird dieser nicht angezeigt") — dasselbe
+      // Staleness-Problem betrifft auch die Lagerbuchung beim
+      // Finalisieren (C5.1). Ping ist harmlos, auch wenn das Modul aus
+      // ist oder gar kein Artikel betroffen war (siehe Doc-Kommentar
+      // bei `StockChangeNotifier`).
+      context.read<StockChangeNotifier>().notifyStockChanged();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Finalisiert als ${finalized.invoiceNumber}.')),
       );

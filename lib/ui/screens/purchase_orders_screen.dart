@@ -34,7 +34,9 @@ class _PurchaseOrdersScreenState extends State<PurchaseOrdersScreen> {
     return context.read<PurchaseOrderRepository>().listForCompany(companyId);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<void> _createDraft() async {
     final companyId = context.read<ActiveCompanyService>().active!.id;

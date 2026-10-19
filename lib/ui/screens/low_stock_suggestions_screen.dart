@@ -62,7 +62,11 @@ class _LowStockSuggestionsScreenState extends State<LowStockSuggestionsScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => PurchaseOrderDetailScreen(purchaseOrderId: draft.id)),
     );
-    if (mounted) setState(() => _future = _load());
+    if (mounted) {
+      setState(() {
+        _future = _load();
+      });
+    }
   }
 
   @override

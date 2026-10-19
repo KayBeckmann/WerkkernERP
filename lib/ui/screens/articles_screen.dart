@@ -7,6 +7,7 @@ import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/stock_change_notifier.dart';
 import 'article_detail_screen.dart';
 import 'article_groups_screen.dart';
 
@@ -22,10 +23,44 @@ class ArticlesScreen extends StatefulWidget {
 class _ArticlesScreenState extends State<ArticlesScreen> {
   late Future<_ArticlesData> _future;
 
+  /// Bugfix 2026-10-19 (Kay: "Wenn ich den Bestand aus einer Bestellung
+  /// buche, wird dieser nicht angezeigt") — Ursache: dieser Screen lädt
+  /// den Bestand bisher nur einmalig über ein `Future`. Bleibt der
+  /// Artikel-Tab im Hintergrund gemountet (IndexedStack, siehe
+  /// `home_shell.dart`), während der Bestand anderswo gebucht wird
+  /// (Wareneingang, Rechnung finalisieren, Korrektur), zeigt er den
+  /// alten Wert bis zur nächsten lokalen Aktion in DIESEM Screen.
+  /// [StockChangeNotifier] ist ein gewöhnlicher `ChangeNotifier`
+  /// (gleiches, bereits bewährtes Muster wie `ActiveCompanyService`) —
+  /// jede bestandsverändernde Stelle pingt ihn an, dieser Screen löst
+  /// darauf einen Reload aus. Bewusst **kein** Drift-`.watch()`-Stream
+  /// hier: ein erster Versuch damit hat 38 bestehende Widget-Tests mit
+  /// "A Timer is still pending even after the widget tree was
+  /// disposed" zum Scheitern gebracht (vermutlich internes
+  /// Cleanup-Timing von Drifts Stream-Query-Mechanismus im Test-
+  /// Binding) — der ChangeNotifier-Weg ist in dieser Codebase bereits
+  /// vielfach erprobt und ohne dieses Risiko.
+  /// Referenz gemerkt statt in `dispose()` erneut per `context.read()`
+  /// zu holen — ein `BuildContext` ist in `dispose()` nicht mehr sicher
+  /// für Ancestor-Lookups ("Looking up a deactivated widget's ancestor
+  /// is unsafe", per Widget-Test gefunden).
+  late StockChangeNotifier _stockChangeNotifier;
+
+  void _onStockChanged() {
+    if (mounted) _reload();
+  }
+
   @override
   void initState() {
     super.initState();
     _future = _load();
+    _stockChangeNotifier = context.read<StockChangeNotifier>()..addListener(_onStockChanged);
+  }
+
+  @override
+  void dispose() {
+    _stockChangeNotifier.removeListener(_onStockChanged);
+    super.dispose();
   }
 
   Future<_ArticlesData> _load() async {

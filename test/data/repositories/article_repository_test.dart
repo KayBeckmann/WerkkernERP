@@ -283,4 +283,5 @@ void main() {
     expect(await articles.setActive(companyId: companyB.id, id: article.id, active: false), isFalse);
     expect((await articles.findById(companyId: companyA.id, id: article.id))!.active, isTrue);
   });
+
 }
