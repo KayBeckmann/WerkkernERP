@@ -1,14 +1,20 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
+import '../../data/repositories/article_group_repository.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
+import 'articles_screen.dart' show ArticleFormDialog, ArticleFormResult;
 
 /// Lieferanten-Einkaufspreise eines Artikels verwalten (A1:
-/// Mehrlieferanten-Preise) und den kalkulierten Verkaufspreis anzeigen.
+/// Mehrlieferanten-Preise), den kalkulierten Verkaufspreis anzeigen —
+/// und seit dem Nachtrag 2026-10-18 ("Artikel können nicht nachträglich
+/// bearbeitet werden") auch die Artikelstammdaten selbst bearbeiten
+/// bzw. den Artikel deaktivieren/reaktivieren.
 class ArticleDetailScreen extends StatefulWidget {
   const ArticleDetailScreen({super.key, required this.article});
 
@@ -19,11 +25,14 @@ class ArticleDetailScreen extends StatefulWidget {
 }
 
 class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
+  late Article _article;
   late Future<_DetailData> _future;
+  bool _busy = false;
 
   @override
   void initState() {
     super.initState();
+    _article = widget.article;
     _future = _load();
   }
 
@@ -31,13 +40,15 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final articleRepo = context.read<ArticleRepository>();
     final supplierRepo = context.read<SupplierRepository>();
-    final prices = await articleRepo.supplierPricesFor(widget.article.id);
+    final groupRepo = context.read<ArticleGroupRepository>();
+    final prices = await articleRepo.supplierPricesFor(_article.id);
     final suppliers = await supplierRepo.listForCompany(companyId);
+    final groups = await groupRepo.listForCompany(companyId);
     final salePrice = await articleRepo.effectiveSalePrice(
       companyId: companyId,
-      articleId: widget.article.id,
+      articleId: _article.id,
     );
-    return _DetailData(prices: prices, suppliers: suppliers, salePrice: salePrice);
+    return _DetailData(prices: prices, suppliers: suppliers, groups: groups, salePrice: salePrice);
   }
 
   void _reload() => setState(() { _future = _load(); });
@@ -51,17 +62,72 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     final companyId = context.read<ActiveCompanyService>().active!.id;
     await context.read<ArticleRepository>().setSupplierPrice(
           companyId: companyId,
-          articleId: widget.article.id,
+          articleId: _article.id,
           supplierId: result.supplierId,
           purchasePriceCents: result.cents,
         );
     _reload();
   }
 
+  Future<void> _edit(List<ArticleGroup> groups, List<Supplier> suppliers) async {
+    final result = await showDialog<ArticleFormResult>(
+      context: context,
+      builder: (context) => ArticleFormDialog(groups: groups, suppliers: suppliers, existing: _article),
+    );
+    if (result == null || !mounted) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final updated = await context.read<ArticleRepository>().update(
+          companyId: companyId,
+          id: _article.id,
+          name: result.name,
+          unit: Value(result.unit),
+          articleGroupId: Value(result.articleGroupId),
+          defaultSupplierId: Value(result.defaultSupplierId),
+        );
+    if (updated == null || !mounted) return;
+    setState(() => _article = updated);
+    _reload();
+  }
+
+  Future<void> _toggleActive() async {
+    setState(() => _busy = true);
+    try {
+      final companyId = context.read<ActiveCompanyService>().active!.id;
+      final nextActive = !_article.active;
+      await context.read<ArticleRepository>().setActive(
+            companyId: companyId,
+            id: _article.id,
+            active: nextActive,
+          );
+      if (mounted) setState(() => _article = _article.copyWith(active: nextActive));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.article.name)),
+      appBar: AppBar(
+        title: Text(_article.active ? _article.name : '${_article.name} (deaktiviert)'),
+        actions: [
+          FutureBuilder<_DetailData>(
+            future: _future,
+            builder: (context, snapshot) => IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Bearbeiten',
+              onPressed: snapshot.hasData
+                  ? () => _edit(snapshot.data!.groups, snapshot.data!.suppliers)
+                  : null,
+            ),
+          ),
+          IconButton(
+            icon: Icon(_article.active ? Icons.block_outlined : Icons.check_circle_outline),
+            tooltip: _article.active ? 'Deaktivieren' : 'Aktivieren',
+            onPressed: _busy ? null : _toggleActive,
+          ),
+        ],
+      ),
       body: FutureBuilder<_DetailData>(
         future: _future,
         builder: (context, snapshot) {
@@ -92,7 +158,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                         separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final price = data.prices[index];
-                          final isDefault = price.supplierId == widget.article.defaultSupplierId;
+                          final isDefault = price.supplierId == _article.defaultSupplierId;
                           return Card(
                             child: ListTile(
                               leading: Icon(
@@ -128,9 +194,15 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 }
 
 class _DetailData {
-  const _DetailData({required this.prices, required this.suppliers, required this.salePrice});
+  const _DetailData({
+    required this.prices,
+    required this.suppliers,
+    required this.groups,
+    required this.salePrice,
+  });
   final List<ArticleSupplierPrice> prices;
   final List<Supplier> suppliers;
+  final List<ArticleGroup> groups;
   final Money? salePrice;
 }
 

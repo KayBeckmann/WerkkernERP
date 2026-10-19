@@ -58,9 +58,9 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     if (!mounted) return;
     final suppliers = await context.read<SupplierRepository>().listForCompany(companyId);
     if (!mounted) return;
-    final result = await showDialog<_NewArticleResult>(
+    final result = await showDialog<ArticleFormResult>(
       context: context,
-      builder: (context) => _NewArticleDialog(groups: groups, suppliers: suppliers),
+      builder: (context) => ArticleFormDialog(groups: groups, suppliers: suppliers),
     );
     if (result == null || !mounted) return;
     await context.read<ArticleRepository>().create(
@@ -142,8 +142,8 @@ class _ArticlesData {
   final Map<String, Money?> salePrices;
 }
 
-class _NewArticleResult {
-  const _NewArticleResult({
+class ArticleFormResult {
+  const ArticleFormResult({
     required this.name,
     this.unit,
     this.articleGroupId,
@@ -155,20 +155,36 @@ class _NewArticleResult {
   final String? defaultSupplierId;
 }
 
-class _NewArticleDialog extends StatefulWidget {
-  const _NewArticleDialog({required this.groups, required this.suppliers});
+/// Erstellen UND Bearbeiten (Nachtrag 2026-10-18: "Artikel können nicht
+/// nachträglich bearbeitet werden") — über [existing] wiederverwendet,
+/// gleiches Prinzip wie `_ExpenseFormDialog`. Öffentlich statt privat,
+/// weil sowohl `ArticlesScreen` (Neuanlage) als auch
+/// `ArticleDetailScreen` (Bearbeiten) ihn brauchen.
+class ArticleFormDialog extends StatefulWidget {
+  const ArticleFormDialog({super.key, required this.groups, required this.suppliers, this.existing});
   final List<ArticleGroup> groups;
   final List<Supplier> suppliers;
+  final Article? existing;
 
   @override
-  State<_NewArticleDialog> createState() => _NewArticleDialogState();
+  State<ArticleFormDialog> createState() => _ArticleFormDialogState();
 }
 
-class _NewArticleDialogState extends State<_NewArticleDialog> {
-  final _nameCtrl = TextEditingController();
-  final _unitCtrl = TextEditingController(text: 'Stk');
+class _ArticleFormDialogState extends State<ArticleFormDialog> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _unitCtrl;
   String? _groupId;
   String? _supplierId;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _nameCtrl = TextEditingController(text: existing?.name);
+    _unitCtrl = TextEditingController(text: existing?.unit ?? (existing == null ? 'Stk' : null));
+    _groupId = existing?.articleGroupId;
+    _supplierId = existing?.defaultSupplierId;
+  }
 
   @override
   void dispose() {
@@ -180,7 +196,7 @@ class _NewArticleDialogState extends State<_NewArticleDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Neuer Artikel'),
+      title: Text(widget.existing == null ? 'Neuer Artikel' : 'Artikel bearbeiten'),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -231,7 +247,7 @@ class _NewArticleDialogState extends State<_NewArticleDialog> {
             if (name.isEmpty) return;
             Navigator.pop(
               context,
-              _NewArticleResult(
+              ArticleFormResult(
                 name: name,
                 unit: _unitCtrl.text.trim().isEmpty ? null : _unitCtrl.text.trim(),
                 articleGroupId: _groupId,
@@ -239,7 +255,7 @@ class _NewArticleDialogState extends State<_NewArticleDialog> {
               ),
             );
           },
-          child: const Text('Anlegen'),
+          child: Text(widget.existing == null ? 'Anlegen' : 'Speichern'),
         ),
       ],
     );
