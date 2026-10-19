@@ -9,6 +9,8 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
+import '../../data/repositories/purchase_order_repository.dart';
+import '../../data/repositories/supplier_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/dunning_service.dart';
@@ -20,6 +22,7 @@ import '../../pdf/invoice_pdf_builder.dart';
 import '../widgets/email_send_dialog.dart';
 import '../widgets/invoice_item_dialog.dart';
 import 'invoices_screen.dart' show DocumentLabels;
+import 'purchase_order_detail_screen.dart';
 
 /// Editiert einen Dokument-Entwurf (Rechnung/Angebot/Auftrag, A2/A5)
 /// und finalisiert ihn (A3) — ab Finalisierung sind Felder/Positionen
@@ -193,6 +196,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _creditNotesEnabled = false;
   List<Invoice> _creditNotes = [];
 
+  // C5.2 Bestellwesen (Nachtrag 2026-10-19): nur bei kind == order
+  // relevant und nur sichtbar, wenn die Firma das Modul aktiviert hat
+  // (gleiches Prinzip wie die Gutschriften oben).
+  bool _bestellwesenEnabled = false;
+
   // Kleinunternehmerregelung §19 UStG (Nachtrag 2026-10-18) — erzwingt
   // 0 % USt im Positions-Dialog, siehe `invoice_item_dialog.dart`.
   bool _isSmallBusinessExempt = false;
@@ -245,6 +253,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _smtpEnabled = company.smtpEnabled;
     _smtpConfig = SmtpConfig.fromCompany(company);
     _creditNotesEnabled = company.creditNotesEnabled;
+    _bestellwesenEnabled = company.bestellwesenEnabled;
     _isSmallBusinessExempt = company.isSmallBusinessExempt;
 
     final invoice = widget.invoice;
@@ -642,6 +651,72 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
   }
 
+  /// C5.2 Bestellwesen, Weg (a) der Roadmap: Bestellungen aus diesem
+  /// finalisierten Auftrag erstellen. Fragt zuerst den Modus ab (alles
+  /// über einen Lieferanten, oder je Artikel automatisch der
+  /// günstigste), bei "einen Lieferanten" zusätzlich welcher — danach
+  /// übernimmt `PurchaseOrderRepository.createDraftsFromOrder()` die
+  /// eigentliche Gruppierung (siehe dort).
+  Future<void> _createPurchaseOrdersFromOrder() async {
+    final invoice = _currentInvoice;
+    if (invoice == null) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final suppliers = await context.read<SupplierRepository>().listForCompany(companyId);
+    if (!mounted) return;
+    if (suppliers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte zuerst einen Lieferanten anlegen.')),
+      );
+      return;
+    }
+    final choice = await showDialog<_PurchaseOrderFromOrderChoice>(
+      context: context,
+      builder: (context) => _PurchaseOrderFromOrderDialog(suppliers: suppliers),
+    );
+    if (choice == null || !mounted) return;
+    try {
+      final result = await context.read<PurchaseOrderRepository>().createDraftsFromOrder(
+            companyId: companyId,
+            sourceOrderId: invoice.id,
+            mode: choice.mode,
+            supplierId: choice.supplierId,
+          );
+      if (!mounted) return;
+      if (result.drafts.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Keine Bestellung erzeugt (keine Artikel-Positionen zuordenbar).')),
+        );
+        return;
+      }
+      if (result.unassignable.isNotEmpty) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Nicht zuordenbare Artikel'),
+            content: Text(
+              'Für diese Artikel ist beim gewählten Lieferanten kein Einkaufspreis hinterlegt, sie '
+              'wurden nicht in eine Bestellung übernommen:\n\n'
+              '${result.unassignable.map((a) => '${a.articleName}: ${a.quantity}').join('\n')}',
+            ),
+            actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+          ),
+        );
+      }
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PurchaseOrderDetailScreen(purchaseOrderId: result.drafts.first.id),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Bestellung konnte nicht erstellt werden: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _finalize() async {
     final invoice = _currentInvoice;
     if (invoice == null) return;
@@ -1030,6 +1105,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               tooltip: 'Gutschrift erstellen',
               onPressed: _createCreditNote,
             ),
+          if (isFinalized && _kind == DocumentKind.order && _bestellwesenEnabled)
+            IconButton(
+              icon: const Icon(Icons.shopping_cart_outlined),
+              tooltip: 'Bestellung erstellen',
+              onPressed: _createPurchaseOrdersFromOrder,
+            ),
           // Vorschau (ENTWURF-Wasserzeichen) macht nur vor der ersten
           // Finalisierung Sinn — danach existiert bereits ein echtes PDF
           // über "PDF teilen".
@@ -1299,6 +1380,81 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               icon: const Icon(Icons.add),
               label: const Text('Position hinzufügen'),
             ),
+    );
+  }
+}
+
+/// Ergebnis von [_PurchaseOrderFromOrderDialog] — [supplierId] ist nur
+/// bei [PurchaseOrderCreationMode.oneSupplierForAll] gesetzt.
+class _PurchaseOrderFromOrderChoice {
+  const _PurchaseOrderFromOrderChoice({required this.mode, this.supplierId});
+  final PurchaseOrderCreationMode mode;
+  final String? supplierId;
+}
+
+/// C5.2 Bestellwesen (Nachtrag 2026-10-19) — fragt den Erzeugungsmodus
+/// ab (siehe Doc-Kommentar bei [PurchaseOrderCreationMode]), bei "einen
+/// Lieferanten" direkt im selben Dialog zusätzlich welcher.
+class _PurchaseOrderFromOrderDialog extends StatefulWidget {
+  const _PurchaseOrderFromOrderDialog({required this.suppliers});
+  final List<Supplier> suppliers;
+
+  @override
+  State<_PurchaseOrderFromOrderDialog> createState() => _PurchaseOrderFromOrderDialogState();
+}
+
+class _PurchaseOrderFromOrderDialogState extends State<_PurchaseOrderFromOrderDialog> {
+  PurchaseOrderCreationMode _mode = PurchaseOrderCreationMode.cheapestPerSupplier;
+  String? _supplierId;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Bestellung erstellen'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SegmentedButton<PurchaseOrderCreationMode>(
+            segments: const [
+              ButtonSegment(
+                value: PurchaseOrderCreationMode.cheapestPerSupplier,
+                label: Text('Billigster Lieferant pro Artikel'),
+              ),
+              ButtonSegment(
+                value: PurchaseOrderCreationMode.oneSupplierForAll,
+                label: Text('Alles über einen Lieferanten'),
+              ),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (selection) => setState(() => _mode = selection.first),
+          ),
+          const SizedBox(height: 12),
+          if (_mode == PurchaseOrderCreationMode.oneSupplierForAll)
+            DropdownButtonFormField<String?>(
+              isExpanded: true,
+              initialValue: _supplierId,
+              decoration: const InputDecoration(labelText: 'Lieferant'),
+              items: [
+                for (final supplier in widget.suppliers)
+                  DropdownMenuItem(value: supplier.id, child: Text(supplier.name)),
+              ],
+              onChanged: (value) => setState(() => _supplierId = value),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: _mode == PurchaseOrderCreationMode.oneSupplierForAll && _supplierId == null
+              ? null
+              : () => Navigator.pop(
+                    context,
+                    _PurchaseOrderFromOrderChoice(mode: _mode, supplierId: _supplierId),
+                  ),
+          child: const Text('Erstellen'),
+        ),
+      ],
     );
   }
 }

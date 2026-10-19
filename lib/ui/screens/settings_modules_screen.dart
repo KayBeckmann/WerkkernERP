@@ -31,10 +31,12 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
     bool? buchhaltungEnabled,
     bool? creditNotesEnabled,
     bool? lagerbestandEnabled,
+    bool? bestellwesenEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
     if (company == null) return;
+    final newLagerbestandEnabled = lagerbestandEnabled ?? company.lagerbestandEnabled;
     setState(() => _busy = true);
     try {
       await context.read<CompanyRepository>().setModules(
@@ -52,7 +54,13 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
             smtpEnabled: smtpEnabled ?? company.smtpEnabled,
             buchhaltungEnabled: buchhaltungEnabled ?? company.buchhaltungEnabled,
             creditNotesEnabled: creditNotesEnabled ?? company.creditNotesEnabled,
-            lagerbestandEnabled: lagerbestandEnabled ?? company.lagerbestandEnabled,
+            lagerbestandEnabled: newLagerbestandEnabled,
+            // C5.2 Bestellwesen setzt Lagerbestand voraus (Roadmap: "nur
+            // sichtbar/nutzbar wenn lagerbestandEnabled ebenfalls aktiv
+            // ist") — wird Lagerbestand hier ausgeschaltet, kann
+            // Bestellwesen nicht aktiviert bleiben.
+            bestellwesenEnabled:
+                newLagerbestandEnabled ? (bestellwesenEnabled ?? company.bestellwesenEnabled) : false,
           );
       await service.refreshActive();
     } finally {
@@ -160,6 +168,17 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
                     title: const Text('Lagerbestand'),
                     value: company.lagerbestandEnabled,
                     onChanged: _busy ? null : (value) => _setModule(lagerbestandEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Bestellwesen'),
+                    subtitle: company.lagerbestandEnabled
+                        ? null
+                        : const Text('Setzt Lagerbestand voraus'),
+                    value: company.bestellwesenEnabled,
+                    onChanged: !_busy && company.lagerbestandEnabled
+                        ? (value) => _setModule(bestellwesenEnabled: value)
+                        : null,
                   ),
                 ],
               ),

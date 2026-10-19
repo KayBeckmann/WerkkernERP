@@ -17,6 +17,7 @@ import 'expenses_screen.dart';
 import 'invoices_screen.dart';
 import 'open_items_screen.dart';
 import 'projects_screen.dart';
+import 'purchase_orders_screen.dart';
 import 'recurring_invoice_templates_screen.dart';
 import 'settings_screen.dart';
 import 'suppliers_screen.dart';
@@ -45,6 +46,7 @@ enum _TabId {
   suppliers,
   projects,
   vehicles,
+  purchaseOrders,
   recurringTemplates,
   openItems,
   expenses,
@@ -250,6 +252,16 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.directions_car_outlined,
             title: 'Fuhrpark',
             screen: VehiclesScreen(),
+            section: _Section.stammdaten,
+          ),
+        // C5.2 Bestellwesen (Nachtrag 2026-10-19) — setzt Lagerbestand
+        // voraus, siehe `Companies.bestellwesenEnabled`.
+        if (company.bestellwesenEnabled)
+          const _Tab(
+            id: _TabId.purchaseOrders,
+            icon: Icons.shopping_cart_outlined,
+            title: 'Bestellungen',
+            screen: PurchaseOrdersScreen(),
             section: _Section.stammdaten,
           ),
         // C14.1 Offene-Posten-Übersicht (Kay-Priorisierungsentscheidung
