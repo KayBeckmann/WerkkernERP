@@ -5599,6 +5599,19 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _activeMeta = const VerificationMeta('active');
+  @override
+  late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
+    'active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -5619,6 +5632,7 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     articleGroupId,
     defaultSupplierId,
     manualSalePriceCents,
+    active,
     createdAt,
   ];
   @override
@@ -5687,6 +5701,12 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
         ),
       );
     }
+    if (data.containsKey('active')) {
+      context.handle(
+        _activeMeta,
+        active.isAcceptableOrUnknown(data['active']!, _activeMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -5732,6 +5752,10 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
         DriftSqlType.int,
         data['${effectivePrefix}manual_sale_price_cents'],
       ),
+      active: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}active'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -5762,6 +5786,14 @@ class Article extends DataClass implements Insertable<Article> {
   /// die Kalkulation aus Standardlieferant + Artikelgruppen-Aufschlag,
   /// falls gesetzt.
   final int? manualSalePriceCents;
+
+  /// Deaktivieren statt löschen (Nachtrag 2026-10-18: "Artikel müssen
+  /// deaktiviert werden können, wenn der Hersteller sie abkündigt") —
+  /// gleiches Prinzip wie Projekte/Fahrzeuge/Modul-Schalter. Ein
+  /// deaktivierter Artikel bleibt in bereits erfassten Positionen
+  /// unverändert sichtbar, verschwindet nur aus Auswahllisten für neue
+  /// Positionen.
+  final bool active;
   final DateTime createdAt;
   const Article({
     required this.id,
@@ -5771,6 +5803,7 @@ class Article extends DataClass implements Insertable<Article> {
     this.articleGroupId,
     this.defaultSupplierId,
     this.manualSalePriceCents,
+    required this.active,
     required this.createdAt,
   });
   @override
@@ -5791,6 +5824,7 @@ class Article extends DataClass implements Insertable<Article> {
     if (!nullToAbsent || manualSalePriceCents != null) {
       map['manual_sale_price_cents'] = Variable<int>(manualSalePriceCents);
     }
+    map['active'] = Variable<bool>(active);
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -5810,6 +5844,7 @@ class Article extends DataClass implements Insertable<Article> {
       manualSalePriceCents: manualSalePriceCents == null && nullToAbsent
           ? const Value.absent()
           : Value(manualSalePriceCents),
+      active: Value(active),
       createdAt: Value(createdAt),
     );
   }
@@ -5831,6 +5866,7 @@ class Article extends DataClass implements Insertable<Article> {
       manualSalePriceCents: serializer.fromJson<int?>(
         json['manualSalePriceCents'],
       ),
+      active: serializer.fromJson<bool>(json['active']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -5845,6 +5881,7 @@ class Article extends DataClass implements Insertable<Article> {
       'articleGroupId': serializer.toJson<String?>(articleGroupId),
       'defaultSupplierId': serializer.toJson<String?>(defaultSupplierId),
       'manualSalePriceCents': serializer.toJson<int?>(manualSalePriceCents),
+      'active': serializer.toJson<bool>(active),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -5857,6 +5894,7 @@ class Article extends DataClass implements Insertable<Article> {
     Value<String?> articleGroupId = const Value.absent(),
     Value<String?> defaultSupplierId = const Value.absent(),
     Value<int?> manualSalePriceCents = const Value.absent(),
+    bool? active,
     DateTime? createdAt,
   }) => Article(
     id: id ?? this.id,
@@ -5872,6 +5910,7 @@ class Article extends DataClass implements Insertable<Article> {
     manualSalePriceCents: manualSalePriceCents.present
         ? manualSalePriceCents.value
         : this.manualSalePriceCents,
+    active: active ?? this.active,
     createdAt: createdAt ?? this.createdAt,
   );
   Article copyWithCompanion(ArticlesCompanion data) {
@@ -5889,6 +5928,7 @@ class Article extends DataClass implements Insertable<Article> {
       manualSalePriceCents: data.manualSalePriceCents.present
           ? data.manualSalePriceCents.value
           : this.manualSalePriceCents,
+      active: data.active.present ? data.active.value : this.active,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -5903,6 +5943,7 @@ class Article extends DataClass implements Insertable<Article> {
           ..write('articleGroupId: $articleGroupId, ')
           ..write('defaultSupplierId: $defaultSupplierId, ')
           ..write('manualSalePriceCents: $manualSalePriceCents, ')
+          ..write('active: $active, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -5917,6 +5958,7 @@ class Article extends DataClass implements Insertable<Article> {
     articleGroupId,
     defaultSupplierId,
     manualSalePriceCents,
+    active,
     createdAt,
   );
   @override
@@ -5930,6 +5972,7 @@ class Article extends DataClass implements Insertable<Article> {
           other.articleGroupId == this.articleGroupId &&
           other.defaultSupplierId == this.defaultSupplierId &&
           other.manualSalePriceCents == this.manualSalePriceCents &&
+          other.active == this.active &&
           other.createdAt == this.createdAt);
 }
 
@@ -5941,6 +5984,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
   final Value<String?> articleGroupId;
   final Value<String?> defaultSupplierId;
   final Value<int?> manualSalePriceCents;
+  final Value<bool> active;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const ArticlesCompanion({
@@ -5951,6 +5995,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     this.articleGroupId = const Value.absent(),
     this.defaultSupplierId = const Value.absent(),
     this.manualSalePriceCents = const Value.absent(),
+    this.active = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -5962,6 +6007,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     this.articleGroupId = const Value.absent(),
     this.defaultSupplierId = const Value.absent(),
     this.manualSalePriceCents = const Value.absent(),
+    this.active = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -5976,6 +6022,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     Expression<String>? articleGroupId,
     Expression<String>? defaultSupplierId,
     Expression<int>? manualSalePriceCents,
+    Expression<bool>? active,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -5988,6 +6035,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
       if (defaultSupplierId != null) 'default_supplier_id': defaultSupplierId,
       if (manualSalePriceCents != null)
         'manual_sale_price_cents': manualSalePriceCents,
+      if (active != null) 'active': active,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6001,6 +6049,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     Value<String?>? articleGroupId,
     Value<String?>? defaultSupplierId,
     Value<int?>? manualSalePriceCents,
+    Value<bool>? active,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -6012,6 +6061,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
       articleGroupId: articleGroupId ?? this.articleGroupId,
       defaultSupplierId: defaultSupplierId ?? this.defaultSupplierId,
       manualSalePriceCents: manualSalePriceCents ?? this.manualSalePriceCents,
+      active: active ?? this.active,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -6043,6 +6093,9 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
         manualSalePriceCents.value,
       );
     }
+    if (active.present) {
+      map['active'] = Variable<bool>(active.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -6062,6 +6115,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
           ..write('articleGroupId: $articleGroupId, ')
           ..write('defaultSupplierId: $defaultSupplierId, ')
           ..write('manualSalePriceCents: $manualSalePriceCents, ')
+          ..write('active: $active, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -18858,6 +18912,7 @@ typedef $$ArticlesTableCreateCompanionBuilder =
       Value<String?> articleGroupId,
       Value<String?> defaultSupplierId,
       Value<int?> manualSalePriceCents,
+      Value<bool> active,
       required DateTime createdAt,
       Value<int> rowid,
     });
@@ -18870,6 +18925,7 @@ typedef $$ArticlesTableUpdateCompanionBuilder =
       Value<String?> articleGroupId,
       Value<String?> defaultSupplierId,
       Value<int?> manualSalePriceCents,
+      Value<bool> active,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -19025,6 +19081,11 @@ class $$ArticlesTableFilterComposer
 
   ColumnFilters<int> get manualSalePriceCents => $composableBuilder(
     column: $table.manualSalePriceCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get active => $composableBuilder(
+    column: $table.active,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -19212,6 +19273,11 @@ class $$ArticlesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -19309,6 +19375,9 @@ class $$ArticlesTableAnnotationComposer
     column: $table.manualSalePriceCents,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get active =>
+      $composableBuilder(column: $table.active, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -19505,6 +19574,7 @@ class $$ArticlesTableTableManager
                 Value<String?> articleGroupId = const Value.absent(),
                 Value<String?> defaultSupplierId = const Value.absent(),
                 Value<int?> manualSalePriceCents = const Value.absent(),
+                Value<bool> active = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ArticlesCompanion(
@@ -19515,6 +19585,7 @@ class $$ArticlesTableTableManager
                 articleGroupId: articleGroupId,
                 defaultSupplierId: defaultSupplierId,
                 manualSalePriceCents: manualSalePriceCents,
+                active: active,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -19527,6 +19598,7 @@ class $$ArticlesTableTableManager
                 Value<String?> articleGroupId = const Value.absent(),
                 Value<String?> defaultSupplierId = const Value.absent(),
                 Value<int?> manualSalePriceCents = const Value.absent(),
+                Value<bool> active = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => ArticlesCompanion.insert(
@@ -19537,6 +19609,7 @@ class $$ArticlesTableTableManager
                 articleGroupId: articleGroupId,
                 defaultSupplierId: defaultSupplierId,
                 manualSalePriceCents: manualSalePriceCents,
+                active: active,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

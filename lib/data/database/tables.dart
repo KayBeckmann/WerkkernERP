@@ -264,6 +264,14 @@ class Articles extends Table {
   /// falls gesetzt.
   IntColumn get manualSalePriceCents => integer().nullable()();
 
+  /// Deaktivieren statt löschen (Nachtrag 2026-10-18: "Artikel müssen
+  /// deaktiviert werden können, wenn der Hersteller sie abkündigt") —
+  /// gleiches Prinzip wie Projekte/Fahrzeuge/Modul-Schalter. Ein
+  /// deaktivierter Artikel bleibt in bereits erfassten Positionen
+  /// unverändert sichtbar, verschwindet nur aus Auswahllisten für neue
+  /// Positionen.
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+
   DateTimeColumn get createdAt => dateTime()();
 
   @override
