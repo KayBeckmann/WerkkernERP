@@ -779,6 +779,20 @@ class $CompaniesTable extends Companies
         ),
         defaultValue: const Constant(false),
       );
+  static const VerificationMeta _lagerbestandEnabledMeta =
+      const VerificationMeta('lagerbestandEnabled');
+  @override
+  late final GeneratedColumn<bool> lagerbestandEnabled = GeneratedColumn<bool>(
+    'lagerbestand_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("lagerbestand_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -846,6 +860,7 @@ class $CompaniesTable extends Companies
     pdfIntroTextCreditNote,
     pdfClosingTextCreditNote,
     isSmallBusinessExempt,
+    lagerbestandEnabled,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1414,6 +1429,15 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('lagerbestand_enabled')) {
+      context.handle(
+        _lagerbestandEnabledMeta,
+        lagerbestandEnabled.isAcceptableOrUnknown(
+          data['lagerbestand_enabled']!,
+          _lagerbestandEnabledMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1683,6 +1707,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}is_small_business_exempt'],
       )!,
+      lagerbestandEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}lagerbestand_enabled'],
+      )!,
     );
   }
 
@@ -1883,6 +1911,12 @@ class Company extends DataClass implements Insertable<Company> {
   /// editierbaren `pdfClosingText`, damit der Hinweis nicht versehentlich
   /// beim Bearbeiten des Schlusstexts verschwindet.
   final bool isSmallBusinessExempt;
+
+  /// C5.1 Lagerbestand (Nachtrag 2026-10-19, Kay-Entscheidung auf
+  /// Rückfrage: "Zwei getrennte Schalter" statt einem gemeinsamen mit
+  /// C5.2 Bestellwesen). Siehe Doc-Kommentar bei [Articles.stockQuantity]
+  /// für das Buchungsmodell.
+  final bool lagerbestandEnabled;
   const Company({
     required this.id,
     required this.name,
@@ -1949,6 +1983,7 @@ class Company extends DataClass implements Insertable<Company> {
     this.pdfIntroTextCreditNote,
     this.pdfClosingTextCreditNote,
     required this.isSmallBusinessExempt,
+    required this.lagerbestandEnabled,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2122,6 +2157,7 @@ class Company extends DataClass implements Insertable<Company> {
       );
     }
     map['is_small_business_exempt'] = Variable<bool>(isSmallBusinessExempt);
+    map['lagerbestand_enabled'] = Variable<bool>(lagerbestandEnabled);
     return map;
   }
 
@@ -2266,6 +2302,7 @@ class Company extends DataClass implements Insertable<Company> {
           ? const Value.absent()
           : Value(pdfClosingTextCreditNote),
       isSmallBusinessExempt: Value(isSmallBusinessExempt),
+      lagerbestandEnabled: Value(lagerbestandEnabled),
     );
   }
 
@@ -2412,6 +2449,9 @@ class Company extends DataClass implements Insertable<Company> {
       isSmallBusinessExempt: serializer.fromJson<bool>(
         json['isSmallBusinessExempt'],
       ),
+      lagerbestandEnabled: serializer.fromJson<bool>(
+        json['lagerbestandEnabled'],
+      ),
     );
   }
   @override
@@ -2517,6 +2557,7 @@ class Company extends DataClass implements Insertable<Company> {
         pdfClosingTextCreditNote,
       ),
       'isSmallBusinessExempt': serializer.toJson<bool>(isSmallBusinessExempt),
+      'lagerbestandEnabled': serializer.toJson<bool>(lagerbestandEnabled),
     };
   }
 
@@ -2586,6 +2627,7 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> pdfIntroTextCreditNote = const Value.absent(),
     Value<String?> pdfClosingTextCreditNote = const Value.absent(),
     bool? isSmallBusinessExempt,
+    bool? lagerbestandEnabled,
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2710,6 +2752,7 @@ class Company extends DataClass implements Insertable<Company> {
         ? pdfClosingTextCreditNote.value
         : this.pdfClosingTextCreditNote,
     isSmallBusinessExempt: isSmallBusinessExempt ?? this.isSmallBusinessExempt,
+    lagerbestandEnabled: lagerbestandEnabled ?? this.lagerbestandEnabled,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -2886,6 +2929,9 @@ class Company extends DataClass implements Insertable<Company> {
       isSmallBusinessExempt: data.isSmallBusinessExempt.present
           ? data.isSmallBusinessExempt.value
           : this.isSmallBusinessExempt,
+      lagerbestandEnabled: data.lagerbestandEnabled.present
+          ? data.lagerbestandEnabled.value
+          : this.lagerbestandEnabled,
     );
   }
 
@@ -2958,7 +3004,8 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('creditNotesEnabled: $creditNotesEnabled, ')
           ..write('pdfIntroTextCreditNote: $pdfIntroTextCreditNote, ')
           ..write('pdfClosingTextCreditNote: $pdfClosingTextCreditNote, ')
-          ..write('isSmallBusinessExempt: $isSmallBusinessExempt')
+          ..write('isSmallBusinessExempt: $isSmallBusinessExempt, ')
+          ..write('lagerbestandEnabled: $lagerbestandEnabled')
           ..write(')'))
         .toString();
   }
@@ -3030,6 +3077,7 @@ class Company extends DataClass implements Insertable<Company> {
     pdfIntroTextCreditNote,
     pdfClosingTextCreditNote,
     isSmallBusinessExempt,
+    lagerbestandEnabled,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -3100,7 +3148,8 @@ class Company extends DataClass implements Insertable<Company> {
           other.creditNotesEnabled == this.creditNotesEnabled &&
           other.pdfIntroTextCreditNote == this.pdfIntroTextCreditNote &&
           other.pdfClosingTextCreditNote == this.pdfClosingTextCreditNote &&
-          other.isSmallBusinessExempt == this.isSmallBusinessExempt);
+          other.isSmallBusinessExempt == this.isSmallBusinessExempt &&
+          other.lagerbestandEnabled == this.lagerbestandEnabled);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -3169,6 +3218,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> pdfIntroTextCreditNote;
   final Value<String?> pdfClosingTextCreditNote;
   final Value<bool> isSmallBusinessExempt;
+  final Value<bool> lagerbestandEnabled;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -3236,6 +3286,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.pdfIntroTextCreditNote = const Value.absent(),
     this.pdfClosingTextCreditNote = const Value.absent(),
     this.isSmallBusinessExempt = const Value.absent(),
+    this.lagerbestandEnabled = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -3304,6 +3355,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.pdfIntroTextCreditNote = const Value.absent(),
     this.pdfClosingTextCreditNote = const Value.absent(),
     this.isSmallBusinessExempt = const Value.absent(),
+    this.lagerbestandEnabled = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -3374,6 +3426,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? pdfIntroTextCreditNote,
     Expression<String>? pdfClosingTextCreditNote,
     Expression<bool>? isSmallBusinessExempt,
+    Expression<bool>? lagerbestandEnabled,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3476,6 +3529,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         'pdf_closing_text_credit_note': pdfClosingTextCreditNote,
       if (isSmallBusinessExempt != null)
         'is_small_business_exempt': isSmallBusinessExempt,
+      if (lagerbestandEnabled != null)
+        'lagerbestand_enabled': lagerbestandEnabled,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3546,6 +3601,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? pdfIntroTextCreditNote,
     Value<String?>? pdfClosingTextCreditNote,
     Value<bool>? isSmallBusinessExempt,
+    Value<bool>? lagerbestandEnabled,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -3636,6 +3692,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           pdfClosingTextCreditNote ?? this.pdfClosingTextCreditNote,
       isSmallBusinessExempt:
           isSmallBusinessExempt ?? this.isSmallBusinessExempt,
+      lagerbestandEnabled: lagerbestandEnabled ?? this.lagerbestandEnabled,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3900,6 +3957,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         isSmallBusinessExempt.value,
       );
     }
+    if (lagerbestandEnabled.present) {
+      map['lagerbestand_enabled'] = Variable<bool>(lagerbestandEnabled.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3976,6 +4036,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('pdfIntroTextCreditNote: $pdfIntroTextCreditNote, ')
           ..write('pdfClosingTextCreditNote: $pdfClosingTextCreditNote, ')
           ..write('isSmallBusinessExempt: $isSmallBusinessExempt, ')
+          ..write('lagerbestandEnabled: $lagerbestandEnabled, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5684,6 +5745,29 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _stockQuantityMeta = const VerificationMeta(
+    'stockQuantity',
+  );
+  @override
+  late final GeneratedColumn<double> stockQuantity = GeneratedColumn<double>(
+    'stock_quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _minimumStockMeta = const VerificationMeta(
+    'minimumStock',
+  );
+  @override
+  late final GeneratedColumn<double> minimumStock = GeneratedColumn<double>(
+    'minimum_stock',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -5705,6 +5789,8 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     defaultSupplierId,
     manualSalePriceCents,
     active,
+    stockQuantity,
+    minimumStock,
     createdAt,
   ];
   @override
@@ -5779,6 +5865,24 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
         active.isAcceptableOrUnknown(data['active']!, _activeMeta),
       );
     }
+    if (data.containsKey('stock_quantity')) {
+      context.handle(
+        _stockQuantityMeta,
+        stockQuantity.isAcceptableOrUnknown(
+          data['stock_quantity']!,
+          _stockQuantityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('minimum_stock')) {
+      context.handle(
+        _minimumStockMeta,
+        minimumStock.isAcceptableOrUnknown(
+          data['minimum_stock']!,
+          _minimumStockMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -5828,6 +5932,14 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
         DriftSqlType.bool,
         data['${effectivePrefix}active'],
       )!,
+      stockQuantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}stock_quantity'],
+      )!,
+      minimumStock: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}minimum_stock'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -5866,6 +5978,26 @@ class Article extends DataClass implements Insertable<Article> {
   /// unverändert sichtbar, verschwindet nur aus Auswahllisten für neue
   /// Positionen.
   final bool active;
+
+  /// C5.1 Lagerbestand (Nachtrag 2026-10-19, Kay-Entscheidung auf
+  /// Rückfrage: "Ein Wert = verfügbar"). **Kein** getrenntes "physisch"/
+  /// "reserviert"-Paar — eine Bestandsbuchung reduziert diesen Wert
+  /// direkt. Darf negativ werden (Kay-Entscheidung: "Nur warnen,
+  /// trotzdem erlauben" statt das Finalisieren zu blockieren, siehe
+  /// `StockBookingService`). `double` statt Minor-Units-Integer wie bei
+  /// [Money], weil Mengen (wie bei [InvoiceItem.quantity]) durchaus
+  /// gebrochene Einheiten sein können (z. B. Meter Kabel) — anders als
+  /// Geldbeträge keine gesetzliche Rundungsvorgabe, daher hier bewusst
+  /// kein Decimal-String-Pattern.
+  final double stockQuantity;
+
+  /// Mindestbestand-Schwelle für die Meldung in C5.2 Bestellwesen
+  /// ("Lagerbestand unter Mindestbestand -> System erzeugt Meldung").
+  /// `null` = keine Überwachung für diesen Artikel (keine Meldung wird
+  /// je erzeugt) — bewusst nicht einfach `0`, das wäre eine aktive,
+  /// nur zufällig nie auslösende Schwelle und nicht dasselbe wie
+  /// "nicht überwacht".
+  final double? minimumStock;
   final DateTime createdAt;
   const Article({
     required this.id,
@@ -5876,6 +6008,8 @@ class Article extends DataClass implements Insertable<Article> {
     this.defaultSupplierId,
     this.manualSalePriceCents,
     required this.active,
+    required this.stockQuantity,
+    this.minimumStock,
     required this.createdAt,
   });
   @override
@@ -5897,6 +6031,10 @@ class Article extends DataClass implements Insertable<Article> {
       map['manual_sale_price_cents'] = Variable<int>(manualSalePriceCents);
     }
     map['active'] = Variable<bool>(active);
+    map['stock_quantity'] = Variable<double>(stockQuantity);
+    if (!nullToAbsent || minimumStock != null) {
+      map['minimum_stock'] = Variable<double>(minimumStock);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -5917,6 +6055,10 @@ class Article extends DataClass implements Insertable<Article> {
           ? const Value.absent()
           : Value(manualSalePriceCents),
       active: Value(active),
+      stockQuantity: Value(stockQuantity),
+      minimumStock: minimumStock == null && nullToAbsent
+          ? const Value.absent()
+          : Value(minimumStock),
       createdAt: Value(createdAt),
     );
   }
@@ -5939,6 +6081,8 @@ class Article extends DataClass implements Insertable<Article> {
         json['manualSalePriceCents'],
       ),
       active: serializer.fromJson<bool>(json['active']),
+      stockQuantity: serializer.fromJson<double>(json['stockQuantity']),
+      minimumStock: serializer.fromJson<double?>(json['minimumStock']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -5954,6 +6098,8 @@ class Article extends DataClass implements Insertable<Article> {
       'defaultSupplierId': serializer.toJson<String?>(defaultSupplierId),
       'manualSalePriceCents': serializer.toJson<int?>(manualSalePriceCents),
       'active': serializer.toJson<bool>(active),
+      'stockQuantity': serializer.toJson<double>(stockQuantity),
+      'minimumStock': serializer.toJson<double?>(minimumStock),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -5967,6 +6113,8 @@ class Article extends DataClass implements Insertable<Article> {
     Value<String?> defaultSupplierId = const Value.absent(),
     Value<int?> manualSalePriceCents = const Value.absent(),
     bool? active,
+    double? stockQuantity,
+    Value<double?> minimumStock = const Value.absent(),
     DateTime? createdAt,
   }) => Article(
     id: id ?? this.id,
@@ -5983,6 +6131,8 @@ class Article extends DataClass implements Insertable<Article> {
         ? manualSalePriceCents.value
         : this.manualSalePriceCents,
     active: active ?? this.active,
+    stockQuantity: stockQuantity ?? this.stockQuantity,
+    minimumStock: minimumStock.present ? minimumStock.value : this.minimumStock,
     createdAt: createdAt ?? this.createdAt,
   );
   Article copyWithCompanion(ArticlesCompanion data) {
@@ -6001,6 +6151,12 @@ class Article extends DataClass implements Insertable<Article> {
           ? data.manualSalePriceCents.value
           : this.manualSalePriceCents,
       active: data.active.present ? data.active.value : this.active,
+      stockQuantity: data.stockQuantity.present
+          ? data.stockQuantity.value
+          : this.stockQuantity,
+      minimumStock: data.minimumStock.present
+          ? data.minimumStock.value
+          : this.minimumStock,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -6016,6 +6172,8 @@ class Article extends DataClass implements Insertable<Article> {
           ..write('defaultSupplierId: $defaultSupplierId, ')
           ..write('manualSalePriceCents: $manualSalePriceCents, ')
           ..write('active: $active, ')
+          ..write('stockQuantity: $stockQuantity, ')
+          ..write('minimumStock: $minimumStock, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -6031,6 +6189,8 @@ class Article extends DataClass implements Insertable<Article> {
     defaultSupplierId,
     manualSalePriceCents,
     active,
+    stockQuantity,
+    minimumStock,
     createdAt,
   );
   @override
@@ -6045,6 +6205,8 @@ class Article extends DataClass implements Insertable<Article> {
           other.defaultSupplierId == this.defaultSupplierId &&
           other.manualSalePriceCents == this.manualSalePriceCents &&
           other.active == this.active &&
+          other.stockQuantity == this.stockQuantity &&
+          other.minimumStock == this.minimumStock &&
           other.createdAt == this.createdAt);
 }
 
@@ -6057,6 +6219,8 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
   final Value<String?> defaultSupplierId;
   final Value<int?> manualSalePriceCents;
   final Value<bool> active;
+  final Value<double> stockQuantity;
+  final Value<double?> minimumStock;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const ArticlesCompanion({
@@ -6068,6 +6232,8 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     this.defaultSupplierId = const Value.absent(),
     this.manualSalePriceCents = const Value.absent(),
     this.active = const Value.absent(),
+    this.stockQuantity = const Value.absent(),
+    this.minimumStock = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -6080,6 +6246,8 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     this.defaultSupplierId = const Value.absent(),
     this.manualSalePriceCents = const Value.absent(),
     this.active = const Value.absent(),
+    this.stockQuantity = const Value.absent(),
+    this.minimumStock = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -6095,6 +6263,8 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     Expression<String>? defaultSupplierId,
     Expression<int>? manualSalePriceCents,
     Expression<bool>? active,
+    Expression<double>? stockQuantity,
+    Expression<double>? minimumStock,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -6108,6 +6278,8 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
       if (manualSalePriceCents != null)
         'manual_sale_price_cents': manualSalePriceCents,
       if (active != null) 'active': active,
+      if (stockQuantity != null) 'stock_quantity': stockQuantity,
+      if (minimumStock != null) 'minimum_stock': minimumStock,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -6122,6 +6294,8 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     Value<String?>? defaultSupplierId,
     Value<int?>? manualSalePriceCents,
     Value<bool>? active,
+    Value<double>? stockQuantity,
+    Value<double?>? minimumStock,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -6134,6 +6308,8 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
       defaultSupplierId: defaultSupplierId ?? this.defaultSupplierId,
       manualSalePriceCents: manualSalePriceCents ?? this.manualSalePriceCents,
       active: active ?? this.active,
+      stockQuantity: stockQuantity ?? this.stockQuantity,
+      minimumStock: minimumStock ?? this.minimumStock,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -6168,6 +6344,12 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     if (active.present) {
       map['active'] = Variable<bool>(active.value);
     }
+    if (stockQuantity.present) {
+      map['stock_quantity'] = Variable<double>(stockQuantity.value);
+    }
+    if (minimumStock.present) {
+      map['minimum_stock'] = Variable<double>(minimumStock.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -6188,6 +6370,8 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
           ..write('defaultSupplierId: $defaultSupplierId, ')
           ..write('manualSalePriceCents: $manualSalePriceCents, ')
           ..write('active: $active, ')
+          ..write('stockQuantity: $stockQuantity, ')
+          ..write('minimumStock: $minimumStock, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -14602,6 +14786,7 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String?> pdfIntroTextCreditNote,
       Value<String?> pdfClosingTextCreditNote,
       Value<bool> isSmallBusinessExempt,
+      Value<bool> lagerbestandEnabled,
       Value<int> rowid,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
@@ -14671,6 +14856,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String?> pdfIntroTextCreditNote,
       Value<String?> pdfClosingTextCreditNote,
       Value<bool> isSmallBusinessExempt,
+      Value<bool> lagerbestandEnabled,
       Value<int> rowid,
     });
 
@@ -15266,6 +15452,11 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<bool> get isSmallBusinessExempt => $composableBuilder(
     column: $table.isSmallBusinessExempt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get lagerbestandEnabled => $composableBuilder(
+    column: $table.lagerbestandEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15930,6 +16121,11 @@ class $$CompaniesTableOrderingComposer
     column: $table.isSmallBusinessExempt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get lagerbestandEnabled => $composableBuilder(
+    column: $table.lagerbestandEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -16241,6 +16437,11 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<bool> get isSmallBusinessExempt => $composableBuilder(
     column: $table.isSmallBusinessExempt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get lagerbestandEnabled => $composableBuilder(
+    column: $table.lagerbestandEnabled,
     builder: (column) => column,
   );
 
@@ -16685,6 +16886,7 @@ class $$CompaniesTableTableManager
                 Value<String?> pdfIntroTextCreditNote = const Value.absent(),
                 Value<String?> pdfClosingTextCreditNote = const Value.absent(),
                 Value<bool> isSmallBusinessExempt = const Value.absent(),
+                Value<bool> lagerbestandEnabled = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -16752,6 +16954,7 @@ class $$CompaniesTableTableManager
                 pdfIntroTextCreditNote: pdfIntroTextCreditNote,
                 pdfClosingTextCreditNote: pdfClosingTextCreditNote,
                 isSmallBusinessExempt: isSmallBusinessExempt,
+                lagerbestandEnabled: lagerbestandEnabled,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -16825,6 +17028,7 @@ class $$CompaniesTableTableManager
                 Value<String?> pdfIntroTextCreditNote = const Value.absent(),
                 Value<String?> pdfClosingTextCreditNote = const Value.absent(),
                 Value<bool> isSmallBusinessExempt = const Value.absent(),
+                Value<bool> lagerbestandEnabled = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -16892,6 +17096,7 @@ class $$CompaniesTableTableManager
                 pdfIntroTextCreditNote: pdfIntroTextCreditNote,
                 pdfClosingTextCreditNote: pdfClosingTextCreditNote,
                 isSmallBusinessExempt: isSmallBusinessExempt,
+                lagerbestandEnabled: lagerbestandEnabled,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -19006,6 +19211,8 @@ typedef $$ArticlesTableCreateCompanionBuilder =
       Value<String?> defaultSupplierId,
       Value<int?> manualSalePriceCents,
       Value<bool> active,
+      Value<double> stockQuantity,
+      Value<double?> minimumStock,
       required DateTime createdAt,
       Value<int> rowid,
     });
@@ -19019,6 +19226,8 @@ typedef $$ArticlesTableUpdateCompanionBuilder =
       Value<String?> defaultSupplierId,
       Value<int?> manualSalePriceCents,
       Value<bool> active,
+      Value<double> stockQuantity,
+      Value<double?> minimumStock,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -19179,6 +19388,16 @@ class $$ArticlesTableFilterComposer
 
   ColumnFilters<bool> get active => $composableBuilder(
     column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get stockQuantity => $composableBuilder(
+    column: $table.stockQuantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get minimumStock => $composableBuilder(
+    column: $table.minimumStock,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -19371,6 +19590,16 @@ class $$ArticlesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get stockQuantity => $composableBuilder(
+    column: $table.stockQuantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get minimumStock => $composableBuilder(
+    column: $table.minimumStock,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -19471,6 +19700,16 @@ class $$ArticlesTableAnnotationComposer
 
   GeneratedColumn<bool> get active =>
       $composableBuilder(column: $table.active, builder: (column) => column);
+
+  GeneratedColumn<double> get stockQuantity => $composableBuilder(
+    column: $table.stockQuantity,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get minimumStock => $composableBuilder(
+    column: $table.minimumStock,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -19668,6 +19907,8 @@ class $$ArticlesTableTableManager
                 Value<String?> defaultSupplierId = const Value.absent(),
                 Value<int?> manualSalePriceCents = const Value.absent(),
                 Value<bool> active = const Value.absent(),
+                Value<double> stockQuantity = const Value.absent(),
+                Value<double?> minimumStock = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ArticlesCompanion(
@@ -19679,6 +19920,8 @@ class $$ArticlesTableTableManager
                 defaultSupplierId: defaultSupplierId,
                 manualSalePriceCents: manualSalePriceCents,
                 active: active,
+                stockQuantity: stockQuantity,
+                minimumStock: minimumStock,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -19692,6 +19935,8 @@ class $$ArticlesTableTableManager
                 Value<String?> defaultSupplierId = const Value.absent(),
                 Value<int?> manualSalePriceCents = const Value.absent(),
                 Value<bool> active = const Value.absent(),
+                Value<double> stockQuantity = const Value.absent(),
+                Value<double?> minimumStock = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => ArticlesCompanion.insert(
@@ -19703,6 +19948,8 @@ class $$ArticlesTableTableManager
                 defaultSupplierId: defaultSupplierId,
                 manualSalePriceCents: manualSalePriceCents,
                 active: active,
+                stockQuantity: stockQuantity,
+                minimumStock: minimumStock,
                 createdAt: createdAt,
                 rowid: rowid,
               ),

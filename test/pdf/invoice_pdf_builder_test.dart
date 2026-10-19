@@ -86,6 +86,7 @@ void main() {
         datevSachkontenlaenge: 4,
         creditNotesEnabled: false,
         isSmallBusinessExempt: isSmallBusinessExempt,
+        lagerbestandEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

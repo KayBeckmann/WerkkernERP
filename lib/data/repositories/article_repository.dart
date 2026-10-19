@@ -38,6 +38,9 @@ class ArticleRepository {
     String? articleGroupId,
     String? defaultSupplierId,
     int? manualSalePriceCents,
+    // C5.1 Lagerbestand (Nachtrag 2026-10-19) — `null` = keine
+    // Mindestbestand-Überwachung für diesen Artikel.
+    double? minimumStock,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.articles).insert(
@@ -49,6 +52,7 @@ class ArticleRepository {
             articleGroupId: Value(articleGroupId),
             defaultSupplierId: Value(defaultSupplierId),
             manualSalePriceCents: Value(manualSalePriceCents),
+            minimumStock: Value(minimumStock),
             createdAt: DateTime.now(),
           ),
         );
@@ -59,7 +63,9 @@ class ArticleRepository {
   /// werden." Wie bei [CustomerRepository]/[SupplierRepository]:
   /// `Value.absent()` = unverändert, `Value(null)` = Zuordnung
   /// entfernen (bei [articleGroupId]/[defaultSupplierId]/
-  /// [manualSalePriceCents]).
+  /// [manualSalePriceCents]/[minimumStock]). **Nicht** für
+  /// [stockQuantity] selbst — eine Bestandskorrektur ist ein eigener,
+  /// gezielter Vorgang, siehe [setStock].
   Future<Article?> update({
     required String companyId,
     required String id,
@@ -68,6 +74,7 @@ class ArticleRepository {
     Value<String?> articleGroupId = const Value.absent(),
     Value<String?> defaultSupplierId = const Value.absent(),
     Value<int?> manualSalePriceCents = const Value.absent(),
+    Value<double?> minimumStock = const Value.absent(),
   }) async {
     final existing = await findById(companyId: companyId, id: id);
     if (existing == null) return null;
@@ -78,8 +85,28 @@ class ArticleRepository {
         articleGroupId: articleGroupId,
         defaultSupplierId: defaultSupplierId,
         manualSalePriceCents: manualSalePriceCents,
+        minimumStock: minimumStock,
       ),
     );
+    return findById(companyId: companyId, id: id);
+  }
+
+  /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — Bestandskorrektur
+  /// (Inventur, Anfangsbestand, Korrektur außerhalb von Bestellungen/
+  /// Dokumenten). Setzt den Lagerbestand auf [newQuantity] **absolut**,
+  /// nicht relativ — bewusst anders als die Dokumenten-Buchung in
+  /// `InvoiceRepository._bookStockOnFinalize()`, die einen Delta-Wert
+  /// abzieht. Darf wie der Lagerbestand selbst negativ sein (keine
+  /// zusätzliche Prüfung hier).
+  Future<Article?> setStock({
+    required String companyId,
+    required String id,
+    required double newQuantity,
+  }) async {
+    final rows = await (_db.update(_db.articles)
+          ..where((a) => a.id.equals(id) & a.companyId.equals(companyId)))
+        .write(ArticlesCompanion(stockQuantity: Value(newQuantity)));
+    if (rows == 0) return null;
     return findById(companyId: companyId, id: id);
   }
 

@@ -664,10 +664,49 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     );
     if (confirmed != true || !mounted) return;
 
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final repo = context.read<InvoiceRepository>();
+
+    // C5.1 Lagerbestand (Nachtrag 2026-10-19, Kay-Entscheidung: "Nur
+    // warnen, trotzdem erlauben") — Warnhinweis VOR dem eigentlichen
+    // Finalisieren, blockiert aber nichts.
+    final warnings = await repo.checkStockBeforeFinalize(companyId: companyId, id: invoice.id);
+    if (!mounted) return;
+    if (warnings.isNotEmpty) {
+      final proceedDespiteWarning = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Lagerbestand reicht nicht aus'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final warning in warnings)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '${warning.articleName}: ${warning.requestedQuantity} benötigt, '
+                    'nur ${warning.availableQuantity} verfügbar',
+                  ),
+                ),
+              const SizedBox(height: 8),
+              const Text('Finalisieren ist trotzdem möglich — der Lagerbestand wird negativ.'),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Trotzdem finalisieren'),
+            ),
+          ],
+        ),
+      );
+      if (proceedDespiteWarning != true || !mounted) return;
+    }
+
     setState(() => _finalizing = true);
     try {
-      final companyId = context.read<ActiveCompanyService>().active!.id;
-      final repo = context.read<InvoiceRepository>();
       final finalized = await repo.finalize(companyId: companyId, id: invoice.id);
       if (!mounted) return;
       if (finalized == null) {
