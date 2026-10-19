@@ -197,6 +197,18 @@ class Companies extends Table {
   /// beim Bearbeiten des Schlusstexts verschwindet.
   BoolColumn get isSmallBusinessExempt => boolean().withDefault(const Constant(false))();
 
+  /// C5.1 Lagerbestand (Nachtrag 2026-10-19, Kay-Entscheidung auf
+  /// Rückfrage: "Zwei getrennte Schalter" statt einem gemeinsamen mit
+  /// C5.2 Bestellwesen). Siehe Doc-Kommentar bei [Articles.stockQuantity]
+  /// für das Buchungsmodell.
+  BoolColumn get lagerbestandEnabled => boolean().withDefault(const Constant(false))();
+
+  // `bestellwesenEnabled` kommt erst mit C5.2 (eigene Migration) —
+  // nicht vorab deklarieren, ohne die Spalte auch zu migrieren (sonst
+  // Laufzeitfehler bei Bestands-Updates, siehe der reale Bug, der in
+  // der v20->v21-Migration dieser App schon einmal genau so gefunden
+  // wurde).
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -284,6 +296,26 @@ class Articles extends Table {
   /// unverändert sichtbar, verschwindet nur aus Auswahllisten für neue
   /// Positionen.
   BoolColumn get active => boolean().withDefault(const Constant(true))();
+
+  /// C5.1 Lagerbestand (Nachtrag 2026-10-19, Kay-Entscheidung auf
+  /// Rückfrage: "Ein Wert = verfügbar"). **Kein** getrenntes "physisch"/
+  /// "reserviert"-Paar — eine Bestandsbuchung reduziert diesen Wert
+  /// direkt. Darf negativ werden (Kay-Entscheidung: "Nur warnen,
+  /// trotzdem erlauben" statt das Finalisieren zu blockieren, siehe
+  /// `StockBookingService`). `double` statt Minor-Units-Integer wie bei
+  /// [Money], weil Mengen (wie bei [InvoiceItem.quantity]) durchaus
+  /// gebrochene Einheiten sein können (z. B. Meter Kabel) — anders als
+  /// Geldbeträge keine gesetzliche Rundungsvorgabe, daher hier bewusst
+  /// kein Decimal-String-Pattern.
+  RealColumn get stockQuantity => real().withDefault(const Constant(0))();
+
+  /// Mindestbestand-Schwelle für die Meldung in C5.2 Bestellwesen
+  /// ("Lagerbestand unter Mindestbestand -> System erzeugt Meldung").
+  /// `null` = keine Überwachung für diesen Artikel (keine Meldung wird
+  /// je erzeugt) — bewusst nicht einfach `0`, das wäre eine aktive,
+  /// nur zufällig nie auslösende Schwelle und nicht dasselbe wie
+  /// "nicht überwacht".
+  RealColumn get minimumStock => real().nullable()();
 
   DateTimeColumn get createdAt => dateTime()();
 

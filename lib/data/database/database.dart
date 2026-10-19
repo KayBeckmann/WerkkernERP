@@ -40,7 +40,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -240,6 +240,13 @@ class AppDatabase extends _$AppDatabase {
           if (from < 23) {
             // Nachtrag 2026-10-18: Kleinunternehmerregelung (§19 UStG).
             await migrator.addColumn(companies, companies.isSmallBusinessExempt);
+          }
+          if (from < 24) {
+            // C5.1 Lagerbestand (Nachtrag 2026-10-19). `bestellwesenEnabled`
+            // kommt erst mit C5.2 in einer eigenen, späteren Migration.
+            await migrator.addColumn(companies, companies.lagerbestandEnabled);
+            await migrator.addColumn(articles, articles.stockQuantity);
+            await migrator.addColumn(articles, articles.minimumStock);
           }
         },
       );
