@@ -30,6 +30,7 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
     bool? smtpEnabled,
     bool? buchhaltungEnabled,
     bool? creditNotesEnabled,
+    bool? lagerbestandEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -51,6 +52,7 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
             smtpEnabled: smtpEnabled ?? company.smtpEnabled,
             buchhaltungEnabled: buchhaltungEnabled ?? company.buchhaltungEnabled,
             creditNotesEnabled: creditNotesEnabled ?? company.creditNotesEnabled,
+            lagerbestandEnabled: lagerbestandEnabled ?? company.lagerbestandEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -152,6 +154,12 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
                     title: const Text('Gutschriften'),
                     value: company.creditNotesEnabled,
                     onChanged: _busy ? null : (value) => _setModule(creditNotesEnabled: value),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Lagerbestand'),
+                    value: company.lagerbestandEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(lagerbestandEnabled: value),
                   ),
                 ],
               ),

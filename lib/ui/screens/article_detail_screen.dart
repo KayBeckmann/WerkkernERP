@@ -8,7 +8,7 @@ import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
-import 'articles_screen.dart' show ArticleFormDialog, ArticleFormResult;
+import 'articles_screen.dart' show ArticleFormDialog, ArticleFormResult, formatArticleQuantity;
 
 /// Lieferanten-Einkaufspreise eines Artikels verwalten (A1:
 /// Mehrlieferanten-Preise), den kalkulierten Verkaufspreis anzeigen —
@@ -28,11 +28,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   late Article _article;
   late Future<_DetailData> _future;
   bool _busy = false;
+  bool _lagerbestandEnabled = false;
 
   @override
   void initState() {
     super.initState();
     _article = widget.article;
+    _lagerbestandEnabled = context.read<ActiveCompanyService>().active!.lagerbestandEnabled;
     _future = _load();
   }
 
@@ -72,7 +74,12 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   Future<void> _edit(List<ArticleGroup> groups, List<Supplier> suppliers) async {
     final result = await showDialog<ArticleFormResult>(
       context: context,
-      builder: (context) => ArticleFormDialog(groups: groups, suppliers: suppliers, existing: _article),
+      builder: (context) => ArticleFormDialog(
+        groups: groups,
+        suppliers: suppliers,
+        lagerbestandEnabled: _lagerbestandEnabled,
+        existing: _article,
+      ),
     );
     if (result == null || !mounted) return;
     final companyId = context.read<ActiveCompanyService>().active!.id;
@@ -83,10 +90,31 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           unit: Value(result.unit),
           articleGroupId: Value(result.articleGroupId),
           defaultSupplierId: Value(result.defaultSupplierId),
+          minimumStock: Value(result.minimumStock),
         );
     if (updated == null || !mounted) return;
     setState(() => _article = updated);
     _reload();
+  }
+
+  /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — Bestandskorrektur
+  /// (Inventur, Anfangsbestand) als eigener, expliziter Vorgang,
+  /// getrennt vom normalen Bearbeiten-Dialog (siehe Doc-Kommentar bei
+  /// `ArticleRepository.setStock()`).
+  Future<void> _correctStock() async {
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) => _StockCorrectionDialog(currentQuantity: _article.stockQuantity),
+    );
+    if (result == null || !mounted) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final updated = await context.read<ArticleRepository>().setStock(
+          companyId: companyId,
+          id: _article.id,
+          newQuantity: result,
+        );
+    if (updated == null || !mounted) return;
+    setState(() => _article = updated);
   }
 
   Future<void> _toggleActive() async {
@@ -141,11 +169,40 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text(
-                  data.salePrice == null
-                      ? 'Verkaufspreis: unbekannt (kein Standardlieferant/Einkaufspreis)'
-                      : 'Kalkulierter Netto-Verkaufspreis: ${data.salePrice}',
-                  style: Theme.of(context).textTheme.titleMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data.salePrice == null
+                          ? 'Verkaufspreis: unbekannt (kein Standardlieferant/Einkaufspreis)'
+                          : 'Kalkulierter Netto-Verkaufspreis: ${data.salePrice}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    if (_lagerbestandEnabled) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Lagerbestand: ${formatArticleQuantity(_article.stockQuantity)}'
+                              '${_article.minimumStock == null ? '' : ' (Mindestbestand: ${formatArticleQuantity(_article.minimumStock!)})'}',
+                              style: TextStyle(
+                                color: _article.minimumStock != null &&
+                                        _article.stockQuantity < _article.minimumStock!
+                                    ? Theme.of(context).colorScheme.error
+                                    : null,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _correctStock,
+                            child: const Text('Bestand korrigieren'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const Divider(height: 1),
@@ -258,6 +315,72 @@ class _SetSupplierPriceDialogState extends State<_SetSupplierPriceDialog> {
             if (supplierId == null || _priceCtrl.text.trim().isEmpty) return;
             final cents = Money.fromEuroString(_priceCtrl.text).cents;
             Navigator.pop(context, (supplierId: supplierId, cents: cents));
+          },
+          child: const Text('Speichern'),
+        ),
+      ],
+    );
+  }
+}
+
+/// C5.1 Lagerbestand (Nachtrag 2026-10-19) — setzt den Lagerbestand
+/// absolut neu (Inventur, Anfangsbestand), siehe
+/// `ArticleRepository.setStock()`.
+class _StockCorrectionDialog extends StatefulWidget {
+  const _StockCorrectionDialog({required this.currentQuantity});
+  final double currentQuantity;
+
+  @override
+  State<_StockCorrectionDialog> createState() => _StockCorrectionDialogState();
+}
+
+class _StockCorrectionDialogState extends State<_StockCorrectionDialog> {
+  late final TextEditingController _quantityCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantityCtrl = TextEditingController(text: formatArticleQuantity(widget.currentQuantity));
+  }
+
+  @override
+  void dispose() {
+    _quantityCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Bestand korrigieren'),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Setzt den Lagerbestand auf den eingegebenen Wert (für Inventur, Anfangsbestand '
+              'oder eine Korrektur außerhalb von Bestellungen/Dokumenten).',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _quantityCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Neuer Lagerbestand *'),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: () {
+            final value = double.tryParse(_quantityCtrl.text.trim().replaceAll(',', '.'));
+            if (value == null) return;
+            Navigator.pop(context, value);
           },
           child: const Text('Speichern'),
         ),
