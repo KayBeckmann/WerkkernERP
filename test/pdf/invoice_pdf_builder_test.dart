@@ -87,6 +87,7 @@ void main() {
         creditNotesEnabled: false,
         isSmallBusinessExempt: isSmallBusinessExempt,
         lagerbestandEnabled: false,
+        bestellwesenEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

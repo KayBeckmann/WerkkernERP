@@ -13,6 +13,7 @@ import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/data/repositories/customer_repository.dart';
 import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
+import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 
 /// Migrationen dieser App (v1→v2 A5: Angebot/Auftrag; v2→v3: erweiterte
 /// Kunden-/Lieferantenfelder; v3→v4: anpassbare PDF-Texte; v4→v5:
@@ -29,7 +30,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// optionale Projektzuordnung bei Belegen, Kay-Entscheidung 2026-10-19;
 /// v21→v22: Artikel deaktivierbar, Nachtrag 2026-10-18; v22→v23:
 /// Kleinunternehmerregelung §19 UStG, Nachtrag 2026-10-18; v23→v24:
-/// C5.1 Lagerbestand, Nachtrag 2026-10-19).
+/// C5.1 Lagerbestand, Nachtrag 2026-10-19; v24→v25: C5.2 Bestellwesen,
+/// Nachtrag 2026-10-19).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -53,13 +55,14 @@ void main() {
   });
 
   test(
-    'Migration v1→v24 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v25 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
     'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
     'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export + Gutschriften/Projektzuordnung '
-    'Belege + Artikel deaktivierbar + Kleinunternehmerregelung + C5.1 Lagerbestand): '
+    'Belege + Artikel deaktivierbar + Kleinunternehmerregelung + C5.1 Lagerbestand + '
+    'C5.2 Bestellwesen): '
     'Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
@@ -74,6 +77,7 @@ void main() {
       final customerRepo = CustomerRepository(db);
       final invoiceRepo = InvoiceRepository(db, NumberSequenceRepository(db));
       final articleRepo = ArticleRepository(db);
+      final supplierRepo = SupplierRepository(db);
 
       final company = await companyRepo.create(name: 'Migrations-Testfirma');
       final customer = await customerRepo.create(
@@ -81,6 +85,7 @@ void main() {
         name: 'Bestandskunde',
         address: 'Alte Anschrift 1',
       );
+      final supplier = await supplierRepo.create(companyId: company.id, name: 'Bestandslieferant');
       final article = await articleRepo.create(companyId: company.id, name: 'Bestandsartikel');
       final invoice = await invoiceRepo.createDraft(
         companyId: company.id,
@@ -226,6 +231,13 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN lagerbestand_enabled;');
       raw.execute('ALTER TABLE articles DROP COLUMN stock_quantity;');
       raw.execute('ALTER TABLE articles DROP COLUMN minimum_stock;');
+      // v24 -> v25 (C5.2 Bestellwesen, Nachtrag 2026-10-19):
+      // purchase_order_items zuerst (verweist auf purchase_orders).
+      raw.execute('DROP TABLE purchase_order_items;');
+      raw.execute('DROP TABLE purchase_orders;');
+      raw.execute('ALTER TABLE suppliers DROP COLUMN minimum_order_quantity;');
+      raw.execute('ALTER TABLE suppliers DROP COLUMN delivery_terms;');
+      raw.execute('ALTER TABLE companies DROP COLUMN bestellwesen_enabled;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -295,6 +307,7 @@ void main() {
         expect(migratedCompany.pdfClosingTextCreditNote, isNull);
         expect(migratedCompany.isSmallBusinessExempt, isFalse);
         expect(migratedCompany.lagerbestandEnabled, isFalse);
+        expect(migratedCompany.bestellwesenEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -464,6 +477,47 @@ void main() {
           isNull,
           reason: 'C5.1 Lagerbestand: null = keine Mindestbestand-Überwachung (nicht 0)',
         );
+
+        final migratedSupplier =
+            await (db.select(db.suppliers)..where((s) => s.id.equals(supplier.id))).getSingle();
+        expect(
+          migratedSupplier.minimumOrderQuantity,
+          isNull,
+          reason: 'C5.2 Bestellwesen: null = keine Mindestbestellmenge bekannt (nicht 0)',
+        );
+        expect(migratedSupplier.deliveryTerms, isNull);
+        expect(
+          migratedSupplier.name,
+          'Bestandslieferant',
+          reason: 'Bestandsdaten dürfen nicht verändert werden',
+        );
+
+        // PurchaseOrders/PurchaseOrderItems existieren nach der Migration
+        // und sind nutzbar.
+        await db.into(db.purchaseOrders).insert(
+              PurchaseOrdersCompanion.insert(
+                id: 'purchase-order-nach-migration',
+                companyId: company.id,
+                supplierId: supplier.id,
+                issueDate: DateTime.now(),
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              ),
+            );
+        await db.into(db.purchaseOrderItems).insert(
+              PurchaseOrderItemsCompanion.insert(
+                id: 'purchase-order-item-nach-migration',
+                purchaseOrderId: 'purchase-order-nach-migration',
+                articleId: Value(article.id),
+                description: 'Testposition',
+                quantity: 5,
+              ),
+            );
+        final createdPurchaseOrderItem = await (db.select(db.purchaseOrderItems)
+              ..where((i) => i.id.equals('purchase-order-item-nach-migration')))
+            .getSingle();
+        expect(createdPurchaseOrderItem.quantity, 5);
+        expect(createdPurchaseOrderItem.receivedQuantity, 0);
       } finally {
         await db.close();
       }

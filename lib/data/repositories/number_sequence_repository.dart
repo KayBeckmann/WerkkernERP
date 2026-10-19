@@ -78,3 +78,20 @@ String formatDocumentNumber({required DocumentKind kind, required int year, requ
   final paddedNumber = number.toString().padLeft(3, '0');
   return '${_prefixFor(kind)}-$shortYear$paddedNumber';
 }
+
+/// C5.2 Bestellwesen (Nachtrag 2026-10-19) — `documentType`-Wert für
+/// [NumberSequenceRepository.allocateNext], da eine Bestellung kein
+/// [DocumentKind] ist (siehe Doc-Kommentar bei [PurchaseOrders] in
+/// tables.dart). Ein fester String statt eines Enum-Werts, weil der
+/// Zähler selbst generisch bleibt und keinen festen Satz an
+/// Dokumentarten kennt.
+const purchaseOrderDocumentType = 'purchaseOrder';
+
+/// `B-JJxxx`, z. B. `B-26001` (Präfix-Vorschlag aus der Roadmap,
+/// bislang unbelegt) — gleiches Format/Wachstumsprinzip wie
+/// [formatDocumentNumber], nur ohne [DocumentKind] als Eingabe.
+String formatPurchaseOrderNumber({required int year, required int number}) {
+  final shortYear = (year % 100).toString().padLeft(2, '0');
+  final paddedNumber = number.toString().padLeft(3, '0');
+  return 'B-$shortYear$paddedNumber';
+}

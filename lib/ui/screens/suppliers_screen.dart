@@ -52,6 +52,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           vatId: result.vatId,
           contactPerson: result.contactPerson,
           notes: result.notes,
+          minimumOrderQuantity: result.minimumOrderQuantity,
+          deliveryTerms: result.deliveryTerms,
         );
     _reload();
   }
@@ -73,6 +75,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
             vatId: Value(result.vatId),
             contactPerson: Value(result.contactPerson),
             notes: Value(result.notes),
+            minimumOrderQuantity: Value(result.minimumOrderQuantity),
+            deliveryTerms: Value(result.deliveryTerms),
           ),
         );
     _reload();
@@ -129,6 +133,8 @@ class _SupplierFormResult {
     this.vatId,
     this.contactPerson,
     this.notes,
+    this.minimumOrderQuantity,
+    this.deliveryTerms,
   });
   final String name;
   final String? address;
@@ -137,6 +143,10 @@ class _SupplierFormResult {
   final String? vatId;
   final String? contactPerson;
   final String? notes;
+
+  /// C5.2 Bestellwesen (Nachtrag 2026-10-19) — `null` = keine MOQ bekannt.
+  final double? minimumOrderQuantity;
+  final String? deliveryTerms;
 }
 
 class _SupplierFormDialog extends StatefulWidget {
@@ -157,6 +167,12 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
   late final _vatIdCtrl = TextEditingController(text: widget.existing?.vatId);
   late final _contactPersonCtrl = TextEditingController(text: widget.existing?.contactPerson);
   late final _notesCtrl = TextEditingController(text: widget.existing?.notes);
+  late final _minimumOrderQuantityCtrl = TextEditingController(
+    text: widget.existing?.minimumOrderQuantity == null
+        ? ''
+        : widget.existing!.minimumOrderQuantity!.toString(),
+  );
+  late final _deliveryTermsCtrl = TextEditingController(text: widget.existing?.deliveryTerms);
 
   bool get _isEdit => widget.existing != null;
 
@@ -169,6 +185,8 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
     _vatIdCtrl.dispose();
     _contactPersonCtrl.dispose();
     _notesCtrl.dispose();
+    _minimumOrderQuantityCtrl.dispose();
+    _deliveryTermsCtrl.dispose();
     super.dispose();
   }
 
@@ -213,6 +231,20 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
                 decoration: const InputDecoration(labelText: 'Notizen'),
                 maxLines: 2,
               ),
+              // C5.2 Bestellwesen (Nachtrag 2026-10-19).
+              TextField(
+                controller: _minimumOrderQuantityCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Mindestbestellmenge (optional)',
+                  hintText: 'leer = keine MOQ-Prüfung',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+              TextField(
+                controller: _deliveryTermsCtrl,
+                decoration: const InputDecoration(labelText: 'Lieferbedingungen'),
+                maxLines: 2,
+              ),
             ],
           ),
         ),
@@ -222,6 +254,7 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
         FilledButton(
           onPressed: () {
             if (_nameCtrl.text.trim().isEmpty) return;
+            final moqText = _minimumOrderQuantityCtrl.text.trim().replaceAll(',', '.');
             Navigator.pop(
               context,
               _SupplierFormResult(
@@ -233,6 +266,9 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
                 contactPerson:
                     _contactPersonCtrl.text.trim().isEmpty ? null : _contactPersonCtrl.text.trim(),
                 notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+                minimumOrderQuantity: moqText.isEmpty ? null : double.tryParse(moqText),
+                deliveryTerms:
+                    _deliveryTermsCtrl.text.trim().isEmpty ? null : _deliveryTermsCtrl.text.trim(),
               ),
             );
           },

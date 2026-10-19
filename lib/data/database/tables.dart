@@ -203,11 +203,14 @@ class Companies extends Table {
   /// für das Buchungsmodell.
   BoolColumn get lagerbestandEnabled => boolean().withDefault(const Constant(false))();
 
-  // `bestellwesenEnabled` kommt erst mit C5.2 (eigene Migration) —
-  // nicht vorab deklarieren, ohne die Spalte auch zu migrieren (sonst
-  // Laufzeitfehler bei Bestands-Updates, siehe der reale Bug, der in
-  // der v20->v21-Migration dieser App schon einmal genau so gefunden
-  // wurde).
+  /// C5.2 Bestellwesen (Nachtrag 2026-10-19). Eigener Schalter, nicht
+  /// derselbe wie [lagerbestandEnabled] (Kay-Entscheidung: "Zwei
+  /// getrennte Schalter") — aber nur sichtbar/nutzbar, wenn
+  /// [lagerbestandEnabled] ebenfalls aktiv ist (siehe
+  /// `SettingsModulesScreen`), weil die Mindestbestand-Meldung, der
+  /// Haupt-Auslöser für eine Bestellung, ohne Lagerbestand keinen Sinn
+  /// hat. Default aus.
+  BoolColumn get bestellwesenEnabled => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -246,6 +249,18 @@ class Suppliers extends Table {
   TextColumn get vatId => text().nullable()();
   TextColumn get contactPerson => text().nullable()();
   TextColumn get notes => text().nullable()();
+
+  /// C5.2 Bestellwesen (Nachtrag 2026-10-19) — Mindestbestellmenge
+  /// dieses Lieferanten. `null` = keine MOQ bekannt/hinterlegt, dann
+  /// prüft `PurchaseOrderRepository.suggestFromLowStock()` nichts für
+  /// ihn. `double` aus demselben Grund wie [Articles.stockQuantity]
+  /// (Mengen können gebrochene Einheiten sein).
+  RealColumn get minimumOrderQuantity => real().nullable()();
+
+  /// Freitext-Lieferbedingungen (z. B. "ab Werk, 2 Wochen Lieferzeit") —
+  /// gleiches Freitext-Prinzip wie [notes], nur fachlich benannt, damit
+  /// es auf der Bestellung gezielt angezeigt werden kann.
+  TextColumn get deliveryTerms => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override
@@ -816,6 +831,105 @@ class BankTransactions extends Table {
   /// überlappendem Zeitraum) doppelte Zeilen anlegt.
   TextColumn get importHash => text()();
   DateTimeColumn get importedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Status einer Bestellung (C5.2). `draft` ist frei bearbeitbar und
+/// nummernlos (gleiches F3-Prinzip wie [InvoiceStatus]). `finalized`
+/// ist die an den Lieferanten tatsächlich übermittelte Fassung — danach
+/// unveränderlich, aber eben noch nicht beliefert. Die beiden
+/// Wareneingangs-Stufen kommen **nach** `finalized` hinzu, sobald
+/// `PurchaseOrderRepository.receiveGoods()` Mengen bucht; eine
+/// Bestellung ohne jede Lieferung bleibt `finalized`, bis die erste
+/// (Teil-)Lieferung eintrifft.
+enum PurchaseOrderStatus { draft, finalized, partiallyReceived, fullyReceived }
+
+/// Eine Bestellung an einen Lieferanten (C5.2 Bestellwesen, Nachtrag
+/// 2026-10-19). Bewusst **nicht** über die bestehende `Invoices`/
+/// [DocumentKind]-Maschinerie gebaut — der Lieferant ist hier
+/// Empfänger, nicht der Kunde, eine andere Richtung als der gesamte
+/// übrige Dokumentenfluss dieser App (Angebot/Auftrag/Lieferschein/
+/// Rechnung/Proforma/Gutschrift gehen alle AN einen Kunden). Teilt sich
+/// trotzdem denselben generischen [NumberSequences]-Mechanismus über
+/// den eigenen `documentType`-String `'purchaseOrder'` (Präfix "B",
+/// siehe `number_sequence_repository.dart`) — der Zähler selbst kennt
+/// gar keinen festen Satz an Dokumentarten.
+class PurchaseOrders extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get supplierId =>
+      text().references(Suppliers, #id, onDelete: KeyAction.restrict)();
+  TextColumn get status =>
+      textEnum<PurchaseOrderStatus>().withDefault(Constant(PurchaseOrderStatus.draft.name))();
+
+  /// Vollständige Bestellnummer, z. B. "B-26001". `null` im Entwurf
+  /// (F3-Prinzip: Entwürfe sind nummernlos).
+  TextColumn get orderNumber => text().nullable()();
+  IntColumn get numberYear => integer().nullable()();
+  DateTimeColumn get issueDate => dateTime()();
+  TextColumn get notes => text().nullable()();
+
+  /// Lieferanten-Schnappschuss zum Finalisierungszeitpunkt (gleicher
+  /// Grund wie der Kunden-/Firmen-Schnappschuss bei [Invoices]: eine
+  /// spätere Stammdatenänderung am Lieferanten darf eine bereits
+  /// übermittelte Bestellung nicht nachträglich anders aussehen lassen).
+  /// `null` im Entwurf — dort wird live aus [Suppliers] gelesen.
+  TextColumn get supplierSnapshotName => text().nullable()();
+  TextColumn get supplierSnapshotAddress => text().nullable()();
+
+  DateTimeColumn get finalizedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  /// Zeigt auf den finalisierten Auftrag, aus dem diese Bestellung per
+  /// "Aus Auftrag erstellen" entstanden ist (siehe
+  /// `PurchaseOrderRepository.createDraftsFromOrder()`). `null` für
+  /// eigenständig oder aus einer Mindestbestand-Meldung angelegte
+  /// Bestellungen. Reine Nachvollziehbarkeits-Markierung, keine
+  /// Geschäftslogik hängt daran — `onDelete: setNull`, eine gelöschte
+  /// Rechnung darf keine bereits angelegte Bestellung mitreißen.
+  TextColumn get sourceOrderId =>
+      text().nullable().references(Invoices, #id, onDelete: KeyAction.setNull)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Position einer Bestellung. Anders als [InvoiceItems] bewusst OHNE
+/// Positionsgruppen/Rabatt/MwSt — eine Bestellung an einen Lieferanten
+/// braucht diese Rechnungs-spezifischen Felder nicht. `articleId` ist
+/// nullable (freie Ad-hoc-Position ohne Artikelstamm bleibt möglich,
+/// gleiches Prinzip wie bei [InvoiceItems]), in der Praxis aber fast
+/// immer gesetzt — nur ein Artikel hat einen Lagerbestand, den
+/// [PurchaseOrderRepository.receiveGoods] erhöhen kann.
+class PurchaseOrderItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get purchaseOrderId =>
+      text().references(PurchaseOrders, #id, onDelete: KeyAction.cascade)();
+  TextColumn get articleId =>
+      text().nullable().references(Articles, #id, onDelete: KeyAction.setNull)();
+  TextColumn get description => text()();
+
+  /// Bestellte Menge — `double` wie [Articles.stockQuantity] (gleicher
+  /// Grund: gebrochene Einheiten möglich).
+  RealColumn get quantity => real()();
+
+  /// Einkaufspreis je Einheit (Minor Units/Cent) — zum Anlegezeitpunkt
+  /// aus [ArticleSupplierPrices] übernommen, aber danach frei editierbar
+  /// (ein Lieferant kann zwischen Anlage und Bestellung einen anderen
+  /// Preis genannt haben). `null` = kein Preis bekannt, zeigt in der UI
+  /// eine Lücke statt eine geratene 0 €.
+  IntColumn get purchasePriceCents => integer().nullable()();
+
+  /// Bereits eingegangene Menge (Wareneingang, auch Teillieferungen) —
+  /// erhöht bei jeder Buchung über `receiveGoods()` sowohl dieses Feld
+  /// als auch den Lagerbestand des Artikels. Startet bei 0, darf nie die
+  /// bestellte [quantity] übersteigen (von `receiveGoods()` durchgesetzt,
+  /// nicht nur in der UI).
+  RealColumn get receivedQuantity => real().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -28,6 +28,8 @@ part 'database.g.dart';
     ExpenseCategories,
     Expenses,
     BankTransactions,
+    PurchaseOrders,
+    PurchaseOrderItems,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -40,7 +42,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 24;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -247,6 +249,16 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.lagerbestandEnabled);
             await migrator.addColumn(articles, articles.stockQuantity);
             await migrator.addColumn(articles, articles.minimumStock);
+          }
+          if (from < 25) {
+            // C5.2 Bestellwesen (Nachtrag 2026-10-19). purchaseOrderItems
+            // verweist auf purchaseOrders UND articles — purchaseOrders
+            // muss vorher existieren (articles seit v1 bereits vorhanden).
+            await migrator.addColumn(companies, companies.bestellwesenEnabled);
+            await migrator.addColumn(suppliers, suppliers.minimumOrderQuantity);
+            await migrator.addColumn(suppliers, suppliers.deliveryTerms);
+            await migrator.createTable(purchaseOrders);
+            await migrator.createTable(purchaseOrderItems);
           }
         },
       );

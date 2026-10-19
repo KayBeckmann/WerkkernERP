@@ -14,6 +14,7 @@ import 'data/repositories/expense_repository.dart';
 import 'data/repositories/invoice_repository.dart';
 import 'data/repositories/number_sequence_repository.dart';
 import 'data/repositories/project_repository.dart';
+import 'data/repositories/purchase_order_repository.dart';
 import 'data/repositories/recurring_invoice_template_repository.dart';
 import 'data/repositories/supplier_repository.dart';
 import 'data/repositories/vehicle_repository.dart';
@@ -135,6 +136,12 @@ class WerkkernErpApp extends StatelessWidget {
         ),
         Provider<VehicleRepository>(
           create: (context) => VehicleRepository(context.read<AppDatabase>()),
+        ),
+        Provider<PurchaseOrderRepository>(
+          create: (context) => PurchaseOrderRepository(
+            context.read<AppDatabase>(),
+            context.read<NumberSequenceRepository>(),
+          ),
         ),
         Provider<RecurringInvoiceTemplateRepository>(
           create: (context) => RecurringInvoiceTemplateRepository(
