@@ -764,6 +764,21 @@ class $CompaniesTable extends Companies
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _isSmallBusinessExemptMeta =
+      const VerificationMeta('isSmallBusinessExempt');
+  @override
+  late final GeneratedColumn<bool> isSmallBusinessExempt =
+      GeneratedColumn<bool>(
+        'is_small_business_exempt',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_small_business_exempt" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -830,6 +845,7 @@ class $CompaniesTable extends Companies
     creditNotesEnabled,
     pdfIntroTextCreditNote,
     pdfClosingTextCreditNote,
+    isSmallBusinessExempt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1389,6 +1405,15 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('is_small_business_exempt')) {
+      context.handle(
+        _isSmallBusinessExemptMeta,
+        isSmallBusinessExempt.isAcceptableOrUnknown(
+          data['is_small_business_exempt']!,
+          _isSmallBusinessExemptMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1654,6 +1679,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.string,
         data['${effectivePrefix}pdf_closing_text_credit_note'],
       ),
+      isSmallBusinessExempt: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_small_business_exempt'],
+      )!,
     );
   }
 
@@ -1841,6 +1870,19 @@ class Company extends DataClass implements Insertable<Company> {
   final bool creditNotesEnabled;
   final String? pdfIntroTextCreditNote;
   final String? pdfClosingTextCreditNote;
+
+  /// Nachtrag 2026-10-18: "Kleingewerbe nach §?? darf Umsatzsteuer
+  /// NICHT ausweisen." Arbeitsvorgabe wie bei allen anderen
+  /// steuerlichen Punkten dieser App (F1: keine Rechtsprüfung) — Kay
+  /// bestätigt mit seinem Steuerberater, dass § 19 Abs. 1 UStG
+  /// (Kleinunternehmerregelung) tatsächlich zutrifft, diese App prüft
+  /// das nicht. Ist der Schalter aktiv, erzwingt der Positions-Dialog
+  /// 0 % auf jede neue Position (siehe `invoice_item_dialog.dart`) und
+  /// das PDF zeigt automatisch den gesetzlich vorgeschriebenen Hinweis
+  /// (siehe `invoice_pdf_builder.dart`) — bewusst NICHT im frei
+  /// editierbaren `pdfClosingText`, damit der Hinweis nicht versehentlich
+  /// beim Bearbeiten des Schlusstexts verschwindet.
+  final bool isSmallBusinessExempt;
   const Company({
     required this.id,
     required this.name,
@@ -1906,6 +1948,7 @@ class Company extends DataClass implements Insertable<Company> {
     required this.creditNotesEnabled,
     this.pdfIntroTextCreditNote,
     this.pdfClosingTextCreditNote,
+    required this.isSmallBusinessExempt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2078,6 +2121,7 @@ class Company extends DataClass implements Insertable<Company> {
         pdfClosingTextCreditNote,
       );
     }
+    map['is_small_business_exempt'] = Variable<bool>(isSmallBusinessExempt);
     return map;
   }
 
@@ -2221,6 +2265,7 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingTextCreditNote: pdfClosingTextCreditNote == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfClosingTextCreditNote),
+      isSmallBusinessExempt: Value(isSmallBusinessExempt),
     );
   }
 
@@ -2364,6 +2409,9 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingTextCreditNote: serializer.fromJson<String?>(
         json['pdfClosingTextCreditNote'],
       ),
+      isSmallBusinessExempt: serializer.fromJson<bool>(
+        json['isSmallBusinessExempt'],
+      ),
     );
   }
   @override
@@ -2468,6 +2516,7 @@ class Company extends DataClass implements Insertable<Company> {
       'pdfClosingTextCreditNote': serializer.toJson<String?>(
         pdfClosingTextCreditNote,
       ),
+      'isSmallBusinessExempt': serializer.toJson<bool>(isSmallBusinessExempt),
     };
   }
 
@@ -2536,6 +2585,7 @@ class Company extends DataClass implements Insertable<Company> {
     bool? creditNotesEnabled,
     Value<String?> pdfIntroTextCreditNote = const Value.absent(),
     Value<String?> pdfClosingTextCreditNote = const Value.absent(),
+    bool? isSmallBusinessExempt,
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2659,6 +2709,7 @@ class Company extends DataClass implements Insertable<Company> {
     pdfClosingTextCreditNote: pdfClosingTextCreditNote.present
         ? pdfClosingTextCreditNote.value
         : this.pdfClosingTextCreditNote,
+    isSmallBusinessExempt: isSmallBusinessExempt ?? this.isSmallBusinessExempt,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -2832,6 +2883,9 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingTextCreditNote: data.pdfClosingTextCreditNote.present
           ? data.pdfClosingTextCreditNote.value
           : this.pdfClosingTextCreditNote,
+      isSmallBusinessExempt: data.isSmallBusinessExempt.present
+          ? data.isSmallBusinessExempt.value
+          : this.isSmallBusinessExempt,
     );
   }
 
@@ -2903,7 +2957,8 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('datevSachkontenlaenge: $datevSachkontenlaenge, ')
           ..write('creditNotesEnabled: $creditNotesEnabled, ')
           ..write('pdfIntroTextCreditNote: $pdfIntroTextCreditNote, ')
-          ..write('pdfClosingTextCreditNote: $pdfClosingTextCreditNote')
+          ..write('pdfClosingTextCreditNote: $pdfClosingTextCreditNote, ')
+          ..write('isSmallBusinessExempt: $isSmallBusinessExempt')
           ..write(')'))
         .toString();
   }
@@ -2974,6 +3029,7 @@ class Company extends DataClass implements Insertable<Company> {
     creditNotesEnabled,
     pdfIntroTextCreditNote,
     pdfClosingTextCreditNote,
+    isSmallBusinessExempt,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -3043,7 +3099,8 @@ class Company extends DataClass implements Insertable<Company> {
           other.datevSachkontenlaenge == this.datevSachkontenlaenge &&
           other.creditNotesEnabled == this.creditNotesEnabled &&
           other.pdfIntroTextCreditNote == this.pdfIntroTextCreditNote &&
-          other.pdfClosingTextCreditNote == this.pdfClosingTextCreditNote);
+          other.pdfClosingTextCreditNote == this.pdfClosingTextCreditNote &&
+          other.isSmallBusinessExempt == this.isSmallBusinessExempt);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -3111,6 +3168,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<bool> creditNotesEnabled;
   final Value<String?> pdfIntroTextCreditNote;
   final Value<String?> pdfClosingTextCreditNote;
+  final Value<bool> isSmallBusinessExempt;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -3177,6 +3235,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.creditNotesEnabled = const Value.absent(),
     this.pdfIntroTextCreditNote = const Value.absent(),
     this.pdfClosingTextCreditNote = const Value.absent(),
+    this.isSmallBusinessExempt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -3244,6 +3303,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.creditNotesEnabled = const Value.absent(),
     this.pdfIntroTextCreditNote = const Value.absent(),
     this.pdfClosingTextCreditNote = const Value.absent(),
+    this.isSmallBusinessExempt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -3313,6 +3373,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<bool>? creditNotesEnabled,
     Expression<String>? pdfIntroTextCreditNote,
     Expression<String>? pdfClosingTextCreditNote,
+    Expression<bool>? isSmallBusinessExempt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3413,6 +3474,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         'pdf_intro_text_credit_note': pdfIntroTextCreditNote,
       if (pdfClosingTextCreditNote != null)
         'pdf_closing_text_credit_note': pdfClosingTextCreditNote,
+      if (isSmallBusinessExempt != null)
+        'is_small_business_exempt': isSmallBusinessExempt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3482,6 +3545,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<bool>? creditNotesEnabled,
     Value<String?>? pdfIntroTextCreditNote,
     Value<String?>? pdfClosingTextCreditNote,
+    Value<bool>? isSmallBusinessExempt,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -3570,6 +3634,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           pdfIntroTextCreditNote ?? this.pdfIntroTextCreditNote,
       pdfClosingTextCreditNote:
           pdfClosingTextCreditNote ?? this.pdfClosingTextCreditNote,
+      isSmallBusinessExempt:
+          isSmallBusinessExempt ?? this.isSmallBusinessExempt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3829,6 +3895,11 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         pdfClosingTextCreditNote.value,
       );
     }
+    if (isSmallBusinessExempt.present) {
+      map['is_small_business_exempt'] = Variable<bool>(
+        isSmallBusinessExempt.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3904,6 +3975,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('creditNotesEnabled: $creditNotesEnabled, ')
           ..write('pdfIntroTextCreditNote: $pdfIntroTextCreditNote, ')
           ..write('pdfClosingTextCreditNote: $pdfClosingTextCreditNote, ')
+          ..write('isSmallBusinessExempt: $isSmallBusinessExempt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -14529,6 +14601,7 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<bool> creditNotesEnabled,
       Value<String?> pdfIntroTextCreditNote,
       Value<String?> pdfClosingTextCreditNote,
+      Value<bool> isSmallBusinessExempt,
       Value<int> rowid,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
@@ -14597,6 +14670,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<bool> creditNotesEnabled,
       Value<String?> pdfIntroTextCreditNote,
       Value<String?> pdfClosingTextCreditNote,
+      Value<bool> isSmallBusinessExempt,
       Value<int> rowid,
     });
 
@@ -15187,6 +15261,11 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<String> get pdfClosingTextCreditNote => $composableBuilder(
     column: $table.pdfClosingTextCreditNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isSmallBusinessExempt => $composableBuilder(
+    column: $table.isSmallBusinessExempt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -15846,6 +15925,11 @@ class $$CompaniesTableOrderingComposer
     column: $table.pdfClosingTextCreditNote,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get isSmallBusinessExempt => $composableBuilder(
+    column: $table.isSmallBusinessExempt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -16152,6 +16236,11 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<String> get pdfClosingTextCreditNote => $composableBuilder(
     column: $table.pdfClosingTextCreditNote,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isSmallBusinessExempt => $composableBuilder(
+    column: $table.isSmallBusinessExempt,
     builder: (column) => column,
   );
 
@@ -16595,6 +16684,7 @@ class $$CompaniesTableTableManager
                 Value<bool> creditNotesEnabled = const Value.absent(),
                 Value<String?> pdfIntroTextCreditNote = const Value.absent(),
                 Value<String?> pdfClosingTextCreditNote = const Value.absent(),
+                Value<bool> isSmallBusinessExempt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -16661,6 +16751,7 @@ class $$CompaniesTableTableManager
                 creditNotesEnabled: creditNotesEnabled,
                 pdfIntroTextCreditNote: pdfIntroTextCreditNote,
                 pdfClosingTextCreditNote: pdfClosingTextCreditNote,
+                isSmallBusinessExempt: isSmallBusinessExempt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -16733,6 +16824,7 @@ class $$CompaniesTableTableManager
                 Value<bool> creditNotesEnabled = const Value.absent(),
                 Value<String?> pdfIntroTextCreditNote = const Value.absent(),
                 Value<String?> pdfClosingTextCreditNote = const Value.absent(),
+                Value<bool> isSmallBusinessExempt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -16799,6 +16891,7 @@ class $$CompaniesTableTableManager
                 creditNotesEnabled: creditNotesEnabled,
                 pdfIntroTextCreditNote: pdfIntroTextCreditNote,
                 pdfClosingTextCreditNote: pdfClosingTextCreditNote,
+                isSmallBusinessExempt: isSmallBusinessExempt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

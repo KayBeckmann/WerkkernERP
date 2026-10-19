@@ -40,7 +40,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 23;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -236,6 +236,10 @@ class AppDatabase extends _$AppDatabase {
             // können — `articles` existiert seit v1, hier reicht ein
             // einfaches addColumn.
             await migrator.addColumn(articles, articles.active);
+          }
+          if (from < 23) {
+            // Nachtrag 2026-10-18: Kleinunternehmerregelung (§19 UStG).
+            await migrator.addColumn(companies, companies.isSmallBusinessExempt);
           }
         },
       );

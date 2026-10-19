@@ -184,6 +184,19 @@ class Companies extends Table {
   TextColumn get pdfIntroTextCreditNote => text().nullable()();
   TextColumn get pdfClosingTextCreditNote => text().nullable()();
 
+  /// Nachtrag 2026-10-18: "Kleingewerbe nach §?? darf Umsatzsteuer
+  /// NICHT ausweisen." Arbeitsvorgabe wie bei allen anderen
+  /// steuerlichen Punkten dieser App (F1: keine Rechtsprüfung) — Kay
+  /// bestätigt mit seinem Steuerberater, dass § 19 Abs. 1 UStG
+  /// (Kleinunternehmerregelung) tatsächlich zutrifft, diese App prüft
+  /// das nicht. Ist der Schalter aktiv, erzwingt der Positions-Dialog
+  /// 0 % auf jede neue Position (siehe `invoice_item_dialog.dart`) und
+  /// das PDF zeigt automatisch den gesetzlich vorgeschriebenen Hinweis
+  /// (siehe `invoice_pdf_builder.dart`) — bewusst NICHT im frei
+  /// editierbaren `pdfClosingText`, damit der Hinweis nicht versehentlich
+  /// beim Bearbeiten des Schlusstexts verschwindet.
+  BoolColumn get isSmallBusinessExempt => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
