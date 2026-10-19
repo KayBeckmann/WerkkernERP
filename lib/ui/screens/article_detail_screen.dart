@@ -8,6 +8,7 @@ import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/stock_change_notifier.dart';
 import 'articles_screen.dart' show ArticleFormDialog, ArticleFormResult, formatArticleQuantity;
 
 /// Lieferanten-Einkaufspreise eines Artikels verwalten (A1:
@@ -30,12 +31,40 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   bool _busy = false;
   bool _lagerbestandEnabled = false;
 
+  /// Bugfix 2026-10-19 (Kay: "Wenn ich den Bestand aus einer Bestellung
+  /// buche, wird dieser nicht angezeigt") — siehe ausführlicher Doc-
+  /// Kommentar bei `_ArticlesScreenState._onStockChanged` für die
+  /// Begründung (ChangeNotifier statt Drift-`.watch()`-Stream). Lädt
+  /// [_article] hier per einmaligem `findById()` neu statt reaktiv zu
+  /// streamen — reicht aus, weil der Ping ohnehin erst NACH der
+  /// abgeschlossenen Buchung ausgelöst wird.
+  Future<void> _onStockChanged() async {
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final reloaded = await context.read<ArticleRepository>().findById(
+          companyId: companyId,
+          id: _article.id,
+        );
+    if (mounted && reloaded != null) setState(() => _article = reloaded);
+  }
+
+  /// Referenz gemerkt statt in `dispose()` erneut per `context.read()`
+  /// zu holen — siehe gleichlautende Doc-Notiz bei
+  /// `_ArticlesScreenState._stockChangeNotifier`.
+  late StockChangeNotifier _stockChangeNotifier;
+
   @override
   void initState() {
     super.initState();
     _article = widget.article;
     _lagerbestandEnabled = context.read<ActiveCompanyService>().active!.lagerbestandEnabled;
     _future = _load();
+    _stockChangeNotifier = context.read<StockChangeNotifier>()..addListener(_onStockChanged);
+  }
+
+  @override
+  void dispose() {
+    _stockChangeNotifier.removeListener(_onStockChanged);
+    super.dispose();
   }
 
   Future<_DetailData> _load() async {
@@ -115,6 +144,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
         );
     if (updated == null || !mounted) return;
     setState(() => _article = updated);
+    context.read<StockChangeNotifier>().notifyStockChanged();
   }
 
   Future<void> _toggleActive() async {

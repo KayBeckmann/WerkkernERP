@@ -7,6 +7,7 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/stock_change_notifier.dart';
 import '../../pdf/purchase_order_pdf_builder.dart';
 
 /// Bestellungsdetail (C5.2 Bestellwesen, Nachtrag 2026-10-19) —
@@ -38,7 +39,9 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
     return _DetailData(order: order, items: items);
   }
 
-  void _reload() => setState(() => _future = _load());
+  void _reload() => setState(() {
+        _future = _load();
+      });
 
   Future<void> _editItems(PurchaseOrder order, List<PurchaseOrderItem> items) async {
     final companyId = context.read<ActiveCompanyService>().active!.id;
@@ -136,6 +139,10 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
       await context
           .read<PurchaseOrderRepository>()
           .receiveGoods(companyId: companyId, id: order.id, receipts: receipts);
+      // Bugfix 2026-10-19 (Kay: "Wenn ich den Bestand aus einer
+      // Bestellung buche, wird dieser nicht angezeigt") — siehe
+      // Doc-Kommentar bei `StockChangeNotifier`.
+      if (mounted) context.read<StockChangeNotifier>().notifyStockChanged();
     } on StateError catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
