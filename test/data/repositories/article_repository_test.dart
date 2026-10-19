@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
@@ -194,5 +195,92 @@ void main() {
       ),
       throwsStateError,
     );
+  });
+
+  test(
+    'Nachtrag 2026-10-18 ("Artikel können nicht nachträglich bearbeitet werden"): update() ändert '
+    'nur die übergebenen Felder, Zuordnungen lassen sich per Value(null) wieder entfernen',
+    () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      final supplier = await suppliers.create(companyId: company.id, name: 'Großhandel');
+      final group = await articleGroups.create(companyId: company.id, name: 'Elektromaterial', markupPercent: 20);
+      final article = await articles.create(
+        companyId: company.id,
+        name: 'Steckdose',
+        unit: 'Stk',
+        articleGroupId: group.id,
+        defaultSupplierId: supplier.id,
+      );
+
+      // Nur den Namen ändern (Tippfehler korrigieren) — Rest bleibt.
+      final renamed = await articles.update(companyId: company.id, id: article.id, name: 'Steckdose weiß');
+      expect(renamed!.name, 'Steckdose weiß');
+      expect(renamed.unit, 'Stk', reason: 'nicht übergebene Felder bleiben unverändert');
+      expect(renamed.articleGroupId, group.id);
+      expect(renamed.defaultSupplierId, supplier.id);
+
+      // Zuordnungen explizit entfernen.
+      final cleared = await articles.update(
+        companyId: company.id,
+        id: article.id,
+        articleGroupId: const Value(null),
+        defaultSupplierId: const Value(null),
+      );
+      expect(cleared!.articleGroupId, isNull);
+      expect(cleared.defaultSupplierId, isNull);
+      expect(cleared.name, 'Steckdose weiß', reason: 'Value.absent() bei name lässt ihn unverändert');
+    },
+  );
+
+  test('update() über eine fremde Firma schlägt fehl (liefert null)', () async {
+    final companyA = await companies.create(name: 'Firma A');
+    final companyB = await companies.create(name: 'Firma B');
+    final article = await articles.create(companyId: companyA.id, name: 'Artikel A');
+
+    expect(await articles.update(companyId: companyB.id, id: article.id, name: 'Manipuliert'), isNull);
+  });
+
+  test(
+    'Nachtrag 2026-10-18 ("Artikel müssen deaktiviert werden können"): setActive(false) blendet '
+    'einen Artikel aus listForCompany() aus, löscht aber keine Lieferantenpreise; setActive(true) '
+    'macht ihn wieder sichtbar',
+    () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      final supplier = await suppliers.create(companyId: company.id, name: 'Großhandel');
+      final article = await articles.create(companyId: company.id, name: 'Steckdose');
+      await articles.setSupplierPrice(
+        companyId: company.id,
+        articleId: article.id,
+        supplierId: supplier.id,
+        purchasePriceCents: 250,
+      );
+
+      expect((await articles.listForCompany(company.id)).map((a) => a.id), contains(article.id));
+
+      await articles.setActive(companyId: company.id, id: article.id, active: false);
+      expect((await articles.listForCompany(company.id)).map((a) => a.id), isNot(contains(article.id)));
+      expect(
+        (await articles.listForCompany(company.id, includeInactive: true)).map((a) => a.id),
+        contains(article.id),
+        reason: 'includeInactive: true zeigt ihn weiterhin',
+      );
+      expect(
+        await articles.supplierPricesFor(article.id),
+        hasLength(1),
+        reason: 'Deaktivieren löscht keine Lieferantenpreise',
+      );
+
+      await articles.setActive(companyId: company.id, id: article.id, active: true);
+      expect((await articles.listForCompany(company.id)).map((a) => a.id), contains(article.id));
+    },
+  );
+
+  test('Fremde Firmen-ID kann einen Artikel nicht deaktivieren', () async {
+    final companyA = await companies.create(name: 'Firma A');
+    final companyB = await companies.create(name: 'Firma B');
+    final article = await articles.create(companyId: companyA.id, name: 'Artikel A');
+
+    expect(await articles.setActive(companyId: companyB.id, id: article.id, active: false), isFalse);
+    expect((await articles.findById(companyId: companyA.id, id: article.id))!.active, isTrue);
   });
 }
