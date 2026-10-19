@@ -30,6 +30,9 @@ part 'database.g.dart';
     BankTransactions,
     PurchaseOrders,
     PurchaseOrderItems,
+    StockMovements,
+    InventoryCounts,
+    InventoryCountItems,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -42,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 25;
+  int get schemaVersion => 26;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -259,6 +262,28 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(suppliers, suppliers.deliveryTerms);
             await migrator.createTable(purchaseOrders);
             await migrator.createTable(purchaseOrderItems);
+          }
+          if (from < 26) {
+            // C5.3 Inventur/Bewegungsprotokoll + SKR03-Kontierung/
+            // Projektzuordnung bei Bestellungen (Nachtrag 2026-10-19).
+            // stockMovements/inventoryCountItems referenzieren articles
+            // (seit v1 vorhanden) — unkritisch. inventoryCountItems
+            // referenziert zusätzlich inventoryCounts, muss also danach
+            // angelegt werden.
+            await migrator.createTable(stockMovements);
+            await migrator.createTable(inventoryCounts);
+            await migrator.createTable(inventoryCountItems);
+            // Nur nachträglich hinzufügen, wenn `purchaseOrders` schon VOR
+            // diesem Schritt existierte (from >= 25) — sonst hat
+            // `createTable` oben (from < 25) die Tabelle bereits mit dem
+            // aktuellen Schema inkl. projectId/expenseCategoryId angelegt,
+            // und ein addColumn hier würde mit "duplicate column name"
+            // fehlschlagen (gleicher Bug wie schon einmal bei
+            // Expenses.projectId in der v20->v21-Migration gefunden).
+            if (from >= 25) {
+              await migrator.addColumn(purchaseOrders, purchaseOrders.projectId);
+              await migrator.addColumn(purchaseOrders, purchaseOrders.expenseCategoryId);
+            }
           }
         },
       );
