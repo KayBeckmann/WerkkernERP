@@ -28,7 +28,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// C14.5 DATEV-Export; v20→v21: Gutschriften mit eigenem Nummernkreis +
 /// optionale Projektzuordnung bei Belegen, Kay-Entscheidung 2026-10-19;
 /// v21→v22: Artikel deaktivierbar, Nachtrag 2026-10-18; v22→v23:
-/// Kleinunternehmerregelung §19 UStG, Nachtrag 2026-10-18).
+/// Kleinunternehmerregelung §19 UStG, Nachtrag 2026-10-18; v23→v24:
+/// C5.1 Lagerbestand, Nachtrag 2026-10-19).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -52,13 +53,14 @@ void main() {
   });
 
   test(
-    'Migration v1→v23 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v24 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
     'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
     'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export + Gutschriften/Projektzuordnung '
-    'Belege + Artikel deaktivierbar + Kleinunternehmerregelung): Bestandsdaten '
+    'Belege + Artikel deaktivierbar + Kleinunternehmerregelung + C5.1 Lagerbestand): '
+    'Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
     () async {
@@ -220,6 +222,10 @@ void main() {
       raw.execute('ALTER TABLE articles DROP COLUMN active;');
       // v22 -> v23 (Kleinunternehmerregelung §19 UStG, Nachtrag 2026-10-18):
       raw.execute('ALTER TABLE companies DROP COLUMN is_small_business_exempt;');
+      // v23 -> v24 (C5.1 Lagerbestand, Nachtrag 2026-10-19):
+      raw.execute('ALTER TABLE companies DROP COLUMN lagerbestand_enabled;');
+      raw.execute('ALTER TABLE articles DROP COLUMN stock_quantity;');
+      raw.execute('ALTER TABLE articles DROP COLUMN minimum_stock;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -288,6 +294,7 @@ void main() {
         expect(migratedCompany.pdfIntroTextCreditNote, isNull);
         expect(migratedCompany.pdfClosingTextCreditNote, isNull);
         expect(migratedCompany.isSmallBusinessExempt, isFalse);
+        expect(migratedCompany.lagerbestandEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -446,6 +453,16 @@ void main() {
           migratedArticle.name,
           'Bestandsartikel',
           reason: 'Bestandsdaten dürfen nicht verändert werden',
+        );
+        expect(
+          migratedArticle.stockQuantity,
+          0,
+          reason: 'C5.1 Lagerbestand: Bestandsartikel starten bei 0, kein geratener Altbestand',
+        );
+        expect(
+          migratedArticle.minimumStock,
+          isNull,
+          reason: 'C5.1 Lagerbestand: null = keine Mindestbestand-Überwachung (nicht 0)',
         );
       } finally {
         await db.close();

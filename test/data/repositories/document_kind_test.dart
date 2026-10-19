@@ -131,6 +131,7 @@ void main() {
         smtpEnabled: false,
         buchhaltungEnabled: false,
         creditNotesEnabled: false,
+        lagerbestandEnabled: false,
       );
       final quoteDraft = await draftWithOneItem(company.id, customer.id, kind: DocumentKind.quote);
       await invoices.finalize(companyId: company.id, id: quoteDraft.id);
@@ -150,6 +151,7 @@ void main() {
         smtpEnabled: false,
         buchhaltungEnabled: false,
         creditNotesEnabled: false,
+        lagerbestandEnabled: false,
       );
       expect(disabled.quotesEnabled, isFalse);
 
