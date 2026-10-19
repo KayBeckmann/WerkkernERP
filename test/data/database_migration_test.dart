@@ -31,7 +31,8 @@ import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 /// v21→v22: Artikel deaktivierbar, Nachtrag 2026-10-18; v22→v23:
 /// Kleinunternehmerregelung §19 UStG, Nachtrag 2026-10-18; v23→v24:
 /// C5.1 Lagerbestand, Nachtrag 2026-10-19; v24→v25: C5.2 Bestellwesen,
-/// Nachtrag 2026-10-19).
+/// Nachtrag 2026-10-19; v25→v26: C5.3 Inventur/Bewegungsprotokoll +
+/// SKR03-Kontierung/Projektzuordnung, Nachtrag 2026-10-19).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -55,14 +56,14 @@ void main() {
   });
 
   test(
-    'Migration v1→v25 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v26 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
     'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
     'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export + Gutschriften/Projektzuordnung '
     'Belege + Artikel deaktivierbar + Kleinunternehmerregelung + C5.1 Lagerbestand + '
-    'C5.2 Bestellwesen): '
+    'C5.2 Bestellwesen + C5.3 Inventur/SKR03/Projektzuordnung): '
     'Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
@@ -238,6 +239,14 @@ void main() {
       raw.execute('ALTER TABLE suppliers DROP COLUMN minimum_order_quantity;');
       raw.execute('ALTER TABLE suppliers DROP COLUMN delivery_terms;');
       raw.execute('ALTER TABLE companies DROP COLUMN bestellwesen_enabled;');
+      // v25 -> v26 (C5.3 Inventur/Bewegungsprotokoll + SKR03-Kontierung/
+      // Projektzuordnung, Nachtrag 2026-10-19). purchase_orders.
+      // project_id/expense_category_id brauchen hier KEINEN separaten
+      // Drop — die ganze Tabelle wurde oben (v24 -> v25) bereits
+      // komplett entfernt, inkl. dieser beiden Spalten.
+      raw.execute('DROP TABLE inventory_count_items;');
+      raw.execute('DROP TABLE inventory_counts;');
+      raw.execute('DROP TABLE stock_movements;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -518,6 +527,50 @@ void main() {
             .getSingle();
         expect(createdPurchaseOrderItem.quantity, 5);
         expect(createdPurchaseOrderItem.receivedQuantity, 0);
+
+        // C5.3: PurchaseOrders.projectId/expenseCategoryId existieren
+        // nach der Migration (null, da beim Anlegen oben nicht gesetzt).
+        final migratedPurchaseOrder = await (db.select(db.purchaseOrders)
+              ..where((o) => o.id.equals('purchase-order-nach-migration')))
+            .getSingle();
+        expect(migratedPurchaseOrder.projectId, isNull);
+        expect(migratedPurchaseOrder.expenseCategoryId, isNull);
+
+        // StockMovements/InventoryCounts/InventoryCountItems existieren
+        // nach der Migration und sind nutzbar.
+        await db.into(db.stockMovements).insert(
+              StockMovementsCompanion.insert(
+                id: 'stock-movement-nach-migration',
+                companyId: company.id,
+                articleId: article.id,
+                type: StockMovementType.inventoryCorrection,
+                quantityDelta: 3,
+                resultingQuantity: 3,
+                createdAt: DateTime.now(),
+              ),
+            );
+        await db.into(db.inventoryCounts).insert(
+              InventoryCountsCompanion.insert(
+                id: 'inventory-count-nach-migration',
+                companyId: company.id,
+                label: 'Testinventur',
+                date: DateTime.now(),
+                createdAt: DateTime.now(),
+              ),
+            );
+        await db.into(db.inventoryCountItems).insert(
+              InventoryCountItemsCompanion.insert(
+                id: 'inventory-count-item-nach-migration',
+                inventoryCountId: 'inventory-count-nach-migration',
+                articleId: article.id,
+                expectedQuantity: 0,
+              ),
+            );
+        final createdInventoryCountItem = await (db.select(db.inventoryCountItems)
+              ..where((i) => i.id.equals('inventory-count-item-nach-migration')))
+            .getSingle();
+        expect(createdInventoryCountItem.expectedQuantity, 0);
+        expect(createdInventoryCountItem.countedQuantity, isNull);
       } finally {
         await db.close();
       }

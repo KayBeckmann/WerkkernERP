@@ -271,4 +271,31 @@ void main() {
       );
     },
   );
+
+  test(
+    'C5.3: Finalisieren eines bestandsrelevanten Dokuments dokumentiert die Buchung im '
+    'Bewegungsprotokoll (Referenz = die vergebene Dokumentnummer)',
+    () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      await companies.update(company.copyWith(lagerbestandEnabled: true, ordersEnabled: true));
+      final customer = await customers.create(companyId: company.id, name: 'Testkunde');
+      final article = await articles.create(companyId: company.id, name: 'Steckdose');
+      await articles.setStock(companyId: company.id, id: article.id, newQuantity: 10);
+
+      final draft = await draftWithArticle(
+        companyId: company.id,
+        customerId: customer.id,
+        articleId: article.id,
+        quantity: '3',
+      );
+      final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+
+      final movements = await db.select(db.stockMovements).get();
+      expect(movements, hasLength(1));
+      expect(movements.single.type, StockMovementType.documentBooking);
+      expect(movements.single.quantityDelta, -3);
+      expect(movements.single.resultingQuantity, 7);
+      expect(movements.single.referenceLabel, finalized!.invoiceNumber);
+    },
+  );
 }

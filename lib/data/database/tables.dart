@@ -884,15 +884,47 @@ class PurchaseOrders extends Table {
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
 
-  /// Zeigt auf den finalisierten Auftrag, aus dem diese Bestellung per
-  /// "Aus Auftrag erstellen" entstanden ist (siehe
-  /// `PurchaseOrderRepository.createDraftsFromOrder()`). `null` für
-  /// eigenständig oder aus einer Mindestbestand-Meldung angelegte
-  /// Bestellungen. Reine Nachvollziehbarkeits-Markierung, keine
-  /// Geschäftslogik hängt daran — `onDelete: setNull`, eine gelöschte
-  /// Rechnung darf keine bereits angelegte Bestellung mitreißen.
+  /// Zugeordnetes Dokument (Auftrag/Rechnung/Angebot/...) — entweder
+  /// automatisch gesetzt beim Erstellen über "Aus Auftrag erstellen"
+  /// (siehe `PurchaseOrderRepository.createDraftsFromOrder()`), oder
+  /// seit dem Nachtrag 2026-10-19 ("Bestellungen sollen auch
+  /// Projekten/Aufträgen/Rechnungen zugeordnet werden können") zusätzlich
+  /// **manuell** im Entwurf wählbar (`PurchaseOrderRepository.
+  /// updateDraft()`, `relatedDocumentId`-Parameter) — unabhängig davon,
+  /// ob die Bestellung so entstanden ist. `null` für eigenständig oder
+  /// aus einer Mindestbestand-Meldung angelegte Bestellungen ohne
+  /// Dokumentbezug ("Lagerbestellung", siehe Roadmap C5.3: eine
+  /// Bestellung OHNE Projekt-/Dokumentzuordnung gilt automatisch als
+  /// Lagerbestellung, kein eigenes Kennzeichen nötig). Reine
+  /// Nachvollziehbarkeits-Markierung, keine Geschäftslogik (insbesondere
+  /// keine automatische Verrechnung) hängt daran — `onDelete: setNull`,
+  /// eine gelöschte Rechnung darf keine bereits angelegte Bestellung
+  /// mitreißen.
   TextColumn get sourceOrderId =>
       text().nullable().references(Invoices, #id, onDelete: KeyAction.setNull)();
+
+  /// C5.3 Projekt-Ergebnisrechnung (Nachtrag 2026-10-19, Kay-Entscheidung
+  /// auf Rückfrage: "Ja, echte Kostenzurechnung"). Anders als
+  /// [sourceOrderId] (reine Markierung) fließt diese Zuordnung ECHT in
+  /// die Projekt-Ergebnisrechnung ein — nicht direkt hier, sondern
+  /// indirekt: `PurchaseOrderRepository.receiveGoods()` übernimmt sie 1:1
+  /// in den automatisch erzeugten Beleg (`Expenses.projectId`), und
+  /// `ProjectDetailScreen._load()` summiert Belege nach `projectId`
+  /// bereits (siehe dort) — kein neuer Berechnungscode nötig. `onDelete:
+  /// setNull` wie überall in diesem Schema.
+  TextColumn get projectId =>
+      text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
+
+  /// C5.3 SKR03-Kontierung (Nachtrag 2026-10-19, Kay-Entscheidung auf
+  /// Rückfrage: "Beim Wareneingang, über Beleg-Kategorien"). Die
+  /// Kategorie, in der `receiveGoods()` den automatisch erzeugten Beleg
+  /// einträgt (siehe `ExpenseCategories.skr03Account`) — `null` = "ohne
+  /// Kategorie", gleiches Verhalten wie ein manuell erfasster Beleg ohne
+  /// Kategorie. Bewusst auf der Bestellung (nicht je Position): eine
+  /// Bestellung hat in der Praxis meist einheitliche Wareneinkäufe,
+  /// keine Überkonstruktion für diesen ersten Entwurf.
+  TextColumn get expenseCategoryId =>
+      text().nullable().references(ExpenseCategories, #id, onDelete: KeyAction.setNull)();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -933,4 +965,139 @@ class PurchaseOrderItems extends Table {
 
   @override
   Set<Column> get primaryKey => {id};
+}
+
+/// Auslöser einer Lagerbestand-Buchung — für das Bewegungsprotokoll
+/// (C5.3, Nachtrag 2026-10-19: "Das muss alles dokumentiert werden,
+/// damit es dem Finanzamt sauber gezeigt werden kann"). Rein
+/// informativ, steuert kein Verhalten.
+enum StockMovementType {
+  /// Finalisieren eines bestandsrelevanten Dokuments (Auftrag/Rechnung/
+  /// Lieferschein), siehe `stock_booking_service.dart` (C5.1).
+  documentBooking,
+
+  /// Wareneingang zu einer Bestellung, siehe
+  /// `PurchaseOrderRepository.receiveGoods()` (C5.2).
+  purchaseOrderReceipt,
+
+  /// Inventur-Korrektur, siehe [InventoryCounts]/`InventoryRepository`
+  /// (C5.3).
+  inventoryCorrection,
+}
+
+/// Lückenloses, **append-only** Bewegungsprotokoll jeder tatsächlichen
+/// Lagerbestand-Änderung (C5.3, Nachtrag 2026-10-19). Wird **nie**
+/// bearbeitet oder gelöscht — gleiches GoBD-Prinzip wie eine
+/// finalisierte Rechnung, nur von Anfang an unveränderlich statt erst
+/// nach einer Finalisierung. Jede Stelle, die [Articles.stockQuantity]
+/// tatsächlich schreibt, erzeugt **in derselben Transaktion** genau eine
+/// Zeile hier — `InvoiceRepository._bookStockOnFinalize()`,
+/// `PurchaseOrderRepository.receiveGoods()` und
+/// `InventoryRepository.complete()`. `ArticleRepository.setStock()`
+/// bleibt bewusst das reine Low-Level-Schreibwerkzeug ohne eigene
+/// Protokollierung — die Dokumentationspflicht liegt bei den
+/// aufrufenden fachlichen Vorgängen, nicht beim Low-Level-Setter
+/// (gleiches Trennungsprinzip wie überall in diesem Schema: die Tabelle
+/// kennt keine Geschäftsregel, das Repository/der Service tut es).
+class StockMovements extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get articleId =>
+      text().references(Articles, #id, onDelete: KeyAction.restrict)();
+  TextColumn get type => textEnum<StockMovementType>()();
+
+  /// Veränderung (vorzeichenbehaftet: negativ = Abgang, positiv =
+  /// Zugang) — nicht der Endbestand.
+  RealColumn get quantityDelta => real()();
+
+  /// Lagerbestand DIREKT NACH dieser Buchung — als Festwert mitgeführt
+  /// (nicht aus der Artikel-Tabelle nachträglich rekonstruiert), damit
+  /// das Protokoll auch dann korrekt bleibt, wenn `Articles.
+  /// stockQuantity` sich durch spätere Buchungen längst weiterbewegt
+  /// hat.
+  RealColumn get resultingQuantity => real()();
+
+  /// Freitext-Referenz auf den auslösenden Vorgang (z. B. Rechnungs-/
+  /// Bestellnummer oder Inventur-Bezeichnung) — `null` nur in
+  /// Ausnahmefällen (z. B. ein Entwurf, der nie eine Nummer bekommt, was
+  /// bei einer Buchung aber nicht vorkommen sollte, da nur finalisierte
+  /// Dokumente/abgeschlossene Vorgänge buchen).
+  TextColumn get referenceLabel => text().nullable()();
+
+  /// Zusätzliche Notiz, insbesondere der Pflicht-Grund einer
+  /// Inventur-Korrektur (siehe `InventoryRepository.
+  /// correctSingleArticleStock()`).
+  TextColumn get note => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Status eines Inventur-Laufs. `draft` ist frei bearbeitbar (Artikel
+/// hinzufügen, gezählte Mengen eintragen), `completed` hat die
+/// Differenzen gebucht und ist danach **unveränderlich** — gleiches
+/// F3-Prinzip wie bei jedem anderen Dokument dieser App.
+enum InventoryCountStatus { draft, completed }
+
+/// Ein Inventur-Lauf (C5.3, Nachtrag 2026-10-19: "Wir müssen auch
+/// Inventur vorsehen", Kay-Entscheidung auf Rückfrage: "Volle
+/// Inventur-Sitzung" statt nur einer dokumentierten Einzelkorrektur).
+/// Mehrere Artikel werden in EINEM Durchgang gezählt (Soll- vs.
+/// Ist-Menge je [InventoryCountItems]) und beim Abschließen gemeinsam
+/// als EIN dokumentierter Vorgang gebucht (siehe `InventoryRepository.
+/// complete()`) — jede dabei gebuchte Differenz erzeugt zusätzlich eine
+/// Zeile in [StockMovements]. Bewusst **ohne eigenen Nummernkreis**
+/// (anders als Rechnung/Bestellung) — [label] plus [date] reichen als
+/// Referenz, ein weiterer formatierter Zähler wäre für diesen Zweck
+/// Überkonstruktion (auch [Expenses] kommt ohne eigenen Nummernkreis
+/// aus).
+class InventoryCounts extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+
+  /// Freitext-Bezeichnung, z. B. "Jahresinventur 2026" oder bei einer
+  /// Einzelkorrektur automatisch der dort eingegebene Grund (siehe
+  /// `InventoryRepository.correctSingleArticleStock()`).
+  TextColumn get label => text()();
+  DateTimeColumn get date => dateTime()();
+  TextColumn get status =>
+      textEnum<InventoryCountStatus>().withDefault(Constant(InventoryCountStatus.draft.name))();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Eine gezählte Position eines Inventur-Laufs. [expectedQuantity] ist
+/// der Lagerbestand-Sollwert zum Zeitpunkt, an dem der Artikel dem Lauf
+/// hinzugefügt wurde (Schnappschuss — ändert sich der tatsächliche
+/// Bestand währenddessen durch einen anderen Vorgang, z. B. eine
+/// Rechnung, bleibt der hier festgehaltene Sollwert für den Vergleich
+/// unverändert, bis der Lauf abgeschlossen wird).
+class InventoryCountItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get inventoryCountId =>
+      text().references(InventoryCounts, #id, onDelete: KeyAction.cascade)();
+  TextColumn get articleId =>
+      text().references(Articles, #id, onDelete: KeyAction.restrict)();
+  RealColumn get expectedQuantity => real()();
+
+  /// `null` = noch nicht gezählt. `InventoryRepository.complete()`
+  /// bucht nur Positionen mit einer tatsächlich eingetragenen Menge und
+  /// einer echten Abweichung — eine nicht gezählte oder unveränderte
+  /// Position erzeugt keine [StockMovements]-Zeile.
+  RealColumn get countedQuantity => real().nullable()();
+  DateTimeColumn get countedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {inventoryCountId, articleId},
+      ];
 }

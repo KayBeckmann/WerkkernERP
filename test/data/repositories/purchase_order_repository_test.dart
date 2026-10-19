@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
@@ -6,8 +7,11 @@ import 'package:werkkernerp/data/database/tables.dart';
 import 'package:werkkernerp/data/repositories/article_repository.dart';
 import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/data/repositories/customer_repository.dart';
+import 'package:werkkernerp/data/repositories/expense_category_repository.dart';
+import 'package:werkkernerp/data/repositories/expense_repository.dart';
 import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
+import 'package:werkkernerp/data/repositories/project_repository.dart';
 import 'package:werkkernerp/data/repositories/purchase_order_repository.dart';
 import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 
@@ -22,6 +26,9 @@ void main() {
   late ArticleRepository articles;
   late InvoiceRepository invoices;
   late PurchaseOrderRepository purchaseOrders;
+  late ProjectRepository projects;
+  late ExpenseCategoryRepository expenseCategories;
+  late ExpenseRepository expenses;
 
   setUp(() {
     db = AppDatabase.forTesting(
@@ -33,6 +40,9 @@ void main() {
     articles = ArticleRepository(db);
     invoices = InvoiceRepository(db, NumberSequenceRepository(db));
     purchaseOrders = PurchaseOrderRepository(db, NumberSequenceRepository(db));
+    projects = ProjectRepository(db);
+    expenseCategories = ExpenseCategoryRepository(db);
+    expenses = ExpenseRepository(db);
   });
 
   tearDown(() async => db.close());
@@ -381,4 +391,162 @@ void main() {
       expect(suggestions.unassignable.single.articleId, articleWithoutPrice.id);
     },
   );
+
+  test(
+    'receiveGoods() dokumentiert jede Buchung im Bewegungsprotokoll und bucht einen Beleg über '
+    'den Wert GENAU dieses Wareneingangs (SKR03-Kategorie + Projekt von der Bestellung übernommen)',
+    () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      await companies.update(company.copyWith(projectsEnabled: true, buchhaltungEnabled: true));
+      final supplier = await suppliers.create(companyId: company.id, name: 'Großhandel Müller');
+      final article = await articles.create(companyId: company.id, name: 'Schrauben');
+      final project = await projects.create(companyId: company.id, name: 'Projekt Nord');
+      final category = await expenseCategories.create(
+        companyId: company.id,
+        label: 'Material/Wareneinkauf',
+        skr03Account: '3400',
+      );
+
+      final draft = await purchaseOrders.createDraft(
+        companyId: company.id,
+        supplierId: supplier.id,
+        issueDate: DateTime.now(),
+        projectId: project.id,
+        expenseCategoryId: category.id,
+        items: [
+          PurchaseOrderItemInput(
+            articleId: article.id,
+            description: 'Schrauben',
+            quantity: 100,
+            purchasePriceCents: 10,
+          ),
+        ],
+      );
+      final finalized = (await purchaseOrders.finalize(companyId: company.id, id: draft.id))!;
+      final itemId = (await purchaseOrders.itemsFor(finalized.id)).single.id;
+
+      // Erste Teillieferung: 60 Stück -> 6,00 €.
+      await purchaseOrders.receiveGoods(companyId: company.id, id: finalized.id, receipts: {itemId: 60});
+
+      final expensesAfterFirst = await expenses.listForCompany(company.id);
+      expect(expensesAfterFirst, hasLength(1));
+      expect(expensesAfterFirst.single.amountGrossCents, 600);
+      expect(expensesAfterFirst.single.categoryId, category.id);
+      expect(expensesAfterFirst.single.projectId, project.id);
+      expect(expensesAfterFirst.single.supplierReference, finalized.orderNumber);
+      expect(expensesAfterFirst.single.vatRatePercent, 0);
+
+      // Zweite Teillieferung: restliche 40 Stück -> ein ZWEITER,
+      // eigenständiger Beleg über 4,00 € (nicht der gesamte Auftragswert
+      // erneut) — jede Teillieferung bucht nur ihren eigenen Anteil.
+      await purchaseOrders.receiveGoods(companyId: company.id, id: finalized.id, receipts: {itemId: 40});
+      final expensesAfterSecond = await expenses.listForCompany(company.id);
+      expect(expensesAfterSecond, hasLength(2));
+      expect(
+        expensesAfterSecond.fold(0, (sum, e) => sum + e.amountGrossCents),
+        1000,
+        reason: 'Beide Teillieferungen zusammen ergeben den vollen Bestellwert',
+      );
+
+      final movements = await db.select(db.stockMovements).get();
+      expect(movements, hasLength(2));
+      expect(movements.every((m) => m.type == StockMovementType.purchaseOrderReceipt), isTrue);
+      expect(movements.every((m) => m.referenceLabel == finalized.orderNumber), isTrue);
+    },
+  );
+
+  test('receiveGoods() ohne bekannten Einkaufspreis bucht den Bestand, aber keinen Beleg', () async {
+    final company = await companies.create(name: 'Elektro Beckmann');
+    final supplier = await suppliers.create(companyId: company.id, name: 'Großhandel Müller');
+    final draft = await purchaseOrders.createDraft(
+      companyId: company.id,
+      supplierId: supplier.id,
+      issueDate: DateTime.now(),
+      items: [const PurchaseOrderItemInput(description: 'Ad-hoc-Position', quantity: 10)],
+    );
+    final finalized = (await purchaseOrders.finalize(companyId: company.id, id: draft.id))!;
+    final itemId = (await purchaseOrders.itemsFor(finalized.id)).single.id;
+
+    await purchaseOrders.receiveGoods(companyId: company.id, id: finalized.id, receipts: {itemId: 10});
+
+    expect(await expenses.listForCompany(company.id), isEmpty);
+  });
+
+  test(
+    'createDraftsFromOrder() übernimmt die Projektzuordnung des Auftrags automatisch in die '
+    'erzeugte(n) Bestellung(en)',
+    () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      await companies.update(company.copyWith(ordersEnabled: true, projectsEnabled: true));
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final supplier = await suppliers.create(companyId: company.id, name: 'Lieferant');
+      final article = await articles.create(companyId: company.id, name: 'Artikel');
+      final project = await projects.create(companyId: company.id, name: 'Projekt Süd');
+      await articles.setSupplierPrice(
+        companyId: company.id,
+        articleId: article.id,
+        supplierId: supplier.id,
+        purchasePriceCents: 100,
+      );
+
+      final orderDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        kind: DocumentKind.order,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        projectId: project.id,
+        items: [
+          InvoiceItemInput(
+            kind: InvoiceItemKind.article,
+            articleId: article.id,
+            description: 'Position',
+            quantity: Decimal.one,
+            unitPriceCents: 1000,
+            vatRatePercent: 19,
+          ),
+        ],
+      );
+      final order = (await invoices.finalize(companyId: company.id, id: orderDraft.id))!;
+
+      final result = await purchaseOrders.createDraftsFromOrder(
+        companyId: company.id,
+        sourceOrderId: order.id,
+        mode: PurchaseOrderCreationMode.cheapestPerSupplier,
+      );
+
+      expect(result.drafts.single.projectId, project.id);
+    },
+  );
+
+  test('updateDraft() kann Projekt/Kategorie/Dokumentzuordnung setzen und per Value(null) wieder entfernen',
+      () async {
+    final company = await companies.create(name: 'Elektro Beckmann');
+    await companies.update(company.copyWith(projectsEnabled: true, buchhaltungEnabled: true));
+    final supplier = await suppliers.create(companyId: company.id, name: 'Lieferant');
+    final project = await projects.create(companyId: company.id, name: 'Projekt West');
+    final category = await expenseCategories.create(companyId: company.id, label: 'Material');
+    final draft = await purchaseOrders.createDraft(
+      companyId: company.id,
+      supplierId: supplier.id,
+      issueDate: DateTime.now(),
+    );
+
+    final updated = await purchaseOrders.updateDraft(
+      companyId: company.id,
+      id: draft.id,
+      projectId: Value(project.id),
+      expenseCategoryId: Value(category.id),
+    );
+    expect(updated!.projectId, project.id);
+    expect(updated.expenseCategoryId, category.id);
+
+    final cleared = await purchaseOrders.updateDraft(
+      companyId: company.id,
+      id: draft.id,
+      projectId: const Value(null),
+    );
+    expect(cleared!.projectId, isNull);
+    expect(cleared.expenseCategoryId, category.id, reason: 'Value.absent() lässt die Kategorie unberührt');
+  });
 }

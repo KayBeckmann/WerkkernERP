@@ -155,6 +155,12 @@ class PurchaseOrderRepository {
     required DateTime issueDate,
     String? notes,
     String? sourceOrderId,
+    // C5.3 Projekt-Ergebnisrechnung/SKR03-Kontierung (Nachtrag
+    // 2026-10-19) — beides optional, `null` = keine Zuordnung
+    // ("Lagerbestellung", siehe Doc-Kommentar bei
+    // `PurchaseOrders.sourceOrderId`).
+    String? projectId,
+    String? expenseCategoryId,
     List<PurchaseOrderItemInput> items = const [],
   }) async {
     final id = _uuid.v4();
@@ -168,6 +174,8 @@ class PurchaseOrderRepository {
               issueDate: issueDate,
               notes: Value(notes),
               sourceOrderId: Value(sourceOrderId),
+              projectId: Value(projectId),
+              expenseCategoryId: Value(expenseCategoryId),
               createdAt: now,
               updatedAt: now,
             ),
@@ -179,13 +187,20 @@ class PurchaseOrderRepository {
 
   /// `null`, wenn die Bestellung nicht existiert oder bereits
   /// finalisiert ist (gleiches Verhalten wie `InvoiceRepository.update`
-  /// bei einem nicht mehr editierbaren Dokument).
+  /// bei einem nicht mehr editierbaren Dokument). [projectId]/
+  /// [expenseCategoryId]/[relatedDocumentId] folgen dem `Value`-Muster
+  /// (`Value.absent()` = unverändert, `Value(null)` = Zuordnung
+  /// entfernen) — anders als die übrigen Felder hier brauchen optionale
+  /// Zuordnungen ein echtes "wieder entfernen".
   Future<PurchaseOrder?> updateDraft({
     required String companyId,
     required String id,
     DateTime? issueDate,
     String? notes,
     String? supplierId,
+    Value<String?> projectId = const Value.absent(),
+    Value<String?> expenseCategoryId = const Value.absent(),
+    Value<String?> relatedDocumentId = const Value.absent(),
     List<PurchaseOrderItemInput>? items,
   }) async {
     return _db.transaction(() async {
@@ -196,6 +211,9 @@ class PurchaseOrderRepository {
           issueDate: issueDate == null ? const Value.absent() : Value(issueDate),
           notes: Value(notes ?? existing.notes),
           supplierId: supplierId == null ? const Value.absent() : Value(supplierId),
+          projectId: projectId,
+          expenseCategoryId: expenseCategoryId,
+          sourceOrderId: relatedDocumentId,
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -268,6 +286,25 @@ class PurchaseOrderRepository {
   /// Position — anders als die "nur warnen"-Entscheidung bei C5.1 ist
   /// ein Wareneingang über die bestellte Menge hinaus kein plausibler
   /// Geschäftsvorgang, sondern ein Eingabefehler, der blockiert gehört.
+  ///
+  /// C5.3 (Nachtrag 2026-10-19, Kay-Entscheidung auf Rückfrage "Beim
+  /// Wareneingang, über Beleg-Kategorien"): bucht zusätzlich — in
+  /// derselben Transaktion — je bewegtem Artikel eine unveränderliche
+  /// [StockMovements]-Zeile sowie, wenn mindestens eine Position einen
+  /// bekannten Einkaufspreis hat, **einen** automatischen Beleg
+  /// (`Expenses`) über den Wert genau DIESES Wareneingangs (nicht der
+  /// gesamten Bestellung — eine Teillieferung bucht nur ihren eigenen
+  /// Anteil, im richtigen Zeitraum). Übernimmt `expenseCategoryId`
+  /// (SKR03-Konto) und `projectId` 1:1 von der Bestellung — Letzteres
+  /// ist der Mechanismus, über den eine zugeordnete Bestellung ECHT in
+  /// die Projekt-Ergebnisrechnung einfließt (`ProjectDetailScreen`
+  /// summiert Belege nach `projectId` bereits, kein neuer
+  /// Berechnungscode nötig). Vereinfachung, bewusst dokumentiert: der
+  /// Beleg wird ohne Umsatzsteuer gebucht (`vatRatePercent: 0`), da
+  /// Bestellungen in diesem ersten Entwurf keine USt. erfassen (siehe
+  /// `purchase_order_pdf_builder.dart`) — der erzeugte Beleg ist wie
+  /// jeder andere danach frei editierbar, falls eine Korrektur nötig
+  /// ist (anders als eine finalisierte Rechnung).
   Future<PurchaseOrder?> receiveGoods({
     required String companyId,
     required String id,
@@ -283,6 +320,8 @@ class PurchaseOrderRepository {
 
       final items = await itemsFor(id);
       final itemsById = {for (final item in items) item.id: item};
+      var receivedValueCents = 0;
+      final now = DateTime.now();
 
       for (final entry in receipts.entries) {
         if (entry.value <= 0) continue;
@@ -299,16 +338,49 @@ class PurchaseOrderRepository {
         }
         await (_db.update(_db.purchaseOrderItems)..where((i) => i.id.equals(item.id)))
             .write(PurchaseOrderItemsCompanion(receivedQuantity: Value(newReceived)));
+        if (item.purchasePriceCents != null) {
+          receivedValueCents += (item.purchasePriceCents! * entry.value).round();
+        }
 
         if (item.articleId != null) {
           final article = await (_db.select(_db.articles)..where((a) => a.id.equals(item.articleId!)))
               .getSingleOrNull();
           if (article != null) {
-            await (_db.update(_db.articles)..where((a) => a.id.equals(article.id))).write(
-              ArticlesCompanion(stockQuantity: Value(article.stockQuantity + entry.value)),
-            );
+            final newStock = article.stockQuantity + entry.value;
+            await (_db.update(_db.articles)..where((a) => a.id.equals(article.id)))
+                .write(ArticlesCompanion(stockQuantity: Value(newStock)));
+            await _db.into(_db.stockMovements).insert(
+                  StockMovementsCompanion.insert(
+                    id: _uuid.v4(),
+                    companyId: companyId,
+                    articleId: article.id,
+                    type: StockMovementType.purchaseOrderReceipt,
+                    quantityDelta: entry.value,
+                    resultingQuantity: newStock,
+                    referenceLabel: Value(order.orderNumber),
+                    createdAt: now,
+                  ),
+                );
           }
         }
+      }
+
+      if (receivedValueCents > 0) {
+        await _db.into(_db.expenses).insert(
+              ExpensesCompanion.insert(
+                id: _uuid.v4(),
+                companyId: companyId,
+                date: now,
+                description: 'Wareneingang zu Bestellung ${order.orderNumber ?? order.id}',
+                amountGrossCents: receivedValueCents,
+                vatRatePercent: 0,
+                categoryId: Value(order.expenseCategoryId),
+                supplierReference: Value(order.orderNumber),
+                projectId: Value(order.projectId),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
       }
 
       final updatedItems = await itemsFor(id);
@@ -320,7 +392,7 @@ class PurchaseOrderRepository {
               ? PurchaseOrderStatus.partiallyReceived
               : order.status;
       await (_db.update(_db.purchaseOrders)..where((p) => p.id.equals(id))).write(
-        PurchaseOrdersCompanion(status: Value(newStatus), updatedAt: Value(DateTime.now())),
+        PurchaseOrdersCompanion(status: Value(newStatus), updatedAt: Value(now)),
       );
       return findById(companyId: companyId, id: id);
     });
@@ -401,6 +473,7 @@ class PurchaseOrderRepository {
               supplierId: supplierId!,
               issueDate: DateTime.now(),
               sourceOrderId: sourceOrderId,
+              projectId: order.projectId,
               items: itemInputs,
             ),
           );
@@ -439,6 +512,7 @@ class PurchaseOrderRepository {
               supplierId: supplierEntry.key,
               issueDate: DateTime.now(),
               sourceOrderId: sourceOrderId,
+              projectId: order.projectId,
               items: supplierEntry.value,
             ),
           );
