@@ -34,6 +34,8 @@ void main() {
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(SidebarNavItem, 'Gutschriften'), findsNothing);
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Gutschriften'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(SidebarNavItem, 'Gutschriften'), findsOneWidget);

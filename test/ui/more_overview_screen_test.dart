@@ -42,6 +42,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       for (final module in [
         'Angebote',
         'Aufträge',
@@ -65,6 +67,12 @@ void main() {
         await tester.tap(finder);
         await tester.pumpAndSettle();
       }
+
+      // Zurück von der "Module"-Unterseite auf die Einstellungen-
+      // Hauptseite — die Unterseite hat ein eigenes Scaffold/AppBar und
+      // überdeckt dabei auch die äußere Bottom-Bar.
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
 
       expect(find.byType(NavigationDestination), findsNWidgets(4));
       expect(find.text('Dashboard'), findsWidgets);

@@ -61,6 +61,8 @@ void main() {
       // Dashboard erscheinen.
       await tester.tap(_sidebarItem('Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Projekte'));
       await tester.pumpAndSettle();
 

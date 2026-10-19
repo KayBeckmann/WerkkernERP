@@ -71,6 +71,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Einstellungen'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Darstellung'));
+    await tester.pumpAndSettle();
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.themeMode, ThemeMode.system);
@@ -100,12 +102,16 @@ void main() {
 
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Darstellung'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Hell'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Rechnungen'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Darstellung'));
       await tester.pumpAndSettle();
 
       final app = tester.widget<MaterialApp>(find.byType(MaterialApp));

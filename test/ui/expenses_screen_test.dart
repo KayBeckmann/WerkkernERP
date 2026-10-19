@@ -22,6 +22,8 @@ Future<void> _createCompanyAndEnableBuchhaltung(WidgetTester tester) async {
 
   await tester.tap(_sidebarItem('Einstellungen'));
   await tester.pumpAndSettle();
+  await tester.tap(find.text('Module'));
+  await tester.pumpAndSettle();
   await tester.tap(find.widgetWithText(SwitchListTile, 'Buchhaltung'));
   await tester.pumpAndSettle();
 }

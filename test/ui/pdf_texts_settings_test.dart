@@ -31,6 +31,8 @@ void main() {
 
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Dokumenttexte'));
+      await tester.pumpAndSettle();
 
       // Standardmäßig ist nur die Rechnung aktiv (A0-Prinzip) — nur ihr
       // Textpaar ist sichtbar (Kay-Nachtrag, zweiter Nachtrag: "pro
@@ -57,6 +59,8 @@ void main() {
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Rechnungen'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Dokumenttexte'));
       await tester.pumpAndSettle();
 
       expect(find.text('Vielen Dank für Ihren Auftrag.'), findsOneWidget);

@@ -34,6 +34,8 @@ void main() {
 
       await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Angebote'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Aufträge'));

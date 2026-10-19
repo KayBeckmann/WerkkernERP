@@ -46,6 +46,8 @@ void main() {
 
       await tester.tap(_sidebarItem('Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       expect(find.widgetWithText(SwitchListTile, 'Angebote'), findsOneWidget);
       expect(find.widgetWithText(SwitchListTile, 'Aufträge'), findsOneWidget);
     },
@@ -62,6 +64,8 @@ void main() {
 
       await tester.tap(_sidebarItem('Einstellungen'));
       await tester.pumpAndSettle();
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Angebote'));
       await tester.pumpAndSettle();
 
@@ -74,6 +78,8 @@ void main() {
       // Wieder in die Einstellungen und deaktivieren -> Tab verschwindet
       // erneut aus der Sidebar (Daten selbst prüft document_kind_test.dart).
       await tester.tap(_sidebarItem('Einstellungen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Module'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Angebote'));
       await tester.pumpAndSettle();
@@ -92,6 +98,8 @@ void main() {
       await _createCompanyAndEnter(tester);
 
       await tester.tap(_sidebarItem('Einstellungen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Module'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(SwitchListTile, 'Angebote'));
       await tester.pumpAndSettle();
