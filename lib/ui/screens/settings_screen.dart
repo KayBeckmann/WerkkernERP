@@ -218,6 +218,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  /// Nachtrag 2026-10-18 (Kleinunternehmerregelung §19 UStG) — bewusst
+  /// kein `setModules()`-Parameter: das ist kein Dokumentart-Modul,
+  /// sondern eine Steuer-Arbeitsvorgabe, die quer durch alle
+  /// Dokumentarten wirkt (siehe `invoice_item_dialog.dart`/
+  /// `invoice_pdf_builder.dart`).
+  Future<void> _setSmallBusinessExempt(bool value) async {
+    final service = context.read<ActiveCompanyService>();
+    final company = service.active;
+    if (company == null) return;
+    setState(() => _busy = true);
+    try {
+      await context.read<CompanyRepository>().update(
+            company.copyWith(isSmallBusinessExempt: value),
+          );
+      await service.refreshActive();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   String? _textOrNull(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
 
   /// Speichert alle Textfelder — Einleitung/Schluss je Dokumentart
@@ -575,6 +595,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Gutschriften'),
                     value: company.creditNotesEnabled,
                     onChanged: _busy ? null : (value) => _setModule(creditNotesEnabled: value),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SectionLabel('Umsatzsteuer'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Arbeitsvorgabe, keine Steuerberatung (F1) — bitte mit deinem '
+                    'Steuerberater bestätigen, dass die Kleinunternehmerregelung tatsächlich '
+                    'zutrifft, bevor du diesen Schalter aktivierst.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Kleinunternehmer nach § 19 UStG'),
+                    subtitle: const Text(
+                      'Neue Positionen erhalten automatisch 0 % USt, das PDF zeigt den '
+                      'gesetzlichen Hinweis.',
+                    ),
+                    value: company.isSmallBusinessExempt,
+                    onChanged: _busy ? null : _setSmallBusinessExempt,
                   ),
                 ],
               ),

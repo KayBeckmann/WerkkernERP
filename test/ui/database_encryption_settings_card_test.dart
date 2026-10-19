@@ -67,7 +67,7 @@ void main() {
     'Datenbank verschlüsseln aktivieren (Geräteschlüssel), Übernehmen zeigt einen '
     'Neustart-Hinweis und der Schalter bleibt danach an',
     (tester) async {
-      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.physicalSize = const Size(1200, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
@@ -125,7 +125,7 @@ void main() {
   testWidgets(
     'Verschlüsselung mit Passwort ohne Bestätigung zeigt einen Fehlerhinweis statt zu übernehmen',
     (tester) async {
-      tester.view.physicalSize = const Size(1200, 2400);
+      tester.view.physicalSize = const Size(1200, 3000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 

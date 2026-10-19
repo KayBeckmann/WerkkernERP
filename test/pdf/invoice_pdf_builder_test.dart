@@ -44,7 +44,13 @@ void main() {
         paymentStatus: PaymentStatus.open,
       );
 
-  Company testCompany({String? pdfIntroText, String? pdfClosingText, String? pdfFooterText}) => Company(
+  Company testCompany({
+    String? pdfIntroText,
+    String? pdfClosingText,
+    String? pdfFooterText,
+    bool isSmallBusinessExempt = false,
+  }) =>
+      Company(
         id: 'company-1',
         name: 'Elektro Beckmann',
         address: 'Musterstraße 1, 23966 Wismar',
@@ -79,6 +85,7 @@ void main() {
         bankCsvDecimalSeparator: ',',
         datevSachkontenlaenge: 4,
         creditNotesEnabled: false,
+        isSmallBusinessExempt: isSmallBusinessExempt,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,
@@ -263,6 +270,36 @@ void main() {
       );
       expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
       expect(bytes.length, greaterThan(1000));
+    },
+  );
+
+  test(
+    'Nachtrag 2026-10-18 (Kleinunternehmerregelung §19 UStG): PDF wird ohne Fehler erzeugt, auch '
+    'mit dem zusätzlichen gesetzlichen Hinweis (Text-/Layoutprüfung bleibt manuell, siehe '
+    'Prüfstrategie oben — hier nur Fehlerfreiheit)',
+    () async {
+      final invoice = draftInvoice(invoiceNumber: 'R-26007');
+      final bytes = await buildInvoicePdf(
+        invoice: invoice,
+        items: [item(description: 'Beratung', price: 10000)],
+        company: testCompany(isSmallBusinessExempt: true),
+      );
+      expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
+      expect(bytes.length, greaterThan(1000));
+    },
+  );
+
+  test(
+    'Kleinunternehmerregelung: Lieferschein-PDF (ohne Preise/Summen) bekommt keinen '
+    'USt-Hinweis-Absturz, obwohl der Schalter aktiv ist',
+    () async {
+      final invoice = draftInvoice(invoiceNumber: 'LS-26002', kind: DocumentKind.deliveryNote);
+      final bytes = await buildInvoicePdf(
+        invoice: invoice,
+        items: [item(description: 'Material')],
+        company: testCompany(isSmallBusinessExempt: true),
+      );
+      expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
     },
   );
 }

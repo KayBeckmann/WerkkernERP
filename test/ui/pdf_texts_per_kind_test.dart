@@ -19,8 +19,9 @@ void main() {
       // C10 (Kay-Priorisierungsentscheidung 2026-10-17) fügt einen vierten
       // Modul-Schalter hinzu — die Einstellungen-Seite braucht dadurch
       // mehr Höhe, um "Speichern" noch innerhalb des Testviewports zu
-      // treffen (sonst Tap-Miss außerhalb des Render-Baums).
-      tester.view.physicalSize = const Size(1200, 1800);
+      // treffen (sonst Tap-Miss außerhalb des Render-Baums). Nachtrag
+      // 2026-10-18 (Kleinunternehmer-Abschnitt) braucht noch mehr Höhe.
+      tester.view.physicalSize = const Size(1200, 2000);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
