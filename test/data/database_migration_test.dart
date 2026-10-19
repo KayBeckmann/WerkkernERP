@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/data/database/tables.dart';
+import 'package:werkkernerp/data/repositories/article_repository.dart';
 import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/data/repositories/customer_repository.dart';
 import 'package:werkkernerp/data/repositories/invoice_repository.dart';
@@ -25,7 +26,8 @@ import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 /// SMTP-Versand; v16→v17: C14 Buchhaltung-Modulschalter; v17→v18:
 /// C14.2 Belege/Ausgaben; v18→v19: C14.4 Bankabgleich/CSV; v19→v20:
 /// C14.5 DATEV-Export; v20→v21: Gutschriften mit eigenem Nummernkreis +
-/// optionale Projektzuordnung bei Belegen, Kay-Entscheidung 2026-10-19).
+/// optionale Projektzuordnung bei Belegen, Kay-Entscheidung 2026-10-19;
+/// v21→v22: Artikel deaktivierbar, Nachtrag 2026-10-18).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -49,13 +51,13 @@ void main() {
   });
 
   test(
-    'Migration v1→v21 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v22 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
     'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
     'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export + Gutschriften/Projektzuordnung '
-    'Belege): Bestandsdaten '
+    'Belege + Artikel deaktivierbar): Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
     () async {
@@ -68,6 +70,7 @@ void main() {
       final companyRepo = CompanyRepository(db);
       final customerRepo = CustomerRepository(db);
       final invoiceRepo = InvoiceRepository(db, NumberSequenceRepository(db));
+      final articleRepo = ArticleRepository(db);
 
       final company = await companyRepo.create(name: 'Migrations-Testfirma');
       final customer = await customerRepo.create(
@@ -75,6 +78,7 @@ void main() {
         name: 'Bestandskunde',
         address: 'Alte Anschrift 1',
       );
+      final article = await articleRepo.create(companyId: company.id, name: 'Bestandsartikel');
       final invoice = await invoiceRepo.createDraft(
         companyId: company.id,
         customerId: customer.id,
@@ -211,6 +215,8 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN credit_notes_enabled;');
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_credit_note;');
       raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_credit_note;');
+      // v21 -> v22 (Artikel deaktivierbar, Nachtrag 2026-10-18):
+      raw.execute('ALTER TABLE articles DROP COLUMN active;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -422,6 +428,19 @@ void main() {
         expect(
           migratedItem.description,
           'Bestandsposition',
+          reason: 'Bestandsdaten dürfen nicht verändert werden',
+        );
+
+        final migratedArticle =
+            await (db.select(db.articles)..where((a) => a.id.equals(article.id))).getSingle();
+        expect(
+          migratedArticle.active,
+          isTrue,
+          reason: 'Bestandsartikel gelten nach der Migration als aktiv (withDefault(true))',
+        );
+        expect(
+          migratedArticle.name,
+          'Bestandsartikel',
           reason: 'Bestandsdaten dürfen nicht verändert werden',
         );
       } finally {

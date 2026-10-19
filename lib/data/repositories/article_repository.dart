@@ -18,8 +18,13 @@ class ArticleRepository {
   final AppDatabase _db;
   static const _uuid = Uuid();
 
-  Future<List<Article>> listForCompany(String companyId) =>
-      (_db.select(_db.articles)..where((a) => a.companyId.equals(companyId))).get();
+  Future<List<Article>> listForCompany(String companyId, {bool includeInactive = false}) {
+    final query = _db.select(_db.articles)..where((a) => a.companyId.equals(companyId));
+    if (!includeInactive) {
+      query.where((a) => a.active.equals(true));
+    }
+    return query.get();
+  }
 
   Future<Article?> findById({required String companyId, required String id}) =>
       (_db.select(_db.articles)
@@ -48,6 +53,45 @@ class ArticleRepository {
           ),
         );
     return (await findById(companyId: companyId, id: id))!;
+  }
+
+  /// Nachtrag 2026-10-18: "Artikel können nicht nachträglich bearbeitet
+  /// werden." Wie bei [CustomerRepository]/[SupplierRepository]:
+  /// `Value.absent()` = unverändert, `Value(null)` = Zuordnung
+  /// entfernen (bei [articleGroupId]/[defaultSupplierId]/
+  /// [manualSalePriceCents]).
+  Future<Article?> update({
+    required String companyId,
+    required String id,
+    String? name,
+    Value<String?> unit = const Value.absent(),
+    Value<String?> articleGroupId = const Value.absent(),
+    Value<String?> defaultSupplierId = const Value.absent(),
+    Value<int?> manualSalePriceCents = const Value.absent(),
+  }) async {
+    final existing = await findById(companyId: companyId, id: id);
+    if (existing == null) return null;
+    await (_db.update(_db.articles)..where((a) => a.id.equals(id))).write(
+      ArticlesCompanion(
+        name: name == null ? const Value.absent() : Value(name),
+        unit: unit,
+        articleGroupId: articleGroupId,
+        defaultSupplierId: defaultSupplierId,
+        manualSalePriceCents: manualSalePriceCents,
+      ),
+    );
+    return findById(companyId: companyId, id: id);
+  }
+
+  /// Deaktivieren statt löschen (Nachtrag 2026-10-18: "Artikel müssen
+  /// deaktiviert werden können, wenn der Hersteller sie abkündigt") —
+  /// bereits erfasste Positionen bleiben unverändert, der Artikel
+  /// verschwindet nur aus Auswahllisten für neue Positionen.
+  Future<bool> setActive({required String companyId, required String id, required bool active}) async {
+    final rows = await (_db.update(_db.articles)
+          ..where((a) => a.id.equals(id) & a.companyId.equals(companyId)))
+        .write(ArticlesCompanion(active: Value(active)));
+    return rows > 0;
   }
 
   /// Legt den Einkaufspreis eines Artikels bei einem Lieferanten an oder

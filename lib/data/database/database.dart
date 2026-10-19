@@ -40,7 +40,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -230,6 +230,12 @@ class AppDatabase extends _$AppDatabase {
             if (from >= 18) {
               await migrator.addColumn(expenses, expenses.projectId);
             }
+          }
+          if (from < 22) {
+            // Nachtrag 2026-10-18: Artikel müssen deaktiviert werden
+            // können — `articles` existiert seit v1, hier reicht ein
+            // einfaches addColumn.
+            await migrator.addColumn(articles, articles.active);
           }
         },
       );
