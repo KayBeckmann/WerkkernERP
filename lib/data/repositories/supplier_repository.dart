@@ -28,6 +28,10 @@ class SupplierRepository {
     String? vatId,
     String? contactPerson,
     String? notes,
+    // C5.2 Bestellwesen (Nachtrag 2026-10-19) — `null` = keine MOQ
+    // bekannt, siehe Doc-Kommentar bei `Suppliers.minimumOrderQuantity`.
+    double? minimumOrderQuantity,
+    String? deliveryTerms,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.suppliers).insert(
@@ -41,6 +45,8 @@ class SupplierRepository {
             vatId: Value(vatId),
             contactPerson: Value(contactPerson),
             notes: Value(notes),
+            minimumOrderQuantity: Value(minimumOrderQuantity),
+            deliveryTerms: Value(deliveryTerms),
             createdAt: DateTime.now(),
           ),
         );
