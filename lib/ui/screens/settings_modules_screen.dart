@@ -32,6 +32,7 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
     bool? creditNotesEnabled,
     bool? lagerbestandEnabled,
     bool? bestellwesenEnabled,
+    bool? timeTrackingEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -61,6 +62,7 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
             // Bestellwesen nicht aktiviert bleiben.
             bestellwesenEnabled:
                 newLagerbestandEnabled ? (bestellwesenEnabled ?? company.bestellwesenEnabled) : false,
+            timeTrackingEnabled: timeTrackingEnabled ?? company.timeTrackingEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -179,6 +181,12 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
                     onChanged: !_busy && company.lagerbestandEnabled
                         ? (value) => _setModule(bestellwesenEnabled: value)
                         : null,
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Zeiterfassung'),
+                    value: company.timeTrackingEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(timeTrackingEnabled: value),
                   ),
                 ],
               ),

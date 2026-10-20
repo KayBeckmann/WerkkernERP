@@ -88,6 +88,7 @@ void main() {
         isSmallBusinessExempt: isSmallBusinessExempt,
         lagerbestandEnabled: false,
         bestellwesenEnabled: false,
+        timeTrackingEnabled: false,
         pdfIntroText: pdfIntroText,
         pdfClosingText: pdfClosingText,
         pdfFooterText: pdfFooterText,

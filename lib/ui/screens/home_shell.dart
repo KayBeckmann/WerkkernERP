@@ -19,6 +19,7 @@ import 'open_items_screen.dart';
 import 'inventory_counts_screen.dart';
 import 'projects_screen.dart';
 import 'purchase_orders_screen.dart';
+import 'time_entries_screen.dart';
 import 'recurring_invoice_templates_screen.dart';
 import 'settings_screen.dart';
 import 'suppliers_screen.dart';
@@ -49,6 +50,7 @@ enum _TabId {
   vehicles,
   purchaseOrders,
   inventoryCounts,
+  timeEntries,
   recurringTemplates,
   openItems,
   expenses,
@@ -274,6 +276,15 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icons.fact_check_outlined,
             title: 'Inventur',
             screen: InventoryCountsScreen(),
+            section: _Section.stammdaten,
+          ),
+        // C3.1 Zeiterfassung (Nachtrag 2026-10-20).
+        if (company.timeTrackingEnabled)
+          const _Tab(
+            id: _TabId.timeEntries,
+            icon: Icons.schedule_outlined,
+            title: 'Zeiterfassung',
+            screen: TimeEntriesScreen(),
             section: _Section.stammdaten,
           ),
         // C14.1 Offene-Posten-Übersicht (Kay-Priorisierungsentscheidung

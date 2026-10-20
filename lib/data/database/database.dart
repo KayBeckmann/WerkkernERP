@@ -33,6 +33,8 @@ part 'database.g.dart';
     StockMovements,
     InventoryCounts,
     InventoryCountItems,
+    StaffRoles,
+    TimeEntries,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -45,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 26;
+  int get schemaVersion => 27;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -284,6 +286,15 @@ class AppDatabase extends _$AppDatabase {
               await migrator.addColumn(purchaseOrders, purchaseOrders.projectId);
               await migrator.addColumn(purchaseOrders, purchaseOrders.expenseCategoryId);
             }
+          }
+          if (from < 27) {
+            // C3.1 Zeiterfassungs-Grundlage (Nachtrag 2026-10-20).
+            // timeEntries referenziert staffRoles/invoices/projects (alle
+            // seit vorherigen Versionen bzw. v1 vorhanden) — muss also
+            // nach staffRoles angelegt werden.
+            await migrator.addColumn(companies, companies.timeTrackingEnabled);
+            await migrator.createTable(staffRoles);
+            await migrator.createTable(timeEntries);
           }
         },
       );

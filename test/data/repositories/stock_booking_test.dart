@@ -76,6 +76,7 @@ void main() {
         creditNotesEnabled: false,
         lagerbestandEnabled: false,
         bestellwesenEnabled: false,
+        timeTrackingEnabled: false,
       );
       final customer = await customers.create(companyId: company.id, name: 'Testkunde');
       final article = await articles.create(companyId: company.id, name: 'Steckdose', minimumStock: 5);
