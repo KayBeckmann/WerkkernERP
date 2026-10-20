@@ -212,6 +212,12 @@ class Companies extends Table {
   /// hat. Default aus.
   BoolColumn get bestellwesenEnabled => boolean().withDefault(const Constant(false))();
 
+  /// C3 Zeiterfassung (Nachtrag 2026-10-20: "Gibt es schon eine
+  /// Möglichkeit Zeiten zu buchen?"). Unabhängiger Schalter wie die
+  /// übrigen optionalen Module, Default aus. Siehe [StaffRoles]/
+  /// [TimeEntries] für das Datenmodell.
+  BoolColumn get timeTrackingEnabled => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1100,4 +1106,77 @@ class InventoryCountItems extends Table {
   List<Set<Column>> get uniqueKeys => [
         {inventoryCountId, articleId},
       ];
+}
+
+/// Rollen-Stamm für die Zeiterfassung (C3, Nachtrag 2026-10-20,
+/// Kay-Entscheidung auf Rückfrage: "Setze es bitte so um, dass es im
+/// Standalone ohne [Personen-]Bezug ist... Stundensätze werden dann
+/// gruppiert (Monteur, Meister, Projektleiter -> kann bearbeitet
+/// werden)"). Bewusst **keine Mitarbeiter-Stammdaten mit Namen** — das
+/// würde ein Login-/Mehrbenutzer-Konzept voraussetzen, das diese App
+/// laut A0 explizit nicht hat. Eine Rolle ist nur eine frei benennbare
+/// Stundensatz-Kategorie (Default-Vorschläge "Monteur"/"Meister"/
+/// "Projektleiter", gleiches lazy-Seed-Prinzip wie
+/// `ExpenseCategoryRepository.seedDefaultsIfNeverSeeded()`), eine
+/// [TimeEntries]-Buchung referenziert optional eine Rolle, nie eine
+/// Person. **Vorbereitet, aber nicht umgesetzt:** Phase B (Online-
+/// Multi-User) soll später echte Benutzerkonten mit je eigenem/
+/// abweichendem Stundensatz bekommen — dieses Rollenmodell bleibt dafür
+/// wiederverwendbar (ein Benutzer könnte einer Rolle zugeordnet werden),
+/// ist aber nicht Teil dieses Schritts.
+class StaffRoles extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+
+  /// Stundenkostensatz in Minor Units/Cent (F2-Muster) — Kays eigene
+  /// Angabe, nicht von dieser App vorgegeben. Default 0, nicht
+  /// nullable: eine Rolle ohne bewusst eingetragenen Satz kostet
+  /// explizit nichts, statt einen unbekannten/geratenen Wert
+  /// vorzutäuschen.
+  IntColumn get hourlyCostRateCents => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Eine Zeitbuchung (C3 Zeiterfassung, Nachtrag 2026-10-20: "Der
+/// Monteur muss seine Zeiten buchen können: Auftrag / Rechnung /
+/// Projekt"). [invoiceId] deckt sowohl Auftrag als auch Rechnung ab
+/// (beide sind [Invoices]-Zeilen, nur mit anderem `kind`, siehe
+/// [DocumentKind]). Mindestens eines von [invoiceId]/[projectId] ist
+/// Pflicht (`TimeEntryRepository` erzwingt das, nicht die Tabelle
+/// selbst — gleiches Trennungsprinzip wie überall in diesem Schema).
+/// Ist das referenzierte Dokument bereits einem Projekt zugeordnet,
+/// übernimmt `TimeEntryRepository.create()` das automatisch in
+/// [projectId] (überschreibbar), analog zum bestehenden Belege-
+/// Projektzuordnungs-Muster.
+class TimeEntries extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  DateTimeColumn get date => dateTime()();
+
+  /// Dauer in Stunden — `double` wie [Articles.stockQuantity] (gleicher
+  /// Grund: keine gesetzliche Rundungsvorgabe wie bei Geld, gebrochene
+  /// Werte wie 1,5 Std. sind der Normalfall).
+  RealColumn get hours => real()();
+
+  /// `null` = keine Rolle gewählt (Standalone-Normalfall ohne
+  /// Personen-/Rollenbezug, siehe Klassendoc bei [StaffRoles]) — dann
+  /// liefert diese Buchung keinen Stundenkostensatz für die Projekt-
+  /// Kostenseite.
+  TextColumn get staffRoleId =>
+      text().nullable().references(StaffRoles, #id, onDelete: KeyAction.setNull)();
+  TextColumn get invoiceId =>
+      text().nullable().references(Invoices, #id, onDelete: KeyAction.setNull)();
+  TextColumn get projectId =>
+      text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
+  TextColumn get note => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
