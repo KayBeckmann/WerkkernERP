@@ -9,6 +9,7 @@ import 'settings_dunning_screen.dart';
 import 'settings_encryption_screen.dart';
 import 'settings_modules_screen.dart';
 import 'settings_smtp_screen.dart';
+import 'settings_staff_roles_screen.dart';
 import 'settings_tax_screen.dart';
 
 /// Einstellungen der aktiven Firma — reine Menüseite (Nachtrag
@@ -66,6 +67,13 @@ class SettingsScreen extends StatelessWidget {
             title: 'Versand (SMTP)',
             subtitle: 'Server, Zugangsdaten, E-Mail-Vorlagen',
             onTap: () => _push(context, const SettingsSmtpScreen()),
+          ),
+        if (company.timeTrackingEnabled)
+          _MenuTile(
+            icon: Icons.badge_outlined,
+            title: 'Rollen & Stundensätze',
+            subtitle: 'Monteur, Meister, Projektleiter …',
+            onTap: () => _push(context, const SettingsStaffRolesScreen()),
           ),
         _MenuTile(
           icon: Icons.save_outlined,
