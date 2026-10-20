@@ -32,6 +32,7 @@ void main() {
         updatedAt: issueDate,
         convertedFromId: null,
         isAdvancePayment: false,
+        isFixedPrice: false,
         dueDate: null,
         paymentStatus: PaymentStatus.open,
         paidAt: null,

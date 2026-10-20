@@ -41,6 +41,7 @@ void main() {
         updatedAt: DateTime.now(),
         convertedFromId: null,
         isAdvancePayment: isAdvancePayment,
+        isFixedPrice: false,
         paymentStatus: PaymentStatus.open,
       );
 
