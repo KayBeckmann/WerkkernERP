@@ -507,6 +507,19 @@ class Invoices extends Table {
   /// kennen dieses Feld, setzen es aber nie.
   BoolColumn get isAdvancePayment => boolean().withDefault(const Constant(false))();
 
+  /// C3.2 Festpreis-Kennzeichen (Nachtrag 2026-10-20, Kay-Entscheidung
+  /// auf Rückfrage: "Fester Schalter je Auftrag"). Steuert, ob eine aus
+  /// diesem Dokument erzeugte Rechnung die geplanten (Angebots-)Stunden
+  /// übernimmt (`true`, Festpreis) oder beim Umwandeln durch die
+  /// tatsächlich gebuchten Ist-Stunden ersetzt (`false`, Zeit-und-
+  /// Material — siehe `InvoiceRepository.convertTo()`). Default `false`
+  /// (Zeit-und-Material ist die Sicherheits-Vorgabe: wird der Schalter
+  /// vergessen, wird abgerechnet was tatsächlich gearbeitet wurde, nicht
+  /// stillschweigend die ursprüngliche Schätzung). Sinnvoll bei `kind ==
+  /// quote`/`order` (dort gesetzt/editierbar), `convertTo()` übernimmt
+  /// den Wert unverändert weiter wie `projectId`.
+  BoolColumn get isFixedPrice => boolean().withDefault(const Constant(false))();
+
   /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales
   /// Fälligkeitsdatum, vom Nutzer im Entwurf gesetzt. `null` = keine
   /// Fälligkeitsüberwachung für dieses Dokument. Nur bei `kind ==

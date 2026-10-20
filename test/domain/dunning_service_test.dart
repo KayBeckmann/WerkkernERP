@@ -49,6 +49,7 @@ void main() {
         updatedAt: DateTime(2026, 1, 1),
         convertedFromId: null,
         isAdvancePayment: false,
+        isFixedPrice: false,
         dueDate: dueDate,
         paymentStatus: paymentStatus,
         paidAt: null,
