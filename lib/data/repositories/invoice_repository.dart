@@ -9,6 +9,7 @@ import '../../domain/services/stock_booking_service.dart';
 import '../database/database.dart';
 import '../database/tables.dart';
 import 'number_sequence_repository.dart';
+import 'time_entry_repository.dart';
 
 /// Eine einzugebende Rechnungsposition (noch ohne ID — die vergibt das
 /// Repository beim Speichern).
@@ -155,6 +156,10 @@ class InvoiceRepository {
     // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): nur bei
     // kind == invoice sinnvoll, sonst ignoriert.
     DateTime? dueDate,
+    // C3.2 Festpreis-Kennzeichen (Nachtrag 2026-10-20): nur bei kind ==
+    // quote/order sinnvoll, siehe Doc-Kommentar bei
+    // `Invoices.isFixedPrice`.
+    bool isFixedPrice = false,
     List<InvoiceItemInput> items = const [],
   }) async {
     _validateItemsForKind(kind, items);
@@ -175,6 +180,7 @@ class InvoiceRepository {
               projectId: Value(projectId),
               isAdvancePayment: Value(isAdvancePayment),
               dueDate: Value(dueDate),
+              isFixedPrice: Value(isFixedPrice),
               createdAt: now,
               updatedAt: now,
             ),
@@ -224,6 +230,7 @@ class InvoiceRepository {
     // C12 Mahnwesen: wie bei projectId braucht ein Fälligkeitsdatum ein
     // echtes "wieder entfernen".
     Value<DateTime?> dueDate = const Value.absent(),
+    bool? isFixedPrice,
     List<InvoiceItemInput>? items,
   }) async {
     return _db.transaction(() async {
@@ -241,6 +248,7 @@ class InvoiceRepository {
           projectId: projectId,
           isAdvancePayment: Value(isAdvancePayment ?? existing.isAdvancePayment),
           dueDate: dueDate,
+          isFixedPrice: Value(isFixedPrice ?? existing.isFixedPrice),
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -452,10 +460,25 @@ class InvoiceRepository {
   /// zurückgegeben — anders als bei [finalize] ist ein ungültiger
   /// Aufruf hier immer ein Programmfehler des Aufrufers, kein normaler
   /// "nichts zu tun"-Fall.
+  /// [timeEntryRepository] ist optional (`null` bei ausgeschaltetem
+  /// Zeiterfassungs-Modul oder in bestehenden Aufrufern, die das noch
+  /// nicht kennen) — ist er gesetzt UND wird ein Auftrag ohne Festpreis
+  /// (`!source.isFixedPrice`) in eine Rechnung gewandelt, ersetzt
+  /// [convertTo] alle Stunden-Positionen durch **eine** zusammengefasste
+  /// Position mit den tatsächlich gebuchten Ist-Stunden (siehe Doc-
+  /// Kommentar bei `Invoices.isFixedPrice`, Nachtrag 2026-10-20: "Sofern
+  /// keine Festpreise vereinbart sind, müssen am Ende aber gebuchte
+  /// Zeiten in die Rechnung überführt werden"). Vereinfachung, bewusst
+  /// dokumentiert: Preis/Einheit/MwSt./Gruppe der ERSTEN Stunden-
+  /// Position werden übernommen — bei mehreren unterschiedlich
+  /// bepreisten Stunden-Positionen im Auftrag ist das eine bewusste
+  /// Vereinfachung für diesen ersten Entwurf, vor dem Finalisieren im
+  /// Rechnungseditor frei korrigierbar.
   Future<Invoice> convertTo({
     required String companyId,
     required String sourceId,
     required DocumentKind targetKind,
+    TimeEntryRepository? timeEntryRepository,
   }) async {
     return _db.transaction(() async {
       final source = await findById(companyId: companyId, id: sourceId);
@@ -473,21 +496,53 @@ class InvoiceRepository {
       }
 
       final sourceItems = await itemsFor(sourceId);
-      final newItems = [
-        for (final item in sourceItems)
-          if (!(targetKind == DocumentKind.deliveryNote && item.kind == InvoiceItemKind.hours))
-            InvoiceItemInput(
-              kind: item.kind,
-              articleId: item.articleId,
-              description: item.description,
-              quantity: Decimal.parse(item.quantity),
-              unitPriceCents: item.unitPriceCents,
-              vatRatePercent: item.vatRatePercent,
-              unit: item.unit,
-              discountPercent: item.discountPercent,
-              groupLabel: item.groupLabel,
-            ),
-      ];
+
+      double? actualBookedHours;
+      if (timeEntryRepository != null &&
+          source.kind == DocumentKind.order &&
+          targetKind == DocumentKind.invoice &&
+          !source.isFixedPrice &&
+          sourceItems.any((i) => i.kind == InvoiceItemKind.hours)) {
+        actualBookedHours = await timeEntryRepository.totalHoursForInvoice(sourceId);
+      }
+
+      final newItems = <InvoiceItemInput>[];
+      InvoiceItem? firstHoursItem;
+      for (final item in sourceItems) {
+        if (targetKind == DocumentKind.deliveryNote && item.kind == InvoiceItemKind.hours) {
+          continue; // Lieferschein enthält nie Stunden (bestehende Regel).
+        }
+        if (actualBookedHours != null && item.kind == InvoiceItemKind.hours) {
+          firstHoursItem ??= item;
+          continue;
+        }
+        newItems.add(
+          InvoiceItemInput(
+            kind: item.kind,
+            articleId: item.articleId,
+            description: item.description,
+            quantity: Decimal.parse(item.quantity),
+            unitPriceCents: item.unitPriceCents,
+            vatRatePercent: item.vatRatePercent,
+            unit: item.unit,
+            discountPercent: item.discountPercent,
+            groupLabel: item.groupLabel,
+          ),
+        );
+      }
+      if (firstHoursItem != null) {
+        newItems.add(
+          InvoiceItemInput(
+            kind: InvoiceItemKind.hours,
+            description: 'Geleistete Stunden (Ist-Zeit)',
+            quantity: Decimal.parse(actualBookedHours!.toString()),
+            unitPriceCents: firstHoursItem.unitPriceCents,
+            vatRatePercent: firstHoursItem.vatRatePercent,
+            unit: firstHoursItem.unit,
+            groupLabel: firstHoursItem.groupLabel,
+          ),
+        );
+      }
 
       final id = _uuid.v4();
       final now = DateTime.now();
@@ -506,6 +561,9 @@ class InvoiceRepository {
               // der Nutzer kann die Zuordnung danach wie jedes andere
               // Entwurfsfeld ändern.
               projectId: Value(source.projectId),
+              // C3.2: Festpreis-Kennzeichen wandert mit, gleiches Prinzip
+              // wie projectId.
+              isFixedPrice: Value(source.isFixedPrice),
               convertedFromId: Value(sourceId),
               createdAt: now,
               updatedAt: now,
@@ -549,6 +607,87 @@ class InvoiceRepository {
       }
     }
     return sum;
+  }
+
+  /// Materialabschlagsrechnung (C3.2, Nachtrag 2026-10-20: "Für einen
+  /// Auftrag möchte ich eine Materialabschlagsrechnung erstellen können:
+  /// Alle Artikel / Ausgewählte Freitexte"). Nutzt bewusst die
+  /// bestehende Abschlagsrechnung (`isAdvancePayment`, C13) wieder statt
+  /// eines eigenen Dokumenttyps (Kay-Entscheidung auf Rückfrage) — der
+  /// entstehende Entwurf ist technisch eine ganz normale
+  /// Abschlagsrechnung, nur mit einer **Teilmenge** der Positionen
+  /// vorausgefüllt (anders als [createCreditNoteDraft]/[convertTo], die
+  /// immer ALLE Positionen kopieren), und bleibt vor dem Finalisieren
+  /// frei editierbar. [includeAllArticles] übernimmt jede Artikel-
+  /// Position vollständig; [selectedFreetextItemIds] übernimmt gezielt
+  /// einzelne Freitext-Positionen (Stunden-Positionen werden nie
+  /// übernommen — eine Materialabschlagsrechnung ist per Definition
+  /// Material, siehe Nachtrag). Wirft [ArgumentError], wenn danach keine
+  /// einzige Position übrig bleibt (sonst ein stiller Leer-Entwurf ohne
+  /// erkennbaren Grund).
+  Future<Invoice> createMaterialAdvanceDraft({
+    required String companyId,
+    required String sourceOrderId,
+    bool includeAllArticles = false,
+    Set<String> selectedFreetextItemIds = const {},
+  }) async {
+    return _db.transaction(() async {
+      final source = await findById(companyId: companyId, id: sourceOrderId);
+      if (source == null) {
+        throw StateError('Auftrag $sourceOrderId existiert nicht in Firma $companyId.');
+      }
+      if (source.kind != DocumentKind.order) {
+        throw ArgumentError('Eine Materialabschlagsrechnung kann nur zu einem Auftrag erstellt werden.');
+      }
+      if (source.status != InvoiceStatus.finalized) {
+        throw StateError('Nur ein finalisierter Auftrag kann eine Materialabschlagsrechnung erhalten.');
+      }
+
+      final sourceItems = await itemsFor(sourceOrderId);
+      final newItems = [
+        for (final item in sourceItems)
+          if ((includeAllArticles && item.kind == InvoiceItemKind.article) ||
+              (item.kind == InvoiceItemKind.text && selectedFreetextItemIds.contains(item.id)))
+            InvoiceItemInput(
+              kind: item.kind,
+              articleId: item.articleId,
+              description: item.description,
+              quantity: Decimal.parse(item.quantity),
+              unitPriceCents: item.unitPriceCents,
+              vatRatePercent: item.vatRatePercent,
+              unit: item.unit,
+              discountPercent: item.discountPercent,
+              groupLabel: item.groupLabel,
+            ),
+      ];
+      if (newItems.isEmpty) {
+        throw ArgumentError(
+          'Materialabschlagsrechnung ohne jede gewählte Position — "Alle Artikel" oder '
+          'mindestens einen Freitext auswählen.',
+        );
+      }
+
+      final id = _uuid.v4();
+      final now = DateTime.now();
+      await _db.into(_db.invoices).insert(
+            InvoicesCompanion.insert(
+              id: id,
+              companyId: companyId,
+              customerId: source.customerId,
+              kind: const Value(DocumentKind.invoice),
+              status: InvoiceStatus.draft,
+              issueDate: now,
+              serviceDate: source.serviceDate,
+              projectId: Value(source.projectId),
+              isAdvancePayment: const Value(true),
+              convertedFromId: Value(sourceOrderId),
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+      await _replaceItems(id, newItems);
+      return (await findById(companyId: companyId, id: id))!;
+    });
   }
 
   /// Gutschriften (Kay-Entscheidung 2026-10-19: "Gutschriften bekommen

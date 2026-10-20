@@ -47,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 27;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -295,6 +295,10 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.timeTrackingEnabled);
             await migrator.createTable(staffRoles);
             await migrator.createTable(timeEntries);
+          }
+          if (from < 28) {
+            // C3.2 Festpreis-Kennzeichen (Nachtrag 2026-10-20).
+            await migrator.addColumn(invoices, invoices.isFixedPrice);
           }
         },
       );

@@ -7805,6 +7805,21 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _isFixedPriceMeta = const VerificationMeta(
+    'isFixedPrice',
+  );
+  @override
+  late final GeneratedColumn<bool> isFixedPrice = GeneratedColumn<bool>(
+    'is_fixed_price',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_fixed_price" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _dueDateMeta = const VerificationMeta(
     'dueDate',
   );
@@ -7865,6 +7880,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     convertedFromId,
     projectId,
     isAdvancePayment,
+    isFixedPrice,
     dueDate,
     paymentStatus,
     paidAt,
@@ -8099,6 +8115,15 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         ),
       );
     }
+    if (data.containsKey('is_fixed_price')) {
+      context.handle(
+        _isFixedPriceMeta,
+        isFixedPrice.isAcceptableOrUnknown(
+          data['is_fixed_price']!,
+          _isFixedPriceMeta,
+        ),
+      );
+    }
     if (data.containsKey('due_date')) {
       context.handle(
         _dueDateMeta,
@@ -8236,6 +8261,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_advance_payment'],
       )!,
+      isFixedPrice: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_fixed_price'],
+      )!,
       dueDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}due_date'],
@@ -8357,6 +8386,19 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   /// kennen dieses Feld, setzen es aber nie.
   final bool isAdvancePayment;
 
+  /// C3.2 Festpreis-Kennzeichen (Nachtrag 2026-10-20, Kay-Entscheidung
+  /// auf Rückfrage: "Fester Schalter je Auftrag"). Steuert, ob eine aus
+  /// diesem Dokument erzeugte Rechnung die geplanten (Angebots-)Stunden
+  /// übernimmt (`true`, Festpreis) oder beim Umwandeln durch die
+  /// tatsächlich gebuchten Ist-Stunden ersetzt (`false`, Zeit-und-
+  /// Material — siehe `InvoiceRepository.convertTo()`). Default `false`
+  /// (Zeit-und-Material ist die Sicherheits-Vorgabe: wird der Schalter
+  /// vergessen, wird abgerechnet was tatsächlich gearbeitet wurde, nicht
+  /// stillschweigend die ursprüngliche Schätzung). Sinnvoll bei `kind ==
+  /// quote`/`order` (dort gesetzt/editierbar), `convertTo()` übernimmt
+  /// den Wert unverändert weiter wie `projectId`.
+  final bool isFixedPrice;
+
   /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales
   /// Fälligkeitsdatum, vom Nutzer im Entwurf gesetzt. `null` = keine
   /// Fälligkeitsüberwachung für dieses Dokument. Nur bei `kind ==
@@ -8401,6 +8443,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.convertedFromId,
     this.projectId,
     required this.isAdvancePayment,
+    required this.isFixedPrice,
     this.dueDate,
     required this.paymentStatus,
     this.paidAt,
@@ -8486,6 +8529,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       map['project_id'] = Variable<String>(projectId);
     }
     map['is_advance_payment'] = Variable<bool>(isAdvancePayment);
+    map['is_fixed_price'] = Variable<bool>(isFixedPrice);
     if (!nullToAbsent || dueDate != null) {
       map['due_date'] = Variable<DateTime>(dueDate);
     }
@@ -8566,6 +8610,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ? const Value.absent()
           : Value(projectId),
       isAdvancePayment: Value(isAdvancePayment),
+      isFixedPrice: Value(isFixedPrice),
       dueDate: dueDate == null && nullToAbsent
           ? const Value.absent()
           : Value(dueDate),
@@ -8636,6 +8681,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       convertedFromId: serializer.fromJson<String?>(json['convertedFromId']),
       projectId: serializer.fromJson<String?>(json['projectId']),
       isAdvancePayment: serializer.fromJson<bool>(json['isAdvancePayment']),
+      isFixedPrice: serializer.fromJson<bool>(json['isFixedPrice']),
       dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
       paymentStatus: $InvoicesTable.$converterpaymentStatus.fromJson(
         serializer.fromJson<String>(json['paymentStatus']),
@@ -8691,6 +8737,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'convertedFromId': serializer.toJson<String?>(convertedFromId),
       'projectId': serializer.toJson<String?>(projectId),
       'isAdvancePayment': serializer.toJson<bool>(isAdvancePayment),
+      'isFixedPrice': serializer.toJson<bool>(isFixedPrice),
       'dueDate': serializer.toJson<DateTime?>(dueDate),
       'paymentStatus': serializer.toJson<String>(
         $InvoicesTable.$converterpaymentStatus.toJson(paymentStatus),
@@ -8728,6 +8775,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<String?> convertedFromId = const Value.absent(),
     Value<String?> projectId = const Value.absent(),
     bool? isAdvancePayment,
+    bool? isFixedPrice,
     Value<DateTime?> dueDate = const Value.absent(),
     PaymentStatus? paymentStatus,
     Value<DateTime?> paidAt = const Value.absent(),
@@ -8786,6 +8834,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
         : this.convertedFromId,
     projectId: projectId.present ? projectId.value : this.projectId,
     isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
+    isFixedPrice: isFixedPrice ?? this.isFixedPrice,
     dueDate: dueDate.present ? dueDate.value : this.dueDate,
     paymentStatus: paymentStatus ?? this.paymentStatus,
     paidAt: paidAt.present ? paidAt.value : this.paidAt,
@@ -8858,6 +8907,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       isAdvancePayment: data.isAdvancePayment.present
           ? data.isAdvancePayment.value
           : this.isAdvancePayment,
+      isFixedPrice: data.isFixedPrice.present
+          ? data.isFixedPrice.value
+          : this.isFixedPrice,
       dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
       paymentStatus: data.paymentStatus.present
           ? data.paymentStatus.value
@@ -8897,6 +8949,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('convertedFromId: $convertedFromId, ')
           ..write('projectId: $projectId, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
+          ..write('isFixedPrice: $isFixedPrice, ')
           ..write('dueDate: $dueDate, ')
           ..write('paymentStatus: $paymentStatus, ')
           ..write('paidAt: $paidAt')
@@ -8934,6 +8987,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     convertedFromId,
     projectId,
     isAdvancePayment,
+    isFixedPrice,
     dueDate,
     paymentStatus,
     paidAt,
@@ -8970,6 +9024,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.convertedFromId == this.convertedFromId &&
           other.projectId == this.projectId &&
           other.isAdvancePayment == this.isAdvancePayment &&
+          other.isFixedPrice == this.isFixedPrice &&
           other.dueDate == this.dueDate &&
           other.paymentStatus == this.paymentStatus &&
           other.paidAt == this.paidAt);
@@ -9004,6 +9059,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String?> convertedFromId;
   final Value<String?> projectId;
   final Value<bool> isAdvancePayment;
+  final Value<bool> isFixedPrice;
   final Value<DateTime?> dueDate;
   final Value<PaymentStatus> paymentStatus;
   final Value<DateTime?> paidAt;
@@ -9037,6 +9093,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.convertedFromId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
+    this.isFixedPrice = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.paymentStatus = const Value.absent(),
     this.paidAt = const Value.absent(),
@@ -9071,6 +9128,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.convertedFromId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
+    this.isFixedPrice = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.paymentStatus = const Value.absent(),
     this.paidAt = const Value.absent(),
@@ -9112,6 +9170,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? convertedFromId,
     Expression<String>? projectId,
     Expression<bool>? isAdvancePayment,
+    Expression<bool>? isFixedPrice,
     Expression<DateTime>? dueDate,
     Expression<String>? paymentStatus,
     Expression<DateTime>? paidAt,
@@ -9157,6 +9216,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (convertedFromId != null) 'converted_from_id': convertedFromId,
       if (projectId != null) 'project_id': projectId,
       if (isAdvancePayment != null) 'is_advance_payment': isAdvancePayment,
+      if (isFixedPrice != null) 'is_fixed_price': isFixedPrice,
       if (dueDate != null) 'due_date': dueDate,
       if (paymentStatus != null) 'payment_status': paymentStatus,
       if (paidAt != null) 'paid_at': paidAt,
@@ -9193,6 +9253,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String?>? convertedFromId,
     Value<String?>? projectId,
     Value<bool>? isAdvancePayment,
+    Value<bool>? isFixedPrice,
     Value<DateTime?>? dueDate,
     Value<PaymentStatus>? paymentStatus,
     Value<DateTime?>? paidAt,
@@ -9233,6 +9294,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       convertedFromId: convertedFromId ?? this.convertedFromId,
       projectId: projectId ?? this.projectId,
       isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
+      isFixedPrice: isFixedPrice ?? this.isFixedPrice,
       dueDate: dueDate ?? this.dueDate,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       paidAt: paidAt ?? this.paidAt,
@@ -9353,6 +9415,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (isAdvancePayment.present) {
       map['is_advance_payment'] = Variable<bool>(isAdvancePayment.value);
     }
+    if (isFixedPrice.present) {
+      map['is_fixed_price'] = Variable<bool>(isFixedPrice.value);
+    }
     if (dueDate.present) {
       map['due_date'] = Variable<DateTime>(dueDate.value);
     }
@@ -9401,6 +9466,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('convertedFromId: $convertedFromId, ')
           ..write('projectId: $projectId, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
+          ..write('isFixedPrice: $isFixedPrice, ')
           ..write('dueDate: $dueDate, ')
           ..write('paymentStatus: $paymentStatus, ')
           ..write('paidAt: $paidAt, ')
@@ -26844,6 +26910,7 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       Value<String?> convertedFromId,
       Value<String?> projectId,
       Value<bool> isAdvancePayment,
+      Value<bool> isFixedPrice,
       Value<DateTime?> dueDate,
       Value<PaymentStatus> paymentStatus,
       Value<DateTime?> paidAt,
@@ -26879,6 +26946,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<String?> convertedFromId,
       Value<String?> projectId,
       Value<bool> isAdvancePayment,
+      Value<bool> isFixedPrice,
       Value<DateTime?> dueDate,
       Value<PaymentStatus> paymentStatus,
       Value<DateTime?> paidAt,
@@ -27160,6 +27228,11 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<bool> get isAdvancePayment => $composableBuilder(
     column: $table.isAdvancePayment,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isFixedPrice => $composableBuilder(
+    column: $table.isFixedPrice,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -27501,6 +27574,11 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isFixedPrice => $composableBuilder(
+    column: $table.isFixedPrice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get dueDate => $composableBuilder(
     column: $table.dueDate,
     builder: (column) => ColumnOrderings(column),
@@ -27721,6 +27799,11 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<bool> get isAdvancePayment => $composableBuilder(
     column: $table.isAdvancePayment,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isFixedPrice => $composableBuilder(
+    column: $table.isFixedPrice,
     builder: (column) => column,
   );
 
@@ -27994,6 +28077,7 @@ class $$InvoicesTableTableManager
                 Value<String?> convertedFromId = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
+                Value<bool> isFixedPrice = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<PaymentStatus> paymentStatus = const Value.absent(),
                 Value<DateTime?> paidAt = const Value.absent(),
@@ -28027,6 +28111,7 @@ class $$InvoicesTableTableManager
                 convertedFromId: convertedFromId,
                 projectId: projectId,
                 isAdvancePayment: isAdvancePayment,
+                isFixedPrice: isFixedPrice,
                 dueDate: dueDate,
                 paymentStatus: paymentStatus,
                 paidAt: paidAt,
@@ -28062,6 +28147,7 @@ class $$InvoicesTableTableManager
                 Value<String?> convertedFromId = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
+                Value<bool> isFixedPrice = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<PaymentStatus> paymentStatus = const Value.absent(),
                 Value<DateTime?> paidAt = const Value.absent(),
@@ -28095,6 +28181,7 @@ class $$InvoicesTableTableManager
                 convertedFromId: convertedFromId,
                 projectId: projectId,
                 isAdvancePayment: isAdvancePayment,
+                isFixedPrice: isFixedPrice,
                 dueDate: dueDate,
                 paymentStatus: paymentStatus,
                 paidAt: paidAt,
