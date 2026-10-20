@@ -11,6 +11,7 @@ import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
+import '../../data/repositories/time_entry_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/dunning_service.dart';
@@ -174,6 +175,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _isAdvancePayment = false;
   Money _priorAdvancePaymentsGross = Money.zero();
 
+  // C3.2 Festpreis-Kennzeichen (Nachtrag 2026-10-20) — nur bei
+  // kind == quote/order sinnvoll, siehe Doc-Kommentar bei
+  // `Invoices.isFixedPrice`.
+  bool _isFixedPrice = false;
+  bool _timeTrackingEnabled = false;
+
   // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): nur bei
   // kind == invoice relevant und nur sichtbar, wenn die Firma das Modul
   // aktiviert hat. Fälligkeitsdatum ist nur im Entwurf änderbar; Status
@@ -256,6 +263,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _creditNotesEnabled = company.creditNotesEnabled;
     _bestellwesenEnabled = company.bestellwesenEnabled;
     _isSmallBusinessExempt = company.isSmallBusinessExempt;
+    _timeTrackingEnabled = company.timeTrackingEnabled;
 
     final invoice = widget.invoice;
     _currentInvoice = invoice;
@@ -265,6 +273,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _notesCtrl.text = invoice.notes ?? '';
       _paymentTermsCtrl.text = invoice.paymentTerms ?? '';
       _projectId = invoice.projectId;
+      _isFixedPrice = invoice.isFixedPrice;
       _isAdvancePayment = invoice.isAdvancePayment;
       _dueDate = invoice.dueDate;
       if (invoice.status == InvoiceStatus.finalized) {
@@ -415,6 +424,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           projectId: _projectId,
           isAdvancePayment: _isAdvancePayment,
           dueDate: _dueDate,
+          isFixedPrice: _isFixedPrice,
           items: items,
         );
       } else {
@@ -428,6 +438,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           projectId: Value(_projectId),
           isAdvancePayment: _isAdvancePayment,
           dueDate: Value(_dueDate),
+          isFixedPrice: _isFixedPrice,
           items: items,
         );
       }
@@ -592,11 +603,16 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     if (invoice == null) return;
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final repo = context.read<InvoiceRepository>();
+    // C3.2 (Nachtrag 2026-10-20) — nur übergeben, wenn das Modul aktiv
+    // ist; `convertTo()` nutzt es nur für Auftrag->Rechnung ohne
+    // Festpreis, ignoriert es sonst folgenlos.
+    final timeEntryRepo = _timeTrackingEnabled ? context.read<TimeEntryRepository>() : null;
     try {
       final draft = await repo.convertTo(
         companyId: companyId,
         sourceId: invoice.id,
         targetKind: targetKind,
+        timeEntryRepository: timeEntryRepo,
       );
       // Kay-Entscheidung 2026-10-17: ab der ersten Umwandlung ist DIESES
       // Dokument gesperrt — sofort hier setzen, kein erneutes Nachladen
@@ -713,6 +729,43 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Bestellung konnte nicht erstellt werden: $e')),
+        );
+      }
+    }
+  }
+
+  /// C3.2 Materialabschlagsrechnung (Nachtrag 2026-10-20) — fragt die
+  /// Auswahl ab (alle Artikel / ausgewählte Freitexte) und übergibt sie
+  /// an `InvoiceRepository.createMaterialAdvanceDraft()`.
+  Future<void> _createMaterialAdvance() async {
+    final invoice = _currentInvoice;
+    if (invoice == null) return;
+    final freetextItems =
+        _items.where((i) => i.kind == InvoiceItemKind.text && i.existingId != null).toList();
+
+    final result = await showDialog<_MaterialAdvanceSelection>(
+      context: context,
+      builder: (context) => _MaterialAdvanceDialog(freetextItems: freetextItems),
+    );
+    if (result == null || !mounted) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    try {
+      final draft = await context.read<InvoiceRepository>().createMaterialAdvanceDraft(
+            companyId: companyId,
+            sourceOrderId: invoice.id,
+            includeAllArticles: result.includeAllArticles,
+            selectedFreetextItemIds: result.selectedFreetextItemIds,
+          );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => InvoiceEditorScreen(customer: widget.customer, invoice: draft),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Materialabschlag konnte nicht erstellt werden: $e')),
         );
       }
     }
@@ -939,6 +992,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       updatedAt: now,
       isAdvancePayment: _isAdvancePayment,
       dueDate: _dueDate,
+      isFixedPrice: _isFixedPrice,
       paymentStatus: PaymentStatus.open,
       paidAt: null,
     );
@@ -1119,6 +1173,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               tooltip: 'Bestellung erstellen',
               onPressed: _createPurchaseOrdersFromOrder,
             ),
+          if (isFinalized && _kind == DocumentKind.order && _advancePaymentInvoicesEnabled)
+            IconButton(
+              icon: const Icon(Icons.request_quote_outlined),
+              tooltip: 'Materialabschlag erstellen',
+              onPressed: _createMaterialAdvance,
+            ),
           // Vorschau (ENTWURF-Wasserzeichen) macht nur vor der ersten
           // Finalisierung Sinn — danach existiert bereits ein echtes PDF
           // über "PDF teilen".
@@ -1213,6 +1273,54 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 onChanged: (value) => setState(() => _isAdvancePayment = value ?? false),
               ),
           ],
+          // C3.2 Festpreis-Kennzeichen (Nachtrag 2026-10-20) — nur bei
+          // Angebot/Auftrag sinnvoll (wandert beim Umwandeln mit, siehe
+          // `InvoiceRepository.convertTo()`), nur im Entwurf umschaltbar.
+          if (_timeTrackingEnabled &&
+              (_kind == DocumentKind.quote || _kind == DocumentKind.order)) ...[
+            const SizedBox(height: 4),
+            if (isLocked)
+              Text(
+                _isFixedPrice ? 'Festpreis vereinbart' : 'Zeit und Material (keine Festpreis-Vereinbarung)',
+                style: Theme.of(context).textTheme.bodyMedium,
+              )
+            else
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text('Festpreis vereinbart'),
+                subtitle: const Text(
+                  'Ohne Festpreis werden beim Umwandeln in eine Rechnung die tatsächlich '
+                  'gebuchten Ist-Stunden statt der geplanten Mengen übernommen.',
+                ),
+                value: _isFixedPrice,
+                onChanged: (value) => setState(() => _isFixedPrice = value ?? false),
+              ),
+          ],
+          // "Geplant vs. Gebucht" (Nachtrag 2026-10-20: "Die Zeiten aus
+          // dem Angebot brauchen wir im Auftrag als Referenz") — braucht
+          // kein eigenes Feld: `convertTo()` kopiert die Angebots-
+          // Stunden-Positionen bereits unverändert in den Auftrag
+          // (bestehendes Verhalten), hier nur gegenübergestellt mit den
+          // tatsächlich gebuchten Ist-Stunden.
+          if (_timeTrackingEnabled && _kind == DocumentKind.order && isFinalized)
+            FutureBuilder<double>(
+              future: context.read<TimeEntryRepository>().totalHoursForInvoice(_currentInvoice!.id),
+              builder: (context, snapshot) {
+                final plannedHours = _items
+                    .where((i) => i.kind == InvoiceItemKind.hours)
+                    .fold(Decimal.zero, (sum, i) => sum + i.quantity);
+                final bookedHours = snapshot.data;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    'Geplant laut Angebot: $plannedHours Std. · Gebucht: '
+                    '${bookedHours == null ? '…' : bookedHours.toStringAsFixed(1)} Std.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                );
+              },
+            ),
           // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17,
           // Nachbesserung nach Kay-Feedback 2026-10-17) — nur bei
           // Rechnungen sinnvoll. Fälligkeitsdatum ist **jederzeit**
@@ -1460,6 +1568,84 @@ class _PurchaseOrderFromOrderDialogState extends State<_PurchaseOrderFromOrderDi
                     context,
                     _PurchaseOrderFromOrderChoice(mode: _mode, supplierId: _supplierId),
                   ),
+          child: const Text('Erstellen'),
+        ),
+      ],
+    );
+  }
+}
+
+class _MaterialAdvanceSelection {
+  const _MaterialAdvanceSelection({required this.includeAllArticles, required this.selectedFreetextItemIds});
+  final bool includeAllArticles;
+  final Set<String> selectedFreetextItemIds;
+}
+
+/// C3.2 Materialabschlagsrechnung (Nachtrag 2026-10-20: "Alle Artikel /
+/// Ausgewählte Freitexte") — zwei unabhängige Auswahlen in einem
+/// Dialog.
+class _MaterialAdvanceDialog extends StatefulWidget {
+  const _MaterialAdvanceDialog({required this.freetextItems});
+  final List<_EditableItem> freetextItems;
+
+  @override
+  State<_MaterialAdvanceDialog> createState() => _MaterialAdvanceDialogState();
+}
+
+class _MaterialAdvanceDialogState extends State<_MaterialAdvanceDialog> {
+  bool _includeAllArticles = true;
+  final Set<String> _selectedFreetextIds = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Materialabschlag erstellen'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Alle Artikel-Positionen'),
+              value: _includeAllArticles,
+              onChanged: (value) => setState(() => _includeAllArticles = value ?? false),
+            ),
+            if (widget.freetextItems.isNotEmpty) ...[
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text('Freitext-Positionen auswählen:'),
+              ),
+              for (final item in widget.freetextItems)
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(item.description),
+                  value: _selectedFreetextIds.contains(item.existingId),
+                  onChanged: (checked) => setState(() {
+                    if (checked ?? false) {
+                      _selectedFreetextIds.add(item.existingId!);
+                    } else {
+                      _selectedFreetextIds.remove(item.existingId);
+                    }
+                  }),
+                ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: () => Navigator.pop(
+            context,
+            _MaterialAdvanceSelection(
+              includeAllArticles: _includeAllArticles,
+              selectedFreetextItemIds: _selectedFreetextIds,
+            ),
+          ),
           child: const Text('Erstellen'),
         ),
       ],
