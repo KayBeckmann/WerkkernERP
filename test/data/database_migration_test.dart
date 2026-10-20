@@ -32,7 +32,8 @@ import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 /// Kleinunternehmerregelung §19 UStG, Nachtrag 2026-10-18; v23→v24:
 /// C5.1 Lagerbestand, Nachtrag 2026-10-19; v24→v25: C5.2 Bestellwesen,
 /// Nachtrag 2026-10-19; v25→v26: C5.3 Inventur/Bewegungsprotokoll +
-/// SKR03-Kontierung/Projektzuordnung, Nachtrag 2026-10-19).
+/// SKR03-Kontierung/Projektzuordnung, Nachtrag 2026-10-19; v26→v27:
+/// C3.1 Zeiterfassungs-Grundlage, Nachtrag 2026-10-20).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -56,14 +57,14 @@ void main() {
   });
 
   test(
-    'Migration v1→v26 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
+    'Migration v1→v27 (A5 + erweiterte Kunden-/Lieferantenfelder + PDF-Texte + Lieferschein + '
     'Einheit/Rabatt pro Position + PDF-Texte pro Dokumentart + C10 Proforma-Rechnungen + '
     'C1 Projekte + C6 Fuhrpark + PDF-Text-Schnappschuss + C11 Wiederkehrende Rechnungen + '
     'C13 Abschlagsrechnungen + C12 Mahnwesen + C12 Mahnwesen-Nachbesserung + C7a '
     'SMTP-Versand + C14 Buchhaltung-Modulschalter + C14.2 Belege/Ausgaben + '
     'C14.4 Bankabgleich/CSV + C14.5 DATEV-Export + Gutschriften/Projektzuordnung '
     'Belege + Artikel deaktivierbar + Kleinunternehmerregelung + C5.1 Lagerbestand + '
-    'C5.2 Bestellwesen + C5.3 Inventur/SKR03/Projektzuordnung): '
+    'C5.2 Bestellwesen + C5.3 Inventur/SKR03/Projektzuordnung + C3.1 Zeiterfassung): '
     'Bestandsdaten '
     'bekommen automatisch die neuen Default-Werte — ohne '
     'Datenverlust an bestehenden Spalten',
@@ -247,6 +248,11 @@ void main() {
       raw.execute('DROP TABLE inventory_count_items;');
       raw.execute('DROP TABLE inventory_counts;');
       raw.execute('DROP TABLE stock_movements;');
+      // v26 -> v27 (C3.1 Zeiterfassungs-Grundlage, Nachtrag 2026-10-20).
+      // time_entries zuerst (verweist auf staff_roles).
+      raw.execute('DROP TABLE time_entries;');
+      raw.execute('DROP TABLE staff_roles;');
+      raw.execute('ALTER TABLE companies DROP COLUMN time_tracking_enabled;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -317,6 +323,7 @@ void main() {
         expect(migratedCompany.isSmallBusinessExempt, isFalse);
         expect(migratedCompany.lagerbestandEnabled, isFalse);
         expect(migratedCompany.bestellwesenEnabled, isFalse);
+        expect(migratedCompany.timeTrackingEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
 
         final migratedInvoice =
@@ -571,6 +578,33 @@ void main() {
             .getSingle();
         expect(createdInventoryCountItem.expectedQuantity, 0);
         expect(createdInventoryCountItem.countedQuantity, isNull);
+
+        // StaffRoles/TimeEntries existieren nach der Migration und sind
+        // nutzbar.
+        await db.into(db.staffRoles).insert(
+              StaffRolesCompanion.insert(
+                id: 'staff-role-nach-migration',
+                companyId: company.id,
+                name: 'Monteur',
+                createdAt: DateTime.now(),
+              ),
+            );
+        await db.into(db.timeEntries).insert(
+              TimeEntriesCompanion.insert(
+                id: 'time-entry-nach-migration',
+                companyId: company.id,
+                date: DateTime.now(),
+                hours: 2.5,
+                staffRoleId: const Value('staff-role-nach-migration'),
+                invoiceId: Value(invoice.id),
+                createdAt: DateTime.now(),
+              ),
+            );
+        final createdTimeEntry = await (db.select(db.timeEntries)
+              ..where((t) => t.id.equals('time-entry-nach-migration')))
+            .getSingle();
+        expect(createdTimeEntry.hours, 2.5);
+        expect(createdTimeEntry.staffRoleId, 'staff-role-nach-migration');
       } finally {
         await db.close();
       }
