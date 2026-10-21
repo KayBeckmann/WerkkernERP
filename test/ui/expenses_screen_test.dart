@@ -140,7 +140,10 @@ void main() {
       // Projekt-Ergebnisrechnung ansehen (noch keine Rechnung -> 0,00 € Erlöse).
       await tester.tap(_sidebarItem('Projekte'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Testprojekt'));
+      // C2-Nachtrag (2026-10-21): die Projektliste zeigt seitdem
+      // "JJ/PP · Name" statt nur den Namen — textContaining statt
+      // text, um unabhängig von der vergebenen Projektnummer zu bleiben.
+      await tester.tap(find.textContaining('Testprojekt'));
       await tester.pumpAndSettle();
 
       expect(find.text('Zugeordnete Belege: 30,00 €'), findsOneWidget);

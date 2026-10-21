@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
@@ -23,7 +24,7 @@ void main() {
     );
     companies = CompanyRepository(db);
     customers = CustomerRepository(db);
-    projects = ProjectRepository(db);
+    projects = ProjectRepository(db, NumberSequenceRepository(db));
     invoices = InvoiceRepository(db, NumberSequenceRepository(db));
   });
 
@@ -139,4 +140,149 @@ void main() {
       expect(stillThere.invoiceNumber, isNotNull, reason: 'Finalisierte Rechnung bleibt erhalten');
     },
   );
+
+  group('C2-Nachtrag (2026-10-21): Projektnummer-Nummernkreise', () {
+    test(
+      'create() vergibt PP fortlaufend je Firma und Gründungsjahr, fest eingefroren',
+      () async {
+        final companyA = await companies.create(name: 'Firma A');
+        final companyB = await companies.create(name: 'Firma B');
+
+        final a1 = await projects.create(companyId: companyA.id, name: 'Projekt A1');
+        final a2 = await projects.create(companyId: companyA.id, name: 'Projekt A2');
+        final b1 = await projects.create(companyId: companyB.id, name: 'Projekt B1');
+
+        final thisYear = DateTime.now().year;
+        expect(a1.foundingYear, thisYear);
+        expect(a1.projectNumber, 1);
+        expect(a2.foundingYear, thisYear);
+        expect(a2.projectNumber, 2, reason: 'zweites Projekt derselben Firma/desselben Jahres');
+        expect(
+          b1.projectNumber,
+          1,
+          reason: 'eigene Firma -> eigener Zähler, keine Vermischung mit Firma A',
+        );
+      },
+    );
+
+    test(
+      'Eine projektbezogene Rechnung zeigt R-JJPPxxx, wobei JJ dem PROJEKT-Gründungsjahr '
+      'folgt, nicht dem tatsächlichen Finalisierungsjahr (Kollisionsvermeidung)',
+      () async {
+        final company = await companies.create(name: 'Firma A');
+        final customer = await customers.create(companyId: company.id, name: 'Kunde');
+        final project = await projects.create(companyId: company.id, name: 'Altprojekt');
+
+        // Simuliert ein Projekt, das letztes Jahr gegründet wurde, auch
+        // wenn der Test selbst "heute" läuft — PP bleibt eingefroren,
+        // nur foundingYear wird hier für den Test zurückdatiert.
+        await (db.update(db.projects)..where((p) => p.id.equals(project.id)))
+            .write(const ProjectsCompanion(foundingYear: Value(2026)));
+
+        final draft = await invoices.createDraft(
+          companyId: company.id,
+          customerId: customer.id,
+          issueDate: DateTime.now(),
+          serviceDate: DateTime.now(),
+          projectId: project.id,
+          items: [
+            InvoiceItemInput(
+              kind: InvoiceItemKind.text,
+              description: 'Testposition',
+              quantity: Decimal.one,
+              unitPriceCents: 1000,
+              vatRatePercent: 19,
+            ),
+          ],
+        );
+        final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+
+        expect(
+          finalized!.invoiceNumber,
+          'R-2601001',
+          reason: 'JJ=26 (Projekt-Gründungsjahr) + PP=01 + laufende Nummer, nicht das '
+              'tatsächliche Finalisierungsjahr',
+        );
+      },
+    );
+
+    test(
+      'Eine projektfreie Rechnung bleibt beim bisherigen R-JJxxx-Format ohne PP',
+      () async {
+        final company = await companies.create(name: 'Firma A');
+        final customer = await customers.create(companyId: company.id, name: 'Kunde');
+        final draft = await invoices.createDraft(
+          companyId: company.id,
+          customerId: customer.id,
+          issueDate: DateTime.now(),
+          serviceDate: DateTime.now(),
+          items: [
+            InvoiceItemInput(
+              kind: InvoiceItemKind.text,
+              description: 'Testposition',
+              quantity: Decimal.one,
+              unitPriceCents: 1000,
+              vatRatePercent: 19,
+            ),
+          ],
+        );
+        final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
+        final thisYear = (DateTime.now().year % 100).toString().padLeft(2, '0');
+        expect(finalized!.invoiceNumber, 'R-${thisYear}001');
+      },
+    );
+
+    test(
+      'backfillProjectNumbersIfMissing() nummeriert Alt-Projekte (projectNumber == null) '
+      'rückwirkend in Anlage-Reihenfolge je Gründungsjahr, ist danach ein No-op',
+      () async {
+        final company = await companies.create(name: 'Firma A');
+
+        // Zwei "Alt-Projekte" ohne PP simulieren (vor dem C2-Nachtrag
+        // angelegt) — direkter Rohzugriff, da `create()` inzwischen
+        // immer sofort eine PP vergibt.
+        await db.into(db.projects).insert(
+              ProjectsCompanion.insert(
+                id: 'old-1',
+                companyId: company.id,
+                name: 'Altprojekt 1',
+                createdAt: DateTime(2025, 3, 1),
+              ),
+            );
+        await db.into(db.projects).insert(
+              ProjectsCompanion.insert(
+                id: 'old-2',
+                companyId: company.id,
+                name: 'Altprojekt 2',
+                createdAt: DateTime(2025, 6, 1),
+              ),
+            );
+        // Ein neueres Projekt über create() dazwischen — bekommt sein PP
+        // bereits bei Anlage, bleibt vom Backfill unberührt.
+        final newProject = await projects.create(companyId: company.id, name: 'Neues Projekt');
+
+        await projects.backfillProjectNumbersIfMissing(company.id);
+
+        final old1 = await projects.findById(companyId: company.id, id: 'old-1');
+        final old2 = await projects.findById(companyId: company.id, id: 'old-2');
+        expect(old1!.foundingYear, 2025);
+        expect(old1.projectNumber, 1);
+        expect(old2!.foundingYear, 2025);
+        expect(old2.projectNumber, 2, reason: 'nach old-1 angelegt, folgt in der Reihenfolge');
+
+        final reloadedNewProject =
+            await projects.findById(companyId: company.id, id: newProject.id);
+        expect(
+          reloadedNewProject!.projectNumber,
+          newProject.projectNumber,
+          reason: 'vom Backfill unberührt, da bereits vergeben',
+        );
+
+        // Erneuter Aufruf ist ein No-op (keine erneute Vergabe/kein Fehler).
+        await projects.backfillProjectNumbersIfMissing(company.id);
+        final old1Again = await projects.findById(companyId: company.id, id: 'old-1');
+        expect(old1Again!.projectNumber, 1);
+      },
+    );
+  });
 }

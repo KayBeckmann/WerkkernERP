@@ -7094,6 +7094,28 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _foundingYearMeta = const VerificationMeta(
+    'foundingYear',
+  );
+  @override
+  late final GeneratedColumn<int> foundingYear = GeneratedColumn<int>(
+    'founding_year',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _projectNumberMeta = const VerificationMeta(
+    'projectNumber',
+  );
+  @override
+  late final GeneratedColumn<int> projectNumber = GeneratedColumn<int>(
+    'project_number',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -7103,6 +7125,8 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
     notes,
     status,
     createdAt,
+    foundingYear,
+    projectNumber,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -7157,6 +7181,24 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('founding_year')) {
+      context.handle(
+        _foundingYearMeta,
+        foundingYear.isAcceptableOrUnknown(
+          data['founding_year']!,
+          _foundingYearMeta,
+        ),
+      );
+    }
+    if (data.containsKey('project_number')) {
+      context.handle(
+        _projectNumberMeta,
+        projectNumber.isAcceptableOrUnknown(
+          data['project_number']!,
+          _projectNumberMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -7196,6 +7238,14 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      foundingYear: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}founding_year'],
+      ),
+      projectNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}project_number'],
+      ),
     );
   }
 
@@ -7219,6 +7269,27 @@ class Project extends DataClass implements Insertable<Project> {
   final String? notes;
   final ProjectStatus status;
   final DateTime createdAt;
+
+  /// C2 Projektnummer-Nummernkreise (Nachtrag 2026-10-21, Kay-
+  /// Entscheidung auf Rückfrage) — beide Felder werden bei Anlage des
+  /// Projekts **fest eingefroren** (nie neu vergeben, auch wenn das
+  /// Projekt später über Jahre hinweg weiterläuft). [projectNumber]
+  /// (PP) ist ein pro Firma und [foundingYear] eigener Zähler, startet
+  /// also jedes Kalenderjahr wieder bei 1 — siehe
+  /// `ProjectRepository.create()`/`NumberSequenceRepository` (Zähler-
+  /// Dokumenttyp `"project"`). Beide `null` bei Projekten, die vor
+  /// diesem Nachtrag angelegt wurden, bis
+  /// `ProjectRepository.backfillProjectNumbersIfMissing()` einmalig
+  /// nachträgt (in Anlage-Reihenfolge je Gründungsjahr, siehe dort).
+  /// Genutzt von `formatDocumentNumber()` für das Format `R-JJPPxxx`
+  /// bei einer projektbezogenen Rechnung — dabei folgt das angezeigte
+  /// JJ bewusst [foundingYear], NICHT dem tatsächlichen Jahr der
+  /// einzelnen Rechnung (Kay-Entscheidung: vermeidet, dass zwei
+  /// verschiedene Projekte in ihren Rechnungsnummern dieselbe JJPP-
+  /// Kombination zeigen, nur weil beide zufällig im selben Kalenderjahr
+  /// eine weitere Rechnung bekommen).
+  final int? foundingYear;
+  final int? projectNumber;
   const Project({
     required this.id,
     required this.companyId,
@@ -7227,6 +7298,8 @@ class Project extends DataClass implements Insertable<Project> {
     this.notes,
     required this.status,
     required this.createdAt,
+    this.foundingYear,
+    this.projectNumber,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7246,6 +7319,12 @@ class Project extends DataClass implements Insertable<Project> {
       );
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || foundingYear != null) {
+      map['founding_year'] = Variable<int>(foundingYear);
+    }
+    if (!nullToAbsent || projectNumber != null) {
+      map['project_number'] = Variable<int>(projectNumber);
+    }
     return map;
   }
 
@@ -7262,6 +7341,12 @@ class Project extends DataClass implements Insertable<Project> {
           : Value(notes),
       status: Value(status),
       createdAt: Value(createdAt),
+      foundingYear: foundingYear == null && nullToAbsent
+          ? const Value.absent()
+          : Value(foundingYear),
+      projectNumber: projectNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectNumber),
     );
   }
 
@@ -7280,6 +7365,8 @@ class Project extends DataClass implements Insertable<Project> {
         serializer.fromJson<String>(json['status']),
       ),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      foundingYear: serializer.fromJson<int?>(json['foundingYear']),
+      projectNumber: serializer.fromJson<int?>(json['projectNumber']),
     );
   }
   @override
@@ -7295,6 +7382,8 @@ class Project extends DataClass implements Insertable<Project> {
         $ProjectsTable.$converterstatus.toJson(status),
       ),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'foundingYear': serializer.toJson<int?>(foundingYear),
+      'projectNumber': serializer.toJson<int?>(projectNumber),
     };
   }
 
@@ -7306,6 +7395,8 @@ class Project extends DataClass implements Insertable<Project> {
     Value<String?> notes = const Value.absent(),
     ProjectStatus? status,
     DateTime? createdAt,
+    Value<int?> foundingYear = const Value.absent(),
+    Value<int?> projectNumber = const Value.absent(),
   }) => Project(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -7314,6 +7405,10 @@ class Project extends DataClass implements Insertable<Project> {
     notes: notes.present ? notes.value : this.notes,
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
+    foundingYear: foundingYear.present ? foundingYear.value : this.foundingYear,
+    projectNumber: projectNumber.present
+        ? projectNumber.value
+        : this.projectNumber,
   );
   Project copyWithCompanion(ProjectsCompanion data) {
     return Project(
@@ -7326,6 +7421,12 @@ class Project extends DataClass implements Insertable<Project> {
       notes: data.notes.present ? data.notes.value : this.notes,
       status: data.status.present ? data.status.value : this.status,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      foundingYear: data.foundingYear.present
+          ? data.foundingYear.value
+          : this.foundingYear,
+      projectNumber: data.projectNumber.present
+          ? data.projectNumber.value
+          : this.projectNumber,
     );
   }
 
@@ -7338,14 +7439,25 @@ class Project extends DataClass implements Insertable<Project> {
           ..write('customerId: $customerId, ')
           ..write('notes: $notes, ')
           ..write('status: $status, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('foundingYear: $foundingYear, ')
+          ..write('projectNumber: $projectNumber')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, companyId, name, customerId, notes, status, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    name,
+    customerId,
+    notes,
+    status,
+    createdAt,
+    foundingYear,
+    projectNumber,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7356,7 +7468,9 @@ class Project extends DataClass implements Insertable<Project> {
           other.customerId == this.customerId &&
           other.notes == this.notes &&
           other.status == this.status &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.foundingYear == this.foundingYear &&
+          other.projectNumber == this.projectNumber);
 }
 
 class ProjectsCompanion extends UpdateCompanion<Project> {
@@ -7367,6 +7481,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
   final Value<String?> notes;
   final Value<ProjectStatus> status;
   final Value<DateTime> createdAt;
+  final Value<int?> foundingYear;
+  final Value<int?> projectNumber;
   final Value<int> rowid;
   const ProjectsCompanion({
     this.id = const Value.absent(),
@@ -7376,6 +7492,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     this.notes = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.foundingYear = const Value.absent(),
+    this.projectNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProjectsCompanion.insert({
@@ -7386,6 +7504,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     this.notes = const Value.absent(),
     this.status = const Value.absent(),
     required DateTime createdAt,
+    this.foundingYear = const Value.absent(),
+    this.projectNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -7399,6 +7519,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Expression<String>? notes,
     Expression<String>? status,
     Expression<DateTime>? createdAt,
+    Expression<int>? foundingYear,
+    Expression<int>? projectNumber,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -7409,6 +7531,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
       if (notes != null) 'notes': notes,
       if (status != null) 'status': status,
       if (createdAt != null) 'created_at': createdAt,
+      if (foundingYear != null) 'founding_year': foundingYear,
+      if (projectNumber != null) 'project_number': projectNumber,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -7421,6 +7545,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Value<String?>? notes,
     Value<ProjectStatus>? status,
     Value<DateTime>? createdAt,
+    Value<int?>? foundingYear,
+    Value<int?>? projectNumber,
     Value<int>? rowid,
   }) {
     return ProjectsCompanion(
@@ -7431,6 +7557,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
       notes: notes ?? this.notes,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      foundingYear: foundingYear ?? this.foundingYear,
+      projectNumber: projectNumber ?? this.projectNumber,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -7461,6 +7589,12 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (foundingYear.present) {
+      map['founding_year'] = Variable<int>(foundingYear.value);
+    }
+    if (projectNumber.present) {
+      map['project_number'] = Variable<int>(projectNumber.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -7477,6 +7611,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
           ..write('notes: $notes, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
+          ..write('foundingYear: $foundingYear, ')
+          ..write('projectNumber: $projectNumber, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -26091,6 +26227,8 @@ typedef $$ProjectsTableCreateCompanionBuilder =
       Value<String?> notes,
       Value<ProjectStatus> status,
       required DateTime createdAt,
+      Value<int?> foundingYear,
+      Value<int?> projectNumber,
       Value<int> rowid,
     });
 typedef $$ProjectsTableUpdateCompanionBuilder =
@@ -26102,6 +26240,8 @@ typedef $$ProjectsTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<ProjectStatus> status,
       Value<DateTime> createdAt,
+      Value<int?> foundingYear,
+      Value<int?> projectNumber,
       Value<int> rowid,
     });
 
@@ -26271,6 +26411,16 @@ class $$ProjectsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get foundingYear => $composableBuilder(
+    column: $table.foundingYear,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get projectNumber => $composableBuilder(
+    column: $table.projectNumber,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -26480,6 +26630,16 @@ class $$ProjectsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get foundingYear => $composableBuilder(
+    column: $table.foundingYear,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get projectNumber => $composableBuilder(
+    column: $table.projectNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CompaniesTableOrderingComposer get companyId {
     final $$CompaniesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -26550,6 +26710,16 @@ class $$ProjectsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get foundingYear => $composableBuilder(
+    column: $table.foundingYear,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get projectNumber => $composableBuilder(
+    column: $table.projectNumber,
+    builder: (column) => column,
+  );
 
   $$CompaniesTableAnnotationComposer get companyId {
     final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
@@ -26767,6 +26937,8 @@ class $$ProjectsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<ProjectStatus> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int?> foundingYear = const Value.absent(),
+                Value<int?> projectNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion(
                 id: id,
@@ -26776,6 +26948,8 @@ class $$ProjectsTableTableManager
                 notes: notes,
                 status: status,
                 createdAt: createdAt,
+                foundingYear: foundingYear,
+                projectNumber: projectNumber,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -26787,6 +26961,8 @@ class $$ProjectsTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<ProjectStatus> status = const Value.absent(),
                 required DateTime createdAt,
+                Value<int?> foundingYear = const Value.absent(),
+                Value<int?> projectNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion.insert(
                 id: id,
@@ -26796,6 +26972,8 @@ class $$ProjectsTableTableManager
                 notes: notes,
                 status: status,
                 createdAt: createdAt,
+                foundingYear: foundingYear,
+                projectNumber: projectNumber,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

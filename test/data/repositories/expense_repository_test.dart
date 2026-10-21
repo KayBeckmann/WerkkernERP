@@ -5,6 +5,7 @@ import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/data/repositories/expense_category_repository.dart';
 import 'package:werkkernerp/data/repositories/expense_repository.dart';
+import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 import 'package:werkkernerp/data/repositories/project_repository.dart';
 
 /// C14.2 Belege/Ausgaben (Kay-Priorisierungsentscheidung 2026-10-18).
@@ -91,7 +92,7 @@ void main() {
     'findet nur die zugeordneten Belege',
     () async {
       final company = await companies.create(name: 'Firma A');
-      final projects = ProjectRepository(db);
+      final projects = ProjectRepository(db, NumberSequenceRepository(db));
       final projectA = await projects.create(companyId: company.id, name: 'Projekt A');
       final projectB = await projects.create(companyId: company.id, name: 'Projekt B');
 
@@ -141,7 +142,7 @@ void main() {
     'Löschen eines Projekts reißt keinen bereits erfassten Beleg mit (onDelete: setNull)',
     () async {
       final company = await companies.create(name: 'Firma A');
-      final projects = ProjectRepository(db);
+      final projects = ProjectRepository(db, NumberSequenceRepository(db));
       final project = await projects.create(companyId: company.id, name: 'Projekt A');
       final expense = await expenses.create(
         companyId: company.id,

@@ -47,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 29;
+  int get schemaVersion => 30;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -314,6 +314,16 @@ class AppDatabase extends _$AppDatabase {
             if (from >= 10) {
               await migrator.addColumn(vehicleCostEntries, vehicleCostEntries.principalAmountCents);
               await migrator.addColumn(vehicleCostEntries, vehicleCostEntries.interestAmountCents);
+            }
+          }
+          if (from < 30) {
+            // C2 Projektnummer-Nummernkreise (Nachtrag 2026-10-21).
+            // Gleicher Guard wie oben: `projects` wird bei `from < 9`
+            // per `createTable()` bereits mit der aktuellen, vollen
+            // Definition inkl. dieser beiden Spalten angelegt.
+            if (from >= 9) {
+              await migrator.addColumn(projects, projects.foundingYear);
+              await migrator.addColumn(projects, projects.projectNumber);
             }
           }
         },
