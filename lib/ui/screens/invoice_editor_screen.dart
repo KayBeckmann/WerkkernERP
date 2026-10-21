@@ -173,7 +173,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   // Modul aktiviert hat.
   bool _advancePaymentInvoicesEnabled = false;
   bool _isAdvancePayment = false;
-  Money _priorAdvancePaymentsGross = Money.zero();
+
+  // Aufgeschlüsselt seit Nachtrag 2026-10-21 ("Diese müssen
+  // aufgeschlüsselt werden und die Rechnungsnummern der Teilzahlungen
+  // müssen aufgelistet werden") — vorher nur eine Summe ohne Herkunft
+  // (`Money _priorAdvancePaymentsGross`).
+  List<AdvancePaymentEntry> _priorAdvancePayments = const [];
+  Money get _priorAdvancePaymentsGrossSum =>
+      _priorAdvancePayments.fold<Money>(Money.zero(), (sum, e) => sum + e.amountGross);
 
   // C3.2 Festpreis-Kennzeichen (Nachtrag 2026-10-20) — nur bei
   // kind == quote/order sinnvoll, siehe Doc-Kommentar bei
@@ -290,8 +297,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           invoice.kind == DocumentKind.invoice &&
           !invoice.isAdvancePayment &&
           invoice.convertedFromId != null) {
-        _priorAdvancePaymentsGross =
-            await invoiceRepo.sumAdvancePaymentsForOrder(invoice.convertedFromId!);
+        _priorAdvancePayments =
+            await invoiceRepo.listAdvancePaymentsForOrder(invoice.convertedFromId!);
       }
       final items = await invoiceRepo.itemsFor(invoice.id);
       _items.addAll([
@@ -887,7 +894,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         invoice: invoice,
         items: items,
         company: company,
-        priorAdvancePaymentsGross: _priorAdvancePaymentsGross,
+        priorAdvancePayments: _priorAdvancePayments,
         referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
       );
       await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
@@ -947,7 +954,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           invoice: invoice,
           items: items,
           company: company,
-          priorAdvancePaymentsGross: _priorAdvancePaymentsGross,
+          priorAdvancePayments: _priorAdvancePayments,
           referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
         );
       },
@@ -1019,8 +1026,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         builder: (_) => Scaffold(
           appBar: AppBar(title: const Text('Vorschau (Entwurf, nicht final)')),
           body: PdfPreview(
-            build: (format) =>
-                buildDraftPreviewPdf(invoice: previewInvoice, items: previewItems, company: company),
+            build: (format) => buildDraftPreviewPdf(
+              invoice: previewInvoice,
+              items: previewItems,
+              company: company,
+              priorAdvancePayments: _priorAdvancePayments,
+            ),
             canChangeOrientation: false,
             canChangePageFormat: false,
             allowSharing: false,
@@ -1466,19 +1477,29 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                     'Gesamt: ${totals.totalGross}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  // C13 Abschlagsrechnungen: Abzugszeile nur, wenn diese
+                  // C13 Abschlagsrechnungen: Abzugszeilen nur, wenn diese
                   // Rechnung aus einem Angebot/Auftrag entstanden ist UND
-                  // bereits finalisierte Abschlagsrechnungen dazu existieren
-                  // (siehe `InvoiceRepository.sumAdvancePaymentsForOrder`).
-                  if (_priorAdvancePaymentsGross.cents > 0) ...[
+                  // bereits finalisierte Abschlagsrechnungen dazu
+                  // existieren (siehe `InvoiceRepository.
+                  // listAdvancePaymentsForOrder`). Aufgeschlüsselt seit
+                  // Nachtrag 2026-10-21 — eine Zeile je Abschlagsrechnung
+                  // mit ihrer Rechnungsnummer, statt nur einer Summe ohne
+                  // Herkunft.
+                  if (_priorAdvancePayments.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      'Bereits erhaltene Abschlagszahlungen: −$_priorAdvancePaymentsGross',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    for (final entry in _priorAdvancePayments)
+                      Text(
+                        'Abschlagsrechnung ${entry.invoiceNumber}: −${entry.amountGross}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    if (_priorAdvancePayments.length > 1)
+                      Text(
+                        'Abschlagszahlungen gesamt: −$_priorAdvancePaymentsGrossSum',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
                     const Divider(),
                     Text(
-                      'Restbetrag: ${totals.totalGross - _priorAdvancePaymentsGross}',
+                      'Restbetrag: ${totals.totalGross - _priorAdvancePaymentsGrossSum}',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ],

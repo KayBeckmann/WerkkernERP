@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../data/database/database.dart';
 import '../data/database/tables.dart';
+import '../data/repositories/invoice_repository.dart' show AdvancePaymentEntry;
 import '../domain/models/money.dart';
 import '../domain/services/document_text_resolver.dart';
 import '../domain/services/invoice_totals_service.dart';
@@ -29,12 +30,14 @@ Future<Uint8List> buildInvoicePdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
   required Company company,
-  // C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
-  // Summe bereits finalisierter Abschlagsrechnungen zum selben
-  // Quelldokument (siehe `InvoiceRepository.sumAdvancePaymentsForOrder`)
-  // — `null`/`Money.zero()` zeigt keine Abzugszeile. Arbeitsvorgabe statt
-  // Rechtsprüfung: die Summe enthält die volle USt der Abschläge.
-  Money? priorAdvancePaymentsGross,
+  // C13 Abschlagsrechnungen, aufgeschlüsselt seit Nachtrag 2026-10-21
+  // ("Diese müssen aufgeschlüsselt werden und die Rechnungsnummern der
+  // Teilzahlungen müssen aufgelistet werden") — eine Zeile je
+  // finalisierter Abschlagsrechnung zum selben Quelldokument (siehe
+  // `InvoiceRepository.listAdvancePaymentsForOrder`), leer = keine
+  // Abzugszeile. Arbeitsvorgabe statt Rechtsprüfung: jeder Betrag
+  // enthält die volle USt der jeweiligen Abschlagsrechnung.
+  List<AdvancePaymentEntry> priorAdvancePayments = const [],
   // Gutschriften (Kay-Entscheidung 2026-10-19): Nummer der Rechnung, auf
   // die sich eine Gutschrift bezieht — `null` bei allen übrigen
   // Dokumentarten. Reiner Anzeigetext, keine eigene Berechnung.
@@ -48,7 +51,7 @@ Future<Uint8List> buildInvoicePdf({
     items: items,
     company: company,
     isPreview: false,
-    priorAdvancePaymentsGross: priorAdvancePaymentsGross,
+    priorAdvancePayments: priorAdvancePayments,
     referencedDocumentNumber: referencedDocumentNumber,
   );
 }
@@ -70,8 +73,15 @@ Future<Uint8List> buildDraftPreviewPdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
   required Company company,
+  List<AdvancePaymentEntry> priorAdvancePayments = const [],
 }) {
-  return _buildPdf(invoice: invoice, items: items, company: company, isPreview: true);
+  return _buildPdf(
+    invoice: invoice,
+    items: items,
+    company: company,
+    isPreview: true,
+    priorAdvancePayments: priorAdvancePayments,
+  );
 }
 
 Future<Uint8List> _buildPdf({
@@ -79,7 +89,7 @@ Future<Uint8List> _buildPdf({
   required List<InvoiceItem> items,
   required Company company,
   required bool isPreview,
-  Money? priorAdvancePaymentsGross,
+  List<AdvancePaymentEntry> priorAdvancePayments = const [],
   String? referencedDocumentNumber,
 }) async {
   final totals = calculateInvoiceTotals([
@@ -170,7 +180,7 @@ Future<Uint8List> _buildPdf({
           ..._buildGroup(key, groups[key]!, showPrices: invoice.kind != DocumentKind.deliveryNote),
         pw.SizedBox(height: 16),
         if (invoice.kind != DocumentKind.deliveryNote)
-          _buildTotals(totals, priorAdvancePaymentsGross: priorAdvancePaymentsGross),
+          _buildTotals(totals, priorAdvancePayments: priorAdvancePayments),
         // Nachtrag 2026-10-18: Kleinunternehmerregelung (§19 UStG) —
         // bewusst ein fester, nicht editierbarer Hinweis statt im frei
         // änderbaren Schlusstext, damit er beim Bearbeiten des
@@ -440,11 +450,13 @@ Money _groupTotal(List<InvoiceItem> items) => calculateInvoiceTotals([
         ),
     ]).totalGross;
 
-pw.Widget _buildTotals(InvoiceTotals totals, {Money? priorAdvancePaymentsGross}) {
-  // C13 Abschlagsrechnungen: nur eine Abzugszeile zeigen, wenn tatsächlich
+pw.Widget _buildTotals(InvoiceTotals totals, {List<AdvancePaymentEntry> priorAdvancePayments = const []}) {
+  // C13 Abschlagsrechnungen: nur Abzugszeilen zeigen, wenn tatsächlich
   // etwas abzuziehen ist — sonst bleibt das Layout wie bisher.
-  final hasAdvancePayments = priorAdvancePaymentsGross != null && priorAdvancePaymentsGross.cents > 0;
-  final remaining = hasAdvancePayments ? totals.totalGross - priorAdvancePaymentsGross : null;
+  final hasAdvancePayments = priorAdvancePayments.isNotEmpty;
+  final totalAdvancePaymentsGross =
+      priorAdvancePayments.fold<Money>(Money.zero(), (sum, e) => sum + e.amountGross);
+  final remaining = hasAdvancePayments ? totals.totalGross - totalAdvancePaymentsGross : null;
 
   return pw.Align(
     alignment: pw.Alignment.centerRight,
@@ -487,16 +499,41 @@ pw.Widget _buildTotals(InvoiceTotals totals, {Money? priorAdvancePaymentsGross})
             ],
           ),
           if (hasAdvancePayments) ...[
-            pw.Padding(
-              padding: const pw.EdgeInsets.symmetric(vertical: 2),
-              child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Bereits erhaltene Abschlagszahlungen', style: const pw.TextStyle(fontSize: 9)),
-                  pw.Text('− $priorAdvancePaymentsGross', style: const pw.TextStyle(fontSize: 9)),
-                ],
+            // Kay-Nachtrag 2026-10-21: "Diese müssen aufgeschlüsselt
+            // werden und die Rechnungsnummern der Teilzahlungen müssen
+            // aufgelistet werden" — eine Zeile je Abschlagsrechnung
+            // statt nur einer Summe ohne Herkunft.
+            for (final entry in priorAdvancePayments)
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      'Abschlagsrechnung ${entry.invoiceNumber}',
+                      style: const pw.TextStyle(fontSize: 9),
+                    ),
+                    pw.Text('− ${entry.amountGross}', style: const pw.TextStyle(fontSize: 9)),
+                  ],
+                ),
               ),
-            ),
+            if (priorAdvancePayments.length > 1)
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text(
+                      'Abschlagszahlungen gesamt',
+                      style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.Text(
+                      '− $totalAdvancePaymentsGross',
+                      style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
             pw.Divider(),
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,

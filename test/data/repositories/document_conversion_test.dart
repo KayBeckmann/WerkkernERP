@@ -556,6 +556,76 @@ void main() {
   );
 
   test(
+    'C13 (Nachtrag 2026-10-21): listAdvancePaymentsForOrder() schlüsselt jede finalisierte '
+    'Abschlagsrechnung einzeln mit Rechnungsnummer und Betrag auf, sortiert nach Nummer, '
+    'ohne Entwürfe oder die Schlussrechnung selbst',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final customer = await customers.create(companyId: company.id, name: 'Kunde');
+      final orderDraft = await invoices.createDraft(
+        companyId: company.id,
+        customerId: customer.id,
+        issueDate: DateTime.now(),
+        serviceDate: DateTime.now(),
+        kind: DocumentKind.order,
+        items: [textItem('Komplettauftrag', price: 100000)],
+      );
+      final orderFinal = await invoices.finalize(companyId: company.id, id: orderDraft.id);
+
+      final advance1Draft = await invoices.convertTo(
+        companyId: company.id,
+        sourceId: orderFinal!.id,
+        targetKind: DocumentKind.invoice,
+      );
+      await invoices.update(
+        companyId: company.id,
+        id: advance1Draft.id,
+        isAdvancePayment: true,
+        items: [textItem('Abschlag 1', price: 30000)],
+      );
+      final advance1Final = await invoices.finalize(companyId: company.id, id: advance1Draft.id);
+
+      final advance2Draft = await invoices.convertTo(
+        companyId: company.id,
+        sourceId: orderFinal.id,
+        targetKind: DocumentKind.invoice,
+      );
+      await invoices.update(
+        companyId: company.id,
+        id: advance2Draft.id,
+        isAdvancePayment: true,
+        items: [textItem('Abschlag 2', price: 20000)],
+      );
+      final advance2Final = await invoices.finalize(companyId: company.id, id: advance2Draft.id);
+
+      // Entwurf bleibt unfinalisiert -> darf NICHT in der Liste auftauchen.
+      await invoices.update(
+        companyId: company.id,
+        id: (await invoices.convertTo(
+          companyId: company.id,
+          sourceId: orderFinal.id,
+          targetKind: DocumentKind.invoice,
+        ))
+            .id,
+        isAdvancePayment: true,
+        items: [textItem('Nicht finalisierter Abschlag', price: 99999)],
+      );
+
+      final entries = await invoices.listAdvancePaymentsForOrder(orderFinal.id);
+      expect(entries, hasLength(2));
+      expect(
+        entries.map((e) => e.invoiceNumber),
+        [advance1Final!.invoiceNumber, advance2Final!.invoiceNumber]
+          ..sort(),
+        reason: 'Sortiert nach Rechnungsnummer, unabhängig von der Erstellungsreihenfolge',
+      );
+      final byNumber = {for (final e in entries) e.invoiceNumber: e.amountGross};
+      expect(byNumber[advance1Final.invoiceNumber], (await invoices.totalsFor(advance1Final.id)).totalGross);
+      expect(byNumber[advance2Final.invoiceNumber], (await invoices.totalsFor(advance2Final.id)).totalGross);
+    },
+  );
+
+  test(
     'C13: isAdvancePayment bleibt über update() und finalize() hinweg erhalten und ist '
     'standardmäßig aus',
     () async {
