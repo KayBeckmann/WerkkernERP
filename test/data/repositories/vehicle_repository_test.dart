@@ -87,4 +87,35 @@ void main() {
     final costs = await vehicles.listCostsForVehicle(companyId: company.id, vehicleId: vehicle.id);
     expect(costs.map((c) => c.amountCents), [2000, 1000]);
   });
+
+  test(
+    'C6-Nachtrag (2026-10-21): Tilgungs-/Zinsanteil einer Leasing-Buchung wird gespeichert, '
+    'bleibt bei anderen Kategorien unbefüllt möglich',
+    () async {
+      final company = await companies.create(name: 'Firma A');
+      final vehicle = await vehicles.create(companyId: company.id, name: 'Transporter 1');
+
+      final leasingEntry = await vehicles.addCostEntry(
+        companyId: company.id,
+        vehicleId: vehicle.id,
+        date: DateTime.now(),
+        amountCents: 50000,
+        category: VehicleCostCategory.leasing,
+        principalAmountCents: 40000,
+        interestAmountCents: 10000,
+      );
+      expect(leasingEntry.principalAmountCents, 40000);
+      expect(leasingEntry.interestAmountCents, 10000);
+
+      final fuelEntry = await vehicles.addCostEntry(
+        companyId: company.id,
+        vehicleId: vehicle.id,
+        date: DateTime.now(),
+        amountCents: 5000,
+        category: VehicleCostCategory.fuel,
+      );
+      expect(fuelEntry.principalAmountCents, isNull);
+      expect(fuelEntry.interestAmountCents, isNull);
+    },
+  );
 }

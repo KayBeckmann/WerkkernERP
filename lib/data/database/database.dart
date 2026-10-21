@@ -47,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => 29;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -299,6 +299,22 @@ class AppDatabase extends _$AppDatabase {
           if (from < 28) {
             // C3.2 Festpreis-Kennzeichen (Nachtrag 2026-10-20).
             await migrator.addColumn(invoices, invoices.isFixedPrice);
+          }
+          if (from < 29) {
+            // C6-Nachtrag (2026-10-21): Tilgungs-/Zinsanteil je
+            // Fahrzeug-Kostenbuchung. Guard wie bei
+            // `purchaseOrders.projectId`/`expenses.projectId`: wird in
+            // EINEM Upgrade-Lauf auch die `from < 10`-Stufe durchlaufen
+            // (C6 Fuhrpark), legt deren `createTable(vehicleCostEntries)`
+            // die Tabelle bereits mit der aktuellen, vollen Dart-
+            // Definition inkl. dieser beiden Spalten an — ein
+            // zusätzliches `addColumn` hier wäre dann "duplicate column
+            // name". Nur nötig, wenn die Tabelle schon VOR diesem
+            // Upgrade-Lauf existierte.
+            if (from >= 10) {
+              await migrator.addColumn(vehicleCostEntries, vehicleCostEntries.principalAmountCents);
+              await migrator.addColumn(vehicleCostEntries, vehicleCostEntries.interestAmountCents);
+            }
           }
         },
       );

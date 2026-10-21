@@ -34,7 +34,9 @@ import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 /// Nachtrag 2026-10-19; v25→v26: C5.3 Inventur/Bewegungsprotokoll +
 /// SKR03-Kontierung/Projektzuordnung, Nachtrag 2026-10-19; v26→v27:
 /// C3.1 Zeiterfassungs-Grundlage, Nachtrag 2026-10-20; v27→v28: C3.2
-/// Festpreis-Kennzeichen, Nachtrag 2026-10-20).
+/// Festpreis-Kennzeichen, Nachtrag 2026-10-20; v28→v29: C6-Nachtrag
+/// Tilgungs-/Zinsanteil bei Fahrzeug-Finanzierungskosten,
+/// Nachtrag 2026-10-21).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -257,6 +259,12 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN time_tracking_enabled;');
       // v27 -> v28 (C3.2 Festpreis-Kennzeichen, Nachtrag 2026-10-20).
       raw.execute('ALTER TABLE invoices DROP COLUMN is_fixed_price;');
+      // v28 -> v29 (C6-Nachtrag: Tilgungs-/Zinsanteil, 2026-10-21) —
+      // kein eigener Rückbau-Schritt nötig: `vehicle_cost_entries` ist
+      // beim Rückbau von v9→v10 oben bereits komplett gedroppt, die
+      // beiden neuen Spalten existieren in dieser Testdatenbank also
+      // gar nicht mehr und müssen nicht separat entfernt werden (siehe
+      // den `from >= 10`-Guard in database.dart).
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -386,6 +394,22 @@ void main() {
               ..where((c) => c.id.equals('cost-nach-migration')))
             .getSingle();
         expect(createdCost.amountCents, 5000);
+        expect(createdCost.principalAmountCents, isNull);
+        expect(createdCost.interestAmountCents, isNull);
+
+        // v28 -> v29: Tilgungs-/Zinsanteil nutzbar.
+        await (db.update(db.vehicleCostEntries)..where((c) => c.id.equals('cost-nach-migration')))
+            .write(
+          const VehicleCostEntriesCompanion(
+            principalAmountCents: Value(4000),
+            interestAmountCents: Value(1000),
+          ),
+        );
+        final updatedCost = await (db.select(db.vehicleCostEntries)
+              ..where((c) => c.id.equals('cost-nach-migration')))
+            .getSingle();
+        expect(updatedCost.principalAmountCents, 4000);
+        expect(updatedCost.interestAmountCents, 1000);
 
         // RecurringInvoiceTemplates/-Items existieren nach der Migration
         // und sind nutzbar.

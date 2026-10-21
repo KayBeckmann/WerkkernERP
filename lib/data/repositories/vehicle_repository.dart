@@ -80,6 +80,13 @@ class VehicleRepository {
             ..orderBy([(c) => OrderingTerm.desc(c.date)]))
           .get();
 
+  /// [principalAmountCents]/[interestAmountCents] (C6-Nachtrag
+  /// 2026-10-21): optionale Aufschlüsselung von [amountCents] bei
+  /// Leasing/Finanzierung in Tilgungs- und Zinsanteil — siehe
+  /// Doc-Kommentar bei `VehicleCostEntries` in tables.dart. Für jede
+  /// andere Kategorie bleiben beide sinnvollerweise `null`, das
+  /// erzwingt die Methode aber nicht (keine fachliche Prüfung hier,
+  /// Kay befüllt sie nur bei Leasing über die UI).
   Future<VehicleCostEntry> addCostEntry({
     required String companyId,
     required String vehicleId,
@@ -88,6 +95,8 @@ class VehicleRepository {
     required VehicleCostCategory category,
     String? description,
     String? projectId,
+    int? principalAmountCents,
+    int? interestAmountCents,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.vehicleCostEntries).insert(
@@ -100,6 +109,8 @@ class VehicleRepository {
             category: category,
             description: Value(description),
             projectId: Value(projectId),
+            principalAmountCents: Value(principalAmountCents),
+            interestAmountCents: Value(interestAmountCents),
             createdAt: DateTime.now(),
           ),
         );
