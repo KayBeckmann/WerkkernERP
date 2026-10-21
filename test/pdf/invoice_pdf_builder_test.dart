@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/data/database/tables.dart';
+import 'package:werkkernerp/data/repositories/invoice_repository.dart' show AdvancePaymentEntry;
 import 'package:werkkernerp/domain/models/money.dart';
 import 'package:werkkernerp/pdf/invoice_pdf_builder.dart';
 
@@ -262,7 +263,9 @@ void main() {
   );
 
   test(
-    'C13: Schlussrechnung-PDF mit Abzugszeile für bereits erhaltene Abschlagszahlungen wird '
+    'C13: Schlussrechnung-PDF mit aufgeschlüsselten Abzugszeilen für mehrere bereits '
+    'erhaltene Abschlagszahlungen (Nachtrag 2026-10-21: "Diese müssen aufgeschlüsselt '
+    'werden und die Rechnungsnummern der Teilzahlungen müssen aufgelistet werden") wird '
     'ohne Fehler erzeugt',
     () async {
       final invoice = draftInvoice(invoiceNumber: 'R-26006');
@@ -270,7 +273,10 @@ void main() {
         invoice: invoice,
         items: [item(description: 'Gesamtleistung', price: 100000)],
         company: testCompany(),
-        priorAdvancePaymentsGross: Money.fromCents(30000),
+        priorAdvancePayments: const [
+          AdvancePaymentEntry(invoiceNumber: 'R-26003', amountGross: Money.fromCents(20000)),
+          AdvancePaymentEntry(invoiceNumber: 'R-26004', amountGross: Money.fromCents(10000)),
+        ],
       );
       expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
       expect(bytes.length, greaterThan(1000));
