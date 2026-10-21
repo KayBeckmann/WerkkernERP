@@ -73,10 +73,22 @@ String _prefixFor(DocumentKind kind) => switch (kind) {
 
 /// `R-JJxxx`/`An-JJxxx`/`A-JJxxx`, z. B. `R-26054` — mindestens drei
 /// Stellen, wächst darüber hinaus ohne Begrenzung (F5).
-String formatDocumentNumber({required DocumentKind kind, required int year, required int number}) {
+///
+/// [projectNumber] (C2-Nachtrag 2026-10-21) fügt bei einer
+/// projektbezogenen Rechnung die Projekt-Kennziffer PP ein:
+/// `R-JJPPxxx`, z. B. `R-2605034` bei PP=05 — mindestens zwei Stellen,
+/// wächst ebenfalls ohne Begrenzung. `null` (projektfreie Rechnung)
+/// liefert unverändert das bisherige `R-JJxxx`-Format.
+String formatDocumentNumber({
+  required DocumentKind kind,
+  required int year,
+  required int number,
+  int? projectNumber,
+}) {
   final shortYear = (year % 100).toString().padLeft(2, '0');
   final paddedNumber = number.toString().padLeft(3, '0');
-  return '${_prefixFor(kind)}-$shortYear$paddedNumber';
+  final ppPart = projectNumber == null ? '' : projectNumber.toString().padLeft(2, '0');
+  return '${_prefixFor(kind)}-$shortYear$ppPart$paddedNumber';
 }
 
 /// C5.2 Bestellwesen (Nachtrag 2026-10-19) — `documentType`-Wert für

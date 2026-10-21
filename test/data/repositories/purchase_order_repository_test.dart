@@ -40,7 +40,7 @@ void main() {
     articles = ArticleRepository(db);
     invoices = InvoiceRepository(db, NumberSequenceRepository(db));
     purchaseOrders = PurchaseOrderRepository(db, NumberSequenceRepository(db));
-    projects = ProjectRepository(db);
+    projects = ProjectRepository(db, NumberSequenceRepository(db));
     expenseCategories = ExpenseCategoryRepository(db);
     expenses = ExpenseRepository(db);
   });

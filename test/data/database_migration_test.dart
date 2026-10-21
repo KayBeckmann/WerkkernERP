@@ -36,7 +36,8 @@ import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 /// C3.1 Zeiterfassungs-Grundlage, Nachtrag 2026-10-20; v27→v28: C3.2
 /// Festpreis-Kennzeichen, Nachtrag 2026-10-20; v28→v29: C6-Nachtrag
 /// Tilgungs-/Zinsanteil bei Fahrzeug-Finanzierungskosten,
-/// Nachtrag 2026-10-21).
+/// Nachtrag 2026-10-21; v29→v30: C2-Nachtrag Projektnummer-
+/// Nummernkreise, Nachtrag 2026-10-21).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -265,6 +266,11 @@ void main() {
       // beiden neuen Spalten existieren in dieser Testdatenbank also
       // gar nicht mehr und müssen nicht separat entfernt werden (siehe
       // den `from >= 10`-Guard in database.dart).
+      // v29 -> v30 (C2-Nachtrag: Projektnummer-Nummernkreise,
+      // 2026-10-21) — aus demselben Grund ebenfalls kein eigener
+      // Rückbau-Schritt: `projects` ist beim Rückbau von v8→v9 oben
+      // bereits komplett gedroppt (siehe den `from >= 9`-Guard in
+      // database.dart).
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -368,6 +374,18 @@ void main() {
               ..where((p) => p.id.equals('project-nach-migration')))
             .getSingle();
         expect(createdProject.status, ProjectStatus.active);
+        expect(createdProject.foundingYear, isNull, reason: 'erst durch den Backfill belegt');
+        expect(createdProject.projectNumber, isNull);
+
+        // v29 -> v30: foundingYear/projectNumber nutzbar.
+        await (db.update(db.projects)..where((p) => p.id.equals('project-nach-migration'))).write(
+          const ProjectsCompanion(foundingYear: Value(2026), projectNumber: Value(1)),
+        );
+        final updatedProject = await (db.select(db.projects)
+              ..where((p) => p.id.equals('project-nach-migration')))
+            .getSingle();
+        expect(updatedProject.foundingYear, 2026);
+        expect(updatedProject.projectNumber, 1);
 
         // Vehicles/VehicleCostEntries-Tabellen existieren nach der
         // Migration und sind nutzbar.

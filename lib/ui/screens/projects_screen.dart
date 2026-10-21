@@ -13,6 +13,18 @@ import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import 'invoices_screen.dart' show DocumentLabels;
 
+/// C2-Nachtrag (2026-10-21) — Anzeige von Gründungsjahr+PP, z. B. "26/01",
+/// vor dem Projektnamen. `null`, solange die rückwirkende Vergabe
+/// (`ProjectRepository.backfillProjectNumbersIfMissing`) noch nicht
+/// gelaufen ist (kurzzeitig beim allerersten Laden nach dem Update).
+String? _projectNumberLabel(Project project) {
+  final year = project.foundingYear;
+  final number = project.projectNumber;
+  if (year == null || number == null) return null;
+  final shortYear = (year % 100).toString().padLeft(2, '0');
+  return '$shortYear/${number.toString().padLeft(2, '0')}';
+}
+
 /// Projektliste der aktiven Firma (C1-Kern, Kay-Priorisierungsentscheidung
 /// 2026-10-17). Zeigt nur aktive Projekte — archivierte bleiben in der DB
 /// erhalten (gleiches Prinzip wie die Modul-Schalter), tauchen hier aber
@@ -37,6 +49,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final projectRepo = context.read<ProjectRepository>();
     final customerRepo = context.read<CustomerRepository>();
+    // C2-Nachtrag (2026-10-21): rückwirkende PP-Vergabe für Projekte von
+    // vor diesem Nachtrag — lazy, gleiches Prinzip wie
+    // ExpenseCategoryRepository.seedDefaultsIfNeverSeeded().
+    await projectRepo.backfillProjectNumbersIfMissing(companyId);
     final projects = await projectRepo.listForCompany(companyId);
     final customers = await customerRepo.listForCompany(companyId);
     return _ProjectsData(projects: projects, customerById: {for (final c in customers) c.id: c});
@@ -89,10 +105,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             itemBuilder: (context, index) {
               final project = data.projects[index];
               final customer = project.customerId == null ? null : data.customerById[project.customerId];
+              final numberLabel = _projectNumberLabel(project);
               return Card(
                 child: ListTile(
                   leading: const Icon(Icons.folder_outlined),
-                  title: Text(project.name),
+                  title: Text(numberLabel == null ? project.name : '$numberLabel · ${project.name}'),
                   subtitle: customer != null ? Text(customer.name) : const Text('Ohne Kundenbezug'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () async {
@@ -334,7 +351,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.project.name),
+        title: Text(
+          _projectNumberLabel(widget.project) == null
+              ? widget.project.name
+              : '${_projectNumberLabel(widget.project)} · ${widget.project.name}',
+        ),
         actions: [
           IconButton(
             icon: Icon(

@@ -303,13 +303,41 @@ class InvoiceRepository {
           .getSingle();
 
       final now = DateTime.now();
-      final year = now.year;
+
+      // C2-Nachtrag (2026-10-21, Kay-Entscheidung auf Rückfrage): bei
+      // einer projektbezogenen Rechnung folgt das angezeigte JJ dem
+      // Projekt-Gründungsjahr, nicht dem tatsächlichen
+      // Finalisierungsjahr — das verhindert, dass zwei verschiedene
+      // Projekte (eines von 2026, eines neu 2027) in ihren
+      // Rechnungsnummern dieselbe JJPP-Kombination zeigen, nur weil
+      // beide zufällig im selben Kalenderjahr eine Rechnung bekommen.
+      // Der Zähler (xxx) bucht konsistent in genau demselben Jahr, aus
+      // dem auch das angezeigte JJ stammt — sonst könnte eine
+      // projektbezogene und eine projektfreie Rechnung mit demselben
+      // sichtbaren JJ aus zwei verschiedenen Zähler-Buckets stammen.
+      // Noch nicht rückwirkend nummerierte Projekte (`projectNumber ==
+      // null`, siehe `ProjectRepository.backfillProjectNumbersIfMissing`)
+      // fallen auf das bisherige Verhalten zurück (kein PP, tatsächliches
+      // Jahr) statt die Finalisierung zu blockieren.
+      Project? project;
+      if (invoice.projectId != null) {
+        project = await (_db.select(_db.projects)..where((p) => p.id.equals(invoice.projectId!)))
+            .getSingleOrNull();
+      }
+      final projectNumber = project?.projectNumber;
+      final year = (project != null && projectNumber != null) ? project.foundingYear! : now.year;
+
       final number = await _numberSequences.allocateNext(
         companyId: companyId,
         documentType: invoice.kind.name,
         year: year,
       );
-      final invoiceNumber = formatDocumentNumber(kind: invoice.kind, year: year, number: number);
+      final invoiceNumber = formatDocumentNumber(
+        kind: invoice.kind,
+        year: year,
+        number: number,
+        projectNumber: projectNumber,
+      );
 
       await (_db.update(_db.invoices)..where((i) => i.id.equals(id))).write(
         InvoicesCompanion(

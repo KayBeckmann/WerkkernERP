@@ -608,6 +608,27 @@ class Projects extends Table {
       textEnum<ProjectStatus>().withDefault(Constant(ProjectStatus.active.name))();
   DateTimeColumn get createdAt => dateTime()();
 
+  /// C2 Projektnummer-Nummernkreise (Nachtrag 2026-10-21, Kay-
+  /// Entscheidung auf Rückfrage) — beide Felder werden bei Anlage des
+  /// Projekts **fest eingefroren** (nie neu vergeben, auch wenn das
+  /// Projekt später über Jahre hinweg weiterläuft). [projectNumber]
+  /// (PP) ist ein pro Firma und [foundingYear] eigener Zähler, startet
+  /// also jedes Kalenderjahr wieder bei 1 — siehe
+  /// `ProjectRepository.create()`/`NumberSequenceRepository` (Zähler-
+  /// Dokumenttyp `"project"`). Beide `null` bei Projekten, die vor
+  /// diesem Nachtrag angelegt wurden, bis
+  /// `ProjectRepository.backfillProjectNumbersIfMissing()` einmalig
+  /// nachträgt (in Anlage-Reihenfolge je Gründungsjahr, siehe dort).
+  /// Genutzt von `formatDocumentNumber()` für das Format `R-JJPPxxx`
+  /// bei einer projektbezogenen Rechnung — dabei folgt das angezeigte
+  /// JJ bewusst [foundingYear], NICHT dem tatsächlichen Jahr der
+  /// einzelnen Rechnung (Kay-Entscheidung: vermeidet, dass zwei
+  /// verschiedene Projekte in ihren Rechnungsnummern dieselbe JJPP-
+  /// Kombination zeigen, nur weil beide zufällig im selben Kalenderjahr
+  /// eine weitere Rechnung bekommen).
+  IntColumn get foundingYear => integer().nullable()();
+  IntColumn get projectNumber => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

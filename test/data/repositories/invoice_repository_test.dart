@@ -237,7 +237,7 @@ void main() {
     'C1: eine Rechnung kann einem Projekt zugeordnet, später geändert und wieder entfernt '
     'werden — listForProject() findet sie entsprechend',
     () async {
-      final projects = ProjectRepository(db);
+      final projects = ProjectRepository(db, NumberSequenceRepository(db));
       final company = await companies.create(name: 'Firma A');
       final customer = await customers.create(companyId: company.id, name: 'Kunde');
       final projectA = await projects.create(companyId: company.id, name: 'Projekt A');

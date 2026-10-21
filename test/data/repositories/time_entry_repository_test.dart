@@ -31,7 +31,7 @@ void main() {
     );
     companies = CompanyRepository(db);
     customers = CustomerRepository(db);
-    projects = ProjectRepository(db);
+    projects = ProjectRepository(db, NumberSequenceRepository(db));
     invoices = InvoiceRepository(db, NumberSequenceRepository(db));
     staffRoles = StaffRoleRepository(db);
     timeEntries = TimeEntryRepository(db);
