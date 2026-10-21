@@ -1002,6 +1002,12 @@ enum StockMovementType {
   /// Inventur-Korrektur, siehe [InventoryCounts]/`InventoryRepository`
   /// (C5.3).
   inventoryCorrection,
+
+  /// Rückbuchung (Zugang) beim Finalisieren einer Gutschrift
+  /// (Warenretoure) — C5-Nachtrag 2026-10-21 (Kay-Entscheidung auf
+  /// Rückfrage: "Automatisch beim Finalisieren der Gutschrift"). Anders
+  /// als [documentBooking] ist [quantityDelta] hier immer positiv.
+  creditNoteReturn,
 }
 
 /// Lückenloses, **append-only** Bewegungsprotokoll jeder tatsächlichen

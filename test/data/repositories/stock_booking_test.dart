@@ -299,4 +299,96 @@ void main() {
       expect(movements.single.referenceLabel, finalized!.invoiceNumber);
     },
   );
+
+  test(
+    'C5-Nachtrag (2026-10-21): Finalisieren einer Gutschrift bucht den Lagerbestand automatisch '
+    'zurück (Rückbuchung, StockMovements.type == creditNoteReturn)',
+    () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      await companies.update(
+        company.copyWith(lagerbestandEnabled: true, ordersEnabled: true, creditNotesEnabled: true),
+      );
+      final customer = await customers.create(companyId: company.id, name: 'Testkunde');
+      final article = await articles.create(companyId: company.id, name: 'Steckdose');
+      await articles.setStock(companyId: company.id, id: article.id, newQuantity: 10);
+
+      final draft = await draftWithArticle(
+        companyId: company.id,
+        customerId: customer.id,
+        articleId: article.id,
+        quantity: '3',
+        kind: DocumentKind.invoice,
+      );
+      final finalizedInvoice = await invoices.finalize(companyId: company.id, id: draft.id);
+      final afterInvoice = await articles.findById(companyId: company.id, id: article.id);
+      expect(afterInvoice!.stockQuantity, 7, reason: 'Rechnung bucht wie gewohnt ab');
+
+      final creditNoteDraft = await invoices.createCreditNoteDraft(
+        companyId: company.id,
+        invoiceId: finalizedInvoice!.id,
+      );
+      final finalizedCreditNote =
+          await invoices.finalize(companyId: company.id, id: creditNoteDraft.id);
+
+      final afterCreditNote = await articles.findById(companyId: company.id, id: article.id);
+      expect(afterCreditNote!.stockQuantity, 10, reason: 'Gutschrift bucht die volle Menge zurück');
+
+      final movements = await (db.select(db.stockMovements)
+            ..where((m) => m.type.equalsValue(StockMovementType.creditNoteReturn)))
+          .get();
+      expect(movements, hasLength(1));
+      expect(movements.single.quantityDelta, 3, reason: 'Rückbuchung ist positiv, kein Abgang');
+      expect(movements.single.resultingQuantity, 10);
+      expect(movements.single.referenceLabel, finalizedCreditNote!.invoiceNumber);
+    },
+  );
+
+  test(
+    'C5-Nachtrag: Gutschrift über eine TEILMENGE der Originalpositionen bucht nur diese '
+    'Teilmenge zurück',
+    () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      await companies.update(
+        company.copyWith(lagerbestandEnabled: true, ordersEnabled: true, creditNotesEnabled: true),
+      );
+      final customer = await customers.create(companyId: company.id, name: 'Testkunde');
+      final article = await articles.create(companyId: company.id, name: 'Steckdose');
+      await articles.setStock(companyId: company.id, id: article.id, newQuantity: 10);
+
+      final draft = await draftWithArticle(
+        companyId: company.id,
+        customerId: customer.id,
+        articleId: article.id,
+        quantity: '5',
+        kind: DocumentKind.invoice,
+      );
+      final finalizedInvoice = await invoices.finalize(companyId: company.id, id: draft.id);
+
+      final creditNoteDraft = await invoices.createCreditNoteDraft(
+        companyId: company.id,
+        invoiceId: finalizedInvoice!.id,
+      );
+      // Teil-Gutschrift: Nutzer kürzt den vorausgefüllten Entwurf auf eine
+      // kleinere Menge, wie in der Doc beschrieben ("Kay kann den
+      // entstandenen Entwurf ... auf eine Teil-Gutschrift herunterkürzen").
+      await invoices.update(
+        companyId: company.id,
+        id: creditNoteDraft.id,
+        items: [
+          InvoiceItemInput(
+            kind: InvoiceItemKind.article,
+            articleId: article.id,
+            description: 'Testartikel',
+            quantity: Decimal.parse('2'),
+            unitPriceCents: 1000,
+            vatRatePercent: 19,
+          ),
+        ],
+      );
+      await invoices.finalize(companyId: company.id, id: creditNoteDraft.id);
+
+      final reloaded = await articles.findById(companyId: company.id, id: article.id);
+      expect(reloaded!.stockQuantity, 7, reason: '10 - 5 (Rechnung) + 2 (Teil-Gutschrift) = 7');
+    },
+  );
 }
