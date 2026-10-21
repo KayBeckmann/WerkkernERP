@@ -11173,6 +11173,26 @@ class $VehicleCostEntriesTable extends VehicleCostEntries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _principalAmountCentsMeta =
+      const VerificationMeta('principalAmountCents');
+  @override
+  late final GeneratedColumn<int> principalAmountCents = GeneratedColumn<int>(
+    'principal_amount_cents',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _interestAmountCentsMeta =
+      const VerificationMeta('interestAmountCents');
+  @override
+  late final GeneratedColumn<int> interestAmountCents = GeneratedColumn<int>(
+    'interest_amount_cents',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _projectIdMeta = const VerificationMeta(
     'projectId',
   );
@@ -11207,6 +11227,8 @@ class $VehicleCostEntriesTable extends VehicleCostEntries
     amountCents,
     category,
     description,
+    principalAmountCents,
+    interestAmountCents,
     projectId,
     createdAt,
   ];
@@ -11271,6 +11293,24 @@ class $VehicleCostEntriesTable extends VehicleCostEntries
         ),
       );
     }
+    if (data.containsKey('principal_amount_cents')) {
+      context.handle(
+        _principalAmountCentsMeta,
+        principalAmountCents.isAcceptableOrUnknown(
+          data['principal_amount_cents']!,
+          _principalAmountCentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('interest_amount_cents')) {
+      context.handle(
+        _interestAmountCentsMeta,
+        interestAmountCents.isAcceptableOrUnknown(
+          data['interest_amount_cents']!,
+          _interestAmountCentsMeta,
+        ),
+      );
+    }
     if (data.containsKey('project_id')) {
       context.handle(
         _projectIdMeta,
@@ -11324,6 +11364,14 @@ class $VehicleCostEntriesTable extends VehicleCostEntries
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
+      principalAmountCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}principal_amount_cents'],
+      ),
+      interestAmountCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}interest_amount_cents'],
+      ),
       projectId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}project_id'],
@@ -11361,6 +11409,19 @@ class VehicleCostEntry extends DataClass
   final VehicleCostCategory category;
   final String? description;
 
+  /// C6-Nachtrag (Kay-Entscheidung 2026-10-21 auf Rückfrage: "Neue
+  /// Felder Tilgung/Zins je Kosteneintrag") — nur bei
+  /// [VehicleCostCategory.leasing] sinnvoll befüllt, sonst `null`.
+  /// [amountCents] bleibt die maßgebliche Gesamtsumme (unverändertes
+  /// Verhalten für die bestehende Belegsumme/EÜR-Gemeinkosten-Zeile);
+  /// diese beiden Felder sind eine rein zusätzliche, optionale
+  /// Aufschlüsselung dieser Summe für eine spätere steuerliche
+  /// Differenzierung (z. B. nur der Zinsanteil ist Aufwand, die Tilgung
+  /// ist Vermögensumschichtung) — keine Prüfung, dass beide zusammen die
+  /// Gesamtsumme ergeben, das bleibt Kays eigene Eingabe.
+  final int? principalAmountCents;
+  final int? interestAmountCents;
+
   /// Reine Markierung für eine spätere, noch zu entscheidende
   /// Projektumlage (siehe Klassendoc) — `onDelete: setNull`, ein
   /// gelöschtes Projekt darf keine Kostenbuchung mitreißen.
@@ -11374,6 +11435,8 @@ class VehicleCostEntry extends DataClass
     required this.amountCents,
     required this.category,
     this.description,
+    this.principalAmountCents,
+    this.interestAmountCents,
     this.projectId,
     required this.createdAt,
   });
@@ -11393,6 +11456,12 @@ class VehicleCostEntry extends DataClass
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
+    if (!nullToAbsent || principalAmountCents != null) {
+      map['principal_amount_cents'] = Variable<int>(principalAmountCents);
+    }
+    if (!nullToAbsent || interestAmountCents != null) {
+      map['interest_amount_cents'] = Variable<int>(interestAmountCents);
+    }
     if (!nullToAbsent || projectId != null) {
       map['project_id'] = Variable<String>(projectId);
     }
@@ -11411,6 +11480,12 @@ class VehicleCostEntry extends DataClass
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
+      principalAmountCents: principalAmountCents == null && nullToAbsent
+          ? const Value.absent()
+          : Value(principalAmountCents),
+      interestAmountCents: interestAmountCents == null && nullToAbsent
+          ? const Value.absent()
+          : Value(interestAmountCents),
       projectId: projectId == null && nullToAbsent
           ? const Value.absent()
           : Value(projectId),
@@ -11433,6 +11508,12 @@ class VehicleCostEntry extends DataClass
         serializer.fromJson<String>(json['category']),
       ),
       description: serializer.fromJson<String?>(json['description']),
+      principalAmountCents: serializer.fromJson<int?>(
+        json['principalAmountCents'],
+      ),
+      interestAmountCents: serializer.fromJson<int?>(
+        json['interestAmountCents'],
+      ),
       projectId: serializer.fromJson<String?>(json['projectId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
@@ -11450,6 +11531,8 @@ class VehicleCostEntry extends DataClass
         $VehicleCostEntriesTable.$convertercategory.toJson(category),
       ),
       'description': serializer.toJson<String?>(description),
+      'principalAmountCents': serializer.toJson<int?>(principalAmountCents),
+      'interestAmountCents': serializer.toJson<int?>(interestAmountCents),
       'projectId': serializer.toJson<String?>(projectId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
@@ -11463,6 +11546,8 @@ class VehicleCostEntry extends DataClass
     int? amountCents,
     VehicleCostCategory? category,
     Value<String?> description = const Value.absent(),
+    Value<int?> principalAmountCents = const Value.absent(),
+    Value<int?> interestAmountCents = const Value.absent(),
     Value<String?> projectId = const Value.absent(),
     DateTime? createdAt,
   }) => VehicleCostEntry(
@@ -11473,6 +11558,12 @@ class VehicleCostEntry extends DataClass
     amountCents: amountCents ?? this.amountCents,
     category: category ?? this.category,
     description: description.present ? description.value : this.description,
+    principalAmountCents: principalAmountCents.present
+        ? principalAmountCents.value
+        : this.principalAmountCents,
+    interestAmountCents: interestAmountCents.present
+        ? interestAmountCents.value
+        : this.interestAmountCents,
     projectId: projectId.present ? projectId.value : this.projectId,
     createdAt: createdAt ?? this.createdAt,
   );
@@ -11489,6 +11580,12 @@ class VehicleCostEntry extends DataClass
       description: data.description.present
           ? data.description.value
           : this.description,
+      principalAmountCents: data.principalAmountCents.present
+          ? data.principalAmountCents.value
+          : this.principalAmountCents,
+      interestAmountCents: data.interestAmountCents.present
+          ? data.interestAmountCents.value
+          : this.interestAmountCents,
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
@@ -11504,6 +11601,8 @@ class VehicleCostEntry extends DataClass
           ..write('amountCents: $amountCents, ')
           ..write('category: $category, ')
           ..write('description: $description, ')
+          ..write('principalAmountCents: $principalAmountCents, ')
+          ..write('interestAmountCents: $interestAmountCents, ')
           ..write('projectId: $projectId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
@@ -11519,6 +11618,8 @@ class VehicleCostEntry extends DataClass
     amountCents,
     category,
     description,
+    principalAmountCents,
+    interestAmountCents,
     projectId,
     createdAt,
   );
@@ -11533,6 +11634,8 @@ class VehicleCostEntry extends DataClass
           other.amountCents == this.amountCents &&
           other.category == this.category &&
           other.description == this.description &&
+          other.principalAmountCents == this.principalAmountCents &&
+          other.interestAmountCents == this.interestAmountCents &&
           other.projectId == this.projectId &&
           other.createdAt == this.createdAt);
 }
@@ -11545,6 +11648,8 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
   final Value<int> amountCents;
   final Value<VehicleCostCategory> category;
   final Value<String?> description;
+  final Value<int?> principalAmountCents;
+  final Value<int?> interestAmountCents;
   final Value<String?> projectId;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
@@ -11556,6 +11661,8 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
     this.amountCents = const Value.absent(),
     this.category = const Value.absent(),
     this.description = const Value.absent(),
+    this.principalAmountCents = const Value.absent(),
+    this.interestAmountCents = const Value.absent(),
     this.projectId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -11568,6 +11675,8 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
     required int amountCents,
     required VehicleCostCategory category,
     this.description = const Value.absent(),
+    this.principalAmountCents = const Value.absent(),
+    this.interestAmountCents = const Value.absent(),
     this.projectId = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
@@ -11586,6 +11695,8 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
     Expression<int>? amountCents,
     Expression<String>? category,
     Expression<String>? description,
+    Expression<int>? principalAmountCents,
+    Expression<int>? interestAmountCents,
     Expression<String>? projectId,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
@@ -11598,6 +11709,10 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
       if (amountCents != null) 'amount_cents': amountCents,
       if (category != null) 'category': category,
       if (description != null) 'description': description,
+      if (principalAmountCents != null)
+        'principal_amount_cents': principalAmountCents,
+      if (interestAmountCents != null)
+        'interest_amount_cents': interestAmountCents,
       if (projectId != null) 'project_id': projectId,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
@@ -11612,6 +11727,8 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
     Value<int>? amountCents,
     Value<VehicleCostCategory>? category,
     Value<String?>? description,
+    Value<int?>? principalAmountCents,
+    Value<int?>? interestAmountCents,
     Value<String?>? projectId,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
@@ -11624,6 +11741,8 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
       amountCents: amountCents ?? this.amountCents,
       category: category ?? this.category,
       description: description ?? this.description,
+      principalAmountCents: principalAmountCents ?? this.principalAmountCents,
+      interestAmountCents: interestAmountCents ?? this.interestAmountCents,
       projectId: projectId ?? this.projectId,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
@@ -11656,6 +11775,12 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (principalAmountCents.present) {
+      map['principal_amount_cents'] = Variable<int>(principalAmountCents.value);
+    }
+    if (interestAmountCents.present) {
+      map['interest_amount_cents'] = Variable<int>(interestAmountCents.value);
+    }
     if (projectId.present) {
       map['project_id'] = Variable<String>(projectId.value);
     }
@@ -11678,6 +11803,8 @@ class VehicleCostEntriesCompanion extends UpdateCompanion<VehicleCostEntry> {
           ..write('amountCents: $amountCents, ')
           ..write('category: $category, ')
           ..write('description: $description, ')
+          ..write('principalAmountCents: $principalAmountCents, ')
+          ..write('interestAmountCents: $interestAmountCents, ')
           ..write('projectId: $projectId, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
@@ -29744,6 +29871,8 @@ typedef $$VehicleCostEntriesTableCreateCompanionBuilder =
       required int amountCents,
       required VehicleCostCategory category,
       Value<String?> description,
+      Value<int?> principalAmountCents,
+      Value<int?> interestAmountCents,
       Value<String?> projectId,
       required DateTime createdAt,
       Value<int> rowid,
@@ -29757,6 +29886,8 @@ typedef $$VehicleCostEntriesTableUpdateCompanionBuilder =
       Value<int> amountCents,
       Value<VehicleCostCategory> category,
       Value<String?> description,
+      Value<int?> principalAmountCents,
+      Value<int?> interestAmountCents,
       Value<String?> projectId,
       Value<DateTime> createdAt,
       Value<int> rowid,
@@ -29863,6 +29994,16 @@ class $$VehicleCostEntriesTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get principalAmountCents => $composableBuilder(
+    column: $table.principalAmountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get interestAmountCents => $composableBuilder(
+    column: $table.interestAmountCents,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -29975,6 +30116,16 @@ class $$VehicleCostEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get principalAmountCents => $composableBuilder(
+    column: $table.principalAmountCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get interestAmountCents => $composableBuilder(
+    column: $table.interestAmountCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -30075,6 +30226,16 @@ class $$VehicleCostEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get principalAmountCents => $composableBuilder(
+    column: $table.principalAmountCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get interestAmountCents => $composableBuilder(
+    column: $table.interestAmountCents,
     builder: (column) => column,
   );
 
@@ -30195,6 +30356,8 @@ class $$VehicleCostEntriesTableTableManager
                 Value<int> amountCents = const Value.absent(),
                 Value<VehicleCostCategory> category = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<int?> principalAmountCents = const Value.absent(),
+                Value<int?> interestAmountCents = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -30206,6 +30369,8 @@ class $$VehicleCostEntriesTableTableManager
                 amountCents: amountCents,
                 category: category,
                 description: description,
+                principalAmountCents: principalAmountCents,
+                interestAmountCents: interestAmountCents,
                 projectId: projectId,
                 createdAt: createdAt,
                 rowid: rowid,
@@ -30219,6 +30384,8 @@ class $$VehicleCostEntriesTableTableManager
                 required int amountCents,
                 required VehicleCostCategory category,
                 Value<String?> description = const Value.absent(),
+                Value<int?> principalAmountCents = const Value.absent(),
+                Value<int?> interestAmountCents = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
@@ -30230,6 +30397,8 @@ class $$VehicleCostEntriesTableTableManager
                 amountCents: amountCents,
                 category: category,
                 description: description,
+                principalAmountCents: principalAmountCents,
+                interestAmountCents: interestAmountCents,
                 projectId: projectId,
                 createdAt: createdAt,
                 rowid: rowid,

@@ -287,6 +287,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
           amountCents: result.amountCents,
           category: result.category,
           description: result.description,
+          principalAmountCents: result.principalAmountCents,
+          interestAmountCents: result.interestAmountCents,
         );
     _reload();
   }
@@ -344,8 +346,10 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                       Text('Summe aller Buchungen: $sum', style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 4),
                       Text(
-                        'Reine Belegsumme, keine Projektumlage oder Ergebnisrechnung (noch zu '
-                        'klärendes Entscheidungstor, z. B. Tilgung vs. Zinsen bei Leasing/Kredit).',
+                        'Reine Belegsumme, keine Projektumlage oder Ergebnisrechnung. Tilgung/Zins '
+                        'bei Leasing/Kredit lassen sich seit dem C6-Nachtrag (2026-10-21) je Buchung '
+                        'aufschlüsseln, fließen aber weiterhin nicht automatisch in eine '
+                        'Ergebnisrechnung ein.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -362,7 +366,8 @@ class _VehicleDetailScreenState extends State<VehicleDetailScreen> {
                     title: Text(_categoryLabel(cost.category)),
                     subtitle: Text(
                       '${_formatDate(cost.date)}'
-                      '${cost.description != null ? ' · ${cost.description}' : ''}',
+                      '${cost.description != null ? ' · ${cost.description}' : ''}'
+                      '${cost.principalAmountCents != null || cost.interestAmountCents != null ? ' · Tilgung ${Money.fromCents(cost.principalAmountCents ?? 0)} / Zins ${Money.fromCents(cost.interestAmountCents ?? 0)}' : ''}',
                     ),
                     trailing: Text(Money.fromCents(cost.amountCents).toString()),
                   ),
@@ -387,11 +392,18 @@ class _CostFormResult {
     required this.amountCents,
     required this.category,
     this.description,
+    this.principalAmountCents,
+    this.interestAmountCents,
   });
   final DateTime date;
   final int amountCents;
   final VehicleCostCategory category;
   final String? description;
+
+  /// C6-Nachtrag 2026-10-21 — nur bei [VehicleCostCategory.leasing]
+  /// über die UI befüllbar.
+  final int? principalAmountCents;
+  final int? interestAmountCents;
 }
 
 class _CostFormDialog extends StatefulWidget {
@@ -404,6 +416,8 @@ class _CostFormDialog extends StatefulWidget {
 class _CostFormDialogState extends State<_CostFormDialog> {
   final _amountCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
+  final _principalCtrl = TextEditingController();
+  final _interestCtrl = TextEditingController();
   DateTime _date = DateTime.now();
   VehicleCostCategory _category = VehicleCostCategory.fuel;
 
@@ -411,6 +425,8 @@ class _CostFormDialogState extends State<_CostFormDialog> {
   void dispose() {
     _amountCtrl.dispose();
     _descriptionCtrl.dispose();
+    _principalCtrl.dispose();
+    _interestCtrl.dispose();
     super.dispose();
   }
 
@@ -464,6 +480,25 @@ class _CostFormDialogState extends State<_CostFormDialog> {
                 controller: _descriptionCtrl,
                 decoration: const InputDecoration(labelText: 'Beschreibung'),
               ),
+              if (_category == VehicleCostCategory.leasing) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Optionale Aufschlüsselung der Rate (C6-Nachtrag):',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: _principalCtrl,
+                  decoration: const InputDecoration(labelText: 'Tilgungsanteil (€)'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _interestCtrl,
+                  decoration: const InputDecoration(labelText: 'Zinsanteil (€)'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+              ],
             ],
           ),
         ),
@@ -479,6 +514,24 @@ class _CostFormDialogState extends State<_CostFormDialog> {
               return;
             }
             if (_amountCtrl.text.trim().isEmpty) return;
+            int? principalCents;
+            int? interestCents;
+            if (_category == VehicleCostCategory.leasing) {
+              if (_principalCtrl.text.trim().isNotEmpty) {
+                try {
+                  principalCents = Money.fromEuroString(_principalCtrl.text.trim()).cents;
+                } catch (_) {
+                  return;
+                }
+              }
+              if (_interestCtrl.text.trim().isNotEmpty) {
+                try {
+                  interestCents = Money.fromEuroString(_interestCtrl.text.trim()).cents;
+                } catch (_) {
+                  return;
+                }
+              }
+            }
             Navigator.pop(
               context,
               _CostFormResult(
@@ -486,6 +539,8 @@ class _CostFormDialogState extends State<_CostFormDialog> {
                 amountCents: amount.cents,
                 category: _category,
                 description: _descriptionCtrl.text.trim().isEmpty ? null : _descriptionCtrl.text.trim(),
+                principalAmountCents: principalCents,
+                interestAmountCents: interestCents,
               ),
             );
           },

@@ -660,6 +660,19 @@ class VehicleCostEntries extends Table {
   TextColumn get category => textEnum<VehicleCostCategory>()();
   TextColumn get description => text().nullable()();
 
+  /// C6-Nachtrag (Kay-Entscheidung 2026-10-21 auf Rückfrage: "Neue
+  /// Felder Tilgung/Zins je Kosteneintrag") — nur bei
+  /// [VehicleCostCategory.leasing] sinnvoll befüllt, sonst `null`.
+  /// [amountCents] bleibt die maßgebliche Gesamtsumme (unverändertes
+  /// Verhalten für die bestehende Belegsumme/EÜR-Gemeinkosten-Zeile);
+  /// diese beiden Felder sind eine rein zusätzliche, optionale
+  /// Aufschlüsselung dieser Summe für eine spätere steuerliche
+  /// Differenzierung (z. B. nur der Zinsanteil ist Aufwand, die Tilgung
+  /// ist Vermögensumschichtung) — keine Prüfung, dass beide zusammen die
+  /// Gesamtsumme ergeben, das bleibt Kays eigene Eingabe.
+  IntColumn get principalAmountCents => integer().nullable()();
+  IntColumn get interestAmountCents => integer().nullable()();
+
   /// Reine Markierung für eine spätere, noch zu entscheidende
   /// Projektumlage (siehe Klassendoc) — `onDelete: setNull`, ein
   /// gelöschtes Projekt darf keine Kostenbuchung mitreißen.
