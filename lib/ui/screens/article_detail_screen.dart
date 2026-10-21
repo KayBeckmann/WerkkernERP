@@ -474,6 +474,7 @@ class _StockMovementsDialog extends StatelessWidget {
         StockMovementType.documentBooking => 'Dokument',
         StockMovementType.purchaseOrderReceipt => 'Wareneingang',
         StockMovementType.inventoryCorrection => 'Inventur',
+        StockMovementType.creditNoteReturn => 'Gutschrift (Rückbuchung)',
       };
 
   String _formatDate(DateTime date) =>

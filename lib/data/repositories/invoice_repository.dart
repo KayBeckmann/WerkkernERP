@@ -337,12 +337,20 @@ class InvoiceRepository {
       );
 
       if (company.lagerbestandEnabled) {
-        await _bookStockOnFinalize(
-          companyId: companyId,
-          invoice: invoice,
-          items: items,
-          referenceLabel: invoiceNumber,
-        );
+        if (shouldBookStockReturnOnCreditNoteFinalize(kind: invoice.kind)) {
+          await _bookStockReturnOnCreditNoteFinalize(
+            companyId: companyId,
+            items: items,
+            referenceLabel: invoiceNumber,
+          );
+        } else {
+          await _bookStockOnFinalize(
+            companyId: companyId,
+            invoice: invoice,
+            items: items,
+            referenceLabel: invoiceNumber,
+          );
+        }
       }
 
       return findById(companyId: companyId, id: id);
@@ -404,6 +412,41 @@ class InvoiceRepository {
               companyId: companyId,
               articleId: entry.key,
               type: StockMovementType.documentBooking,
+              quantityDelta: delta,
+              resultingQuantity: newStock,
+              referenceLabel: Value(referenceLabel),
+              createdAt: DateTime.now(),
+            ),
+          );
+    }
+  }
+
+  /// C5-Nachtrag (Kay-Entscheidung 2026-10-21) — Rückbuchung beim
+  /// Finalisieren einer Gutschrift. Bewusst eine eigene, einfachere
+  /// Methode statt [_bookStockOnFinalize] mit einem "Vorzeichen"-Flag:
+  /// eine Gutschrift braucht keine Vorgänger-Ketten-Prüfung
+  /// (`shouldBookStockReturnOnCreditNoteFinalize` bucht immer, siehe
+  /// Doc-Kommentar dort) und keine Warnung bei zu wenig Bestand — ein
+  /// Lagerzugang kann nie "zu wenig Bestand" verursachen.
+  Future<void> _bookStockReturnOnCreditNoteFinalize({
+    required String companyId,
+    required List<InvoiceItem> items,
+    required String referenceLabel,
+  }) async {
+    for (final entry in _aggregateArticleQuantities(items).entries) {
+      final article =
+          await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
+      if (article == null) continue;
+      final delta = entry.value.toDouble();
+      final newStock = article.stockQuantity + delta;
+      await (_db.update(_db.articles)..where((a) => a.id.equals(entry.key)))
+          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
+      await _db.into(_db.stockMovements).insert(
+            StockMovementsCompanion.insert(
+              id: _uuid.v4(),
+              companyId: companyId,
+              articleId: entry.key,
+              type: StockMovementType.creditNoteReturn,
               quantityDelta: delta,
               resultingQuantity: newStock,
               referenceLabel: Value(referenceLabel),
