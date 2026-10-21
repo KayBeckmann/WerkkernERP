@@ -43,6 +43,18 @@ class InvoiceItemInput {
   final String? groupLabel;
 }
 
+/// C13 Abschlagsrechnungen — eine einzelne, bereits finalisierte
+/// Abschlagsrechnung zum selben Quelldokument wie die Schlussrechnung
+/// (Kay-Nachtrag 2026-10-21: "Diese müssen aufgeschlüsselt werden und
+/// die Rechnungsnummern der Teilzahlungen müssen aufgelistet werden" —
+/// vorher nur als eine Summe ohne Herkunft gezeigt, siehe Doc-Kommentar
+/// bei `InvoiceRepository.listAdvancePaymentsForOrder`).
+class AdvancePaymentEntry {
+  const AdvancePaymentEntry({required this.invoiceNumber, required this.amountGross});
+  final String invoiceNumber;
+  final Money amountGross;
+}
+
 /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — ein Artikel, der beim
 /// Finalisieren unter 0 Lagerbestand fallen würde. Reine Anzeige-
 /// Information für einen Warnhinweis, kein Blocker (siehe
@@ -589,24 +601,40 @@ class InvoiceRepository {
             ..orderBy([(i) => OrderingTerm.desc(i.updatedAt)]))
           .get();
 
-  /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
-  /// Summe aller **finalisierten** Abschlagsrechnungen, die per
-  /// [convertTo] aus demselben Quelldokument (typischerweise ein Auftrag)
-  /// wie [orderId] entstanden sind — für die Abzugszeile in einer
-  /// Schlussrechnung. Arbeitsvorgabe (siehe Doc-Kommentar bei
-  /// `Invoices.isAdvancePayment`): die Summe enthält die volle USt der
-  /// jeweiligen Abschlagsrechnung, keine Nettobetrachtung.
-  Future<Money> sumAdvancePaymentsForOrder(String orderId) async {
+  /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17,
+  /// aufgeschlüsselt seit Nachtrag 2026-10-21: "Diese müssen
+  /// aufgeschlüsselt werden und die Rechnungsnummern der Teilzahlungen
+  /// müssen aufgelistet werden") — alle **finalisierten**
+  /// Abschlagsrechnungen, die per [convertTo] aus demselben
+  /// Quelldokument (typischerweise ein Auftrag) wie [orderId] entstanden
+  /// sind, einzeln mit ihrer Rechnungsnummer und ihrem Bruttobetrag —
+  /// für die Abzugszeilen in einer Schlussrechnung (PDF + Editor zeigen
+  /// jede Teilzahlung einzeln, statt nur eine Summe ohne Herkunft).
+  /// Arbeitsvorgabe (siehe Doc-Kommentar bei `Invoices.isAdvancePayment`):
+  /// jeder Betrag enthält die volle USt der jeweiligen Abschlagsrechnung,
+  /// keine Nettobetrachtung. Sortiert nach Rechnungsnummer, damit die
+  /// Reihenfolge nicht von der (für den Leser bedeutungslosen)
+  /// internen Erstellungsreihenfolge abhängt.
+  Future<List<AdvancePaymentEntry>> listAdvancePaymentsForOrder(String orderId) async {
     final converted = await listConvertedFrom(orderId);
-    var sum = Money.zero();
+    final entries = <AdvancePaymentEntry>[];
     for (final doc in converted) {
       if (doc.kind == DocumentKind.invoice &&
           doc.isAdvancePayment &&
           doc.status == InvoiceStatus.finalized) {
-        sum = sum + (await totalsFor(doc.id)).totalGross;
+        final total = (await totalsFor(doc.id)).totalGross;
+        entries.add(AdvancePaymentEntry(invoiceNumber: doc.invoiceNumber!, amountGross: total));
       }
     }
-    return sum;
+    entries.sort((a, b) => a.invoiceNumber.compareTo(b.invoiceNumber));
+    return entries;
+  }
+
+  /// Summe von [listAdvancePaymentsForOrder] — für Stellen, die nur den
+  /// Gesamtbetrag brauchen, nicht die Aufschlüsselung.
+  Future<Money> sumAdvancePaymentsForOrder(String orderId) async {
+    final entries = await listAdvancePaymentsForOrder(orderId);
+    return entries.fold<Money>(Money.zero(), (sum, e) => sum + e.amountGross);
   }
 
   /// Materialabschlagsrechnung (C3.2, Nachtrag 2026-10-20: "Für einen
