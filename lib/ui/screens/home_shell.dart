@@ -20,6 +20,7 @@ import 'inventory_counts_screen.dart';
 import 'projects_screen.dart';
 import 'purchase_orders_screen.dart';
 import 'time_entries_screen.dart';
+import 'time_sheets_screen.dart';
 import 'recurring_invoice_templates_screen.dart';
 import 'settings_screen.dart';
 import 'suppliers_screen.dart';
@@ -51,6 +52,7 @@ enum _TabId {
   purchaseOrders,
   inventoryCounts,
   timeEntries,
+  timeSheets,
   recurringTemplates,
   openItems,
   expenses,
@@ -279,7 +281,7 @@ class _HomeShellState extends State<HomeShell> {
             section: _Section.stammdaten,
           ),
         // C3.1 Zeiterfassung (Nachtrag 2026-10-20).
-        if (company.timeTrackingEnabled)
+        if (company.timeTrackingEnabled) ...[
           const _Tab(
             id: _TabId.timeEntries,
             icon: Icons.schedule_outlined,
@@ -287,6 +289,18 @@ class _HomeShellState extends State<HomeShell> {
             screen: TimeEntriesScreen(),
             section: _Section.stammdaten,
           ),
+          // C3-Rest Kunden-Stundenzettel/Unterschrift (Nachtrag
+          // 2026-10-21) — Unterfunktion der Zeiterfassung, kein eigener
+          // Modul-Schalter (gleiches Prinzip wie "Inventur" unter
+          // Lagerbestand).
+          const _Tab(
+            id: _TabId.timeSheets,
+            icon: Icons.draw_outlined,
+            title: 'Stundenzettel',
+            screen: TimeSheetsScreen(),
+            section: _Section.stammdaten,
+          ),
+        ],
         // C14.1 Offene-Posten-Übersicht (Kay-Priorisierungsentscheidung
         // 2026-10-18 — erster Baustein der vollen Buchhaltung).
         if (company.buchhaltungEnabled) ...[

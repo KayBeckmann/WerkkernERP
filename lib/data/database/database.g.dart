@@ -18471,6 +18471,665 @@ class StaffRolesCompanion extends UpdateCompanion<StaffRole> {
   }
 }
 
+class $TimeSheetsTable extends TimeSheets
+    with TableInfo<$TimeSheetsTable, TimeSheet> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TimeSheetsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES companies (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _invoiceIdMeta = const VerificationMeta(
+    'invoiceId',
+  );
+  @override
+  late final GeneratedColumn<String> invoiceId = GeneratedColumn<String>(
+    'invoice_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES invoices (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _projectIdMeta = const VerificationMeta(
+    'projectId',
+  );
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+    'project_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES projects (id) ON DELETE SET NULL',
+    ),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<TimeSheetStatus, String> status =
+      GeneratedColumn<String>(
+        'status',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: Constant(TimeSheetStatus.draft.name),
+      ).withConverter<TimeSheetStatus>($TimeSheetsTable.$converterstatus);
+  static const VerificationMeta _signatureImageMeta = const VerificationMeta(
+    'signatureImage',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> signatureImage =
+      GeneratedColumn<Uint8List>(
+        'signature_image',
+        aliasedName,
+        true,
+        type: DriftSqlType.blob,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _signedAtMeta = const VerificationMeta(
+    'signedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> signedAt = GeneratedColumn<DateTime>(
+    'signed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _supersedesIdMeta = const VerificationMeta(
+    'supersedesId',
+  );
+  @override
+  late final GeneratedColumn<String> supersedesId = GeneratedColumn<String>(
+    'supersedes_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES time_sheets (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    companyId,
+    date,
+    invoiceId,
+    projectId,
+    status,
+    signatureImage,
+    signedAt,
+    supersedesId,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'time_sheets';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TimeSheet> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('invoice_id')) {
+      context.handle(
+        _invoiceIdMeta,
+        invoiceId.isAcceptableOrUnknown(data['invoice_id']!, _invoiceIdMeta),
+      );
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(
+        _projectIdMeta,
+        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
+      );
+    }
+    if (data.containsKey('signature_image')) {
+      context.handle(
+        _signatureImageMeta,
+        signatureImage.isAcceptableOrUnknown(
+          data['signature_image']!,
+          _signatureImageMeta,
+        ),
+      );
+    }
+    if (data.containsKey('signed_at')) {
+      context.handle(
+        _signedAtMeta,
+        signedAt.isAcceptableOrUnknown(data['signed_at']!, _signedAtMeta),
+      );
+    }
+    if (data.containsKey('supersedes_id')) {
+      context.handle(
+        _supersedesIdMeta,
+        supersedesId.isAcceptableOrUnknown(
+          data['supersedes_id']!,
+          _supersedesIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TimeSheet map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TimeSheet(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_id'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      invoiceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}invoice_id'],
+      ),
+      projectId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}project_id'],
+      ),
+      status: $TimeSheetsTable.$converterstatus.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}status'],
+        )!,
+      ),
+      signatureImage: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}signature_image'],
+      ),
+      signedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}signed_at'],
+      ),
+      supersedesId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}supersedes_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TimeSheetsTable createAlias(String alias) {
+    return $TimeSheetsTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<TimeSheetStatus, String, String> $converterstatus =
+      const EnumNameConverter<TimeSheetStatus>(TimeSheetStatus.values);
+}
+
+class TimeSheet extends DataClass implements Insertable<TimeSheet> {
+  final String id;
+  final String companyId;
+
+  /// Der Tag, auf den sich der Stundenzettel bezieht (die zugeordneten
+  /// [TimeEntries] können trotzdem ein eigenes Datum tragen — in der
+  /// Praxis identisch, aber nicht erzwungen).
+  final DateTime date;
+
+  /// Mindestens eines von [invoiceId]/[projectId] ist Pflicht (siehe
+  /// `TimeSheetRepository.createDraft()`), gleiche Regel wie bei
+  /// [TimeEntries] selbst.
+  final String? invoiceId;
+  final String? projectId;
+  final TimeSheetStatus status;
+
+  /// PNG-Bytes der Touch-Unterschrift — `null` bis zum Unterschreiben.
+  final Uint8List? signatureImage;
+  final DateTime? signedAt;
+
+  /// Verweist auf den Stundenzettel, den dieser hier korrigiert (siehe
+  /// Klassendoc) — `null` für einen normalen, nicht korrigierenden
+  /// Stundenzettel. `onDelete: setNull`, eine gelöschte Korrektur reißt
+  /// nicht die Kette der Vorgänger mit.
+  final String? supersedesId;
+  final DateTime createdAt;
+  const TimeSheet({
+    required this.id,
+    required this.companyId,
+    required this.date,
+    this.invoiceId,
+    this.projectId,
+    required this.status,
+    this.signatureImage,
+    this.signedAt,
+    this.supersedesId,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['company_id'] = Variable<String>(companyId);
+    map['date'] = Variable<DateTime>(date);
+    if (!nullToAbsent || invoiceId != null) {
+      map['invoice_id'] = Variable<String>(invoiceId);
+    }
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
+    }
+    {
+      map['status'] = Variable<String>(
+        $TimeSheetsTable.$converterstatus.toSql(status),
+      );
+    }
+    if (!nullToAbsent || signatureImage != null) {
+      map['signature_image'] = Variable<Uint8List>(signatureImage);
+    }
+    if (!nullToAbsent || signedAt != null) {
+      map['signed_at'] = Variable<DateTime>(signedAt);
+    }
+    if (!nullToAbsent || supersedesId != null) {
+      map['supersedes_id'] = Variable<String>(supersedesId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  TimeSheetsCompanion toCompanion(bool nullToAbsent) {
+    return TimeSheetsCompanion(
+      id: Value(id),
+      companyId: Value(companyId),
+      date: Value(date),
+      invoiceId: invoiceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(invoiceId),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
+      status: Value(status),
+      signatureImage: signatureImage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(signatureImage),
+      signedAt: signedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(signedAt),
+      supersedesId: supersedesId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(supersedesId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory TimeSheet.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TimeSheet(
+      id: serializer.fromJson<String>(json['id']),
+      companyId: serializer.fromJson<String>(json['companyId']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      invoiceId: serializer.fromJson<String?>(json['invoiceId']),
+      projectId: serializer.fromJson<String?>(json['projectId']),
+      status: $TimeSheetsTable.$converterstatus.fromJson(
+        serializer.fromJson<String>(json['status']),
+      ),
+      signatureImage: serializer.fromJson<Uint8List?>(json['signatureImage']),
+      signedAt: serializer.fromJson<DateTime?>(json['signedAt']),
+      supersedesId: serializer.fromJson<String?>(json['supersedesId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'companyId': serializer.toJson<String>(companyId),
+      'date': serializer.toJson<DateTime>(date),
+      'invoiceId': serializer.toJson<String?>(invoiceId),
+      'projectId': serializer.toJson<String?>(projectId),
+      'status': serializer.toJson<String>(
+        $TimeSheetsTable.$converterstatus.toJson(status),
+      ),
+      'signatureImage': serializer.toJson<Uint8List?>(signatureImage),
+      'signedAt': serializer.toJson<DateTime?>(signedAt),
+      'supersedesId': serializer.toJson<String?>(supersedesId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  TimeSheet copyWith({
+    String? id,
+    String? companyId,
+    DateTime? date,
+    Value<String?> invoiceId = const Value.absent(),
+    Value<String?> projectId = const Value.absent(),
+    TimeSheetStatus? status,
+    Value<Uint8List?> signatureImage = const Value.absent(),
+    Value<DateTime?> signedAt = const Value.absent(),
+    Value<String?> supersedesId = const Value.absent(),
+    DateTime? createdAt,
+  }) => TimeSheet(
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    date: date ?? this.date,
+    invoiceId: invoiceId.present ? invoiceId.value : this.invoiceId,
+    projectId: projectId.present ? projectId.value : this.projectId,
+    status: status ?? this.status,
+    signatureImage: signatureImage.present
+        ? signatureImage.value
+        : this.signatureImage,
+    signedAt: signedAt.present ? signedAt.value : this.signedAt,
+    supersedesId: supersedesId.present ? supersedesId.value : this.supersedesId,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  TimeSheet copyWithCompanion(TimeSheetsCompanion data) {
+    return TimeSheet(
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      date: data.date.present ? data.date.value : this.date,
+      invoiceId: data.invoiceId.present ? data.invoiceId.value : this.invoiceId,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      status: data.status.present ? data.status.value : this.status,
+      signatureImage: data.signatureImage.present
+          ? data.signatureImage.value
+          : this.signatureImage,
+      signedAt: data.signedAt.present ? data.signedAt.value : this.signedAt,
+      supersedesId: data.supersedesId.present
+          ? data.supersedesId.value
+          : this.supersedesId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TimeSheet(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('date: $date, ')
+          ..write('invoiceId: $invoiceId, ')
+          ..write('projectId: $projectId, ')
+          ..write('status: $status, ')
+          ..write('signatureImage: $signatureImage, ')
+          ..write('signedAt: $signedAt, ')
+          ..write('supersedesId: $supersedesId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    date,
+    invoiceId,
+    projectId,
+    status,
+    $driftBlobEquality.hash(signatureImage),
+    signedAt,
+    supersedesId,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TimeSheet &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.date == this.date &&
+          other.invoiceId == this.invoiceId &&
+          other.projectId == this.projectId &&
+          other.status == this.status &&
+          $driftBlobEquality.equals(
+            other.signatureImage,
+            this.signatureImage,
+          ) &&
+          other.signedAt == this.signedAt &&
+          other.supersedesId == this.supersedesId &&
+          other.createdAt == this.createdAt);
+}
+
+class TimeSheetsCompanion extends UpdateCompanion<TimeSheet> {
+  final Value<String> id;
+  final Value<String> companyId;
+  final Value<DateTime> date;
+  final Value<String?> invoiceId;
+  final Value<String?> projectId;
+  final Value<TimeSheetStatus> status;
+  final Value<Uint8List?> signatureImage;
+  final Value<DateTime?> signedAt;
+  final Value<String?> supersedesId;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const TimeSheetsCompanion({
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.date = const Value.absent(),
+    this.invoiceId = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.status = const Value.absent(),
+    this.signatureImage = const Value.absent(),
+    this.signedAt = const Value.absent(),
+    this.supersedesId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TimeSheetsCompanion.insert({
+    required String id,
+    required String companyId,
+    required DateTime date,
+    this.invoiceId = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.status = const Value.absent(),
+    this.signatureImage = const Value.absent(),
+    this.signedAt = const Value.absent(),
+    this.supersedesId = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       companyId = Value(companyId),
+       date = Value(date),
+       createdAt = Value(createdAt);
+  static Insertable<TimeSheet> custom({
+    Expression<String>? id,
+    Expression<String>? companyId,
+    Expression<DateTime>? date,
+    Expression<String>? invoiceId,
+    Expression<String>? projectId,
+    Expression<String>? status,
+    Expression<Uint8List>? signatureImage,
+    Expression<DateTime>? signedAt,
+    Expression<String>? supersedesId,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (date != null) 'date': date,
+      if (invoiceId != null) 'invoice_id': invoiceId,
+      if (projectId != null) 'project_id': projectId,
+      if (status != null) 'status': status,
+      if (signatureImage != null) 'signature_image': signatureImage,
+      if (signedAt != null) 'signed_at': signedAt,
+      if (supersedesId != null) 'supersedes_id': supersedesId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TimeSheetsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? companyId,
+    Value<DateTime>? date,
+    Value<String?>? invoiceId,
+    Value<String?>? projectId,
+    Value<TimeSheetStatus>? status,
+    Value<Uint8List?>? signatureImage,
+    Value<DateTime?>? signedAt,
+    Value<String?>? supersedesId,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return TimeSheetsCompanion(
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      date: date ?? this.date,
+      invoiceId: invoiceId ?? this.invoiceId,
+      projectId: projectId ?? this.projectId,
+      status: status ?? this.status,
+      signatureImage: signatureImage ?? this.signatureImage,
+      signedAt: signedAt ?? this.signedAt,
+      supersedesId: supersedesId ?? this.supersedesId,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<String>(companyId.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (invoiceId.present) {
+      map['invoice_id'] = Variable<String>(invoiceId.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(
+        $TimeSheetsTable.$converterstatus.toSql(status.value),
+      );
+    }
+    if (signatureImage.present) {
+      map['signature_image'] = Variable<Uint8List>(signatureImage.value);
+    }
+    if (signedAt.present) {
+      map['signed_at'] = Variable<DateTime>(signedAt.value);
+    }
+    if (supersedesId.present) {
+      map['supersedes_id'] = Variable<String>(supersedesId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TimeSheetsCompanion(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('date: $date, ')
+          ..write('invoiceId: $invoiceId, ')
+          ..write('projectId: $projectId, ')
+          ..write('status: $status, ')
+          ..write('signatureImage: $signatureImage, ')
+          ..write('signedAt: $signedAt, ')
+          ..write('supersedesId: $supersedesId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $TimeEntriesTable extends TimeEntries
     with TableInfo<$TimeEntriesTable, TimeEntry> {
   @override
@@ -18569,6 +19228,20 @@ class $TimeEntriesTable extends TimeEntries
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _timeSheetIdMeta = const VerificationMeta(
+    'timeSheetId',
+  );
+  @override
+  late final GeneratedColumn<String> timeSheetId = GeneratedColumn<String>(
+    'time_sheet_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES time_sheets (id) ON DELETE SET NULL',
+    ),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -18590,6 +19263,7 @@ class $TimeEntriesTable extends TimeEntries
     invoiceId,
     projectId,
     note,
+    timeSheetId,
     createdAt,
   ];
   @override
@@ -18660,6 +19334,15 @@ class $TimeEntriesTable extends TimeEntries
         note.isAcceptableOrUnknown(data['note']!, _noteMeta),
       );
     }
+    if (data.containsKey('time_sheet_id')) {
+      context.handle(
+        _timeSheetIdMeta,
+        timeSheetId.isAcceptableOrUnknown(
+          data['time_sheet_id']!,
+          _timeSheetIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -18709,6 +19392,10 @@ class $TimeEntriesTable extends TimeEntries
         DriftSqlType.string,
         data['${effectivePrefix}note'],
       ),
+      timeSheetId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}time_sheet_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -18740,6 +19427,20 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
   final String? invoiceId;
   final String? projectId;
   final String? note;
+
+  /// C3-Rest (Nachtrag 2026-10-21, Kay-Entscheidung auf Rückfrage:
+  /// "Touch-Zeichenfläche ... Unterschrift wird als Bild einer
+  /// Zeitbuchung/-gruppe zugeordnet") — `null`, solange die Buchung
+  /// keinem Kunden-Stundenzettel zugeordnet ist. Ist der referenzierte
+  /// [TimeSheets]-Datensatz `signed`, ist diese Buchung über
+  /// `TimeEntryRepository.update()`/`delete()` **unveränderlich** (siehe
+  /// Doc-Kommentar dort) — eine Korrektur geht nur über einen neuen,
+  /// erneut zu unterschreibenden Stundenzettel
+  /// (`TimeSheetRepository.createCorrectionDraft()`), nie über eine
+  /// stille Änderung der bereits unterschriebenen Buchung.
+  /// `onDelete: setNull`, damit ein gelöschter Stundenzettel-Entwurf
+  /// keine Zeitbuchung mitreißt.
+  final String? timeSheetId;
   final DateTime createdAt;
   const TimeEntry({
     required this.id,
@@ -18750,6 +19451,7 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
     this.invoiceId,
     this.projectId,
     this.note,
+    this.timeSheetId,
     required this.createdAt,
   });
   @override
@@ -18771,6 +19473,9 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
     }
+    if (!nullToAbsent || timeSheetId != null) {
+      map['time_sheet_id'] = Variable<String>(timeSheetId);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -18791,6 +19496,9 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
           ? const Value.absent()
           : Value(projectId),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      timeSheetId: timeSheetId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(timeSheetId),
       createdAt: Value(createdAt),
     );
   }
@@ -18809,6 +19517,7 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
       invoiceId: serializer.fromJson<String?>(json['invoiceId']),
       projectId: serializer.fromJson<String?>(json['projectId']),
       note: serializer.fromJson<String?>(json['note']),
+      timeSheetId: serializer.fromJson<String?>(json['timeSheetId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -18824,6 +19533,7 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
       'invoiceId': serializer.toJson<String?>(invoiceId),
       'projectId': serializer.toJson<String?>(projectId),
       'note': serializer.toJson<String?>(note),
+      'timeSheetId': serializer.toJson<String?>(timeSheetId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -18837,6 +19547,7 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
     Value<String?> invoiceId = const Value.absent(),
     Value<String?> projectId = const Value.absent(),
     Value<String?> note = const Value.absent(),
+    Value<String?> timeSheetId = const Value.absent(),
     DateTime? createdAt,
   }) => TimeEntry(
     id: id ?? this.id,
@@ -18847,6 +19558,7 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
     invoiceId: invoiceId.present ? invoiceId.value : this.invoiceId,
     projectId: projectId.present ? projectId.value : this.projectId,
     note: note.present ? note.value : this.note,
+    timeSheetId: timeSheetId.present ? timeSheetId.value : this.timeSheetId,
     createdAt: createdAt ?? this.createdAt,
   );
   TimeEntry copyWithCompanion(TimeEntriesCompanion data) {
@@ -18861,6 +19573,9 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
       invoiceId: data.invoiceId.present ? data.invoiceId.value : this.invoiceId,
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
       note: data.note.present ? data.note.value : this.note,
+      timeSheetId: data.timeSheetId.present
+          ? data.timeSheetId.value
+          : this.timeSheetId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -18876,6 +19591,7 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
           ..write('invoiceId: $invoiceId, ')
           ..write('projectId: $projectId, ')
           ..write('note: $note, ')
+          ..write('timeSheetId: $timeSheetId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -18891,6 +19607,7 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
     invoiceId,
     projectId,
     note,
+    timeSheetId,
     createdAt,
   );
   @override
@@ -18905,6 +19622,7 @@ class TimeEntry extends DataClass implements Insertable<TimeEntry> {
           other.invoiceId == this.invoiceId &&
           other.projectId == this.projectId &&
           other.note == this.note &&
+          other.timeSheetId == this.timeSheetId &&
           other.createdAt == this.createdAt);
 }
 
@@ -18917,6 +19635,7 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
   final Value<String?> invoiceId;
   final Value<String?> projectId;
   final Value<String?> note;
+  final Value<String?> timeSheetId;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const TimeEntriesCompanion({
@@ -18928,6 +19647,7 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
     this.invoiceId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.note = const Value.absent(),
+    this.timeSheetId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -18940,6 +19660,7 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
     this.invoiceId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.note = const Value.absent(),
+    this.timeSheetId = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -18956,6 +19677,7 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
     Expression<String>? invoiceId,
     Expression<String>? projectId,
     Expression<String>? note,
+    Expression<String>? timeSheetId,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -18968,6 +19690,7 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
       if (invoiceId != null) 'invoice_id': invoiceId,
       if (projectId != null) 'project_id': projectId,
       if (note != null) 'note': note,
+      if (timeSheetId != null) 'time_sheet_id': timeSheetId,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -18982,6 +19705,7 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
     Value<String?>? invoiceId,
     Value<String?>? projectId,
     Value<String?>? note,
+    Value<String?>? timeSheetId,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -18994,6 +19718,7 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
       invoiceId: invoiceId ?? this.invoiceId,
       projectId: projectId ?? this.projectId,
       note: note ?? this.note,
+      timeSheetId: timeSheetId ?? this.timeSheetId,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -19026,6 +19751,9 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
     if (note.present) {
       map['note'] = Variable<String>(note.value);
     }
+    if (timeSheetId.present) {
+      map['time_sheet_id'] = Variable<String>(timeSheetId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -19046,6 +19774,7 @@ class TimeEntriesCompanion extends UpdateCompanion<TimeEntry> {
           ..write('invoiceId: $invoiceId, ')
           ..write('projectId: $projectId, ')
           ..write('note: $note, ')
+          ..write('timeSheetId: $timeSheetId, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -19092,6 +19821,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $InventoryCountItemsTable inventoryCountItems =
       $InventoryCountItemsTable(this);
   late final $StaffRolesTable staffRoles = $StaffRolesTable(this);
+  late final $TimeSheetsTable timeSheets = $TimeSheetsTable(this);
   late final $TimeEntriesTable timeEntries = $TimeEntriesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -19121,6 +19851,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     inventoryCounts,
     inventoryCountItems,
     staffRoles,
+    timeSheets,
     timeEntries,
   ];
   @override
@@ -19415,6 +20146,34 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         'companies',
         limitUpdateKind: UpdateKind.delete,
       ),
+      result: [TableUpdate('time_sheets', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'invoices',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('time_sheets', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'projects',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('time_sheets', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'time_sheets',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('time_sheets', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'companies',
+        limitUpdateKind: UpdateKind.delete,
+      ),
       result: [TableUpdate('time_entries', kind: UpdateKind.delete)],
     ),
     WritePropagation(
@@ -19434,6 +20193,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'projects',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('time_entries', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'time_sheets',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('time_entries', kind: UpdateKind.update)],
@@ -19915,6 +20681,24 @@ final class $$CompaniesTableReferences
     ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_staffRolesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$TimeSheetsTable, List<TimeSheet>>
+  _timeSheetsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.timeSheets,
+    aliasName: 'companies__id__time_sheets__company_id',
+  );
+
+  $$TimeSheetsTableProcessedTableManager get timeSheetsRefs {
+    final manager = $$TimeSheetsTableTableManager(
+      $_db,
+      $_db.timeSheets,
+    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_timeSheetsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -20706,6 +21490,31 @@ class $$CompaniesTableFilterComposer
           }) => $$StaffRolesTableFilterComposer(
             $db: $db,
             $table: $db.staffRoles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> timeSheetsRefs(
+    Expression<bool> Function($$TimeSheetsTableFilterComposer f) f,
+  ) {
+    final $$TimeSheetsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableFilterComposer(
+            $db: $db,
+            $table: $db.timeSheets,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -21847,6 +22656,31 @@ class $$CompaniesTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> timeSheetsRefs<T extends Object>(
+    Expression<T> Function($$TimeSheetsTableAnnotationComposer a) f,
+  ) {
+    final $$TimeSheetsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.timeSheets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> timeEntriesRefs<T extends Object>(
     Expression<T> Function($$TimeEntriesTableAnnotationComposer a) f,
   ) {
@@ -21904,6 +22738,7 @@ class $$CompaniesTableTableManager
             bool stockMovementsRefs,
             bool inventoryCountsRefs,
             bool staffRolesRefs,
+            bool timeSheetsRefs,
             bool timeEntriesRefs,
           })
         > {
@@ -22237,6 +23072,7 @@ class $$CompaniesTableTableManager
                 stockMovementsRefs = false,
                 inventoryCountsRefs = false,
                 staffRolesRefs = false,
+                timeSheetsRefs = false,
                 timeEntriesRefs = false,
               }) {
                 return PrefetchHooks(
@@ -22260,6 +23096,7 @@ class $$CompaniesTableTableManager
                     if (stockMovementsRefs) db.stockMovements,
                     if (inventoryCountsRefs) db.inventoryCounts,
                     if (staffRolesRefs) db.staffRoles,
+                    if (timeSheetsRefs) db.timeSheets,
                     if (timeEntriesRefs) db.timeEntries,
                   ],
                   addJoins: null,
@@ -22622,6 +23459,27 @@ class $$CompaniesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (timeSheetsRefs)
+                        await $_getPrefetchedData<
+                          Company,
+                          $CompaniesTable,
+                          TimeSheet
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompaniesTableReferences
+                              ._timeSheetsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompaniesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).timeSheetsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.companyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (timeEntriesRefs)
                         await $_getPrefetchedData<
                           Company,
@@ -22681,6 +23539,7 @@ typedef $$CompaniesTableProcessedTableManager =
         bool stockMovementsRefs,
         bool inventoryCountsRefs,
         bool staffRolesRefs,
+        bool timeSheetsRefs,
         bool timeEntriesRefs,
       })
     >;
@@ -26360,6 +27219,24 @@ final class $$ProjectsTableReferences
     );
   }
 
+  static MultiTypedResultKey<$TimeSheetsTable, List<TimeSheet>>
+  _timeSheetsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.timeSheets,
+    aliasName: 'projects__id__time_sheets__project_id',
+  );
+
+  $$TimeSheetsTableProcessedTableManager get timeSheetsRefs {
+    final manager = $$TimeSheetsTableTableManager(
+      $_db,
+      $_db.timeSheets,
+    ).filter((f) => f.projectId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_timeSheetsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$TimeEntriesTable, List<TimeEntry>>
   _timeEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.timeEntries,
@@ -26561,6 +27438,31 @@ class $$ProjectsTableFilterComposer
           }) => $$PurchaseOrdersTableFilterComposer(
             $db: $db,
             $table: $db.purchaseOrders,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> timeSheetsRefs(
+    Expression<bool> Function($$TimeSheetsTableFilterComposer f) f,
+  ) {
+    final $$TimeSheetsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.projectId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableFilterComposer(
+            $db: $db,
+            $table: $db.timeSheets,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -26868,6 +27770,31 @@ class $$ProjectsTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> timeSheetsRefs<T extends Object>(
+    Expression<T> Function($$TimeSheetsTableAnnotationComposer a) f,
+  ) {
+    final $$TimeSheetsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.projectId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.timeSheets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> timeEntriesRefs<T extends Object>(
     Expression<T> Function($$TimeEntriesTableAnnotationComposer a) f,
   ) {
@@ -26914,6 +27841,7 @@ class $$ProjectsTableTableManager
             bool vehicleCostEntriesRefs,
             bool expensesRefs,
             bool purchaseOrdersRefs,
+            bool timeSheetsRefs,
             bool timeEntriesRefs,
           })
         > {
@@ -26992,6 +27920,7 @@ class $$ProjectsTableTableManager
                 vehicleCostEntriesRefs = false,
                 expensesRefs = false,
                 purchaseOrdersRefs = false,
+                timeSheetsRefs = false,
                 timeEntriesRefs = false,
               }) {
                 return PrefetchHooks(
@@ -27001,6 +27930,7 @@ class $$ProjectsTableTableManager
                     if (vehicleCostEntriesRefs) db.vehicleCostEntries,
                     if (expensesRefs) db.expenses,
                     if (purchaseOrdersRefs) db.purchaseOrders,
+                    if (timeSheetsRefs) db.timeSheets,
                     if (timeEntriesRefs) db.timeEntries,
                   ],
                   addJoins:
@@ -27134,6 +28064,27 @@ class $$ProjectsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (timeSheetsRefs)
+                        await $_getPrefetchedData<
+                          Project,
+                          $ProjectsTable,
+                          TimeSheet
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ProjectsTableReferences
+                              ._timeSheetsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ProjectsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).timeSheetsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.projectId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (timeEntriesRefs)
                         await $_getPrefetchedData<
                           Project,
@@ -27182,6 +28133,7 @@ typedef $$ProjectsTableProcessedTableManager =
         bool vehicleCostEntriesRefs,
         bool expensesRefs,
         bool purchaseOrdersRefs,
+        bool timeSheetsRefs,
         bool timeEntriesRefs,
       })
     >;
@@ -27381,6 +28333,24 @@ final class $$InvoicesTableReferences
     ).filter((f) => f.sourceOrderId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_purchaseOrdersRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$TimeSheetsTable, List<TimeSheet>>
+  _timeSheetsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.timeSheets,
+    aliasName: 'invoices__id__time_sheets__invoice_id',
+  );
+
+  $$TimeSheetsTableProcessedTableManager get timeSheetsRefs {
+    final manager = $$TimeSheetsTableTableManager(
+      $_db,
+      $_db.timeSheets,
+    ).filter((f) => f.invoiceId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_timeSheetsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -27715,6 +28685,31 @@ class $$InvoicesTableFilterComposer
           }) => $$PurchaseOrdersTableFilterComposer(
             $db: $db,
             $table: $db.purchaseOrders,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> timeSheetsRefs(
+    Expression<bool> Function($$TimeSheetsTableFilterComposer f) f,
+  ) {
+    final $$TimeSheetsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.invoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableFilterComposer(
+            $db: $db,
+            $table: $db.timeSheets,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -28291,6 +29286,31 @@ class $$InvoicesTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> timeSheetsRefs<T extends Object>(
+    Expression<T> Function($$TimeSheetsTableAnnotationComposer a) f,
+  ) {
+    final $$TimeSheetsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.invoiceId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.timeSheets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> timeEntriesRefs<T extends Object>(
     Expression<T> Function($$TimeEntriesTableAnnotationComposer a) f,
   ) {
@@ -28338,6 +29358,7 @@ class $$InvoicesTableTableManager
             bool invoiceItemsRefs,
             bool bankTransactionsRefs,
             bool purchaseOrdersRefs,
+            bool timeSheetsRefs,
             bool timeEntriesRefs,
           })
         > {
@@ -28509,6 +29530,7 @@ class $$InvoicesTableTableManager
                 invoiceItemsRefs = false,
                 bankTransactionsRefs = false,
                 purchaseOrdersRefs = false,
+                timeSheetsRefs = false,
                 timeEntriesRefs = false,
               }) {
                 return PrefetchHooks(
@@ -28517,6 +29539,7 @@ class $$InvoicesTableTableManager
                     if (invoiceItemsRefs) db.invoiceItems,
                     if (bankTransactionsRefs) db.bankTransactions,
                     if (purchaseOrdersRefs) db.purchaseOrders,
+                    if (timeSheetsRefs) db.timeSheets,
                     if (timeEntriesRefs) db.timeEntries,
                   ],
                   addJoins:
@@ -28655,6 +29678,27 @@ class $$InvoicesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (timeSheetsRefs)
+                        await $_getPrefetchedData<
+                          Invoice,
+                          $InvoicesTable,
+                          TimeSheet
+                        >(
+                          currentTable: table,
+                          referencedTable: $$InvoicesTableReferences
+                              ._timeSheetsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$InvoicesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).timeSheetsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.invoiceId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (timeEntriesRefs)
                         await $_getPrefetchedData<
                           Invoice,
@@ -28704,6 +29748,7 @@ typedef $$InvoicesTableProcessedTableManager =
         bool invoiceItemsRefs,
         bool bankTransactionsRefs,
         bool purchaseOrdersRefs,
+        bool timeSheetsRefs,
         bool timeEntriesRefs,
       })
     >;
@@ -36906,6 +37951,794 @@ typedef $$StaffRolesTableProcessedTableManager =
       StaffRole,
       PrefetchHooks Function({bool companyId, bool timeEntriesRefs})
     >;
+typedef $$TimeSheetsTableCreateCompanionBuilder =
+    TimeSheetsCompanion Function({
+      required String id,
+      required String companyId,
+      required DateTime date,
+      Value<String?> invoiceId,
+      Value<String?> projectId,
+      Value<TimeSheetStatus> status,
+      Value<Uint8List?> signatureImage,
+      Value<DateTime?> signedAt,
+      Value<String?> supersedesId,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$TimeSheetsTableUpdateCompanionBuilder =
+    TimeSheetsCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<DateTime> date,
+      Value<String?> invoiceId,
+      Value<String?> projectId,
+      Value<TimeSheetStatus> status,
+      Value<Uint8List?> signatureImage,
+      Value<DateTime?> signedAt,
+      Value<String?> supersedesId,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$TimeSheetsTableReferences
+    extends BaseReferences<_$AppDatabase, $TimeSheetsTable, TimeSheet> {
+  $$TimeSheetsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CompaniesTable _companyIdTable(_$AppDatabase db) =>
+      db.companies.createAlias('time_sheets__company_id__companies__id');
+
+  $$CompaniesTableProcessedTableManager get companyId {
+    final $_column = $_itemColumn<String>('company_id')!;
+
+    final manager = $$CompaniesTableTableManager(
+      $_db,
+      $_db.companies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $InvoicesTable _invoiceIdTable(_$AppDatabase db) =>
+      db.invoices.createAlias('time_sheets__invoice_id__invoices__id');
+
+  $$InvoicesTableProcessedTableManager? get invoiceId {
+    final $_column = $_itemColumn<String>('invoice_id');
+    if ($_column == null) return null;
+    final manager = $$InvoicesTableTableManager(
+      $_db,
+      $_db.invoices,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_invoiceIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProjectsTable _projectIdTable(_$AppDatabase db) =>
+      db.projects.createAlias('time_sheets__project_id__projects__id');
+
+  $$ProjectsTableProcessedTableManager? get projectId {
+    final $_column = $_itemColumn<String>('project_id');
+    if ($_column == null) return null;
+    final manager = $$ProjectsTableTableManager(
+      $_db,
+      $_db.projects,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_projectIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $TimeSheetsTable _supersedesIdTable(_$AppDatabase db) =>
+      db.timeSheets.createAlias('time_sheets__supersedes_id__time_sheets__id');
+
+  $$TimeSheetsTableProcessedTableManager? get supersedesId {
+    final $_column = $_itemColumn<String>('supersedes_id');
+    if ($_column == null) return null;
+    final manager = $$TimeSheetsTableTableManager(
+      $_db,
+      $_db.timeSheets,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_supersedesIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$TimeEntriesTable, List<TimeEntry>>
+  _timeEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.timeEntries,
+    aliasName: 'time_sheets__id__time_entries__time_sheet_id',
+  );
+
+  $$TimeEntriesTableProcessedTableManager get timeEntriesRefs {
+    final manager = $$TimeEntriesTableTableManager(
+      $_db,
+      $_db.timeEntries,
+    ).filter((f) => f.timeSheetId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_timeEntriesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$TimeSheetsTableFilterComposer
+    extends Composer<_$AppDatabase, $TimeSheetsTable> {
+  $$TimeSheetsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<TimeSheetStatus, TimeSheetStatus, String>
+  get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get signatureImage => $composableBuilder(
+    column: $table.signatureImage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get signedAt => $composableBuilder(
+    column: $table.signedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CompaniesTableFilterComposer get companyId {
+    final $$CompaniesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableFilterComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$InvoicesTableFilterComposer get invoiceId {
+    final $$InvoicesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.invoiceId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableFilterComposer(
+            $db: $db,
+            $table: $db.invoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProjectsTableFilterComposer get projectId {
+    final $$ProjectsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableFilterComposer(
+            $db: $db,
+            $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TimeSheetsTableFilterComposer get supersedesId {
+    final $$TimeSheetsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.supersedesId,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableFilterComposer(
+            $db: $db,
+            $table: $db.timeSheets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> timeEntriesRefs(
+    Expression<bool> Function($$TimeEntriesTableFilterComposer f) f,
+  ) {
+    final $$TimeEntriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeEntries,
+      getReferencedColumn: (t) => t.timeSheetId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeEntriesTableFilterComposer(
+            $db: $db,
+            $table: $db.timeEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$TimeSheetsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TimeSheetsTable> {
+  $$TimeSheetsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<Uint8List> get signatureImage => $composableBuilder(
+    column: $table.signatureImage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get signedAt => $composableBuilder(
+    column: $table.signedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CompaniesTableOrderingComposer get companyId {
+    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableOrderingComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$InvoicesTableOrderingComposer get invoiceId {
+    final $$InvoicesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.invoiceId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableOrderingComposer(
+            $db: $db,
+            $table: $db.invoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProjectsTableOrderingComposer get projectId {
+    final $$ProjectsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableOrderingComposer(
+            $db: $db,
+            $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TimeSheetsTableOrderingComposer get supersedesId {
+    final $$TimeSheetsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.supersedesId,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableOrderingComposer(
+            $db: $db,
+            $table: $db.timeSheets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TimeSheetsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TimeSheetsTable> {
+  $$TimeSheetsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<TimeSheetStatus, String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get signatureImage => $composableBuilder(
+    column: $table.signatureImage,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get signedAt =>
+      $composableBuilder(column: $table.signedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$CompaniesTableAnnotationComposer get companyId {
+    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$InvoicesTableAnnotationComposer get invoiceId {
+    final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.invoiceId,
+      referencedTable: $db.invoices,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoicesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.invoices,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProjectsTableAnnotationComposer get projectId {
+    final $$ProjectsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.projectId,
+      referencedTable: $db.projects,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProjectsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TimeSheetsTableAnnotationComposer get supersedesId {
+    final $$TimeSheetsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.supersedesId,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.timeSheets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> timeEntriesRefs<T extends Object>(
+    Expression<T> Function($$TimeEntriesTableAnnotationComposer a) f,
+  ) {
+    final $$TimeEntriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeEntries,
+      getReferencedColumn: (t) => t.timeSheetId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeEntriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.timeEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$TimeSheetsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TimeSheetsTable,
+          TimeSheet,
+          $$TimeSheetsTableFilterComposer,
+          $$TimeSheetsTableOrderingComposer,
+          $$TimeSheetsTableAnnotationComposer,
+          $$TimeSheetsTableCreateCompanionBuilder,
+          $$TimeSheetsTableUpdateCompanionBuilder,
+          (TimeSheet, $$TimeSheetsTableReferences),
+          TimeSheet,
+          PrefetchHooks Function({
+            bool companyId,
+            bool invoiceId,
+            bool projectId,
+            bool supersedesId,
+            bool timeEntriesRefs,
+          })
+        > {
+  $$TimeSheetsTableTableManager(_$AppDatabase db, $TimeSheetsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TimeSheetsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TimeSheetsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TimeSheetsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> companyId = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<String?> invoiceId = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<TimeSheetStatus> status = const Value.absent(),
+                Value<Uint8List?> signatureImage = const Value.absent(),
+                Value<DateTime?> signedAt = const Value.absent(),
+                Value<String?> supersedesId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TimeSheetsCompanion(
+                id: id,
+                companyId: companyId,
+                date: date,
+                invoiceId: invoiceId,
+                projectId: projectId,
+                status: status,
+                signatureImage: signatureImage,
+                signedAt: signedAt,
+                supersedesId: supersedesId,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String companyId,
+                required DateTime date,
+                Value<String?> invoiceId = const Value.absent(),
+                Value<String?> projectId = const Value.absent(),
+                Value<TimeSheetStatus> status = const Value.absent(),
+                Value<Uint8List?> signatureImage = const Value.absent(),
+                Value<DateTime?> signedAt = const Value.absent(),
+                Value<String?> supersedesId = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => TimeSheetsCompanion.insert(
+                id: id,
+                companyId: companyId,
+                date: date,
+                invoiceId: invoiceId,
+                projectId: projectId,
+                status: status,
+                signatureImage: signatureImage,
+                signedAt: signedAt,
+                supersedesId: supersedesId,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$TimeSheetsTable, TimeSheet>(table),
+                  $$TimeSheetsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                companyId = false,
+                invoiceId = false,
+                projectId = false,
+                supersedesId = false,
+                timeEntriesRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (timeEntriesRefs) db.timeEntries,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (companyId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$TimeSheetsTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn:
+                                        $$TimeSheetsTableReferences
+                                            ._companyIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (invoiceId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.invoiceId,
+                                    referencedTable: $$TimeSheetsTableReferences
+                                        ._invoiceIdTable(db),
+                                    referencedColumn:
+                                        $$TimeSheetsTableReferences
+                                            ._invoiceIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (projectId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.projectId,
+                                    referencedTable: $$TimeSheetsTableReferences
+                                        ._projectIdTable(db),
+                                    referencedColumn:
+                                        $$TimeSheetsTableReferences
+                                            ._projectIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (supersedesId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.supersedesId,
+                                    referencedTable: $$TimeSheetsTableReferences
+                                        ._supersedesIdTable(db),
+                                    referencedColumn:
+                                        $$TimeSheetsTableReferences
+                                            ._supersedesIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (timeEntriesRefs)
+                        await $_getPrefetchedData<
+                          TimeSheet,
+                          $TimeSheetsTable,
+                          TimeEntry
+                        >(
+                          currentTable: table,
+                          referencedTable: $$TimeSheetsTableReferences
+                              ._timeEntriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$TimeSheetsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).timeEntriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.timeSheetId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$TimeSheetsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TimeSheetsTable,
+      TimeSheet,
+      $$TimeSheetsTableFilterComposer,
+      $$TimeSheetsTableOrderingComposer,
+      $$TimeSheetsTableAnnotationComposer,
+      $$TimeSheetsTableCreateCompanionBuilder,
+      $$TimeSheetsTableUpdateCompanionBuilder,
+      (TimeSheet, $$TimeSheetsTableReferences),
+      TimeSheet,
+      PrefetchHooks Function({
+        bool companyId,
+        bool invoiceId,
+        bool projectId,
+        bool supersedesId,
+        bool timeEntriesRefs,
+      })
+    >;
 typedef $$TimeEntriesTableCreateCompanionBuilder =
     TimeEntriesCompanion Function({
       required String id,
@@ -36916,6 +38749,7 @@ typedef $$TimeEntriesTableCreateCompanionBuilder =
       Value<String?> invoiceId,
       Value<String?> projectId,
       Value<String?> note,
+      Value<String?> timeSheetId,
       required DateTime createdAt,
       Value<int> rowid,
     });
@@ -36929,6 +38763,7 @@ typedef $$TimeEntriesTableUpdateCompanionBuilder =
       Value<String?> invoiceId,
       Value<String?> projectId,
       Value<String?> note,
+      Value<String?> timeSheetId,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -36999,6 +38834,23 @@ final class $$TimeEntriesTableReferences
       $_db.projects,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_projectIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $TimeSheetsTable _timeSheetIdTable(_$AppDatabase db) =>
+      db.timeSheets.createAlias('time_entries__time_sheet_id__time_sheets__id');
+
+  $$TimeSheetsTableProcessedTableManager? get timeSheetId {
+    final $_column = $_itemColumn<String>('time_sheet_id');
+    if ($_column == null) return null;
+    final manager = $$TimeSheetsTableTableManager(
+      $_db,
+      $_db.timeSheets,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_timeSheetIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -37123,6 +38975,29 @@ class $$TimeEntriesTableFilterComposer
           }) => $$ProjectsTableFilterComposer(
             $db: $db,
             $table: $db.projects,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TimeSheetsTableFilterComposer get timeSheetId {
+    final $$TimeSheetsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.timeSheetId,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableFilterComposer(
+            $db: $db,
+            $table: $db.timeSheets,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -37258,6 +39133,29 @@ class $$TimeEntriesTableOrderingComposer
     );
     return composer;
   }
+
+  $$TimeSheetsTableOrderingComposer get timeSheetId {
+    final $$TimeSheetsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.timeSheetId,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableOrderingComposer(
+            $db: $db,
+            $table: $db.timeSheets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$TimeEntriesTableAnnotationComposer
@@ -37375,6 +39273,29 @@ class $$TimeEntriesTableAnnotationComposer
     );
     return composer;
   }
+
+  $$TimeSheetsTableAnnotationComposer get timeSheetId {
+    final $$TimeSheetsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.timeSheetId,
+      referencedTable: $db.timeSheets,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeSheetsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.timeSheets,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$TimeEntriesTableTableManager
@@ -37395,6 +39316,7 @@ class $$TimeEntriesTableTableManager
             bool staffRoleId,
             bool invoiceId,
             bool projectId,
+            bool timeSheetId,
           })
         > {
   $$TimeEntriesTableTableManager(_$AppDatabase db, $TimeEntriesTable table)
@@ -37418,6 +39340,7 @@ class $$TimeEntriesTableTableManager
                 Value<String?> invoiceId = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<String?> note = const Value.absent(),
+                Value<String?> timeSheetId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TimeEntriesCompanion(
@@ -37429,6 +39352,7 @@ class $$TimeEntriesTableTableManager
                 invoiceId: invoiceId,
                 projectId: projectId,
                 note: note,
+                timeSheetId: timeSheetId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -37442,6 +39366,7 @@ class $$TimeEntriesTableTableManager
                 Value<String?> invoiceId = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<String?> note = const Value.absent(),
+                Value<String?> timeSheetId = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => TimeEntriesCompanion.insert(
@@ -37453,6 +39378,7 @@ class $$TimeEntriesTableTableManager
                 invoiceId: invoiceId,
                 projectId: projectId,
                 note: note,
+                timeSheetId: timeSheetId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -37470,6 +39396,7 @@ class $$TimeEntriesTableTableManager
                 staffRoleId = false,
                 invoiceId = false,
                 projectId = false,
+                timeSheetId = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -37550,6 +39477,21 @@ class $$TimeEntriesTableTableManager
                                   )
                                   as T;
                         }
+                        if (timeSheetId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.timeSheetId,
+                                    referencedTable:
+                                        $$TimeEntriesTableReferences
+                                            ._timeSheetIdTable(db),
+                                    referencedColumn:
+                                        $$TimeEntriesTableReferences
+                                            ._timeSheetIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
 
                         return state;
                       },
@@ -37579,6 +39521,7 @@ typedef $$TimeEntriesTableProcessedTableManager =
         bool staffRoleId,
         bool invoiceId,
         bool projectId,
+        bool timeSheetId,
       })
     >;
 
@@ -37638,6 +39581,8 @@ class $AppDatabaseManager {
       $$InventoryCountItemsTableTableManager(_db, _db.inventoryCountItems);
   $$StaffRolesTableTableManager get staffRoles =>
       $$StaffRolesTableTableManager(_db, _db.staffRoles);
+  $$TimeSheetsTableTableManager get timeSheets =>
+      $$TimeSheetsTableTableManager(_db, _db.timeSheets);
   $$TimeEntriesTableTableManager get timeEntries =>
       $$TimeEntriesTableTableManager(_db, _db.timeEntries);
 }
