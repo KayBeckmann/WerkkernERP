@@ -1228,6 +1228,84 @@ class TimeEntries extends Table {
   TextColumn get projectId =>
       text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
   TextColumn get note => text().nullable()();
+
+  /// C3-Rest (Nachtrag 2026-10-21, Kay-Entscheidung auf Rückfrage:
+  /// "Touch-Zeichenfläche ... Unterschrift wird als Bild einer
+  /// Zeitbuchung/-gruppe zugeordnet") — `null`, solange die Buchung
+  /// keinem Kunden-Stundenzettel zugeordnet ist. Ist der referenzierte
+  /// [TimeSheets]-Datensatz `signed`, ist diese Buchung über
+  /// `TimeEntryRepository.update()`/`delete()` **unveränderlich** (siehe
+  /// Doc-Kommentar dort) — eine Korrektur geht nur über einen neuen,
+  /// erneut zu unterschreibenden Stundenzettel
+  /// (`TimeSheetRepository.createCorrectionDraft()`), nie über eine
+  /// stille Änderung der bereits unterschriebenen Buchung.
+  /// `onDelete: setNull`, damit ein gelöschter Stundenzettel-Entwurf
+  /// keine Zeitbuchung mitreißt.
+  TextColumn get timeSheetId =>
+      text().nullable().references(TimeSheets, #id, onDelete: KeyAction.setNull)();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Status eines Kunden-Stundenzettels (C3-Rest, Nachtrag 2026-10-21).
+/// `draft`: frei editierbar (Zeitbuchungen hinzu-/entfernbar). `signed`:
+/// unveränderlich wie eine finalisierte Rechnung (F3-Prinzip) — die
+/// zugeordneten [TimeEntries] sind ab diesem Zeitpunkt gesperrt.
+enum TimeSheetStatus { draft, signed }
+
+/// Kunden-Stundenzettel mit Touch-Unterschrift (C3-Rest, Nachtrag
+/// 2026-10-21 — der ursprünglich im C3-Platzhalter zurückgestellte Teil
+/// des Nachtrags vom 2026-10-20, siehe Roadmap). Bündelt mehrere
+/// [TimeEntries] eines Tages zu einem vom Kunden unterschriebenen
+/// Beleg — eigenständige Tabelle statt nur eines Felds auf
+/// [TimeEntries], weil mehrere Buchungen gemeinsam EINE Unterschrift
+/// tragen ("-gruppe", Kay-Entscheidung).
+///
+/// Kay-Entscheidungen auf Rückfrage:
+/// - **Signatur:** einfache Touch-Zeichenfläche (kein Drittanbieter-
+///   Paket, siehe `signature_pad.dart`), als PNG in [signatureImage]
+///   gespeichert. **Keine qualifizierte elektronische Signatur** — das
+///   muss jede Anzeige/jedes PDF fest mit ausweisen, siehe
+///   `time_sheet_pdf_builder.dart`.
+/// - **Unveränderlichkeit:** nach dem Unterschreiben (`status: signed`)
+///   wie eine Finalisierung gesperrt. Eine Korrektur erzeugt über
+///   [supersedesId] einen NEUEN, erneut zu unterschreibenden
+///   Stundenzettel statt die alte Fassung zu ändern — die alte Fassung
+///   bleibt unverändert als Nachweis erhalten (GoBD-Prinzip, siehe
+///   [StockMovements]/[InventoryCounts] für dasselbe Muster bei
+///   anderen Belegarten).
+class TimeSheets extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+
+  /// Der Tag, auf den sich der Stundenzettel bezieht (die zugeordneten
+  /// [TimeEntries] können trotzdem ein eigenes Datum tragen — in der
+  /// Praxis identisch, aber nicht erzwungen).
+  DateTimeColumn get date => dateTime()();
+
+  /// Mindestens eines von [invoiceId]/[projectId] ist Pflicht (siehe
+  /// `TimeSheetRepository.createDraft()`), gleiche Regel wie bei
+  /// [TimeEntries] selbst.
+  TextColumn get invoiceId =>
+      text().nullable().references(Invoices, #id, onDelete: KeyAction.setNull)();
+  TextColumn get projectId =>
+      text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
+  TextColumn get status =>
+      textEnum<TimeSheetStatus>().withDefault(Constant(TimeSheetStatus.draft.name))();
+
+  /// PNG-Bytes der Touch-Unterschrift — `null` bis zum Unterschreiben.
+  BlobColumn get signatureImage => blob().nullable()();
+  DateTimeColumn get signedAt => dateTime().nullable()();
+
+  /// Verweist auf den Stundenzettel, den dieser hier korrigiert (siehe
+  /// Klassendoc) — `null` für einen normalen, nicht korrigierenden
+  /// Stundenzettel. `onDelete: setNull`, eine gelöschte Korrektur reißt
+  /// nicht die Kette der Vorgänger mit.
+  TextColumn get supersedesId =>
+      text().nullable().references(TimeSheets, #id, onDelete: KeyAction.setNull)();
   DateTimeColumn get createdAt => dateTime()();
 
   @override

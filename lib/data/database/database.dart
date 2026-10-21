@@ -35,6 +35,7 @@ part 'database.g.dart';
     InventoryCountItems,
     StaffRoles,
     TimeEntries,
+    TimeSheets,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -47,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 30;
+  int get schemaVersion => 31;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -324,6 +325,20 @@ class AppDatabase extends _$AppDatabase {
             if (from >= 9) {
               await migrator.addColumn(projects, projects.foundingYear);
               await migrator.addColumn(projects, projects.projectNumber);
+            }
+          }
+          if (from < 31) {
+            // C3-Rest Kunden-Stundenzettel/Unterschrift (Nachtrag
+            // 2026-10-21). `timeSheets` ist eine neue Tabelle, daher
+            // immer per createTable — `timeEntries` existiert dagegen
+            // schon seit v27 (C3.1), gleicher Guard wie oben: nur
+            // addColumn, wenn die Tabelle VOR diesem Upgrade-Lauf schon
+            // existierte, sonst hat `createTable(timeEntries)` bei
+            // `from < 27` die Spalte schon mit der aktuellen Definition
+            // angelegt.
+            await migrator.createTable(timeSheets);
+            if (from >= 27) {
+              await migrator.addColumn(timeEntries, timeEntries.timeSheetId);
             }
           }
         },

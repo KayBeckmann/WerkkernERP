@@ -37,7 +37,8 @@ import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 /// Festpreis-Kennzeichen, Nachtrag 2026-10-20; v28→v29: C6-Nachtrag
 /// Tilgungs-/Zinsanteil bei Fahrzeug-Finanzierungskosten,
 /// Nachtrag 2026-10-21; v29→v30: C2-Nachtrag Projektnummer-
-/// Nummernkreise, Nachtrag 2026-10-21).
+/// Nummernkreise, Nachtrag 2026-10-21; v30→v31: C3-Rest
+/// Kunden-Stundenzettel/Unterschrift, Nachtrag 2026-10-21).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -271,6 +272,12 @@ void main() {
       // Rückbau-Schritt: `projects` ist beim Rückbau von v8→v9 oben
       // bereits komplett gedroppt (siehe den `from >= 9`-Guard in
       // database.dart).
+      // v30 -> v31 (C3-Rest: Kunden-Stundenzettel/Unterschrift,
+      // 2026-10-21) — ebenfalls kein eigener Rückbau-Schritt:
+      // `time_sheets` ist eine komplett neue Tabelle (existierte vor
+      // v31 nie) und `time_entries.time_sheet_id` wird beim Rückbau von
+      // v26→v27 oben bereits mit der ganzen Tabelle gedroppt (siehe den
+      // `from >= 27`-Guard in database.dart).
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -652,6 +659,29 @@ void main() {
             .getSingle();
         expect(createdTimeEntry.hours, 2.5);
         expect(createdTimeEntry.staffRoleId, 'staff-role-nach-migration');
+
+        // v30 -> v31: TimeSheets existiert und time_entries.time_sheet_id
+        // ist nutzbar (C3-Rest, Kunden-Stundenzettel/Unterschrift).
+        await db.into(db.timeSheets).insert(
+              TimeSheetsCompanion.insert(
+                id: 'time-sheet-nach-migration',
+                companyId: company.id,
+                date: DateTime.now(),
+                invoiceId: Value(invoice.id),
+                createdAt: DateTime.now(),
+              ),
+            );
+        await (db.update(db.timeEntries)..where((t) => t.id.equals('time-entry-nach-migration')))
+            .write(const TimeEntriesCompanion(timeSheetId: Value('time-sheet-nach-migration')));
+        final linkedTimeEntry = await (db.select(db.timeEntries)
+              ..where((t) => t.id.equals('time-entry-nach-migration')))
+            .getSingle();
+        expect(linkedTimeEntry.timeSheetId, 'time-sheet-nach-migration');
+        final createdTimeSheet = await (db.select(db.timeSheets)
+              ..where((s) => s.id.equals('time-sheet-nach-migration')))
+            .getSingle();
+        expect(createdTimeSheet.status, TimeSheetStatus.draft);
+        expect(createdTimeSheet.signatureImage, isNull);
       } finally {
         await db.close();
       }

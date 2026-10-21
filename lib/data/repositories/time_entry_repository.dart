@@ -118,6 +118,25 @@ class TimeEntryRepository {
     return (await findById(companyId: companyId, id: id))!;
   }
 
+  /// C3-Rest (Nachtrag 2026-10-21) — ist die Buchung einem bereits
+  /// `signed` [TimeSheet] zugeordnet, ist sie unveränderlich (F3-
+  /// Prinzip, gleiche Begründung wie bei einer finalisierten Rechnung).
+  /// Eine Korrektur geht nur über `TimeSheetRepository.
+  /// createCorrectionDraft()` + eine neue Zeitbuchung, nie über eine
+  /// stille Änderung dieser hier.
+  Future<void> _assertNotLocked(TimeEntry entry) async {
+    if (entry.timeSheetId == null) return;
+    final sheet =
+        await (_db.select(_db.timeSheets)..where((s) => s.id.equals(entry.timeSheetId!)))
+            .getSingleOrNull();
+    if (sheet?.status == TimeSheetStatus.signed) {
+      throw StateError(
+        'Zeitbuchung gehört zu einem bereits unterschriebenen Stundenzettel und ist '
+        'unveränderlich — Korrektur über einen neuen Stundenzettel.',
+      );
+    }
+  }
+
   Future<TimeEntry?> update({
     required String companyId,
     required String id,
@@ -130,6 +149,7 @@ class TimeEntryRepository {
   }) async {
     final existing = await findById(companyId: companyId, id: id);
     if (existing == null) return null;
+    await _assertNotLocked(existing);
 
     final nextInvoiceId = invoiceId.present ? invoiceId.value : existing.invoiceId;
     final nextProjectId = projectId.present ? projectId.value : existing.projectId;
@@ -151,6 +171,10 @@ class TimeEntryRepository {
   }
 
   Future<bool> delete({required String companyId, required String id}) async {
+    final existing = await findById(companyId: companyId, id: id);
+    if (existing == null) return false;
+    await _assertNotLocked(existing);
+
     final rows = await (_db.delete(_db.timeEntries)
           ..where((t) => t.id.equals(id) & t.companyId.equals(companyId)))
         .go();
