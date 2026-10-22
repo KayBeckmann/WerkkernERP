@@ -5,3 +5,40 @@ services:
     restart: unless-stopped
     ports:
       - "0.0.0.0:8085:80"
+
+  # ---- Phase B: Online-Multi-User-Server (B1) ------------------------
+  # Eigenständiger Dienst, unabhängig vom Flutter-Client/Offline-
+  # SQLite. Siehe server/README.md und das Vault-ADR-0001
+  # (10_Projects/Flutter-ERP-RechnungsFee/Decisions/).
+  server-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: werkkernerp_server
+      POSTGRES_USER: werkkernerp_server
+      POSTGRES_PASSWORD: ${SERVER_DB_PASSWORD:-werkkernerp_server}
+    volumes:
+      - server-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U werkkernerp_server"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+    depends_on:
+      server-db:
+        condition: service_healthy
+    environment:
+      PORT: "8090"
+      DB_HOST: server-db
+      DB_PORT: "5432"
+      DB_NAME: werkkernerp_server
+      DB_USER: werkkernerp_server
+      DB_PASSWORD: ${SERVER_DB_PASSWORD:-werkkernerp_server}
+    ports:
+      - "8190:8090"
+
+volumes:
+  server-db-data:

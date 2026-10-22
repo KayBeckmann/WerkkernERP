@@ -1,3 +1,6 @@
+# Secrets (Phase B Server, server/.dart_tool etc. — siehe server/.gitignore)
+.env
+
 # Miscellaneous
 *.class
 *.log
