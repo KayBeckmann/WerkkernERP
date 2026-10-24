@@ -176,5 +176,118 @@ class WerkkernApiClient {
   Future<OnlineDocument> finalizeDocument(String id, {required int version}) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents/$id/finalize', body: {'version': version})));
 
+  // ---- Konto/Firma (ohne Firmensitzung) -----------------------------------------
+
+  Future<void> register(String email, String password) =>
+      _send('POST', '/auth/register', body: {'email': email, 'password': password});
+
+  /// Legt eine neue Firma an, der Aufrufer wird deren Admin. Verbraucht
+  /// das [identityToken] — für die Firmenwahl danach erneut [login].
+  Future<String> createCompany(String identityToken, String name) async =>
+      _map(await _send('POST', '/companies', body: {'identityToken': identityToken, 'name': name}))['companyId'] as String;
+
+  /// Löst eine Einladung ein (neues Konto oder Nachweis des bestehenden
+  /// per Passwort). Liefert die companyId.
+  Future<String> acceptInvitation(String invitationToken, String password) async =>
+      _map(await _send('POST', '/auth/accept-invitation', body: {'invitationToken': invitationToken, 'password': password}))['companyId']
+          as String;
+
+  // ---- Verwaltung (Firmen-Admin) ------------------------------------------------------
+
+  Future<List<OnlineGroup>> groups() async {
+    final j = _map(await _send('GET', '/groups'));
+    return [
+      for (final g in j['groups'] as List)
+        OnlineGroup(id: (g as Map<String, Object?>)['id'] as String, name: g['name'] as String),
+    ];
+  }
+
+  Future<OnlineGroup> createGroup(String name) async {
+    final j = _map(await _send('POST', '/groups', body: {'name': name}));
+    return OnlineGroup(id: j['id'] as String, name: j['name'] as String);
+  }
+
+  Future<Set<String>> groupPermissions(String groupId) async {
+    final j = _map(await _send('GET', '/groups/$groupId/permissions'));
+    return {for (final p in j['permissions'] as List) p as String};
+  }
+
+  Future<void> setGroupPermission(String groupId, String permission, {required bool granted}) =>
+      _send('PUT', '/groups/$groupId/permissions/$permission', body: {'granted': granted});
+
+  Future<List<OnlinePermissionInfo>> permissionCatalog() async {
+    final j = _map(await _send('GET', '/permissions/catalog'));
+    return [
+      for (final p in j['permissions'] as List)
+        OnlinePermissionInfo(key: (p as Map<String, Object?>)['key'] as String, module: p['module'] as String?),
+    ];
+  }
+
+  Future<List<OnlineMember>> members() async {
+    final j = _map(await _send('GET', '/memberships'));
+    return [for (final m in j['memberships'] as List) OnlineMember.fromJson(m as Map<String, Object?>)];
+  }
+
+  /// 409 = letzter aktiver Admin würde ausgesperrt.
+  Future<void> updateMember(String id, {String? groupId, bool? active, bool? isAdmin}) => _send('PATCH', '/memberships/$id', body: {
+        'groupId': ?groupId,
+        'active': ?active,
+        'isAdmin': ?isAdmin,
+      });
+
+  /// Individuelle Ausnahmen: Schlüssel -> erlaubt (true) / gesperrt (false).
+  Future<Map<String, bool>> memberOverrides(String id) async {
+    final j = _map(await _send('GET', '/memberships/$id/overrides'));
+    return {
+      for (final o in j['overrides'] as List)
+        (o as Map<String, Object?>)['permission'] as String: o['allowed'] as bool,
+    };
+  }
+
+  /// [allowed] `null` entfernt die Ausnahme (zurück auf Gruppenvorgabe).
+  Future<void> setMemberOverride(String id, String permission, bool? allowed) => allowed == null
+      ? _send('DELETE', '/memberships/$id/overrides/$permission')
+      : _send('PUT', '/memberships/$id/overrides/$permission', body: {'allowed': allowed});
+
+  Future<List<OnlineInvitation>> invitations() async {
+    final j = _map(await _send('GET', '/invitations'));
+    return [
+      for (final i in j['invitations'] as List)
+        OnlineInvitation(
+          id: (i as Map<String, Object?>)['id'] as String,
+          email: i['email'] as String,
+          groupId: i['groupId'] as String,
+          expiresAt: DateTime.parse(i['expiresAt'] as String),
+          expired: i['expired'] as bool,
+        ),
+    ];
+  }
+
+  /// Liefert das einmalig im Klartext ausgegebene Einladungs-Token.
+  Future<String> createInvitation(String email, String groupId) async =>
+      _map(await _send('POST', '/invitations', body: {'email': email, 'groupId': groupId}))['invitationToken'] as String;
+
+  Future<void> revokeInvitation(String id) => _send('DELETE', '/invitations/$id');
+
+  Future<void> setModules(Set<String> modules) => _send('PUT', '/company/modules', body: {'modules': modules.toList()});
+
+  Future<OnlineCompanyProfile> companyProfile() async =>
+      OnlineCompanyProfile.fromJson(_map(await _send('GET', '/company/profile')));
+
+  Future<void> saveCompanyProfile(OnlineCompanyProfile profile) => _send('PUT', '/company/profile', body: profile.toJson());
+
+  Future<List<OnlineAuditEntry>> audit({int limit = 200}) async {
+    final j = _map(await _send('GET', '/audit', query: {'limit': '$limit'}));
+    return [
+      for (final e in j['entries'] as List)
+        OnlineAuditEntry(
+          at: DateTime.parse((e as Map<String, Object?>)['at'] as String),
+          userEmail: e['userEmail'] as String?,
+          action: e['action'] as String,
+          entityType: e['entityType'] as String,
+        ),
+    ];
+  }
+
   void close() => _http.close();
 }

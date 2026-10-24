@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/services/online_session.dart';
+import 'online_admin_screen.dart';
 import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
 import 'online_documents_screen.dart';
@@ -48,6 +49,14 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
           appBar: AppBar(
             title: Text('${session.companyName} · online'),
             actions: [
+              if (session.isAdmin)
+                IconButton(
+                  tooltip: 'Verwaltung',
+                  icon: const Icon(Icons.admin_panel_settings_outlined),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => OnlineAdminScreen(session: session)),
+                  ),
+                ),
               IconButton(
                 tooltip: 'Rechte neu laden',
                 icon: const Icon(Icons.refresh),
@@ -84,7 +93,7 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
                           padding: EdgeInsets.all(24),
                           child: Text(
                             'Für diese Firma sind dir noch keine Rechte zugewiesen. Der Firmen-Admin vergibt sie '
-                            'über deine Gruppe oder eine individuelle Ausnahme.',
+                            'über deine Gruppe oder eine individuelle Ausnahme — als Admin über „Verwaltung“ oben rechts.',
                             textAlign: TextAlign.center,
                           ),
                         ),

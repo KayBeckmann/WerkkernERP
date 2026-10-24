@@ -219,3 +219,90 @@ class OnlineDocument {
 
   bool get isDraft => status == 'draft';
 }
+
+// ---- Verwaltung (nur Firmen-Admin) -------------------------------------------
+
+class OnlineGroup {
+  const OnlineGroup({required this.id, required this.name});
+  final String id;
+  final String name;
+}
+
+class OnlineMember {
+  const OnlineMember({
+    required this.id,
+    required this.email,
+    required this.groupId,
+    required this.groupName,
+    required this.isAdmin,
+    required this.active,
+  });
+  factory OnlineMember.fromJson(Map<String, Object?> j) => OnlineMember(
+        id: j['id'] as String,
+        email: j['email'] as String? ?? '?',
+        groupId: j['groupId'] as String,
+        groupName: j['groupName'] as String? ?? '?',
+        isAdmin: j['isAdmin'] as bool,
+        active: j['active'] as bool,
+      );
+  final String id;
+  final String email;
+  final String groupId;
+  final String groupName;
+  final bool isAdmin;
+  final bool active;
+}
+
+class OnlinePermissionInfo {
+  const OnlinePermissionInfo({required this.key, this.module});
+  final String key;
+
+  /// Erforderliches Firmenmodul, `null` = Kernfunktion.
+  final String? module;
+}
+
+class OnlineInvitation {
+  const OnlineInvitation({required this.id, required this.email, required this.groupId, required this.expiresAt, required this.expired});
+  final String id;
+  final String email;
+  final String groupId;
+  final DateTime expiresAt;
+  final bool expired;
+}
+
+class OnlineCompanyProfile {
+  const OnlineCompanyProfile({this.name, this.address, this.taxNumber, this.vatId, this.iban, this.email, this.phone});
+  factory OnlineCompanyProfile.fromJson(Map<String, Object?> j) => OnlineCompanyProfile(
+        name: j['name'] as String?,
+        address: j['address'] as String?,
+        taxNumber: j['taxNumber'] as String?,
+        vatId: j['vatId'] as String?,
+        iban: j['iban'] as String?,
+        email: j['email'] as String?,
+        phone: j['phone'] as String?,
+      );
+  final String? name;
+  final String? address;
+  final String? taxNumber;
+  final String? vatId;
+  final String? iban;
+  final String? email;
+  final String? phone;
+
+  Map<String, Object?> toJson() => {
+        'address': address,
+        'taxNumber': taxNumber,
+        'vatId': vatId,
+        'iban': iban,
+        'email': email,
+        'phone': phone,
+      };
+}
+
+class OnlineAuditEntry {
+  const OnlineAuditEntry({required this.at, this.userEmail, required this.action, required this.entityType});
+  final DateTime at;
+  final String? userEmail;
+  final String action;
+  final String entityType;
+}
