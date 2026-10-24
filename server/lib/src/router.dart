@@ -72,6 +72,9 @@ class PhaseBRouter {
 
     router.post('/companies', _createCompany);
     router.get('/company/modules', _getModules);
+    router.get('/company/profile', _getProfile);
+    router.put('/company/profile', _setProfile);
+    router.get('/audit', _listAudit);
     router.put('/company/modules', _setModules);
 
     router.get('/groups', _listGroups);
@@ -253,6 +256,14 @@ class PhaseBRouter {
       groupId: defaultGroup!.id,
       isAdmin: true,
     );
+    await repository.recordAudit(AuditEntry(
+      companyId: company.id,
+      userId: userId,
+      action: 'company.create',
+      entityType: 'company',
+      entityId: company.id,
+      at: DateTime.now().toUtc(),
+    ));
     return jsonOk({'companyId': company.id, 'name': company.name}, status: 201);
   }
 
@@ -272,6 +283,7 @@ class PhaseBRouter {
     final name = (body['name'] as String?)?.trim();
     if (name == null || name.isEmpty) return jsonError('name ist Pflicht.');
     final group = await repository.createGroup(id: _uuid.v4(), companyId: auth.session.companyId, name: name);
+    await _auth.audit(auth, 'group.create', 'group', group.id);
     return jsonOk({'id': group.id, 'name': group.name}, status: 201);
   }
 
@@ -298,6 +310,7 @@ class PhaseBRouter {
     final granted = body['granted'] as bool?;
     if (granted == null) return jsonError('granted (bool) ist Pflicht.');
     await repository.setGroupPermission(groupId: groupId, permission: permission, granted: granted);
+    await _auth.audit(auth, granted ? 'group.permission.grant:$permission' : 'group.permission.revoke:$permission', 'group', groupId);
     return jsonOk({'groupId': groupId, 'permission': permission, 'granted': granted});
   }
 
@@ -353,6 +366,7 @@ class PhaseBRouter {
       groupId: groupId,
       isAdmin: false,
     );
+    await _auth.audit(auth, 'membership.create', 'membership', membership.id);
     return jsonOk({'id': membership.id, 'email': user.email, 'groupId': groupId}, status: 201);
   }
 
@@ -392,6 +406,7 @@ class PhaseBRouter {
     }
 
     await repository.updateMembership(id: id, groupId: newGroupId, active: newActive, isAdmin: newIsAdmin);
+    await _auth.audit(auth, 'membership.update', 'membership', id);
     return jsonOk({'id': id});
   }
 
@@ -407,6 +422,7 @@ class PhaseBRouter {
     final allowed = body['allowed'] as bool?;
     if (allowed == null) return jsonError('allowed (bool) ist Pflicht.');
     await repository.setMembershipOverride(membershipId: id, permission: permission, allowed: allowed);
+    await _auth.audit(auth, '${allowed ? 'membership.override.allow' : 'membership.override.deny'}:$permission', 'membership', id);
     return jsonOk({'id': id, 'permission': permission, 'allowed': allowed});
   }
 
@@ -418,6 +434,7 @@ class PhaseBRouter {
       return jsonError('Mitgliedschaft nicht gefunden.', status: 404);
     }
     await repository.removeMembershipOverride(membershipId: id, permission: permission);
+    await _auth.audit(auth, 'membership.override.remove:$permission', 'membership', id);
     return Response(204);
   }
 
@@ -488,7 +505,66 @@ class PhaseBRouter {
       return jsonError('Modul "bestellwesen" setzt "lagerbestand" voraus.');
     }
     await repository.setCompanyModules(companyId: auth.session.companyId, enabledModules: modules);
+    await _auth.audit(auth, 'company.modules', 'company', auth.session.companyId);
     return jsonOk({'modules': modules.toList()..sort()});
+  }
+
+  // ---- Firmen-Stammdaten / Audit ------------------------------------------------
+
+  Future<Response> _getProfile(Request request) async {
+    final auth = await _requireSession(request);
+    if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
+    final company = await repository.findCompanyById(auth.session.companyId);
+    final profile = await repository.getCompanyProfile(auth.session.companyId);
+    return jsonOk({'name': company?.name, ...profile.toJson()});
+  }
+
+  /// Nur Admin — Stammdaten landen beim Finalisieren unveränderlich in
+  /// jedem Dokument.
+  Future<Response> _setProfile(Request request) async {
+    final auth = await _requireAdmin(request);
+    if (auth == null) return jsonError('Nicht angemeldet oder keine Admin-Rechte.', status: 403);
+    final body = await _bodyJson(request);
+    String? field(String key) {
+      final value = (body[key] as String?)?.trim();
+      return (value == null || value.isEmpty) ? null : value;
+    }
+
+    final profile = CompanyProfile(
+      companyId: auth.session.companyId,
+      address: field('address'),
+      taxNumber: field('taxNumber'),
+      vatId: field('vatId'),
+      iban: field('iban'),
+      email: field('email'),
+      phone: field('phone'),
+    );
+    await repository.saveCompanyProfile(profile);
+    await _auth.audit(auth, 'company.profile', 'company', auth.session.companyId);
+    return jsonOk(profile.toJson());
+  }
+
+  Future<Response> _listAudit(Request request) async {
+    final auth = await _requireAdmin(request);
+    if (auth == null) return jsonError('Nicht angemeldet oder keine Admin-Rechte.', status: 403);
+    final limit = (int.tryParse(request.url.queryParameters['limit'] ?? '') ?? 100).clamp(1, 1000);
+    final entries = await repository.listAudit(auth.session.companyId, limit: limit);
+    final emails = <String, String?>{};
+    final result = <Map<String, Object?>>[];
+    for (final e in entries) {
+      final userId = e.userId;
+      if (userId != null && !emails.containsKey(userId)) {
+        emails[userId] = (await repository.findUserById(userId))?.email;
+      }
+      result.add({
+        'at': e.at.toIso8601String(),
+        'userEmail': userId == null ? null : emails[userId],
+        'action': e.action,
+        'entityType': e.entityType,
+        'entityId': e.entityId,
+      });
+    }
+    return jsonOk({'entries': result});
   }
 
   // ---- Einladungen -------------------------------------------------------------
@@ -522,6 +598,7 @@ class PhaseBRouter {
         expiresAt: expiresAt,
       ),
     );
+    await _auth.audit(auth, 'invitation.create', 'invitation');
     // Der Server versendet bewusst selbst keine E-Mail (kein SMTP im
     // Server-Dienst) — der Admin gibt das Token/den Link selbst weiter.
     // Es wird genau einmal im Klartext ausgeliefert, danach nur noch
@@ -563,6 +640,7 @@ class PhaseBRouter {
       return jsonError('Einladung nicht gefunden.', status: 404);
     }
     await repository.consumeInvitation(id, DateTime.now().toUtc());
+    await _auth.audit(auth, 'invitation.revoke', 'invitation');
     return Response(204);
   }
 
@@ -612,6 +690,14 @@ class PhaseBRouter {
       groupId: invitation.groupId,
       isAdmin: false,
     );
+    await repository.recordAudit(AuditEntry(
+      companyId: invitation.companyId,
+      userId: user.id,
+      action: 'invitation.accept',
+      entityType: 'membership',
+      entityId: membership.id,
+      at: DateTime.now().toUtc(),
+    ));
     return jsonOk({'membershipId': membership.id, 'companyId': invitation.companyId}, status: 201);
   }
 

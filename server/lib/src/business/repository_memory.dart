@@ -156,7 +156,7 @@ class InMemoryBusinessRepository implements BusinessRepository {
     required String companyId,
     required String id,
     required int expectedVersion,
-    required String companySnapshotName,
+    required CompanySnapshot company,
     required DateTime now,
   }) async {
     final index = _documents.indexWhere((d) => d.companyId == companyId && d.id == id);
@@ -184,7 +184,11 @@ class InMemoryBusinessRepository implements BusinessRepository {
       customerSnapshotName: customer.name,
       customerSnapshotAddress: customer.address,
       customerSnapshotVatId: customer.vatId,
-      companySnapshotName: companySnapshotName,
+      companySnapshotName: company.name,
+      companySnapshotAddress: company.address,
+      companySnapshotTaxNumber: company.taxNumber,
+      companySnapshotVatId: company.vatId,
+      companySnapshotIban: company.iban,
       createdByUserId: existing.createdByUserId,
       createdAt: existing.createdAt,
       updatedAt: now,

@@ -4,7 +4,6 @@ library;
 import 'package:postgres/postgres.dart';
 import 'package:test/test.dart';
 import 'package:werkkernerp_server/src/business/repository_postgres.dart';
-import 'package:werkkernerp_server/src/business/schema.dart';
 import 'package:werkkernerp_server/src/repository_postgres.dart';
 
 import 'business_router_test.dart';
@@ -29,7 +28,6 @@ void main() {
   runBusinessTests(() async {
     admin ??= await openTestDb();
     await resetSchema(admin!);
-    await ensureBusinessSchema(admin!);
     pool ??= openTestPool();
     return (PostgresPhaseBRepository(pool!), PostgresBusinessRepository(pool!));
   });

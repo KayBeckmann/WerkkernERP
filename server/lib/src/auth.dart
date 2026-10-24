@@ -80,4 +80,16 @@ class SessionAuthenticator {
     }
     return (auth: auth, error: null);
   }
+
+  /// Protokolliert eine schreibende Aktion der Sitzung (ohne Inhalte,
+  /// siehe [AuditEntry]).
+  Future<void> audit(AuthContext auth, String action, String entityType, [String? entityId]) =>
+      repository.recordAudit(AuditEntry(
+        companyId: auth.session.companyId,
+        userId: auth.session.userId,
+        action: action,
+        entityType: entityType,
+        entityId: entityId,
+        at: DateTime.now().toUtc(),
+      ));
 }

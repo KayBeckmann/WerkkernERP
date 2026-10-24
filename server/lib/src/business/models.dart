@@ -108,6 +108,10 @@ class Document {
     this.customerSnapshotAddress,
     this.customerSnapshotVatId,
     this.companySnapshotName,
+    this.companySnapshotAddress,
+    this.companySnapshotTaxNumber,
+    this.companySnapshotVatId,
+    this.companySnapshotIban,
     required this.createdByUserId,
     required this.createdAt,
     required this.updatedAt,
@@ -129,6 +133,10 @@ class Document {
   final String? customerSnapshotAddress;
   final String? customerSnapshotVatId;
   final String? companySnapshotName;
+  final String? companySnapshotAddress;
+  final String? companySnapshotTaxNumber;
+  final String? companySnapshotVatId;
+  final String? companySnapshotIban;
   final String createdByUserId;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -151,7 +159,15 @@ class Document {
         'customerSnapshot': customerSnapshotName == null
             ? null
             : {'name': customerSnapshotName, 'address': customerSnapshotAddress, 'vatId': customerSnapshotVatId},
-        'companySnapshotName': companySnapshotName,
+        'companySnapshot': companySnapshotName == null
+            ? null
+            : {
+                'name': companySnapshotName,
+                'address': companySnapshotAddress,
+                'taxNumber': companySnapshotTaxNumber,
+                'vatId': companySnapshotVatId,
+                'iban': companySnapshotIban,
+              },
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
         'finalizedAt': finalizedAt?.toIso8601String(),
@@ -202,6 +218,18 @@ class DocumentItem {
         'groupLabel': groupLabel,
         'sortOrder': sortOrder,
       };
+}
+
+/// Firmendaten, die beim Finalisieren eingefroren werden — eine
+/// spätere Änderung der Stammdaten verändert ein finalisiertes Dokument
+/// nicht mehr (gleicher Audit-Befund wie offline, Abweichungen.md 2.1).
+class CompanySnapshot {
+  const CompanySnapshot({required this.name, this.address, this.taxNumber, this.vatId, this.iban});
+  final String name;
+  final String? address;
+  final String? taxNumber;
+  final String? vatId;
+  final String? iban;
 }
 
 String _date(DateTime d) =>

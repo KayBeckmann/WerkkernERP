@@ -169,7 +169,8 @@ class PostgresBusinessRepository implements BusinessRepository {
   static const _documentColumns =
       'd.id, d.company_id, d.customer_id, d.kind, d.status, d.number, d.number_year, d.issue_date, d.service_date, '
       'd.payment_terms, d.notes, d.customer_snapshot_name, d.customer_snapshot_address, d.customer_snapshot_vat_id, '
-      'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version';
+      'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version, '
+      'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -192,6 +193,10 @@ class PostgresBusinessRepository implements BusinessRepository {
         updatedAt: r[17] as DateTime,
         finalizedAt: r[18] as DateTime?,
         version: r[19] as int,
+        companySnapshotAddress: r[20] as String?,
+        companySnapshotTaxNumber: r[21] as String?,
+        companySnapshotVatId: r[22] as String?,
+        companySnapshotIban: r[23] as String?,
       );
 
   @override
@@ -375,7 +380,7 @@ class PostgresBusinessRepository implements BusinessRepository {
     required String companyId,
     required String id,
     required int expectedVersion,
-    required String companySnapshotName,
+    required CompanySnapshot company,
     required DateTime now,
   }) async {
     final finalized = await _db.runTx((s) async {
@@ -399,6 +404,8 @@ class PostgresBusinessRepository implements BusinessRepository {
         Sql.named(
           "UPDATE documents d SET status = 'finalized', number = @number, number_year = @year, finalized_at = @now, "
           'updated_at = @now, version = d.version + 1, company_snapshot_name = @companyName, '
+          'company_snapshot_address = @companyAddress, company_snapshot_tax_number = @companyTaxNumber, '
+          'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, '
           'customer_snapshot_name = c.name, customer_snapshot_address = c.address, customer_snapshot_vat_id = c.vat_id '
           'FROM customers c WHERE c.id = d.customer_id AND d.company_id = @companyId AND d.id = @id',
         ),
@@ -406,7 +413,11 @@ class PostgresBusinessRepository implements BusinessRepository {
           'number': number,
           'year': now.year,
           'now': now,
-          'companyName': companySnapshotName,
+          'companyName': company.name,
+          'companyAddress': company.address,
+          'companyTaxNumber': company.taxNumber,
+          'companyVatId': company.vatId,
+          'companyIban': company.iban,
           'companyId': companyId,
           'id': id,
         },

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:postgres/postgres.dart';
-import 'package:werkkernerp_server/src/db/schema.dart';
+import 'package:werkkernerp_server/src/db/migrations.dart';
 
 /// Echte Postgres-Instanz für Integrationstests — nur wenn
 /// `WERKKERN_TEST_DB` gesetzt ist (Format `host:port:db:user:password`),
@@ -27,7 +27,7 @@ Future<Connection> openTestDb() async {
 Future<void> resetSchema(Connection db) async {
   await db.execute('DROP SCHEMA public CASCADE');
   await db.execute('CREATE SCHEMA public');
-  await ensureSchema(db);
+  await migrate(db);
 }
 
 /// Pool mit mehreren Verbindungen — nur so laufen parallele Requests

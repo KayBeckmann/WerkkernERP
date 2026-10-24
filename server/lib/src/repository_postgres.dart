@@ -67,6 +67,84 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   }
 
   @override
+  Future<CompanyProfile> getCompanyProfile(String companyId) async {
+    final result = await _db.execute(
+      Sql.named('SELECT address, tax_number, vat_id, iban, email, phone FROM companies WHERE id = @id'),
+      parameters: {'id': companyId},
+    );
+    if (result.isEmpty) return CompanyProfile(companyId: companyId);
+    final r = result.first;
+    return CompanyProfile(
+      companyId: companyId,
+      address: r[0] as String?,
+      taxNumber: r[1] as String?,
+      vatId: r[2] as String?,
+      iban: r[3] as String?,
+      email: r[4] as String?,
+      phone: r[5] as String?,
+    );
+  }
+
+  @override
+  Future<void> saveCompanyProfile(CompanyProfile p) async {
+    await _db.execute(
+      Sql.named(
+        'UPDATE companies SET address = @address, tax_number = @taxNumber, vat_id = @vatId, iban = @iban, '
+        'email = @email, phone = @phone WHERE id = @id',
+      ),
+      parameters: {
+        'address': p.address,
+        'taxNumber': p.taxNumber,
+        'vatId': p.vatId,
+        'iban': p.iban,
+        'email': p.email,
+        'phone': p.phone,
+        'id': p.companyId,
+      },
+    );
+  }
+
+  @override
+  Future<void> recordAudit(AuditEntry e) async {
+    await _db.execute(
+      Sql.named(
+        'INSERT INTO audit_log (company_id, user_id, action, entity_type, entity_id, at) '
+        'VALUES (@companyId, @userId, @action, @entityType, @entityId, @at)',
+      ),
+      parameters: {
+        'companyId': e.companyId,
+        'userId': e.userId,
+        'action': e.action,
+        'entityType': e.entityType,
+        'entityId': e.entityId,
+        'at': e.at,
+      },
+    );
+  }
+
+  @override
+  Future<List<AuditEntry>> listAudit(String companyId, {int limit = 100}) async {
+    final result = await _db.execute(
+      Sql.named(
+        'SELECT company_id, user_id, action, entity_type, entity_id, at FROM audit_log '
+        'WHERE company_id = @companyId ORDER BY at DESC, id DESC LIMIT @limit',
+      ),
+      parameters: {'companyId': companyId, 'limit': limit},
+    );
+    return [
+      for (final r in result)
+        AuditEntry(
+          companyId: r[0] as String,
+          userId: r[1] as String?,
+          action: r[2] as String,
+          entityType: r[3] as String,
+          entityId: r[4] as String?,
+          at: r[5] as DateTime,
+        ),
+    ];
+  }
+
+  @override
   Future<Group> createGroup({required String id, required String companyId, required String name}) async {
     await _db.execute(
       Sql.named('INSERT INTO groups (id, company_id, name) VALUES (@id, @companyId, @name)'),
