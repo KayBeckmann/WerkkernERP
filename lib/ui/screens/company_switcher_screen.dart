@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../data/database/database.dart';
 import '../../domain/services/active_company_service.dart';
 import 'home_shell.dart';
+import 'online/online_login_screen.dart';
 
 /// Firmenauswahl/-anlage — der Einstiegspunkt der App (A0). Keine
 /// Anmeldung, kein Server: eine Liste lokal geführter Firmen zum
@@ -63,6 +64,17 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
             ],
           ),
         ),
+        actions: [
+          // Phase B: zusätzlicher Online-Modus, ändert nichts an den
+          // lokalen Offline-Firmen.
+          IconButton(
+            tooltip: 'Online anmelden',
+            icon: const Icon(Icons.cloud_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const OnlineLoginScreen()),
+            ),
+          ),
+        ],
       ),
       body: service.companies.isEmpty
           ? const Center(

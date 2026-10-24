@@ -69,6 +69,9 @@ dependencies:
   # Gemeinsamer Rechenkern mit dem Server (Phase B), siehe packages/werkkern_core.
   werkkern_core:
     path: packages/werkkern_core
+  # Online-Modus (Phase B): Client für den eigenen Server, siehe server/.
+  werkkern_client:
+    path: packages/werkkern_client
 
   # Backup-Export/-Import über Android-Dateiauswahl (A4).
   file_picker: ^13.1.0
@@ -81,6 +84,13 @@ dependencies:
   csv: ^8.0.0
 
 dev_dependencies:
+  # MockClient für Widget-Tests des Online-Modus.
+  http: ^1.5.0
+  # Widget-Tests des Online-Modus laufen gegen den echten Server-Router
+  # (In-Memory-Repositories), nicht gegen handgeschriebene Fake-Antworten.
+  werkkernerp_server:
+    path: server
+  shelf: ^1.4.2
   flutter_test:
     sdk: flutter
 

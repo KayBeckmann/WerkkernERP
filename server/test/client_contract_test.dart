@@ -71,6 +71,7 @@ void main() {
       OnlineDocumentItem(kind: OnlineItemKind.hours, description: 'Montage', quantity: '1.5', unitPriceCents: 6000, vatRatePercent: 7),
     ]);
     expect(draft.isDraft, isTrue);
+    expect(draft.displayCustomerName, 'Müller & Söhne');
     expect(draft.grossCents, 9630);
     expect(draft.taxLines.single.vatRatePercent, 7);
 

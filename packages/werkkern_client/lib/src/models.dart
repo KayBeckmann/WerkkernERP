@@ -150,6 +150,7 @@ class OnlineDocument {
     this.paymentTerms,
     this.notes,
     this.customerSnapshotName,
+    this.customerName,
     required this.version,
     this.items = const [],
     this.netCents,
@@ -171,6 +172,7 @@ class OnlineDocument {
       paymentTerms: j['paymentTerms'] as String?,
       notes: j['notes'] as String?,
       customerSnapshotName: (j['customerSnapshot'] as Map<String, Object?>?)?['name'] as String?,
+      customerName: j['customerName'] as String?,
       version: j['version'] as int,
       items: [
         for (final i in (j['items'] as List? ?? const [])) OnlineDocumentItem.fromJson(i as Map<String, Object?>),
@@ -199,6 +201,13 @@ class OnlineDocument {
   final String? paymentTerms;
   final String? notes;
   final String? customerSnapshotName;
+
+  /// Aktueller Name aus den Stammdaten (nur Anzeige).
+  final String? customerName;
+
+  /// Was angezeigt wird: bei finalisierten Dokumenten der eingefrorene
+  /// Schnappschuss, bei Entwürfen der aktuelle Stammdatenname.
+  String? get displayCustomerName => customerSnapshotName ?? customerName;
 
   /// Für optimistische Sperre — bei jedem Update/Finalisieren mitsenden.
   final int version;
