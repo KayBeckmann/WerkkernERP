@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../domain/services/online_session.dart';
 import 'online_admin_screen.dart';
+import 'online_agent_screen.dart';
 import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
 import 'online_documents_screen.dart';
@@ -119,6 +120,14 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
                     child: const Icon(Icons.sync),
                   ),
                   onPressed: _syncing ? null : _sync,
+                ),
+              if (session.modules.contains('aiAgents') && !session.offlineOnly)
+                IconButton(
+                  tooltip: 'KI-Zugang und Freigaben',
+                  icon: const Icon(Icons.smart_toy_outlined),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => OnlineAgentScreen(session: session)),
+                  ),
                 ),
               if (session.isAdmin && !session.offlineOnly)
                 IconButton(

@@ -503,6 +503,13 @@ packages:
       relative: true
     source: path
     version: "0.0.0"
+  werkkern_mcp:
+    dependency: "direct dev"
+    description:
+      path: "../packages/werkkern_mcp"
+      relative: true
+    source: path
+    version: "0.0.0"
   yaml:
     dependency: transitive
     description:

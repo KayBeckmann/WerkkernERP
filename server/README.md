@@ -97,6 +97,18 @@ Ausnahme → Gruppenrecht.
 - Offline erlaubt: nur Entwürfe ausdrücklich markierter Dokumente
   bearbeiten. Finalisieren/Umwandeln/Zahlung nur online.
 
+## KI-Agenten: Agent-Token, Freigaben, MCP (C8)
+
+- Firmenmodul `aiAgents` (Admin) schaltet Agent-Token frei. Token
+  (`wka_…`) erzeugt jeder Nutzer selbst: `POST /agent-tokens` (nur aus
+  einer App-Sitzung). Der Agent hat exakt die Rechte dieses Nutzers,
+  nie Admin-Funktionen; Protokolleinträge tragen `[agent]`.
+- Finalisieren/Entwurf löschen per Agent -> `202` + Freigabe-Anfrage.
+  `GET /approvals`, `POST /approvals/:id/confirm|reject` (nur der
+  Nutzer selbst, nicht das Token). Bestätigen führt mit der Sitzung des
+  Nutzers aus und prüft dabei alles neu; höchstens einmal.
+- MCP-Server: `packages/werkkern_mcp` (siehe dortige README).
+
 ## Firmen-Stammdaten und Audit
 
 - `GET /company/profile` (alle), `PUT /company/profile` (Admin):
