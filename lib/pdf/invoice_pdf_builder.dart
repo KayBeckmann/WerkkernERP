@@ -84,6 +84,88 @@ Future<Uint8List> buildDraftPreviewPdf({
   );
 }
 
+/// Neutrales Eingabemodell des PDF-Generators — entkoppelt das Layout
+/// von den Drift-Zeilen, damit Offline-Dokumente und Online-Dokumente
+/// (Phase B, `buildOnlineDocumentPdf`) exakt dasselbe PDF erzeugen.
+/// Feldnamen bewusst wie in [Invoice], damit das Layout unverändert
+/// bleibt.
+class PdfDocumentData {
+  const PdfDocumentData({
+    required this.kind,
+    this.isAdvancePayment = false,
+    this.invoiceNumber,
+    required this.issueDate,
+    required this.serviceDate,
+    this.companySnapshotName,
+    this.companySnapshotAddress,
+    this.companySnapshotTaxNumber,
+    this.companySnapshotVatId,
+    this.companySnapshotIban,
+    this.customerSnapshotName,
+    this.customerSnapshotAddress,
+    this.customerSnapshotVatId,
+    this.paymentTerms,
+    this.notes,
+    this.introText,
+    this.closingText,
+    this.footerText,
+    this.isSmallBusinessExempt = false,
+    required this.lines,
+  });
+
+  final DocumentKind kind;
+  final bool isAdvancePayment;
+  final String? invoiceNumber;
+  final DateTime issueDate;
+  final DateTime serviceDate;
+  final String? companySnapshotName;
+  final String? companySnapshotAddress;
+  final String? companySnapshotTaxNumber;
+  final String? companySnapshotVatId;
+  final String? companySnapshotIban;
+  final String? customerSnapshotName;
+  final String? customerSnapshotAddress;
+  final String? customerSnapshotVatId;
+  final String? paymentTerms;
+  final String? notes;
+  final String? introText;
+  final String? closingText;
+  final String? footerText;
+  final bool isSmallBusinessExempt;
+  final List<PdfLine> lines;
+}
+
+/// Eine Position im PDF (Feldnamen wie [InvoiceItem]).
+class PdfLine {
+  const PdfLine({
+    required this.description,
+    required this.quantity,
+    this.unit,
+    required this.unitPriceCents,
+    required this.vatRatePercent,
+    this.discountPercent = 0,
+    this.groupLabel,
+  });
+
+  factory PdfLine.fromItem(InvoiceItem item) => PdfLine(
+        description: item.description,
+        quantity: item.quantity,
+        unit: item.unit,
+        unitPriceCents: item.unitPriceCents,
+        vatRatePercent: item.vatRatePercent,
+        discountPercent: item.discountPercent,
+        groupLabel: item.groupLabel,
+      );
+
+  final String description;
+  final String quantity;
+  final String? unit;
+  final int unitPriceCents;
+  final double vatRatePercent;
+  final double discountPercent;
+  final String? groupLabel;
+}
+
 Future<Uint8List> _buildPdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
@@ -91,7 +173,52 @@ Future<Uint8List> _buildPdf({
   required bool isPreview,
   List<AdvancePaymentEntry> priorAdvancePayments = const [],
   String? referencedDocumentNumber,
+}) {
+  // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.1): Für ein
+  // bereits finalisiertes Dokument wird NIE aus den aktuellen (live)
+  // Firmeneinstellungen gelesen — nur aus dem beim Finalisieren
+  // eingefrorenen Schnappschuss. Sonst könnte ein später geänderter
+  // Text beim erneuten Teilen eine andere PDF-Fassung derselben
+  // Rechnung erzeugen. Eine Vorschau (noch kein Schnappschuss
+  // vorhanden) liest weiterhin live, wie bisher.
+  return renderDocumentPdf(
+    PdfDocumentData(
+      kind: invoice.kind,
+      isAdvancePayment: invoice.isAdvancePayment,
+      invoiceNumber: invoice.invoiceNumber,
+      issueDate: invoice.issueDate,
+      serviceDate: invoice.serviceDate,
+      companySnapshotName: invoice.companySnapshotName,
+      companySnapshotAddress: invoice.companySnapshotAddress,
+      companySnapshotTaxNumber: invoice.companySnapshotTaxNumber,
+      companySnapshotVatId: invoice.companySnapshotVatId,
+      companySnapshotIban: invoice.companySnapshotIban,
+      customerSnapshotName: invoice.customerSnapshotName,
+      customerSnapshotAddress: invoice.customerSnapshotAddress,
+      customerSnapshotVatId: invoice.customerSnapshotVatId,
+      paymentTerms: invoice.paymentTerms,
+      notes: invoice.notes,
+      introText: isPreview ? introTextFor(company, invoice.kind) : invoice.pdfIntroTextSnapshot,
+      closingText: isPreview ? closingTextFor(company, invoice.kind) : invoice.pdfClosingTextSnapshot,
+      footerText: isPreview ? company.pdfFooterText : invoice.pdfFooterTextSnapshot,
+      isSmallBusinessExempt: company.isSmallBusinessExempt,
+      lines: [for (final item in items) PdfLine.fromItem(item)],
+    ),
+    isPreview: isPreview,
+    priorAdvancePayments: priorAdvancePayments,
+    referencedDocumentNumber: referencedDocumentNumber,
+  );
+}
+
+/// Rendert [data] — gemeinsamer Kern für Offline- und Online-Dokumente.
+Future<Uint8List> renderDocumentPdf(
+  PdfDocumentData data, {
+  required bool isPreview,
+  List<AdvancePaymentEntry> priorAdvancePayments = const [],
+  String? referencedDocumentNumber,
 }) async {
+  final invoice = data;
+  final items = data.lines;
   final totals = calculateInvoiceTotals([
     for (final item in items)
       InvoiceLineInput(
@@ -102,7 +229,7 @@ Future<Uint8List> _buildPdf({
       ),
   ]);
 
-  final groups = <String?, List<InvoiceItem>>{};
+  final groups = <String?, List<PdfLine>>{};
   for (final item in items) {
     groups.putIfAbsent(item.groupLabel, () => []).add(item);
   }
@@ -121,16 +248,9 @@ Future<Uint8List> _buildPdf({
   final regularFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans.ttf'));
   final boldFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'));
 
-  // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.1): Für ein
-  // bereits finalisiertes Dokument wird NIE aus den aktuellen (live)
-  // Firmeneinstellungen gelesen — nur aus dem beim Finalisieren
-  // eingefrorenen Schnappschuss. Sonst könnte ein später geänderter
-  // Text beim erneuten Teilen eine andere PDF-Fassung derselben
-  // Rechnung erzeugen. Eine Vorschau (noch kein Schnappschuss
-  // vorhanden) liest weiterhin live, wie bisher.
-  final introText = isPreview ? introTextFor(company, invoice.kind) : invoice.pdfIntroTextSnapshot;
-  final closingText = isPreview ? closingTextFor(company, invoice.kind) : invoice.pdfClosingTextSnapshot;
-  final footerText = isPreview ? company.pdfFooterText : invoice.pdfFooterTextSnapshot;
+  final introText = data.introText;
+  final closingText = data.closingText;
+  final footerText = data.footerText;
 
   final doc = pw.Document(theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont));
   doc.addPage(
@@ -187,7 +307,7 @@ Future<Uint8List> _buildPdf({
         // Schlusstexts nicht versehentlich verschwindet. Arbeitsvorgabe
         // (F1: keine Rechtsprüfung) — Kay bestätigt mit seinem
         // Steuerberater, dass die Regelung tatsächlich zutrifft.
-        if (company.isSmallBusinessExempt && invoice.kind != DocumentKind.deliveryNote) ...[
+        if (data.isSmallBusinessExempt && invoice.kind != DocumentKind.deliveryNote) ...[
           pw.SizedBox(height: 8),
           pw.Text(
             'Gemäß § 19 Abs. 1 UStG wird keine Umsatzsteuer berechnet.',
@@ -236,7 +356,7 @@ String _dateLabel(DocumentKind kind) => switch (kind) {
     };
 
 pw.Widget _buildHeader(
-  Invoice invoice, {
+  PdfDocumentData invoice, {
   required bool isPreview,
   String? referencedDocumentNumber,
 }) {
@@ -331,7 +451,7 @@ pw.Widget _buildHeader(
   );
 }
 
-List<pw.Widget> _buildGroup(String? groupLabel, List<InvoiceItem> items, {required bool showPrices}) {
+List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items, {required bool showPrices}) {
   return [
     if (groupLabel != null)
       pw.Padding(
@@ -391,7 +511,7 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<InvoiceItem> items, {requir
 /// keine Code-/Text-Übernahme). Menge und Einheit werden in einer
 /// Zelle zusammengefasst ("10 Stk"), um keine zusätzliche, auf A4 eng
 /// werdende Spalte zu brauchen.
-List<pw.TableRow> _buildItemRows(InvoiceItem item, {required bool showPrices}) {
+List<pw.TableRow> _buildItemRows(PdfLine item, {required bool showPrices}) {
   final quantityLabel = item.unit == null ? item.quantity : '${item.quantity} ${item.unit}';
   final grossBeforeDiscount =
       Money.fromCents(item.unitPriceCents).multiplyByQuantity(Decimal.parse(item.quantity));
@@ -440,7 +560,7 @@ List<pw.TableRow> _buildItemRows(InvoiceItem item, {required bool showPrices}) {
   ];
 }
 
-Money _groupTotal(List<InvoiceItem> items) => calculateInvoiceTotals([
+Money _groupTotal(List<PdfLine> items) => calculateInvoiceTotals([
       for (final item in items)
         InvoiceLineInput(
           quantity: Decimal.parse(item.quantity),
