@@ -9,8 +9,8 @@ import 'package:werkkernerp_server/src/router.dart';
 void main() {
   Future<(HttpServer, Uri)> serve(Set<String> origins) async {
     final router = PhaseBRouter(repository: InMemoryPhaseBRepository(), corsAllowedOrigins: origins);
-    final server = await shelf_io.serve(router.handler.call, 'localhost', 0);
-    return (server, Uri.parse('http://localhost:${server.port}'));
+    final server = await shelf_io.serve(router.handler.call, InternetAddress.loopbackIPv4, 0);
+    return (server, Uri.parse('http://127.0.0.1:${server.port}'));
   }
 
   test('Erlaubter Origin: Preflight 204 mit CORS-Headern, normale Antwort trägt sie ebenfalls', () async {

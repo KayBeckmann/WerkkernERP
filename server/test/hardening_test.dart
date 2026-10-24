@@ -49,8 +49,8 @@ void runHardeningTests(Future<PhaseBRepository> Function() create) {
         repository: repository,
         loginThrottle: LoginThrottle(maxFailuresPerAccount: 3, clock: () => now),
       );
-      server = await shelf_io.serve(router.handler.call, 'localhost', 0);
-      base = Uri.parse('http://localhost:${server.port}');
+      server = await shelf_io.serve(router.handler.call, InternetAddress.loopbackIPv4, 0);
+      base = Uri.parse('http://127.0.0.1:${server.port}');
       await http.post(base.resolve('/auth/register'), body: jsonEncode({'email': 'a@example.com', 'password': 'passwort-12345'}));
     });
     tearDown(() => server.close(force: true));
