@@ -489,6 +489,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.1"
+  werkkern_client:
+    dependency: "direct dev"
+    description:
+      path: "../packages/werkkern_client"
+      relative: true
+    source: path
+    version: "0.0.0"
   werkkern_core:
     dependency: "direct main"
     description:

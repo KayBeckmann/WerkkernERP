@@ -33,7 +33,16 @@ Future<void> main() async {
   final schemaVersion = await migrate(db);
 
   final repository = PostgresPhaseBRepository(db);
-  final router = PhaseBRouter(repository: repository, business: PostgresBusinessRepository(db));
+  final corsOrigins = (Platform.environment['CORS_ALLOWED_ORIGINS'] ?? '')
+      .split(',')
+      .map((o) => o.trim())
+      .where((o) => o.isNotEmpty)
+      .toSet();
+  final router = PhaseBRouter(
+    repository: repository,
+    business: PostgresBusinessRepository(db),
+    corsAllowedOrigins: corsOrigins,
+  );
   final handler = const Pipeline().addMiddleware(logRequests()).addHandler(router.handler.call);
 
   final server = await shelf_io.serve(handler, InternetAddress.anyIPv4, port);

@@ -1,0 +1,14 @@
+name: werkkern_client
+description: >
+  HTTP-Client für den WerkkernERP-Online-Server (Phase B) — reines Dart,
+  damit er sowohl in der Flutter-App als auch in den Server-Tests gegen
+  den echten Router verwendet werden kann (Vertragstests).
+publish_to: none
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  http: ^1.5.0
+
+dev_dependencies:
+  test: ^1.26.2
