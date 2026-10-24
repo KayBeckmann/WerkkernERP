@@ -154,6 +154,11 @@ class OnlineDocument {
     this.customerSnapshotVatId,
     this.companySnapshot,
     this.customerName,
+    this.convertedFromId,
+    this.convertedTo = const [],
+    this.paymentStatus = 'open',
+    this.paidAt,
+    this.dueDate,
     required this.version,
     this.items = const [],
     this.netCents,
@@ -181,6 +186,18 @@ class OnlineDocument {
       customerSnapshotVatId: customerSnapshot?['vatId'] as String?,
       companySnapshot: companySnapshot == null ? null : OnlineCompanyProfile.fromJson(companySnapshot),
       customerName: j['customerName'] as String?,
+      convertedFromId: j['convertedFromId'] as String?,
+      convertedTo: [
+        for (final c in (j['convertedTo'] as List? ?? const []))
+          (
+            id: (c as Map<String, Object?>)['id'] as String,
+            kind: c['kind'] as String,
+            number: c['number'] as String?,
+          ),
+      ],
+      paymentStatus: j['paymentStatus'] as String? ?? 'open',
+      paidAt: j['paidAt'] == null ? null : DateTime.parse(j['paidAt'] as String),
+      dueDate: j['dueDate'] == null ? null : DateTime.parse(j['dueDate'] as String),
       version: j['version'] as int,
       items: [
         for (final i in (j['items'] as List? ?? const [])) OnlineDocumentItem.fromJson(i as Map<String, Object?>),
@@ -217,6 +234,18 @@ class OnlineDocument {
 
   /// Aktueller Name aus den Stammdaten (nur Anzeige).
   final String? customerName;
+
+  final String? convertedFromId;
+
+  /// Folgedokumente, die per Umwandlung aus diesem entstanden sind.
+  final List<({String id, String kind, String? number})> convertedTo;
+
+  /// `open`/`paid` (nur finalisierte Rechnungen).
+  final String paymentStatus;
+  final DateTime? paidAt;
+  final DateTime? dueDate;
+
+  bool get isPaid => paymentStatus == 'paid';
 
   /// Was angezeigt wird: bei finalisierten Dokumenten der eingefrorene
   /// Schnappschuss, bei Entwürfen der aktuelle Stammdatenname.

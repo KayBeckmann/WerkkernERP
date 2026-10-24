@@ -199,6 +199,124 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     );
   }
 
+  Future<void> _convert(String targetKind) async {
+    final label = onlineDocumentKindLabels[targetKind] ?? targetKind;
+    setState(() => _busy = true);
+    try {
+      final created = await _client.convertDocument(widget.documentId, targetKind);
+      if (!mounted) return;
+      _snack('$label als Entwurf angelegt.');
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: created.id)),
+      );
+    } on Exception catch (e) {
+      if (mounted) _snack(describeOnlineError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _togglePaid() =>
+      _run(() => _client.setPaid(widget.documentId, paid: !_document!.isPaid), 'Zahlungsstatus gespeichert.');
+
+  Future<void> _pickDueDate() async {
+    final current = _document!.dueDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime.now().add(const Duration(days: 14)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    await _run(() => _client.setDueDate(widget.documentId, picked), 'Fälligkeit gespeichert.');
+  }
+
+  /// Folgeaktionen eines finalisierten Dokuments: Umwandlung und —
+  /// bei Rechnungen — Zahlungsstatus/Fälligkeit.
+  Widget _buildFinalizedSection(OnlineDocument document) {
+    final session = widget.session;
+    final dateFormat = DateFormat('dd.MM.yyyy');
+    final targets = [
+      for (final target in documentConversionTargets[document.kind] ?? const <String>{})
+        if (onlineDocumentKindModules[target] == null || session.modules.contains(onlineDocumentKindModules[target]))
+          target,
+    ];
+    final canConvert = session.can('invoices.write') && targets.isNotEmpty;
+    final canPay = session.can('invoices.payment');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (document.kind == 'invoice')
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Text über den Aktionen statt daneben — auf schmalen
+                  // Handys (~330 px) liefe eine Zeile sonst über.
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(document.isPaid ? Icons.check_circle_outline : Icons.schedule),
+                    title: Text(
+                      document.isPaid
+                          ? 'Bezahlt${document.paidAt == null ? '' : ' am ${dateFormat.format(document.paidAt!.toLocal())}'}'
+                          : 'Offen',
+                    ),
+                    subtitle: Text(
+                      document.dueDate == null ? 'Keine Fälligkeit' : 'Fällig am ${dateFormat.format(document.dueDate!)}',
+                    ),
+                  ),
+                  if (canPay)
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: _busy ? null : _togglePaid,
+                          child: Text(document.isPaid ? 'Als offen markieren' : 'Als bezahlt markieren'),
+                        ),
+                        TextButton(onPressed: _busy ? null : _pickDueDate, child: const Text('Fälligkeit setzen')),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+          ),
+        if (document.convertedTo.isNotEmpty)
+          Card(
+            child: Column(
+              children: [
+                for (final c in document.convertedTo)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.subdirectory_arrow_right),
+                    title: Text(c.number ?? '${onlineDocumentKindLabels[c.kind] ?? c.kind} (Entwurf)'),
+                    subtitle: Text('Folgedokument · ${onlineDocumentKindLabels[c.kind] ?? c.kind}'),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => OnlineDocumentScreen(session: session, documentId: c.id),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        if (canConvert)
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final target in targets)
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : () => _convert(target),
+                  icon: const Icon(Icons.transform),
+                  label: Text('In ${onlineDocumentKindLabels[target] ?? target} umwandeln'),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
   Future<void> _addItem() async {
     List<OnlineArticle> articles = const [];
     if (widget.session.can('articles.read')) {
@@ -296,6 +414,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             ),
           ),
         ),
+        if (!document.isDraft) _buildFinalizedSection(document),
         const SizedBox(height: 8),
         Text('Positionen', style: Theme.of(context).textTheme.titleMedium),
         if (_items.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Noch keine Positionen.')),

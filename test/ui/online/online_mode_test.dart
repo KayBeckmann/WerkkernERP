@@ -15,6 +15,7 @@ const _allPermissions = [
   'invoices.read',
   'invoices.write',
   'invoices.finalize',
+  'invoices.payment',
 ];
 
 void main() {
@@ -161,5 +162,49 @@ void main() {
     await tester.tap(find.text('Anmelden'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Server nicht erreichbar'), findsOneWidget);
+  });
+
+  testWidgets('Finalisiertes Angebot in Auftrag umwandeln; Rechnung als bezahlt markieren', (tester) async {
+    tester.view.physicalSize = const Size(1200, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final server = OnlineTestServer();
+    await tester.runAsync(() async {
+      final token = await server.seedCompany(email: 'kay@example.com', companyName: 'Elektro Kay', permissions: _allPermissions);
+      await server.put('/company/modules', {'modules': ['quotes', 'orders']}, token);
+      final customer = await server.post('/customers', {'name': 'Kunde'}, token);
+      for (final kind in ['quote', 'invoice']) {
+        final draft = await server.post('/documents', {
+          'kind': kind,
+          'customerId': customer['id'],
+          'items': [
+            {'kind': 'text', 'description': 'Leistung', 'quantity': '1', 'unitPriceCents': 10000, 'vatRatePercent': 19},
+          ],
+        }, token);
+        await server.post('/documents/${draft['id']}/finalize', {'version': 1}, token);
+      }
+    });
+    final year = (DateTime.now().toUtc().year % 100).toString().padLeft(2, '0');
+
+    await login(tester, server);
+    await tester.tap(find.text('Elektro Kay'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('An-${year}001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('In Auftrag umwandeln'));
+    await tester.pumpAndSettle();
+    expect(find.text('Auftrag (Entwurf)'), findsOneWidget);
+    expect(find.text('Leistung'), findsOneWidget, reason: 'Positionen übernommen');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('R-${year}001'));
+    await tester.pumpAndSettle();
+    expect(find.text('Offen'), findsOneWidget);
+    await tester.tap(find.text('Als bezahlt markieren'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Bezahlt am'), findsOneWidget);
+    expect(find.text('Als offen markieren'), findsOneWidget);
   });
 }

@@ -117,6 +117,10 @@ class Document {
     required this.updatedAt,
     this.finalizedAt,
     required this.version,
+    this.convertedFromId,
+    this.paymentStatus = 'open',
+    this.paidAt,
+    this.dueDate,
   });
   final String id;
   final String companyId;
@@ -143,7 +147,69 @@ class Document {
   final DateTime? finalizedAt;
   final int version;
 
+  /// Quelldokument einer Umwandlung (Angebot -> Auftrag -> Rechnung).
+  final String? convertedFromId;
+
+  /// `open`/`paid` — Folge-Metadatum wie offline (C12), ändert nie den
+  /// Dokumentinhalt und ist daher auch nach Finalisierung setzbar.
+  final String paymentStatus;
+  final DateTime? paidAt;
+  final DateTime? dueDate;
+
   bool get isDraft => status == 'draft';
+
+  /// Kopie mit geänderten Feldern — verhindert, dass beim Aktualisieren
+  /// einzelner Felder andere stillschweigend verloren gehen.
+  Document copyWith({
+    String? customerId,
+    String? status,
+    String? number,
+    int? numberYear,
+    DateTime? issueDate,
+    DateTime? serviceDate,
+    String? Function()? paymentTerms,
+    String? Function()? notes,
+    String? customerSnapshotName,
+    String? customerSnapshotAddress,
+    String? customerSnapshotVatId,
+    CompanySnapshot? company,
+    DateTime? updatedAt,
+    DateTime? finalizedAt,
+    int? version,
+    String? paymentStatus,
+    DateTime? Function()? paidAt,
+    DateTime? Function()? dueDate,
+  }) =>
+      Document(
+        id: id,
+        companyId: companyId,
+        customerId: customerId ?? this.customerId,
+        kind: kind,
+        status: status ?? this.status,
+        number: number ?? this.number,
+        numberYear: numberYear ?? this.numberYear,
+        issueDate: issueDate ?? this.issueDate,
+        serviceDate: serviceDate ?? this.serviceDate,
+        paymentTerms: paymentTerms != null ? paymentTerms() : this.paymentTerms,
+        notes: notes != null ? notes() : this.notes,
+        customerSnapshotName: customerSnapshotName ?? this.customerSnapshotName,
+        customerSnapshotAddress: customerSnapshotAddress ?? this.customerSnapshotAddress,
+        customerSnapshotVatId: customerSnapshotVatId ?? this.customerSnapshotVatId,
+        companySnapshotName: company?.name ?? companySnapshotName,
+        companySnapshotAddress: company != null ? company.address : companySnapshotAddress,
+        companySnapshotTaxNumber: company != null ? company.taxNumber : companySnapshotTaxNumber,
+        companySnapshotVatId: company != null ? company.vatId : companySnapshotVatId,
+        companySnapshotIban: company != null ? company.iban : companySnapshotIban,
+        createdByUserId: createdByUserId,
+        createdAt: createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        finalizedAt: finalizedAt ?? this.finalizedAt,
+        version: version ?? this.version,
+        convertedFromId: convertedFromId,
+        paymentStatus: paymentStatus ?? this.paymentStatus,
+        paidAt: paidAt != null ? paidAt() : this.paidAt,
+        dueDate: dueDate != null ? dueDate() : this.dueDate,
+      );
 
   Map<String, Object?> toJson() => {
         'id': id,
@@ -172,6 +238,10 @@ class Document {
         'updatedAt': updatedAt.toIso8601String(),
         'finalizedAt': finalizedAt?.toIso8601String(),
         'version': version,
+        'convertedFromId': convertedFromId,
+        'paymentStatus': paymentStatus,
+        'paidAt': paidAt?.toIso8601String(),
+        'dueDate': dueDate == null ? null : _date(dueDate!),
       };
 }
 

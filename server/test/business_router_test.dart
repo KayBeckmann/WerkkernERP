@@ -58,6 +58,7 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
       'invoices.read',
       'invoices.write',
       'invoices.finalize',
+      'invoices.payment',
     ],
     List<String> modules = const [],
   }) async {
@@ -356,6 +357,67 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
     final auditA = jsonDecode((await http.get(baseUrl.resolve('/audit?limit=1000'), headers: a.auth)).body) as Map;
     final emails = (auditA['entries'] as List).map((e) => (e as Map)['userEmail']).toSet();
     expect(emails.contains('b@example.com'), isFalse);
+  });
+
+  test('Umwandlung Angebot → Auftrag → Lieferschein/Rechnung: Entwurf mit Positionen, Herkunft, Regeln wie offline', () async {
+    final a = await company('a@example.com', 'Firma A', modules: ['quotes', 'orders', 'deliveryNotes']);
+    final b = await company('b@example.com', 'Firma B', modules: ['quotes', 'orders']);
+    final customer = await post('/customers', a.auth, {'name': 'Kunde'}, expect: 201);
+    final quoteDraft = await post('/documents', a.auth, invoiceBody(customer['id'] as String, kind: 'quote'), expect: 201);
+
+    await post('/documents/${quoteDraft['id']}/convert', a.auth, {'kind': 'order'}, expect: 409); // Entwurf
+    final quote = await post('/documents/${quoteDraft['id']}/finalize', a.auth, {'version': 1});
+    await post('/documents/${quote['id']}/convert', b.auth, {'kind': 'order'}, expect: 404); // fremde Firma
+    await post('/documents/${quote['id']}/convert', a.auth, {'kind': 'proforma'}, expect: 403); // Modul aus
+
+    final order = await post('/documents/${quote['id']}/convert', a.auth, {'kind': 'order'}, expect: 201);
+    expect(order['status'], 'draft');
+    expect(order['convertedFromId'], quote['id']);
+    expect((order['items'] as List), hasLength(3));
+    expect((order['totals'] as Map)['grossCents'], 45570);
+    final reloadedQuote = jsonDecode((await http.get(baseUrl.resolve('/documents/${quote['id']}'), headers: a.auth)).body) as Map;
+    expect((reloadedQuote['convertedTo'] as List).single['id'], order['id']);
+
+    final finalOrder = await post('/documents/${order['id']}/finalize', a.auth, {'version': 1});
+    final deliveryNote = await post('/documents/${finalOrder['id']}/convert', a.auth, {'kind': 'deliveryNote'}, expect: 201);
+    expect((deliveryNote['items'] as List).map((i) => (i as Map)['kind']), isNot(contains('hours')),
+        reason: 'Lieferschein enthält nie Stunden');
+    final invoice = await post('/documents/${finalOrder['id']}/convert', a.auth, {'kind': 'invoice'}, expect: 201);
+    final finalInvoice = await post('/documents/${invoice['id']}/finalize', a.auth, {'version': 1});
+    await post('/documents/${finalInvoice['id']}/convert', a.auth, {'kind': 'order'}, expect: 409,
+        ); // Rechnung ist nie Quelle
+  });
+
+  test('Zahlungsstatus und Fälligkeit: nur finalisierte Rechnungen, eigenes Recht, Protokoll', () async {
+    final a = await company('a@example.com', 'Firma A', modules: ['quotes']);
+    final customer = await post('/customers', a.auth, {'name': 'Kunde'}, expect: 201);
+    final draft = await post('/documents', a.auth, invoiceBody(customer['id'] as String), expect: 201);
+    await post('/documents/${draft['id']}/payment', a.auth, {'paid': true}, expect: 409); // Entwurf
+    final invoice = await post('/documents/${draft['id']}/finalize', a.auth, {'version': 1});
+    expect(invoice['paymentStatus'], 'open');
+
+    final paid = await post('/documents/${invoice['id']}/payment', a.auth, {'paid': true});
+    expect(paid['paymentStatus'], 'paid');
+    expect(paid['paidAt'], isNotNull);
+    expect(paid['number'], invoice['number'], reason: 'Inhalt/Nummer bleiben unverändert');
+    final open = await post('/documents/${invoice['id']}/payment', a.auth, {'paid': false});
+    expect(open['paidAt'], isNull);
+
+    final due = await http.put(baseUrl.resolve('/documents/${invoice['id']}/due-date'), headers: a.auth, body: jsonEncode({'dueDate': '2026-11-07'}));
+    expectStatus(due, 200);
+    expect((jsonDecode(due.body) as Map)['dueDate'], '2026-11-07');
+    final cleared = await http.put(baseUrl.resolve('/documents/${invoice['id']}/due-date'), headers: a.auth, body: jsonEncode({'dueDate': null}));
+    expect((jsonDecode(cleared.body) as Map)['dueDate'], isNull);
+
+    final quoteDraft = await post('/documents', a.auth, invoiceBody(customer['id'] as String, kind: 'quote'), expect: 201);
+    final quote = await post('/documents/${quoteDraft['id']}/finalize', a.auth, {'version': 1});
+    await post('/documents/${quote['id']}/payment', a.auth, {'paid': true}, expect: 409);
+
+    final monteur = await member(a, 'monteur@example.com', ['invoices.read', 'invoices.write']);
+    await post('/documents/${invoice['id']}/payment', monteur, {'paid': true}, expect: 403);
+
+    final audit = jsonDecode((await http.get(baseUrl.resolve('/audit'), headers: a.auth)).body) as Map;
+    expect((audit['entries'] as List).map((e) => (e as Map)['action']), containsAll(['document.paid', 'document.unpaid', 'document.dueDate']));
   });
 }
 

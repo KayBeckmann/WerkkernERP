@@ -120,18 +120,12 @@ class InMemoryBusinessRepository implements BusinessRepository {
     if (index == -1) return null;
     final existing = _documents[index];
     _checkWritable(existing, expectedVersion);
-    final updated = Document(
-      id: existing.id,
-      companyId: existing.companyId,
+    final updated = existing.copyWith(
       customerId: customerId,
-      kind: existing.kind,
-      status: existing.status,
       issueDate: issueDate,
       serviceDate: serviceDate,
-      paymentTerms: paymentTerms,
-      notes: notes,
-      createdByUserId: existing.createdByUserId,
-      createdAt: existing.createdAt,
+      paymentTerms: () => paymentTerms,
+      notes: () => notes,
       updatedAt: now,
       version: existing.version + 1,
     );
@@ -169,34 +163,47 @@ class InMemoryBusinessRepository implements BusinessRepository {
     final number = (_sequences[key] ?? 0) + 1;
     _sequences[key] = number;
 
-    final finalized = Document(
-      id: existing.id,
-      companyId: existing.companyId,
-      customerId: existing.customerId,
-      kind: existing.kind,
+    final finalized = existing.copyWith(
       status: 'finalized',
       number: formatNumberWithPrefix(prefix: documentNumberPrefixes[existing.kind]!, year: now.year, number: number),
       numberYear: now.year,
-      issueDate: existing.issueDate,
-      serviceDate: existing.serviceDate,
-      paymentTerms: existing.paymentTerms,
-      notes: existing.notes,
       customerSnapshotName: customer.name,
       customerSnapshotAddress: customer.address,
       customerSnapshotVatId: customer.vatId,
-      companySnapshotName: company.name,
-      companySnapshotAddress: company.address,
-      companySnapshotTaxNumber: company.taxNumber,
-      companySnapshotVatId: company.vatId,
-      companySnapshotIban: company.iban,
-      createdByUserId: existing.createdByUserId,
-      createdAt: existing.createdAt,
+      company: company,
       updatedAt: now,
       finalizedAt: now,
       version: existing.version + 1,
     );
     _documents[index] = finalized;
     return finalized;
+  }
+
+  @override
+  Future<List<Document>> listConvertedFrom(String companyId, String sourceId) async =>
+      _documents.where((d) => d.companyId == companyId && d.convertedFromId == sourceId).toList();
+
+  @override
+  Future<Document?> setPaymentInfo({
+    required String companyId,
+    required String id,
+    String? paymentStatus,
+    DateTime? Function()? dueDate,
+    required DateTime now,
+  }) async {
+    final index = _documents.indexWhere((d) => d.companyId == companyId && d.id == id);
+    if (index == -1) return null;
+    final existing = _documents[index];
+    if (existing.isDraft) throw const BusinessConflict('Zahlungsangaben gibt es erst für finalisierte Dokumente.');
+    final updated = existing.copyWith(
+      paymentStatus: paymentStatus,
+      paidAt: paymentStatus == null ? null : () => paymentStatus == 'paid' ? now : null,
+      dueDate: dueDate,
+      updatedAt: now,
+      version: existing.version + 1,
+    );
+    _documents[index] = updated;
+    return updated;
   }
 
   void _checkWritable(Document existing, int expectedVersion) {

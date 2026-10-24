@@ -16,6 +16,7 @@ final List<Future<void> Function(Session db)> _steps = [
   ensureSchema, // 1: B1 Mitgliedschaften/Gruppen/Sitzungen/Einladungen
   ensureBusinessSchema, // 2: B1.3 Kunden/Artikel/Dokumente/Nummernkreise
   _step3CompanyProfileAuditSnapshots,
+  _step4ConversionAndPayment,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -59,4 +60,13 @@ Future<void> _step3CompanyProfileAuditSnapshots(Session db) async {
     );
   ''');
   await db.execute('CREATE INDEX IF NOT EXISTS audit_log_company_at_idx ON audit_log (company_id, at DESC)');
+}
+
+Future<void> _step4ConversionAndPayment(Session db) async {
+  await db.execute(
+    'ALTER TABLE documents ADD COLUMN IF NOT EXISTS converted_from_id TEXT REFERENCES documents(id) ON DELETE SET NULL',
+  );
+  await db.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'open'");
+  await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ');
+  await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS due_date DATE');
 }

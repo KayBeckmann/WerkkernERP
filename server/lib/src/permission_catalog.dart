@@ -51,6 +51,9 @@ const permissionCatalog = <String, String?>{
   // unveränderliche Nummer (F3) — eine Firma soll Entwürfe von Monteuren
   // erstellen lassen können, ohne dass diese selbst finalisieren.
   'invoices.finalize': null,
+  // Zahlungseingang/Fälligkeit — getrennt, damit z. B. nur die
+  // Buchhaltung Rechnungen als bezahlt markiert.
+  'invoices.payment': null,
   'projects.read': 'projects',
   'projects.write': 'projects',
   'timeTracking.read': 'timeTracking',

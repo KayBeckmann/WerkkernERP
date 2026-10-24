@@ -176,6 +176,21 @@ class WerkkernApiClient {
   Future<OnlineDocument> finalizeDocument(String id, {required int version}) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents/$id/finalize', body: {'version': version})));
 
+  /// Neuer Entwurf der Zielart aus einem finalisierten Dokument.
+  Future<OnlineDocument> convertDocument(String id, String targetKind) async =>
+      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$id/convert', body: {'kind': targetKind})));
+
+  Future<OnlineDocument> setPaid(String id, {required bool paid}) async =>
+      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$id/payment', body: {'paid': paid})));
+
+  Future<OnlineDocument> setDueDate(String id, DateTime? dueDate) async {
+    String? iso(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    return OnlineDocument.fromJson(
+      _map(await _send('PUT', '/documents/$id/due-date', body: {'dueDate': dueDate == null ? null : iso(dueDate)})),
+    );
+  }
+
   // ---- Konto/Firma (ohne Firmensitzung) -----------------------------------------
 
   Future<void> register(String email, String password) =>
