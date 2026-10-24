@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:shelf/shelf.dart';
@@ -9,6 +10,7 @@ import 'models.dart';
 import 'auth.dart';
 import 'business/repository.dart';
 import 'business/router.dart';
+import 'login_throttle.dart';
 import 'permission_catalog.dart';
 import 'repository.dart';
 import 'util/passwords.dart';
@@ -31,7 +33,18 @@ class PhaseBRouter {
     this.sessionTtl = const Duration(hours: 8),
     this.invitationTtl = const Duration(days: 7),
     this.corsAllowedOrigins = const {},
-  });
+    LoginThrottle? loginThrottle,
+    this.trustForwardedFor = false,
+  }) : loginThrottle = loginThrottle ?? LoginThrottle();
+
+  /// Schutz gegen Passwort-Durchprobieren (Login, Einladung mit
+  /// bestehendem Konto, Passwortänderung).
+  final LoginThrottle loginThrottle;
+
+  /// Nur hinter einem eigenen Reverse-Proxy (TLS) setzen — dann gilt die
+  /// erste Adresse aus `X-Forwarded-For` als Absender, sonst die direkte
+  /// Verbindung (ein Client könnte den Header sonst frei fälschen).
+  final bool trustForwardedFor;
 
   /// Origins, die den Server aus dem Browser ansprechen dürfen (Flutter-
   /// Web-Build). Leer = kein CORS (nur native Apps). `*` erlaubt alle —
@@ -164,6 +177,7 @@ class PhaseBRouter {
     router.post('/auth/login', _login);
     router.post('/auth/select-company', _selectCompany);
     router.post('/auth/logout', _logout);
+    router.post('/auth/change-password', _changePassword);
     router.post('/auth/accept-invitation', _acceptInvitation);
     router.get('/me', _me);
 
@@ -232,16 +246,39 @@ class PhaseBRouter {
     return jsonOk({'userId': user.id, 'email': user.email}, status: 201);
   }
 
+  String? _clientAddress(Request request) {
+    if (trustForwardedFor) {
+      final forwarded = request.headers['x-forwarded-for'];
+      if (forwarded != null && forwarded.isNotEmpty) return forwarded.split(',').first.trim();
+    }
+    final info = request.context['shelf.io.connection_info'];
+    return info is HttpConnectionInfo ? info.remoteAddress.address : null;
+  }
+
+  Response? _throttled(String account, Request request) {
+    final wait = loginThrottle.blockedFor(account: account, address: _clientAddress(request));
+    if (wait == null) return null;
+    final seconds = wait.inSeconds < 1 ? 1 : wait.inSeconds;
+    return jsonOk(
+      {'error': 'Zu viele Fehlversuche — bitte in ${(seconds / 60).ceil()} Minute(n) erneut versuchen.'},
+      status: 429,
+    ).change(headers: {'retry-after': '$seconds'});
+  }
+
   Future<Response> _login(Request request) async {
     final body = await _bodyJson(request);
     final email = body['email'] as String?;
     final password = body['password'] as String?;
     if (email == null || password == null) return jsonError('email und password sind Pflicht.');
+    final throttled = _throttled(email, request);
+    if (throttled != null) return throttled;
 
     final user = await repository.findUserByEmail(email);
     if (user == null || !Passwords.verify(password, user.passwordHash)) {
+      loginThrottle.recordFailure(account: email, address: _clientAddress(request));
       return jsonError('E-Mail oder Passwort falsch.', status: 401);
     }
+    loginThrottle.recordSuccess(account: email);
 
     final memberships = await repository.listMembershipsForUser(user.id);
     final visibleMemberships = <Map<String, Object?>>[];
@@ -305,6 +342,33 @@ class PhaseBRouter {
       'groupName': group.name,
       'isAdmin': membership.isAdmin,
     });
+  }
+
+  /// Eigenes Passwort ändern (nur aus einer App-Sitzung, aktuelles
+  /// Passwort nötig). Beendet alle ANDEREN Sitzungen des Kontos — ein
+  /// Gerät mit möglicherweise kompromittiertem Zugang fliegt sofort raus.
+  /// Agent-Token bleiben bestehen (eigene Zugangsdaten, separat widerrufbar).
+  Future<Response> _changePassword(Request request) async {
+    final auth = await _auth.requireHumanSession(request);
+    if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
+    final user = await repository.findUserById(auth.session.userId);
+    if (user == null) return jsonError('Nicht angemeldet.', status: 401);
+    final body = await _bodyJson(request);
+    final current = body['currentPassword'] as String?;
+    final next = body['newPassword'] as String?;
+    if (current == null || next == null || next.length < 8) {
+      return jsonError('currentPassword und newPassword (mind. 8 Zeichen) sind Pflicht.');
+    }
+    final throttled = _throttled(user.email, request);
+    if (throttled != null) return throttled;
+    if (!Passwords.verify(current, user.passwordHash)) {
+      loginThrottle.recordFailure(account: user.email, address: _clientAddress(request));
+      return jsonError('Aktuelles Passwort ist falsch.', status: 403);
+    }
+    await repository.updatePasswordHash(user.id, Passwords.hash(next));
+    await repository.deleteSessionsForUser(user.id, exceptTokenHash: auth.session.tokenHash);
+    await _auth.audit(auth, 'user.passwordChange', 'user', user.id);
+    return Response(204);
   }
 
   Future<Response> _logout(Request request) async {
@@ -909,9 +973,17 @@ class PhaseBRouter {
         email: invitation.email,
         passwordHash: Passwords.hash(password),
       );
-    } else if (!Passwords.verify(password, user.passwordHash)) {
-      await repository.saveInvitation(invitation);
-      return jsonError('Passwort passt nicht zum bestehenden Konto dieser E-Mail.', status: 401);
+    } else {
+      final throttled = _throttled(invitation.email, request);
+      if (throttled != null) {
+        await repository.saveInvitation(invitation);
+        return throttled;
+      }
+      if (!Passwords.verify(password, user.passwordHash)) {
+        loginThrottle.recordFailure(account: invitation.email, address: _clientAddress(request));
+        await repository.saveInvitation(invitation);
+        return jsonError('Passwort passt nicht zum bestehenden Konto dieser E-Mail.', status: 401);
+      }
     }
 
     if (await repository.findMembership(userId: user.id, companyId: invitation.companyId) != null) {

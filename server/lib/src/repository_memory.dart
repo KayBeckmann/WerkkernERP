@@ -312,6 +312,24 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
       _invitations.where((i) => i.companyId == companyId).toList();
 
   @override
+  Future<void> deleteSessionsForUser(String userId, {String? exceptTokenHash}) async =>
+      _sessions.removeWhere((s) => s.userId == userId && s.tokenHash != exceptTokenHash);
+
+  @override
+  Future<void> updatePasswordHash(String userId, String passwordHash) async {
+    final i = _users.indexWhere((u) => u.id == userId);
+    if (i == -1) return;
+    _users[i] = AppUser(id: _users[i].id, email: _users[i].email, passwordHash: passwordHash);
+  }
+
+  @override
+  Future<void> purgeExpired(DateTime now) async {
+    _sessions.removeWhere((s) => s.isExpired(now));
+    _pendingLogins.removeWhere((p) => now.isAfter(p.expiresAt));
+    _invitations.removeWhere((i) => now.isAfter(i.expiresAt.add(const Duration(days: 30))));
+  }
+
+  @override
   Future<void> saveSession(CompanySession session) async {
     _sessions.removeWhere((s) => s.tokenHash == session.tokenHash);
     _sessions.add(session);

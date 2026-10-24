@@ -6,6 +6,7 @@ import 'online_agent_screen.dart';
 import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
 import 'online_documents_screen.dart';
+import 'online_password_dialog.dart';
 
 /// Hauptansicht im Online-Modus. Tabs erscheinen nur bei wirksamem
 /// Leserecht — der Server prüft trotzdem jede Aktion selbst.
@@ -137,17 +138,40 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
                     context,
                   ).push(MaterialPageRoute<void>(builder: (_) => OnlineAdminScreen(session: session))),
                 ),
-              if (!session.offlineOnly)
-                IconButton(
-                  tooltip: 'Rechte neu laden',
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () => session.refreshPermissions().catchError((Object e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
-                    }
-                  }),
-                ),
-              IconButton(tooltip: 'Abmelden', icon: const Icon(Icons.logout), onPressed: _logout),
+              // Seltene Aktionen im Überlaufmenü — auf dem Handy ist in der
+              // AppBar sonst kein Platz für den Firmennamen.
+              PopupMenuButton<String>(
+                tooltip: 'Weitere Aktionen',
+                onSelected: (value) async {
+                  switch (value) {
+                    case 'refresh':
+                      try {
+                        await session.refreshPermissions();
+                      } on Exception catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+                        }
+                      }
+                    case 'password':
+                      final changed = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => OnlinePasswordDialog(session: session),
+                      );
+                      if (changed == true && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Passwort geändert — andere Geräte wurden abgemeldet.')),
+                        );
+                      }
+                    case 'logout':
+                      await _logout();
+                  }
+                },
+                itemBuilder: (_) => [
+                  if (!session.offlineOnly) const PopupMenuItem(value: 'refresh', child: Text('Rechte neu laden')),
+                  if (!session.offlineOnly) const PopupMenuItem(value: 'password', child: Text('Passwort ändern')),
+                  const PopupMenuItem(value: 'logout', child: Text('Abmelden')),
+                ],
+              ),
             ],
           ),
           body: Column(

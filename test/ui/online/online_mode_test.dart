@@ -207,4 +207,45 @@ void main() {
     expect(find.textContaining('Bezahlt am'), findsOneWidget);
     expect(find.text('Als offen markieren'), findsOneWidget);
   });
+
+  testWidgets('Passwort ändern und Abmelden über das Menü', (tester) async {
+    final server = OnlineTestServer();
+    await tester.runAsync(() => server.seedCompany(email: 'kay@example.com', companyName: 'Elektro Kay', permissions: _allPermissions));
+    final navigator = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(MaterialApp(navigatorKey: navigator, home: const Scaffold(body: Text('Startseite'))));
+    navigator.currentState!.push(MaterialPageRoute<void>(
+      builder: (_) => OnlineLoginScreen(clientFactory: (_) => server.client(), offlineStoreFactory: () => null),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('online-server')), 'erp.example.org');
+    await tester.enterText(find.byKey(const Key('online-email')), 'kay@example.com');
+    await tester.enterText(find.byKey(const Key('online-password')), 'passwort-12345');
+    await tester.tap(find.text('Anmelden'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Elektro Kay'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Weitere Aktionen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Passwort ändern'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('online-password-current')), 'passwort-12345');
+    await tester.enterText(find.byKey(const Key('online-password-new')), 'neues-passwort-1');
+    await tester.enterText(find.byKey(const Key('online-password-repeat')), 'anders-passwort');
+    await tester.tap(find.text('Ändern'));
+    await tester.pumpAndSettle();
+    expect(find.text('Die Wiederholung stimmt nicht überein.'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('online-password-repeat')), 'neues-passwort-1');
+    await tester.tap(find.text('Ändern'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Passwort geändert'), findsOneWidget);
+    final relogin = await tester.runAsync(() => server.client().login('kay@example.com', 'neues-passwort-1'));
+    expect(relogin!.memberships, hasLength(1));
+
+    await tester.tap(find.byTooltip('Weitere Aktionen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Abmelden'));
+    await tester.pumpAndSettle();
+    expect(find.text('Startseite'), findsOneWidget);
+  });
 }

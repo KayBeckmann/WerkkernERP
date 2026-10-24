@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:postgres/postgres.dart';
@@ -42,7 +43,22 @@ Future<void> main() async {
     repository: repository,
     business: PostgresBusinessRepository(db),
     corsAllowedOrigins: corsOrigins,
+    trustForwardedFor: Platform.environment['TRUST_PROXY'] == 'true',
   );
+
+  // Abgelaufenes regelmäßig aufräumen (Sitzungen, Login-Token,
+  // Einladungen, Idempotenz-Einträge) — sonst wachsen die Tabellen
+  // unbegrenzt.
+  Future<void> purge() async {
+    try {
+      await repository.purgeExpired(DateTime.now().toUtc());
+    } on Object catch (e) {
+      stderr.writeln('Aufräumen fehlgeschlagen: $e');
+    }
+  }
+
+  await purge();
+  Timer.periodic(const Duration(hours: 1), (_) => purge());
   final handler = const Pipeline().addMiddleware(logRequests()).addHandler(router.handler.call);
 
   final server = await shelf_io.serve(handler, InternetAddress.anyIPv4, port);

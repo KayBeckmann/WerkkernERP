@@ -1,0 +1,13 @@
+# TLS-Terminierung für den WerkkernERP-Server (ADR-0001 B0.3:
+# Transport-TLS ist Pflicht). Caddy holt Zertifikate automatisch (Let's
+# Encrypt) für SERVER_DOMAIN; für "localhost" nutzt es eine interne CA.
+{$SERVER_DOMAIN} {
+	encode gzip
+	reverse_proxy server:8090
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

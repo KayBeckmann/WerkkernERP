@@ -1,11 +1,16 @@
 # WerkkernERP
 
-Lokal-first Offline-ERP für ein Elektro-Kleingewerbe (Android + Web),
-gebaut mit Flutter/Dart und einer lokalen SQLite-Datenbank (Drift). Eine
-Person führt mehrere lokal vollständig getrennte Firmen, legt Kunden/
-Artikel an und erstellt Angebote, Aufträge, Lieferscheine, Proforma- und
-echte Rechnungen bis zum PDF — ohne Server, Konto, Login oder
-Internetzwang.
+Lokal-first ERP für ein Elektro-Kleingewerbe (Android + Web), gebaut mit
+Flutter/Dart. Zwei Betriebsarten in derselben App:
+
+- **Offline (Single-User):** lokale SQLite-Datenbank (Drift), mehrere
+  vollständig getrennte Firmen, Kunden/Artikel, Angebote, Aufträge,
+  Lieferscheine, Proforma-, Abschlags- und echte Rechnungen bis zum
+  PDF — ohne Server, Konto, Login oder Internetzwang.
+- **Online (Multi-User):** eigener Server (`server/`, Dart + PostgreSQL)
+  mit Mitgliedschaften, Gruppen, serverseitiger Rechteprüfung,
+  verschlüsseltem selektiven Offline-Bestand und einer Schnittstelle
+  für KI-Agenten (MCP). Der Offline-Modus bleibt davon unberührt.
 
 ## Status
 
@@ -23,9 +28,10 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   und stehen noch aus: ein Navigations-/Formulardurchlauf auf einem
   kleinen Bildschirm, sowie ein Backup/Restore-Test über Neustart,
   App-Update und eine frische Installation hinweg.
-- Eine zweite Betriebsart — **Online-Multi-User** mit Server, Mitglied-
-  schaften und Rechteprüfung — ist bewusst noch nicht begonnen (siehe
-  „Geplant, aber bewusst zurückgestellt" unten).
+- Die **Online-Betriebsart** ist funktionsfähig und getestet, umfasst
+  serverseitig aber bisher nur den Kern (Kunden, Artikel, Dokumente inkl.
+  Umwandlung, Zahlungsstatus, PDF). Weitere Module laufen vorerst nur
+  offline — siehe unten.
 
 ## Umfang (umgesetzt)
 
@@ -36,17 +42,18 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - Geldbeträge durchgängig als Integer-Cent mit kaufmännischer Rundung
   (`package:decimal`), nie als Fließkommazahl.
 - Lokale, schema-versionierte SQLite-Datenbank mit automatischer
-  Migration bei App-Updates (aktuell 20 Schemastufen, keine wird
-  rückwirkend geändert — nur angehängt).
+  Migration bei App-Updates (Stufen werden nur angehängt, nie
+  rückwirkend geändert).
 - **Dashboard** als Einstiegspunkt nach Firmenwahl: Rechnungssumme
   Monat/Jahr, offene/überfällige Rechnungen, Fuhrpark-TÜV, aktive
   Projekte, wiederkehrende Vorlagen — je nach aktiviertem Modul.
 
 **Dokumente**
-- Rechnung, Angebot, Auftrag, Lieferschein und Proforma-Rechnung als
-  eigenständige, pro Firma ein-/ausblendbare Dokumentarten mit eigenen
-  Nummernkreisen (`R`/`An`/`A`/`LS`/`PF`), eigenem PDF-Titel und eigenem
-  Einleitungs-/Schlusstext.
+- Rechnung, Angebot, Auftrag, Lieferschein, Proforma-Rechnung und
+  Gutschrift als eigenständige, pro Firma ein-/ausblendbare
+  Dokumentarten mit eigenen Nummernkreisen (`R`/`An`/`A`/`LS`/`PF`/`G`,
+  optional mit Projektnummer `R-JJPPxxx`), eigenem PDF-Titel und eigenem
+  Einleitungs-/Schlusstext; Kleinunternehmerregelung (§ 19 UStG).
 - Entwurf frei editierbar; Finalisierung vergibt atomar die nächste
   Nummer im Firmen-/Typ-/Jahreskreis und ist danach unveränderlich —
   mit einer Ausnahme: ein finalisiertes Angebot/Auftrag/Proforma bleibt
@@ -61,9 +68,15 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   bereits finalisiertes PDF mehr).
 
 **Weitere Module (pro Firma einzeln aktivierbar)**
-- **Projekte**: Dokumente aller Arten einem Projekt zuordnen.
-- **Fuhrpark**: Fahrzeuge, TÜV-Fälligkeit, Kostenbuchungen (Tanken/
-  Wartung/Leasing/Versicherung/Sonstiges).
+- **Projekte**: Dokumente aller Arten einem Projekt zuordnen, einfache
+  Ergebnisrechnung (Erlöse − Belege − Stundenkosten, Stunden Soll/Ist).
+- **Zeiterfassung** mit Rollen-Stundensätzen, Festpreis-Kennzeichen,
+  Materialabschlag und **Kunden-Stundenzettel mit Touch-Unterschrift**
+  (keine qualifizierte elektronische Signatur).
+- **Lagerbestand, Inventur, Bewegungsprotokoll und Bestellwesen**
+  (Mindestbestand, Mindestbestellmenge, Wareneingang, SKR03-Beleg).
+- **Fuhrpark**: Fahrzeuge, TÜV-Fälligkeit, Kostenbuchungen inkl.
+  Tilgungs-/Zinsanteil, als Gemeinkosten in der EÜR.
 - **Wiederkehrende Rechnungen**: Vorlagen erzeugen bei Fälligkeit einen
   neuen Entwurf (nie automatisch finalisiert), holen beim nächsten
   App-Start alle inzwischen fälligen Perioden nach.
@@ -92,32 +105,43 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   über eine Temp-Datei + atomares `rename()`.
 - SMTP-Passwörter liegen in `flutter_secure_storage` (Android Keystore /
   Web WebCrypto), nie in der SQLite-Datenbank oder im Backup-Zip.
-- Die laufende SQLite-Datenbank selbst ist **noch nicht** verschlüsselt
-  (siehe unten).
+- Optionale Verschlüsselung der laufenden Datenbank (SQLite3 Multiple
+  Ciphers) mit Geräteschlüssel **oder** Passwort — Android; Web
+  bewusst ohne.
 
-## Bewusst nicht umgesetzt / zurückgestellt
+**Online-Betriebsart (Phase B)** — Details in [`server/README.md`](server/README.md)
+- Server `server/` (Dart/shelf + PostgreSQL, versionierte Migrationen,
+  Docker Compose, optionaler TLS-Proxy). Nutzer ↔ Firmen viele-zu-viele,
+  Gruppen + individuelle Ausnahmen, Einladungen, Firmenmodule,
+  Audit-Protokoll, Login-Drosselung, verschlüsseltes Backup/Restore.
+- Jede Abfrage firmengebunden, fremde IDs verhalten sich wie nicht
+  existierende; optimistische Versionierung statt „last write wins“.
+- In der App: „Online anmelden“ (Wolken-Symbol) mit Dokumenten, Kunden,
+  Artikeln, Verwaltung für Admins, PDF mit demselben Generator wie
+  offline.
+- **Selektiver Offline-Bestand:** ausdrücklich markierte Dokumente
+  liegen AES-256-GCM-verschlüsselt auf dem Gerät, Entwürfe sind offline
+  bearbeitbar (Outbox, idempotenter Abgleich, Konflikte sichtbar).
+- **KI-Agenten (MCP):** persönliche Agent-Token mit genau den Rechten
+  des Nutzers, irreversible Aktionen nur nach Bestätigung in der App;
+  MCP-Server in [`packages/werkkern_mcp`](packages/werkkern_mcp/README.md).
+- Gemeinsame reine Dart-Pakete: `packages/werkkern_core` (Geld, Summen,
+  Nummernformat, Umwandlungsregeln — App und Server rechnen identisch)
+  und `packages/werkkern_client` (API-Client, Offline-Abgleich).
 
-- **Verschlüsselung der laufenden lokalen Datenbank** (nur Backups sind
-  optional verschlüsselt). Ein konkreter Weg ist recherchiert, aber
-  noch nicht gebaut.
-- **Gutschrift-/Korrekturbeleg** für finalisierte Rechnungen — eigener
-  Dokumenttyp/Nummernkreis, fachlich/steuerlich noch zu klären.
-- **DATEV-Export für Rechnungen/Einnahmen** (nur Belege/Ausgaben sind
-  umgesetzt, siehe oben) und **E-Rechnung (XRechnung/ZUGFeRD)** —
-  brauchen jeweils eine eigene fachliche/rechtliche Prüfung
-  (Personenkonten/Debitoren-Kontierung bzw. E-Rechnungs-Pflichtfelder),
-  aktuell nicht Teil der App.
-- **Projekt-Ergebnisrechnung** (kalkulierte vs. tatsächliche Stunden,
-  interne GuV, Fahrzeugkosten-Umlage auf Projekte) — Projekte/Fuhrpark
-  erfassen bereits Daten, aber ohne automatische Auswertung.
+## Bewusst nicht umgesetzt / offen
+
+- **E-Rechnung (XRechnung/ZUGFeRD)** und **DATEV-Export für Rechnungen/
+  Einnahmen** — brauchen eine eigene fachliche/rechtliche Prüfung.
 - Konfigurierbare Steuersätze, Nummernmuster und PDF-Layouts mit
   Migration vorhandener Dokumente.
-- Zeiterfassung vor Ort, Kunden-Unterschrift, Personal-/Einsatzplanung,
-  Materialbestellung/Lager, externe LLM-Anbindung — nicht begonnen.
-- **Online-Multi-User-Betrieb** (Server, Mitgliedschaften, Rechte-
-  prüfung, selektive Offline-Synchronisation) — eigene zweite
-  Betriebsart, noch nicht begonnen. Diese App bleibt bis dahin bewusst
-  Single-User/Single-Device ohne Sync zwischen Geräten.
+- Personal-/Einsatzplanung (Disposition, Urlaub, Überstunden).
+- **Online-Betriebsart:** Projekte, Zeiterfassung, Lager/Bestellwesen,
+  Buchhaltung, Fuhrpark, Mahnwesen, Abschläge/Gutschriften und
+  E-Mail-Versand laufen bisher nur offline; Offline-Anlage neuer
+  Dokumente im Online-Modus ist nicht vorgesehen.
+- Import von Materiallisten aus LibreECAD (Format noch offen).
+- Lokaler KI-Adapter für die reine Offline-App (ohne Server).
 
 ## E-Mail-Versand: Android vs. Web
 
@@ -152,6 +176,15 @@ Tests und statische Analyse:
 ```bash
 flutter analyze
 flutter test
+(cd server && dart analyze && dart test)      # + echtes Postgres: siehe server/README.md
+(cd packages/werkkern_core && dart test)
+(cd packages/werkkern_client && dart test)
+```
+
+Online-Server lokal starten:
+
+```bash
+docker compose up -d --build server-db server   # http://<LAN-IP>:8190
 ```
 
 Paketkennung ist aktuell `de.kaybeckmann.werkkernerp` (Platzhalter, vor

@@ -9,6 +9,24 @@ nutzbar.
 Architektur-Entscheidungen: siehe das Vault-ADR
 `10_Projects/Flutter-ERP-RechnungsFee/Decisions/ADR-0001-phase-b-architektur.md`.
 
+## Produktion mit TLS
+
+ADR-0001 B0.3: Transport-TLS ist Pflicht. Der Server spricht selbst nur
+HTTP; davor steht Caddy (Compose-Profil `tls`, automatische
+Let's-Encrypt-Zertifikate, HSTS):
+
+```bash
+# .env: SERVER_DOMAIN=erp.example.org, SERVER_BIND=127.0.0.1,
+#       SERVER_TRUST_PROXY=true, SERVER_CORS_ALLOWED_ORIGINS=<App-Origin>
+docker compose --profile tls up -d --build server-db server proxy
+```
+
+Sicherheit im Betrieb: Login-Drosselung (5 Fehlversuche je Konto bzw.
+30 je Adresse in 15 min -> 429), Passwortänderung beendet alle anderen
+Sitzungen, stündliches Aufräumen abgelaufener Sitzungen/Token/
+Idempotenz-Einträge. `TRUST_PROXY=true` nur hinter dem eigenen Proxy —
+sonst könnte ein Client die Absenderadresse per `X-Forwarded-For` fälschen.
+
 ## Starten
 
 ```bash
