@@ -67,10 +67,21 @@ class WerkkernApiClient {
     } on http.ClientException catch (e) {
       throw ApiUnreachable(e);
     }
-    final text = utf8.decode(response.bodyBytes);
-    final decoded = text.isEmpty ? null : jsonDecode(text);
+    final text = utf8.decode(response.bodyBytes, allowMalformed: true);
+    Object? decoded;
+    try {
+      decoded = text.isEmpty ? null : jsonDecode(text);
+    } on FormatException {
+      // Kein JSON — z. B. eine HTML-Fehlerseite eines Proxys (502) oder
+      // "Route not found" eines älteren Servers. Als Fehler melden statt
+      // mit einer FormatException abzustürzen.
+      if (response.statusCode < 400) throw ApiException(response.statusCode, 'Unerwartete Antwort des Servers.');
+      decoded = null;
+    }
     if (response.statusCode >= 400) {
-      final message = decoded is Map && decoded['error'] is String ? decoded['error'] as String : 'Fehler ${response.statusCode}';
+      final message = decoded is Map && decoded['error'] is String
+          ? decoded['error'] as String
+          : 'Fehler ${response.statusCode}${text.isNotEmpty && text.length < 120 ? ': $text' : ''}';
       throw ApiException(response.statusCode, message);
     }
     return decoded;
@@ -161,12 +172,14 @@ class WerkkernApiClient {
     String kind = 'invoice',
     List<OnlineDocumentItem> items = const [],
     String? notes,
+    String? projectId,
   }) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents', body: {
         'kind': kind,
         'customerId': customerId,
         'items': [for (final i in items) i.toJson()],
         'notes': ?notes,
+        'projectId': ?projectId,
       })));
 
   /// Wirft [ApiException] mit 409, wenn [version] veraltet ist — dann
@@ -349,17 +362,20 @@ class WerkkernApiClient {
     );
   }
 
+  /// Bezug: [documentId] und/oder [projectId] (mindestens eines).
   Future<OnlineTimeEntry> saveTimeEntry({
     String? id,
     required DateTime date,
     required String hours,
-    required String documentId,
+    String? documentId,
+    String? projectId,
     String? note,
   }) async {
     final body = {
       'date': '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
       'hours': hours,
-      'documentId': documentId,
+      'documentId': ?documentId,
+      'projectId': ?projectId,
       'note': note,
     };
     return OnlineTimeEntry.fromJson(
@@ -368,6 +384,26 @@ class WerkkernApiClient {
   }
 
   Future<void> deleteTimeEntry(String id) => _send('DELETE', '/time-entries/$id');
+
+  // ---- Projekte (C1 online) -----------------------------------------------------
+
+  Future<List<OnlineProject>> projects({bool includeArchived = false}) async {
+    final j = _map(await _send('GET', '/projects', query: {if (includeArchived) 'includeArchived': 'true'}));
+    return [for (final p in j['projects'] as List) OnlineProject.fromJson(p as Map<String, Object?>)];
+  }
+
+  Future<OnlineProject> createProject(String name, {String? customerId}) async =>
+      OnlineProject.fromJson(_map(await _send('POST', '/projects', body: {'name': name, 'customerId': ?customerId})));
+
+  Future<OnlineProject> updateProject(String id, {String? name, String? status}) async =>
+      OnlineProject.fromJson(_map(await _send('PUT', '/projects/$id', body: {'name': ?name, 'status': ?status})));
+
+  Future<OnlineProjectDetail> projectDetail(String id) async =>
+      OnlineProjectDetail.fromJson(_map(await _send('GET', '/projects/$id')));
+
+  /// Projekt eines Entwurfs setzen/entfernen ([projectId] `null`).
+  Future<OnlineDocument> setDocumentProject(String id, {required int version, String? projectId}) async =>
+      OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id/project', body: {'version': version, 'projectId': projectId})));
 
   // ---- KI-Agenten (C8) ------------------------------------------------------------
 

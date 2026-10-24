@@ -80,13 +80,26 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
         // ebenso wenig "aus dem Nichts" anbieten.
         if (entry.key != 'creditNote' && (entry.value == null || session.modules.contains(entry.value))) entry.key,
     ];
-    final choice = await showDialog<({String kind, String customerId})>(
+    var projects = const <OnlineProject>[];
+    if (session.modules.contains('projects') && session.can('projects.read')) {
+      try {
+        projects = await session.client.projects();
+      } on Exception {
+        // Ohne Projektliste: Dokument eben ohne Projekt.
+      }
+    }
+    if (!mounted) return;
+    final choice = await showDialog<({String kind, String customerId, String? projectId})>(
       context: context,
-      builder: (_) => _NewDocumentDialog(customers: customers, kinds: kinds),
+      builder: (_) => _NewDocumentDialog(customers: customers, kinds: kinds, projects: projects),
     );
     if (choice == null || !mounted) return;
     try {
-      final created = await session.client.createDocument(customerId: choice.customerId, kind: choice.kind);
+      final created = await session.client.createDocument(
+        customerId: choice.customerId,
+        kind: choice.kind,
+        projectId: choice.projectId,
+      );
       if (mounted) await _open(created.id);
     } on Exception catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
@@ -186,9 +199,10 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
 }
 
 class _NewDocumentDialog extends StatefulWidget {
-  const _NewDocumentDialog({required this.customers, required this.kinds});
+  const _NewDocumentDialog({required this.customers, required this.kinds, this.projects = const []});
   final List<OnlineCustomer> customers;
   final List<String> kinds;
+  final List<OnlineProject> projects;
 
   @override
   State<_NewDocumentDialog> createState() => _NewDocumentDialogState();
@@ -197,6 +211,7 @@ class _NewDocumentDialog extends StatefulWidget {
 class _NewDocumentDialogState extends State<_NewDocumentDialog> {
   late String _kind = widget.kinds.first;
   String? _customerId;
+  String? _projectId;
 
   @override
   Widget build(BuildContext context) {
@@ -226,12 +241,26 @@ class _NewDocumentDialogState extends State<_NewDocumentDialog> {
                   ],
                   onChanged: (v) => setState(() => _customerId = v),
                 ),
+                if (widget.projects.isNotEmpty)
+                  DropdownButtonFormField<String?>(
+                    initialValue: _projectId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Projekt (optional)'),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('— ohne Projekt —')),
+                      for (final p in widget.projects)
+                        DropdownMenuItem<String?>(value: p.id, child: Text('${p.displayNumber} · ${p.name}', overflow: TextOverflow.ellipsis)),
+                    ],
+                    onChanged: (v) => setState(() => _projectId = v),
+                  ),
               ],
             ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
         FilledButton(
-          onPressed: _customerId == null ? null : () => Navigator.pop(context, (kind: _kind, customerId: _customerId!)),
+          onPressed: _customerId == null
+              ? null
+              : () => Navigator.pop(context, (kind: _kind, customerId: _customerId!, projectId: _projectId)),
           child: const Text('Anlegen'),
         ),
       ],

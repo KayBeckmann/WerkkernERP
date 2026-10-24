@@ -47,6 +47,14 @@ class BusinessRoutes {
     router.post('/documents/<id>/payment', _setPayment);
     router.put('/documents/<id>/due-date', _setDueDate);
 
+    router.put('/documents/<id>/project', _setDocumentProject);
+
+    router.get('/projects', _listProjects);
+    router.post('/projects', _createProject);
+    router.get('/projects/<id>', _getProject);
+    router.put('/projects/<id>', _updateProject);
+    router.delete('/projects/<id>', _deleteProject);
+
     router.get('/time-entries', _listTimeEntries);
     router.post('/time-entries', _createTimeEntry);
     router.put('/time-entries/<id>', _updateTimeEntry);
@@ -245,12 +253,11 @@ class BusinessRoutes {
       return jsonError('Modul "${documentKindModules[kind]}" ist für diese Firma nicht aktiviert.', status: 403);
     }
 
-    final documents = await business.listDocuments(
-      check.auth!.session.companyId,
-      kind: kind,
-      status: status,
-      query: params['q'],
-    );
+    final projectFilter = params['projectId'];
+    final documents = [
+      for (final d in await business.listDocuments(check.auth!.session.companyId, kind: kind, status: status, query: params['q']))
+        if (projectFilter == null || d.projectId == projectFilter) d,
+    ];
     final result = <Map<String, Object?>>[];
     final customerNames = {
       for (final c in await business.listCustomers(check.auth!.session.companyId)) c.id: c.name,
@@ -406,6 +413,11 @@ class BusinessRoutes {
     final id = _uuid.v4();
     final parsed = await _parseItems(body['items'], companyId, id);
     if (parsed.error != null) return jsonError(parsed.error!);
+    final projectId = body['projectId'] as String?;
+    if (projectId != null) {
+      final projectError = await _checkProjectReference(check.auth!, projectId);
+      if (projectError != null) return projectError;
+    }
 
     final document = Document(
       id: id,
@@ -421,6 +433,7 @@ class BusinessRoutes {
       createdAt: now,
       updatedAt: now,
       version: 1,
+      projectId: projectId,
     );
     await business.createDocument(document, parsed.items!);
     await auth.audit(check.auth!, 'document.create', document.kind, id);
@@ -660,6 +673,8 @@ class BusinessRoutes {
       updatedAt: now,
       version: 1,
       convertedFromId: source.id,
+      // Projektzuordnung wandert mit (wie offline convertTo()).
+      projectId: source.projectId,
     );
     await business.createDocument(draft, items);
     await auth.audit(session, 'document.convert', targetKind, newId);
@@ -747,6 +762,7 @@ class BusinessRoutes {
       ctx.session.companyId,
       userId: mineOnly ? ctx.session.userId : params['userId'],
       documentId: params['documentId'],
+      projectId: params['projectId'],
       from: _parseDate(params['from']),
       to: _parseDate(params['to']),
     );
@@ -758,14 +774,18 @@ class BusinessRoutes {
     });
   }
 
-  /// Validiert Datum/Stunden/Bezug. Bezug ist Pflicht (Auftrag oder
-  /// Rechnung der eigenen Firma) — Projekte gibt es online noch nicht.
-  Future<({DateTime? date, Decimal? hours, String? documentId, String? error})> _parseTimeBody(
+  /// Validiert Datum/Stunden/Bezug. Bezug: Auftrag/Rechnung und/oder
+  /// Projekt — mindestens eines (wie offline). Gehört das Dokument zu
+  /// einem Projekt und ist keins angegeben, wird es übernommen.
+  Future<({DateTime? date, Decimal? hours, String? documentId, String? projectId, String? error})> _parseTimeBody(
     Map<String, Object?> body,
-    String companyId,
+    AuthContext ctx,
   ) async {
+    final companyId = ctx.session.companyId;
+    ({DateTime? date, Decimal? hours, String? documentId, String? projectId, String? error}) fail(String e) =>
+        (date: null, hours: null, documentId: null, projectId: null, error: e);
     final date = _parseDate(body['date']);
-    if (date == null) return (date: null, hours: null, documentId: null, error: 'date (JJJJ-MM-TT) ist Pflicht.');
+    if (date == null) return fail('date (JJJJ-MM-TT) ist Pflicht.');
     final rawHours = body['hours'];
     final hours = rawHours is num
         ? Decimal.tryParse(rawHours.toString())
@@ -773,15 +793,26 @@ class BusinessRoutes {
             ? Decimal.tryParse(rawHours.replaceAll(',', '.'))
             : null;
     if (hours == null || hours <= Decimal.zero || hours > Decimal.fromInt(24)) {
-      return (date: null, hours: null, documentId: null, error: 'hours muss größer 0 und höchstens 24 sein.');
+      return fail('hours muss größer 0 und höchstens 24 sein.');
     }
     final documentId = body['documentId'] as String?;
-    if (documentId == null) return (date: null, hours: null, documentId: null, error: 'documentId (Auftrag/Rechnung) ist Pflicht.');
-    final document = await business.findDocument(companyId, documentId);
-    if (document == null || !{'order', 'invoice'}.contains(document.kind)) {
-      return (date: null, hours: null, documentId: null, error: 'Auftrag/Rechnung nicht gefunden.');
+    var projectId = body['projectId'] as String?;
+    if (documentId == null && projectId == null) return fail('documentId (Auftrag/Rechnung) oder projectId ist Pflicht.');
+    if (documentId != null) {
+      final document = await business.findDocument(companyId, documentId);
+      if (document == null || !{'order', 'invoice'}.contains(document.kind)) {
+        return fail('Auftrag/Rechnung nicht gefunden.');
+      }
+      if (!body.containsKey('projectId')) projectId = document.projectId;
     }
-    return (date: date, hours: hours, documentId: documentId, error: null);
+    if (projectId != null) {
+      final company = await repository.findCompanyById(companyId);
+      final project = await business.findProject(companyId, projectId);
+      if (project == null || !(company?.enabledModules.contains('projects') ?? false)) {
+        return fail('Projekt nicht gefunden.');
+      }
+    }
+    return (date: date, hours: hours, documentId: documentId, projectId: projectId, error: null);
   }
 
   Future<Response> _createTimeEntry(Request request) async {
@@ -789,7 +820,7 @@ class BusinessRoutes {
     if (check.error != null) return check.error!;
     final ctx = check.auth!;
     final body = await _body(request);
-    final parsed = await _parseTimeBody(body, ctx.session.companyId);
+    final parsed = await _parseTimeBody(body, ctx);
     if (parsed.error != null) {
       return jsonError(parsed.error!, status: parsed.error!.contains('nicht gefunden') ? 404 : 400);
     }
@@ -799,6 +830,7 @@ class BusinessRoutes {
       companyId: ctx.session.companyId,
       userId: ctx.session.userId,
       documentId: parsed.documentId,
+      projectId: parsed.projectId,
       workDate: parsed.date!,
       hours: parsed.hours!.toString(),
       note: _trimmed(body['note']),
@@ -836,7 +868,7 @@ class BusinessRoutes {
     final own = await _ownEntry(request, id);
     if (own.error != null) return own.error!;
     final body = await _body(request);
-    final parsed = await _parseTimeBody(body, own.auth!.session.companyId);
+    final parsed = await _parseTimeBody(body, own.auth!);
     if (parsed.error != null) {
       return jsonError(parsed.error!, status: parsed.error!.contains('nicht gefunden') ? 404 : 400);
     }
@@ -846,6 +878,7 @@ class BusinessRoutes {
       companyId: e.companyId,
       userId: e.userId,
       documentId: parsed.documentId,
+      projectId: parsed.projectId,
       workDate: parsed.date!,
       hours: parsed.hours!.toString(),
       note: _trimmed(body['note']),
@@ -864,5 +897,186 @@ class BusinessRoutes {
     await business.deleteTimeEntry(own.auth!.session.companyId, id);
     await auth.audit(own.auth!, 'timeEntry.delete', 'timeEntry', id);
     return Response(204);
+  }
+
+  // ---- Projekte (C1 online) --------------------------------------------------------
+
+  /// Ein Dokument/eine Zeit darf nur auf ein existierendes Projekt der
+  /// eigenen Firma verweisen; das Projekt muss für den Nutzer sichtbar sein.
+  Future<Response?> _checkProjectReference(AuthContext ctx, String projectId) async {
+    if (!await auth.isGranted(ctx, 'projects.read')) {
+      return jsonError('Keine Berechtigung: projects.read', status: 403);
+    }
+    if (await business.findProject(ctx.session.companyId, projectId) == null) {
+      return jsonError('Projekt nicht gefunden.', status: 404);
+    }
+    return null;
+  }
+
+  Future<Response> _setDocumentProject(Request request, String id) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return jsonError('Nicht angemeldet.', status: 401);
+    final existing = await business.findDocument(session.session.companyId, id);
+    if (existing == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final check = await _requireDocumentPermission(request, 'invoices.write', existing.kind);
+    if (check.error != null) return check.error!;
+    final body = await _body(request);
+    final version = body['version'];
+    if (version is! int) return jsonError('version (Ganzzahl) ist Pflicht.');
+    final projectId = body['projectId'] as String?;
+    if (projectId != null) {
+      final error = await _checkProjectReference(check.auth!, projectId);
+      if (error != null) return error;
+    }
+    try {
+      final updated = await business.setDocumentProject(
+        companyId: session.session.companyId,
+        id: id,
+        expectedVersion: version,
+        projectId: projectId,
+        now: DateTime.now().toUtc(),
+      );
+      if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
+      await auth.audit(check.auth!, 'document.project', existing.kind, id);
+      return await _documentResponse(session.session.companyId, updated);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
+  }
+
+  Future<Response> _listProjects(Request request) async {
+    final check = await auth.requirePermission(request, 'projects.read');
+    if (check.error != null) return check.error!;
+    final projects = await business.listProjects(
+      check.auth!.session.companyId,
+      includeArchived: request.url.queryParameters['includeArchived'] == 'true',
+    );
+    return jsonOk({'projects': [for (final p in projects) p.toJson()]});
+  }
+
+  Future<Response> _createProject(Request request) async {
+    final check = await auth.requirePermission(request, 'projects.write');
+    if (check.error != null) return check.error!;
+    final companyId = check.auth!.session.companyId;
+    final body = await _body(request);
+    final name = _trimmed(body['name']);
+    if (name == null) return jsonError('name ist Pflicht.');
+    final customerId = body['customerId'] as String?;
+    if (customerId != null && await business.findCustomer(companyId, customerId) == null) {
+      return jsonError('Kunde nicht gefunden.', status: 404);
+    }
+    final project = await business.createProject(
+      id: _uuid.v4(),
+      companyId: companyId,
+      name: name,
+      customerId: customerId,
+      now: DateTime.now().toUtc(),
+    );
+    await auth.audit(check.auth!, 'project.create', 'project', project.id);
+    return jsonOk(project.toJson(), status: 201);
+  }
+
+  /// Projekt mit zugeordneten Dokumenten und einfacher Ergebnisrechnung
+  /// wie offline (C1/C3.3): Erlöse = Brutto finalisierter Rechnungen,
+  /// geplant = Stunden-Positionen aus Angeboten/Aufträgen, Ist/Kosten aus
+  /// Zeitbuchungen. Jede Teilsumme nur mit dem passenden Leserecht.
+  Future<Response> _getProject(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'projects.read');
+    if (check.error != null) return check.error!;
+    final ctx = check.auth!;
+    final companyId = ctx.session.companyId;
+    final project = await business.findProject(companyId, id);
+    if (project == null) return jsonError('Projekt nicht gefunden.', status: 404);
+
+    final canReadDocuments = await auth.isGranted(ctx, 'invoices.read');
+    final modules = await _enabledModules(ctx);
+    final documents = <Map<String, Object?>>[];
+    int? invoiceGross;
+    Decimal? plannedHours;
+    if (canReadDocuments) {
+      invoiceGross = 0;
+      plannedHours = Decimal.zero;
+      for (final d in await business.listDocumentsForProject(companyId, id)) {
+        final module = documentKindModules[d.kind];
+        if (module != null && !modules.contains(module)) continue;
+        final items = await business.itemsFor(companyId, d.id);
+        final gross = _totals(items).totalGross.cents;
+        documents.add({...d.toJson(), 'totalGrossCents': gross});
+        if (d.kind == 'invoice' && !d.isDraft) invoiceGross = invoiceGross! + gross;
+        if (d.kind == 'quote' || d.kind == 'order') {
+          for (final i in items.where((i) => i.kind == 'hours')) {
+            plannedHours = plannedHours! + Decimal.parse(i.quantity);
+          }
+        }
+      }
+    }
+
+    Decimal? bookedHours;
+    int? hoursCost;
+    if (await auth.isGranted(ctx, 'timeTracking.read')) {
+      bookedHours = Decimal.zero;
+      hoursCost = 0;
+      for (final t in await business.listTimeEntries(companyId, projectId: id)) {
+        final h = Decimal.parse(t.hours);
+        bookedHours = bookedHours! + h;
+        if (t.hourlyCostCents != null) {
+          hoursCost = hoursCost! + Money.fromCents(t.hourlyCostCents!).multiplyByQuantity(h).cents;
+        }
+      }
+    }
+    return jsonOk({
+      ...project.toJson(),
+      'documents': documents,
+      'result': {
+        'invoiceGrossCents': invoiceGross,
+        'plannedHours': plannedHours?.toString(),
+        'bookedHours': bookedHours?.toString(),
+        'hoursCostCents': hoursCost,
+        'resultCents': (invoiceGross != null && hoursCost != null) ? invoiceGross - hoursCost : null,
+      },
+    });
+  }
+
+  Future<Response> _updateProject(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'projects.write');
+    if (check.error != null) return check.error!;
+    final companyId = check.auth!.session.companyId;
+    final existing = await business.findProject(companyId, id);
+    if (existing == null) return jsonError('Projekt nicht gefunden.', status: 404);
+    final body = await _body(request);
+    final name = _trimmed(body['name']) ?? existing.name;
+    final status = body['status'] as String? ?? existing.status;
+    if (!{'active', 'archived'}.contains(status)) return jsonError('status active|archived.');
+    final customerId = body.containsKey('customerId') ? body['customerId'] as String? : existing.customerId;
+    if (customerId != null && await business.findCustomer(companyId, customerId) == null) {
+      return jsonError('Kunde nicht gefunden.', status: 404);
+    }
+    final updated = Project(
+      id: existing.id,
+      companyId: companyId,
+      name: name,
+      customerId: customerId,
+      status: status,
+      foundingYear: existing.foundingYear,
+      projectNumber: existing.projectNumber,
+      createdAt: existing.createdAt,
+    );
+    await business.updateProject(updated);
+    await auth.audit(check.auth!, 'project.update', 'project', id);
+    return jsonOk(updated.toJson());
+  }
+
+  Future<Response> _deleteProject(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'projects.write');
+    if (check.error != null) return check.error!;
+    try {
+      if (!await business.deleteProject(check.auth!.session.companyId, id)) {
+        return jsonError('Projekt nicht gefunden.', status: 404);
+      }
+      await auth.audit(check.auth!, 'project.delete', 'project', id);
+      return Response(204);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
   }
 }

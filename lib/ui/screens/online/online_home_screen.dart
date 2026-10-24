@@ -7,6 +7,7 @@ import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
 import 'online_documents_screen.dart';
 import 'online_password_dialog.dart';
+import 'online_projects_screen.dart';
 import 'online_time_screen.dart';
 
 /// Hauptansicht im Online-Modus. Tabs erscheinen nur bei wirksamem
@@ -103,6 +104,8 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             (label: 'Dokumente', icon: Icons.receipt_long_outlined, body: OnlineDocumentsScreen(session: session)),
           if (session.can('customers.read') && !session.offlineOnly)
             (label: 'Kunden', icon: Icons.people_outline, body: OnlineCustomersScreen(session: session)),
+          if (session.modules.contains('projects') && session.can('projects.read') && !session.offlineOnly)
+            (label: 'Projekte', icon: Icons.folder_outlined, body: OnlineProjectsScreen(session: session)),
           if (session.modules.contains('timeTracking') &&
               (session.can('timeTracking.write') || session.can('timeTracking.read')) &&
               !session.offlineOnly)

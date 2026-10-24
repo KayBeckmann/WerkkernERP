@@ -79,6 +79,7 @@ abstract class BusinessRepository {
     String companyId, {
     String? userId,
     String? documentId,
+    String? projectId,
     DateTime? from,
     DateTime? to,
   });
@@ -86,4 +87,33 @@ abstract class BusinessRepository {
   Future<void> createTimeEntry(TimeEntry entry);
   Future<bool> updateTimeEntry(TimeEntry entry);
   Future<bool> deleteTimeEntry(String companyId, String id);
+
+  // ---- Projekte (C1 online) --------------------------------------------
+  Future<List<Project>> listProjects(String companyId, {bool includeArchived = false});
+  Future<Project?> findProject(String companyId, String id);
+
+  /// Vergibt atomar die nächste Projektnummer (PP) im Firmen-/Jahreskreis.
+  Future<Project> createProject({
+    required String id,
+    required String companyId,
+    required String name,
+    String? customerId,
+    required DateTime now,
+  });
+  Future<bool> updateProject(Project project);
+
+  /// Wirft [BusinessConflict], solange Dokumente/Zeiten zugeordnet sind
+  /// (archivieren statt löschen, wie offline).
+  Future<bool> deleteProject(String companyId, String id);
+  Future<List<Document>> listDocumentsForProject(String companyId, String projectId);
+
+  /// Projektzuordnung eines **Entwurfs** ändern (finalisierte Dokumente
+  /// behalten ihre Nummer samt PP — daher dort unveränderlich).
+  Future<Document?> setDocumentProject({
+    required String companyId,
+    required String id,
+    required int expectedVersion,
+    required String? projectId,
+    required DateTime now,
+  });
 }

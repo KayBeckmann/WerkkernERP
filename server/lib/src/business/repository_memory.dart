@@ -10,12 +10,90 @@ class InMemoryBusinessRepository implements BusinessRepository {
   final List<DocumentItem> _items = [];
   final Map<String, int> _sequences = {};
   final List<TimeEntry> _timeEntries = [];
+  final List<Project> _projects = [];
+
+  @override
+  Future<List<Project>> listProjects(String companyId, {bool includeArchived = false}) async =>
+      _projects.where((p) => p.companyId == companyId && (includeArchived || p.status == 'active')).toList()
+        ..sort((a, b) => b.foundingYear != a.foundingYear
+            ? b.foundingYear.compareTo(a.foundingYear)
+            : b.projectNumber.compareTo(a.projectNumber));
+
+  @override
+  Future<Project?> findProject(String companyId, String id) async =>
+      _projects.where((p) => p.companyId == companyId && p.id == id).firstOrNull;
+
+  @override
+  Future<Project> createProject({
+    required String id,
+    required String companyId,
+    required String name,
+    String? customerId,
+    required DateTime now,
+  }) async {
+    final key = '$companyId|project|${now.year}';
+    final number = (_sequences[key] ?? 0) + 1;
+    _sequences[key] = number;
+    final project = Project(
+      id: id,
+      companyId: companyId,
+      name: name,
+      customerId: customerId,
+      status: 'active',
+      foundingYear: now.year,
+      projectNumber: number,
+      createdAt: now,
+    );
+    _projects.add(project);
+    return project;
+  }
+
+  @override
+  Future<bool> updateProject(Project project) async {
+    final i = _projects.indexWhere((p) => p.companyId == project.companyId && p.id == project.id);
+    if (i == -1) return false;
+    _projects[i] = project;
+    return true;
+  }
+
+  @override
+  Future<bool> deleteProject(String companyId, String id) async {
+    if (await findProject(companyId, id) == null) return false;
+    if (_documents.any((d) => d.projectId == id) || _timeEntries.any((t) => t.projectId == id)) {
+      throw const BusinessConflict('Dem Projekt sind noch Dokumente oder Zeiten zugeordnet — archivieren statt löschen.');
+    }
+    _projects.removeWhere((p) => p.id == id);
+    return true;
+  }
+
+  @override
+  Future<List<Document>> listDocumentsForProject(String companyId, String projectId) async =>
+      _documents.where((d) => d.companyId == companyId && d.projectId == projectId).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  @override
+  Future<Document?> setDocumentProject({
+    required String companyId,
+    required String id,
+    required int expectedVersion,
+    required String? projectId,
+    required DateTime now,
+  }) async {
+    final index = _documents.indexWhere((d) => d.companyId == companyId && d.id == id);
+    if (index == -1) return null;
+    final existing = _documents[index];
+    _checkWritable(existing, expectedVersion);
+    final updated = existing.copyWith(projectId: () => projectId, updatedAt: now, version: existing.version + 1);
+    _documents[index] = updated;
+    return updated;
+  }
 
   @override
   Future<List<TimeEntry>> listTimeEntries(
     String companyId, {
     String? userId,
     String? documentId,
+    String? projectId,
     DateTime? from,
     DateTime? to,
   }) async =>
@@ -24,6 +102,7 @@ class InMemoryBusinessRepository implements BusinessRepository {
               t.companyId == companyId &&
               (userId == null || t.userId == userId) &&
               (documentId == null || t.documentId == documentId) &&
+              (projectId == null || t.projectId == projectId) &&
               (from == null || !t.workDate.isBefore(from)) &&
               (to == null || !t.workDate.isAfter(to)))
           .toList()
@@ -203,14 +282,25 @@ class InMemoryBusinessRepository implements BusinessRepository {
     _checkWritable(existing, expectedVersion);
     final customer = _customers.firstWhere((c) => c.companyId == companyId && c.id == existing.customerId);
 
-    final key = '$companyId|${existing.kind}|${now.year}';
+    // C2: projektbezogen -> JJ = Gründungsjahr des Projekts + PP; der
+    // Zähler bucht konsistent in genau diesem Jahr (wie offline).
+    final project = existing.projectId == null
+        ? null
+        : _projects.where((p) => p.id == existing.projectId).firstOrNull;
+    final year = project?.foundingYear ?? now.year;
+    final key = '$companyId|${existing.kind}|$year';
     final number = (_sequences[key] ?? 0) + 1;
     _sequences[key] = number;
 
     final finalized = existing.copyWith(
       status: 'finalized',
-      number: formatNumberWithPrefix(prefix: documentNumberPrefixes[existing.kind]!, year: now.year, number: number),
-      numberYear: now.year,
+      number: formatNumberWithPrefix(
+        prefix: documentNumberPrefixes[existing.kind]!,
+        year: year,
+        number: number,
+        projectNumber: project?.projectNumber,
+      ),
+      numberYear: year,
       customerSnapshotName: customer.name,
       customerSnapshotAddress: customer.address,
       customerSnapshotVatId: customer.vatId,

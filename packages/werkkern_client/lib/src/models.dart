@@ -159,6 +159,7 @@ class OnlineDocument {
     this.paymentStatus = 'open',
     this.paidAt,
     this.dueDate,
+    this.projectId,
     required this.version,
     this.items = const [],
     this.netCents,
@@ -199,6 +200,7 @@ class OnlineDocument {
       paymentStatus: j['paymentStatus'] as String? ?? 'open',
       paidAt: j['paidAt'] == null ? null : DateTime.parse(j['paidAt'] as String),
       dueDate: j['dueDate'] == null ? null : DateTime.parse(j['dueDate'] as String),
+      projectId: j['projectId'] as String?,
       version: j['version'] as int,
       items: [
         for (final i in (j['items'] as List? ?? const [])) OnlineDocumentItem.fromJson(i as Map<String, Object?>),
@@ -251,6 +253,9 @@ class OnlineDocument {
   final DateTime? dueDate;
 
   bool get isPaid => paymentStatus == 'paid';
+
+  /// Projektzuordnung (C1 online).
+  final String? projectId;
 
   /// Was angezeigt wird: bei finalisierten Dokumenten der eingefrorene
   /// Schnappschuss, bei Entwürfen der aktuelle Stammdatenname.
@@ -366,6 +371,7 @@ class OnlineTimeEntry {
     required this.userId,
     this.userEmail,
     this.documentId,
+    this.projectId,
     required this.date,
     required this.hours,
     this.note,
@@ -376,6 +382,7 @@ class OnlineTimeEntry {
         userId: j['userId'] as String,
         userEmail: j['userEmail'] as String?,
         documentId: j['documentId'] as String?,
+        projectId: j['projectId'] as String?,
         date: DateTime.parse(j['date'] as String),
         hours: j['hours'] as String,
         note: j['note'] as String?,
@@ -385,6 +392,7 @@ class OnlineTimeEntry {
   final String userId;
   final String? userEmail;
   final String? documentId;
+  final String? projectId;
   final DateTime date;
 
   /// Dezimal als Text ("1.5").
@@ -393,4 +401,62 @@ class OnlineTimeEntry {
 
   /// Beim Buchen eingefrorener Stundensatz des Mitglieds (`null` = nicht gepflegt).
   final int? hourlyCostCents;
+}
+
+/// Projekt (C1 online). [displayNumber] = "JJ/PP".
+class OnlineProject {
+  const OnlineProject({
+    required this.id,
+    required this.name,
+    this.customerId,
+    required this.status,
+    required this.displayNumber,
+  });
+  factory OnlineProject.fromJson(Map<String, Object?> j) => OnlineProject(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        customerId: j['customerId'] as String?,
+        status: j['status'] as String,
+        displayNumber: j['displayNumber'] as String,
+      );
+  final String id;
+  final String name;
+  final String? customerId;
+  final String status;
+  final String displayNumber;
+
+  bool get isArchived => status == 'archived';
+}
+
+/// Projektdetail mit Ergebnisrechnung; Teilsummen `null`, wenn dem
+/// Nutzer das jeweilige Leserecht fehlt.
+class OnlineProjectDetail {
+  const OnlineProjectDetail({
+    required this.project,
+    required this.documents,
+    this.invoiceGrossCents,
+    this.plannedHours,
+    this.bookedHours,
+    this.hoursCostCents,
+    this.resultCents,
+  });
+  factory OnlineProjectDetail.fromJson(Map<String, Object?> j) {
+    final r = j['result'] as Map<String, Object?>;
+    return OnlineProjectDetail(
+      project: OnlineProject.fromJson(j),
+      documents: [for (final d in j['documents'] as List) OnlineDocument.fromJson(d as Map<String, Object?>)],
+      invoiceGrossCents: r['invoiceGrossCents'] as int?,
+      plannedHours: r['plannedHours'] as String?,
+      bookedHours: r['bookedHours'] as String?,
+      hoursCostCents: r['hoursCostCents'] as int?,
+      resultCents: r['resultCents'] as int?,
+    );
+  }
+  final OnlineProject project;
+  final List<OnlineDocument> documents;
+  final int? invoiceGrossCents;
+  final String? plannedHours;
+  final String? bookedHours;
+  final int? hoursCostCents;
+  final int? resultCents;
 }
