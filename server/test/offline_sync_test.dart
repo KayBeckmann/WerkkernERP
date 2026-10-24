@@ -12,6 +12,8 @@ import 'package:werkkernerp_server/src/repository.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
+import 'support/starter_groups.dart';
+
 /// HTTP-Client, der sich auf Kommando wie ein Funkloch verhält:
 /// [offline] = keine Verbindung; [loseNextResponse] = Server bekommt
 /// und verarbeitet die Anfrage, die Antwort geht aber verloren.
@@ -53,6 +55,7 @@ void runOfflineSyncTests(Future<(PhaseBRepository, BusinessRepository)> Function
     await admin.register('chef@example.com', 'passwort-12345');
     companyId = await admin.createCompany((await admin.login('chef@example.com', 'passwort-12345')).identityToken, 'Firma');
     await admin.selectCompany((await admin.login('chef@example.com', 'passwort-12345')).identityToken, companyId);
+    await clearGroupPermissions(admin);
     adminAuth = {'authorization': 'Bearer ${admin.token}'};
     groupId = (await admin.groups()).firstWhere((g) => g.name == 'Monteur').id;
     for (final p in ['customers.read', 'invoices.read', 'invoices.write']) {

@@ -145,11 +145,13 @@ void main() {
     expect(catalog.firstWhere((p) => p.key == 'projects.read').module, 'projects');
     final groups = await admin.groups();
     expect(groups.map((g) => g.name), containsAll(['Projektleiter', 'Monteur', 'Buchhaltung']));
-    final monteur = groups.firstWhere((g) => g.name == 'Monteur');
+    expect(await admin.groupPermissions(groups.firstWhere((g) => g.name == 'Monteur').id),
+        contains('invoices.write'), reason: 'Startgruppen kommen mit Standardrechten');
+    // Eigene, leere Gruppe — damit die folgenden Rechte-Erwartungen exakt bleiben.
+    final monteur = await admin.createGroup('Lager');
+    expect((await admin.groups()).map((g) => g.id), contains(monteur.id));
     await admin.setGroupPermission(monteur.id, 'customers.read', granted: true);
     expect(await admin.groupPermissions(monteur.id), {'customers.read'});
-    final extra = await admin.createGroup('Lager');
-    expect((await admin.groups()).map((g) => g.id), contains(extra.id));
 
     // Einladung -> neues Konto über einen zweiten Client.
     final invitationToken = await admin.createInvitation('monteur@example.com', monteur.id);
@@ -159,7 +161,7 @@ void main() {
     expect(await admin.invitations(), isEmpty);
 
     final member = (await admin.members()).firstWhere((m) => m.email == 'monteur@example.com');
-    expect(member.groupName, 'Monteur');
+    expect(member.groupName, 'Lager');
     await admin.setMemberOverride(member.id, 'customers.read', false);
     await admin.setMemberOverride(member.id, 'invoices.read', true);
     expect(await admin.memberOverrides(member.id), {'customers.read': false, 'invoices.read': true});

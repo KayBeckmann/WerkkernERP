@@ -46,7 +46,7 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
   }
 
   /// Firma mit Admin, dessen eigene Gruppe die angegebenen Rechte hat
-  /// (Startgruppen haben bewusst keine vorbelegten Rechte).
+  /// — genau diese: die Standardrechte der Startgruppe werden vorher entzogen.
   Future<({Map<String, String> auth, String companyId, String groupId})> company(
     String email,
     String name, {
@@ -68,6 +68,12 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
     final auth = {'authorization': 'Bearer ${await select(email, companyId)}'};
     final me = jsonDecode((await http.get(baseUrl.resolve('/me'), headers: auth)).body) as Map<String, Object?>;
     final groupId = me['groupId'] as String;
+    final starter = jsonDecode((await http.get(baseUrl.resolve('/groups/$groupId/permissions'), headers: auth)).body)
+        as Map<String, Object?>;
+    for (final p in (starter['permissions'] as List).cast<String>()) {
+      final r = await http.put(baseUrl.resolve('/groups/$groupId/permissions/$p'), headers: auth, body: jsonEncode({'granted': false}));
+      expectStatus(r, 200);
+    }
     for (final p in permissions) {
       final r = await http.put(baseUrl.resolve('/groups/$groupId/permissions/$p'), headers: auth, body: jsonEncode({'granted': true}));
       expectStatus(r, 200);

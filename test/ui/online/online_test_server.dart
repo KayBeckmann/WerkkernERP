@@ -55,6 +55,11 @@ class OnlineTestServer {
     final token = (await _call('POST', '/auth/select-company', {'identityToken': await identity(), 'companyId': companyId}))['token'] as String;
     final response = await handler(shelf.Request('GET', Uri.parse('http://localhost/me'), headers: {'authorization': 'Bearer $token'}));
     final groupId = (jsonDecode(await response.readAsString()) as Map)['groupId'] as String;
+    // Startgruppen kommen mit Standardrechten — für exakte Testrechte leeren.
+    final existing = await _call('GET', '/groups/$groupId/permissions', const {}, token);
+    for (final p in (existing['permissions'] as List).cast<String>()) {
+      await _call('PUT', '/groups/$groupId/permissions/$p', {'granted': false}, token);
+    }
     for (final p in permissions) {
       await _call('PUT', '/groups/$groupId/permissions/$p', {'granted': true}, token);
     }

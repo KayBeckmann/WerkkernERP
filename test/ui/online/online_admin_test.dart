@@ -36,9 +36,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Neu'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('noch keine Rechte zugewiesen'), findsOneWidget);
+    // Startgruppe „Projektleiter“ bringt Standardrechte mit — sofort nutzbar.
+    expect(find.textContaining('noch keine Rechte zugewiesen'), findsNothing);
+    expect(find.text('Kunden'), findsOneWidget);
 
-    // Verwaltung: eigener Gruppe (Projektleiter) Kunden-Leserecht geben.
+    // Verwaltung: eigener Gruppe (Projektleiter) das Kunden-Leserecht entziehen.
     await tester.tap(find.byTooltip('Verwaltung'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gruppen & Rechte'));
@@ -62,11 +64,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('monteur@example.com'), findsOneWidget);
 
-    // Zurück: Kunden-Tab ist jetzt da (Rechte wurden neu geladen).
+    // Zurück: Kunden-Tab ist weg (Rechte wurden neu geladen).
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Elektro Neu · online'), findsOneWidget);
-    expect(find.textContaining('Keine Kunden'), findsOneWidget);
+    expect(find.text('Kunden'), findsNothing);
 
     // Eingeladene Person löst die Einladung in der App ein.
     await fillLogin(tester, server, 'monteur@example.com');
