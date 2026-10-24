@@ -290,8 +290,17 @@ class PostgresBusinessRepository implements BusinessRepository {
   }
 
   @override
-  Future<void> createDocument(Document d, List<DocumentItem> items) async {
+  Future<void> createDocument(Document d, List<DocumentItem> items, {int? expectedSourceVersion}) async {
     await _db.runTx((s) async {
+      if (expectedSourceVersion != null) {
+        final source = await s.execute(
+          Sql.named('SELECT version FROM documents WHERE company_id = @companyId AND id = @id FOR UPDATE'),
+          parameters: {'companyId': d.companyId, 'id': d.convertedFromId},
+        );
+        if (source.isEmpty || source.first[0] != expectedSourceVersion) {
+          throw const BusinessConflict('Quelle wurde zwischenzeitlich geändert — bitte neu laden.');
+        }
+      }
       await s.execute(
         Sql.named(
           'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
@@ -341,6 +350,29 @@ class PostgresBusinessRepository implements BusinessRepository {
     return row;
   }
 
+  /// Wie [_lockDraft], lässt aber zusätzlich ein finalisiertes
+  /// Angebot/Auftrag/Proforma ohne Umwandlung zu (`isDocumentEditable`).
+  /// Die Umwandlung sperrt dieselbe Zeile (siehe [createDocument]), daher
+  /// kann zwischen Prüfung und Schreiben keine Umwandlung entstehen.
+  Future<bool> _lockEditable(TxSession s, String companyId, String id, int expectedVersion) async {
+    final result = await s.execute(
+      Sql.named(
+        'SELECT status, version, kind, EXISTS (SELECT 1 FROM documents c WHERE c.company_id = @companyId '
+        'AND c.converted_from_id = @id) FROM documents WHERE company_id = @companyId AND id = @id FOR UPDATE',
+      ),
+      parameters: {'companyId': companyId, 'id': id},
+    );
+    if (result.isEmpty) return false;
+    final row = result.first;
+    if (!isDocumentEditable(kind: row[2] as String, isDraft: row[0] == 'draft', hasConversions: row[3] as bool)) {
+      throw const BusinessConflict('Dokument ist finalisiert und unveränderlich.');
+    }
+    if (row[1] != expectedVersion) {
+      throw BusinessConflict('Dokument wurde zwischenzeitlich geändert (Version ${row[1]}, erwartet $expectedVersion).');
+    }
+    return true;
+  }
+
   @override
   Future<Document?> updateDraft({
     required String companyId,
@@ -357,7 +389,7 @@ class PostgresBusinessRepository implements BusinessRepository {
     bool? isFixedPrice,
   }) async {
     final updated = await _db.runTx((s) async {
-      if (await _lockDraft(s, companyId, id, expectedVersion) == null) return false;
+      if (!await _lockEditable(s, companyId, id, expectedVersion)) return false;
       await s.execute(
         Sql.named(
           'UPDATE documents SET customer_id = @customerId, issue_date = @issueDate, service_date = @serviceDate, '

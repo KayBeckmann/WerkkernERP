@@ -42,8 +42,14 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   /// landet in der Outbox, serverpflichtige Aktionen sind gesperrt.
   bool _offlineView = false;
 
-  bool get _editable =>
-      (_document?.isDraft ?? false) && widget.session.can('invoices.write');
+  /// Entwurf, oder finalisiertes Angebot/Auftrag/Proforma ohne Umwandlung
+  /// (Server-Feld `editable`, Regel wie offline). Finalisierte nur online —
+  /// offline lassen sich ausschließlich Entwürfe bearbeiten (B2).
+  bool get _editable {
+    final document = _document;
+    if (document == null || !document.editable || !widget.session.can('invoices.write')) return false;
+    return document.isDraft || !_offlineView;
+  }
 
   bool get _pinned => _store?.isPinned(widget.documentId) ?? false;
   List<OutboxEntry> get _pending => _store?.pendingFor(widget.documentId) ?? const [];
@@ -582,7 +588,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                 icon: const Icon(Icons.picture_as_pdf_outlined),
                 onPressed: _busy ? null : _showPdf,
               ),
-            if (_editable && _serverActionsAllowed)
+            if (_editable && document!.isDraft && _serverActionsAllowed)
               IconButton(tooltip: 'Entwurf löschen', icon: const Icon(Icons.delete_outline), onPressed: _busy ? null : _delete),
           ],
         ),
@@ -652,7 +658,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             ),
           ),
         ),
-        if (!document.isDraft && _serverActionsAllowed) _buildFinalizedSection(document),
+        // Umwandeln erst mit gespeichertem Stand — sonst übernähme die
+        // Folgeurkunde nicht das, was auf dem Bildschirm steht.
+        if (!document.isDraft && _serverActionsAllowed && !_dirty) _buildFinalizedSection(document),
         const SizedBox(height: 8),
         Text('Positionen', style: Theme.of(context).textTheme.titleMedium),
         if (_items.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Noch keine Positionen.')),
@@ -752,8 +760,8 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   }
 
   Widget? _buildActions(OnlineDocument document) {
-    if (!document.isDraft) return null;
-    final canFinalize = widget.session.can('invoices.finalize');
+    if (!document.isDraft && !_editable) return null;
+    final canFinalize = document.isDraft && widget.session.can('invoices.finalize');
     if (!_editable && !canFinalize) return null;
     return SafeArea(
       child: Padding(

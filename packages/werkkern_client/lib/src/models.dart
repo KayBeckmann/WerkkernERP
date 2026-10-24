@@ -177,7 +177,8 @@ class OnlineDocument {
     this.grossCents,
     this.taxLines = const [],
     this.rawJson = const {},
-  });
+    bool? editable,
+  }) : editable = editable ?? status == 'draft';
 
   factory OnlineDocument.fromJson(Map<String, Object?> j) {
     final totals = j['totals'] as Map<String, Object?>?;
@@ -201,6 +202,7 @@ class OnlineDocument {
       convertedFromId: j['convertedFromId'] as String?,
       isAdvancePayment: j['isAdvancePayment'] as bool? ?? false,
       isFixedPrice: j['isFixedPrice'] as bool? ?? false,
+      editable: j['editable'] as bool?,
       convertedFromNumber: j['convertedFromNumber'] as String?,
       advancePayments: _summaries(j['advancePayments']),
       remainingCents: j['remainingCents'] as int?,
@@ -323,6 +325,11 @@ class OnlineDocument {
   final List<OnlineTaxLine> taxLines;
 
   bool get isDraft => status == 'draft';
+
+  /// Darf noch bearbeitet werden (Server-Regel `isDocumentEditable`):
+  /// Entwurf, oder finalisiertes Angebot/Auftrag/Proforma ohne
+  /// Umwandlung. Fehlt das Feld (ältere Antwort), gilt nur der Entwurf.
+  final bool editable;
 }
 
 // ---- Verwaltung (nur Firmen-Admin) -------------------------------------------

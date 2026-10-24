@@ -215,7 +215,13 @@ class InMemoryBusinessRepository implements BusinessRepository {
   }
 
   @override
-  Future<void> createDocument(Document document, List<DocumentItem> items) async {
+  Future<void> createDocument(Document document, List<DocumentItem> items, {int? expectedSourceVersion}) async {
+    if (expectedSourceVersion != null) {
+      final source = _documents.firstWhere((d) => d.companyId == document.companyId && d.id == document.convertedFromId);
+      if (source.version != expectedSourceVersion) {
+        throw const BusinessConflict('Quelle wurde zwischenzeitlich geändert — bitte neu laden.');
+      }
+    }
     _documents.add(document);
     _items.addAll(items);
   }
@@ -241,7 +247,7 @@ class InMemoryBusinessRepository implements BusinessRepository {
     final index = _documents.indexWhere((d) => d.companyId == companyId && d.id == id);
     if (index == -1) return null;
     final existing = _documents[index];
-    _checkWritable(existing, expectedVersion);
+    _checkEditable(existing, expectedVersion);
     final updated = existing.copyWith(
       customerId: customerId,
       issueDate: issueDate,
@@ -344,8 +350,20 @@ class InMemoryBusinessRepository implements BusinessRepository {
     return updated;
   }
 
+  void _checkEditable(Document existing, int expectedVersion) {
+    final hasConversions = _documents.any((d) => d.companyId == existing.companyId && d.convertedFromId == existing.id);
+    if (!isDocumentEditable(kind: existing.kind, isDraft: existing.isDraft, hasConversions: hasConversions)) {
+      throw const BusinessConflict('Dokument ist finalisiert und unveränderlich.');
+    }
+    _checkVersion(existing, expectedVersion);
+  }
+
   void _checkWritable(Document existing, int expectedVersion) {
     if (!existing.isDraft) throw const BusinessConflict('Dokument ist finalisiert und unveränderlich.');
+    _checkVersion(existing, expectedVersion);
+  }
+
+  void _checkVersion(Document existing, int expectedVersion) {
     if (existing.version != expectedVersion) {
       throw BusinessConflict(
         'Dokument wurde zwischenzeitlich geändert (Version ${existing.version}, erwartet $expectedVersion).',

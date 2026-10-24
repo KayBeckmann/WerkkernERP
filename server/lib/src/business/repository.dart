@@ -26,11 +26,18 @@ abstract class BusinessRepository {
   Future<List<Document>> listDocuments(String companyId, {String? kind, String? status, String? query});
   Future<Document?> findDocument(String companyId, String id);
   Future<List<DocumentItem>> itemsFor(String companyId, String documentId);
-  Future<void> createDocument(Document document, List<DocumentItem> items);
+  /// Legt ein Dokument an. Bei einer Umwandlung ([Document.convertedFromId])
+  /// mit [expectedSourceVersion] wird die Quelle gesperrt und ihre Version
+  /// geprüft ([BusinessConflict] bei Abweichung) — sonst könnte eine
+  /// gleichzeitige Bearbeitung der noch editierbaren Quelle (siehe
+  /// [updateDraft]) nach der Umwandlung durchrutschen.
+  Future<void> createDocument(Document document, List<DocumentItem> items, {int? expectedSourceVersion});
 
-  /// Ersetzt Kopf + alle Positionen eines **Entwurfs**. Wirft
-  /// [BusinessConflict] bei finalisiertem Dokument oder wenn
-  /// [expectedVersion] nicht mehr aktuell ist. Liefert die neue
+  /// Ersetzt Kopf + alle Positionen eines bearbeitbaren Dokuments
+  /// (Entwurf, oder finalisiertes Angebot/Auftrag/Proforma ohne
+  /// Umwandlung — siehe `isDocumentEditable`). Wirft [BusinessConflict]
+  /// bei nicht mehr bearbeitbarem Dokument oder wenn [expectedVersion]
+  /// nicht mehr aktuell ist. Liefert die neue
   /// Fassung, `null` wenn nicht gefunden.
   Future<Document?> updateDraft({
     required String companyId,
