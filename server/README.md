@@ -98,6 +98,33 @@ Ausnahme → Gruppenrecht.
 Advisory-Lock ausgeführt. Stufen werden nur angehängt, nie geändert —
 wie in der Offline-App.
 
+## Backup und Restore (B3)
+
+```bash
+# Backup (verschlüsselt mit dem ÖFFENTLICHEN Schlüssel des Betreibers)
+BACKUP_GPG_RECIPIENT=backup@example.org server/scripts/backup.sh /pfad/zu/backups
+
+# Restore-Test in einer Wegwerf-Instanz (privater Schlüssel nötig),
+# --compare-live vergleicht Zeilenzahlen mit der laufenden DB
+server/scripts/restore-test.sh /pfad/zu/backups/werkkernerp-server-<stamp>.dump.gpg --compare-live
+
+# Echte Wiederherstellung (ersetzt ALLE Mandanten, fragt nach Bestätigung)
+server/scripts/restore.sh /pfad/zu/backups/werkkernerp-server-<stamp>.dump.gpg
+```
+
+- `pg_dump -Fc` = transaktional konsistenter Snapshot; vor dem
+  Verschlüsseln per `pg_restore --list` geprüft, atomar geschrieben,
+  mit `.sha256`.
+- Der Server-Host kann Backups erzeugen, aber nicht lesen — der
+  private GPG-Schlüssel gehört offline (pass/KeePassXC).
+- `restore.sh` stoppt den Server, spielt in **einer** Transaktion ein
+  (Fehler → bisheriger Bestand bleibt), beendet danach alle Sitzungen.
+- **Offsite-Kopie** der `.gpg`-Dateien (z. B. per Cron + rsync) und
+  regelmäßiger `restore-test.sh`-Lauf sind Betreiberaufgabe.
+- Mandanten liegen in einer gemeinsamen Datenbank; ein Backup enthält
+  daher alle Firmen und ist reines Betreiberwerkzeug (kein Export für
+  einzelne Firmen — der wäre ein eigener, firmengebundener API-Pfad).
+
 ## Erstadmin-Recovery (Betreiber)
 
 Kein API-Endpunkt — nur mit direktem DB-Zugriff:
