@@ -42,6 +42,9 @@ class BusinessRoutes {
     router.put('/documents/<id>', _updateDocument);
     router.delete('/documents/<id>', _deleteDocument);
     router.post('/documents/<id>/finalize', _finalizeDocument);
+    router.post('/documents/<id>/convert', _convertDocument);
+    router.post('/documents/<id>/payment', _setPayment);
+    router.put('/documents/<id>/due-date', _setDueDate);
   }
 
   Future<Map<String, Object?>> _body(Request request) async {
@@ -283,9 +286,13 @@ class BusinessRoutes {
     // Schnappschuss); maßgeblich für finalisierte Dokumente bleibt
     // customerSnapshot.
     final customer = await business.findCustomer(companyId, document.customerId);
+    final convertedTo = await business.listConvertedFrom(companyId, document.id);
     return jsonOk({
       ...document.toJson(),
       'customerName': customer?.name,
+      'convertedTo': [
+        for (final d in convertedTo) {'id': d.id, 'kind': d.kind, 'number': d.number, 'status': d.status},
+      ],
       'items': [for (final i in items) i.toJson()],
       'totals': _totalsJson(_totals(items)),
     }, status: status);
@@ -503,6 +510,131 @@ class BusinessRoutes {
       if (finalized == null) return jsonError('Dokument nicht gefunden.', status: 404);
       await auth.audit(check.auth!, 'document.finalize', existing.kind, id);
       return await _documentResponse(companyId, finalized);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
+  }
+
+  /// Umwandlung (Angebot -> Auftrag -> Lieferschein/Rechnung, Proforma ->
+  /// Rechnung) nach derselben Tabelle wie offline (`werkkern_core`).
+  /// Erzeugt einen neuen **Entwurf** mit kopierten Positionen — nie
+  /// automatisch finalisiert. Lieferscheine übernehmen keine Stunden.
+  ///
+  /// **Bewusste Abweichung von offline:** dort bleibt ein finalisiertes
+  /// Angebot/Auftrag bis zur ersten Umwandlung editierbar (F3-
+  /// Verfeinerung). Online ist jedes finalisierte Dokument sofort
+  /// unveränderlich — bei mehreren Bearbeitern wäre ein nachträglich
+  /// geändertes, bereits verschicktes Angebot nicht nachvollziehbar.
+  Future<Response> _convertDocument(Request request, String id) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return jsonError('Nicht angemeldet.', status: 401);
+    final companyId = session.session.companyId;
+    final source = await business.findDocument(companyId, id);
+    if (source == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final body = await _body(request);
+    final targetKind = body['kind'] as String?;
+    if (targetKind == null || !documentKindModules.containsKey(targetKind)) {
+      return jsonError('kind (Zieldokumentart) ist Pflicht.');
+    }
+    // Recht + Modul für Quelle UND Ziel.
+    for (final kind in {source.kind, targetKind}) {
+      final check = await _requireDocumentPermission(request, 'invoices.write', kind);
+      if (check.error != null) return check.error!;
+    }
+    if (source.isDraft) return jsonError('Nur finalisierte Dokumente können umgewandelt werden.', status: 409);
+    if (!(documentConversionTargets[source.kind]?.contains(targetKind) ?? false)) {
+      return jsonError('Umwandlung von ${source.kind} nach $targetKind ist nicht erlaubt.', status: 409);
+    }
+
+    final now = DateTime.now().toUtc();
+    final newId = _uuid.v4();
+    final sourceItems = await business.itemsFor(companyId, id);
+    var sortOrder = 0;
+    final items = [
+      for (final item in sourceItems)
+        if (!(targetKind == 'deliveryNote' && item.kind == 'hours'))
+          DocumentItem(
+            id: _uuid.v4(),
+            documentId: newId,
+            kind: item.kind,
+            articleId: item.articleId,
+            description: item.description,
+            quantity: item.quantity,
+            unitPriceCents: item.unitPriceCents,
+            vatRatePercent: item.vatRatePercent,
+            unit: item.unit,
+            discountPercent: item.discountPercent,
+            groupLabel: item.groupLabel,
+            sortOrder: sortOrder++,
+          ),
+    ];
+    final draft = Document(
+      id: newId,
+      companyId: companyId,
+      customerId: source.customerId,
+      kind: targetKind,
+      status: 'draft',
+      issueDate: DateTime.utc(now.year, now.month, now.day),
+      serviceDate: source.serviceDate,
+      paymentTerms: source.paymentTerms,
+      notes: source.notes,
+      createdByUserId: session.session.userId,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      convertedFromId: source.id,
+    );
+    await business.createDocument(draft, items);
+    await auth.audit(session, 'document.convert', targetKind, newId);
+    return _documentResponse(companyId, draft, status: 201);
+  }
+
+  /// Zahlungseingang erfassen/zurücknehmen (`{"paid": true|false}`) —
+  /// eigenes Recht `invoices.payment`, nur für finalisierte Rechnungen.
+  /// Nie automatisch (kein Bankabgleich online).
+  Future<Response> _setPayment(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'invoices.payment');
+    if (check.error != null) return check.error!;
+    final companyId = check.auth!.session.companyId;
+    final existing = await business.findDocument(companyId, id);
+    if (existing == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    if (existing.kind != 'invoice') return jsonError('Zahlungsstatus gibt es nur für Rechnungen.', status: 409);
+    final paid = (await _body(request))['paid'];
+    if (paid is! bool) return jsonError('paid (bool) ist Pflicht.');
+    try {
+      final updated = await business.setPaymentInfo(
+        companyId: companyId,
+        id: id,
+        paymentStatus: paid ? 'paid' : 'open',
+        now: DateTime.now().toUtc(),
+      );
+      await auth.audit(check.auth!, paid ? 'document.paid' : 'document.unpaid', existing.kind, id);
+      return await _documentResponse(companyId, updated!);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
+  }
+
+  Future<Response> _setDueDate(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'invoices.payment');
+    if (check.error != null) return check.error!;
+    final companyId = check.auth!.session.companyId;
+    final existing = await business.findDocument(companyId, id);
+    if (existing == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final body = await _body(request);
+    if (!body.containsKey('dueDate')) return jsonError('dueDate (JJJJ-MM-TT oder null) ist Pflicht.');
+    final raw = body['dueDate'];
+    final dueDate = raw == null ? null : _parseDate(raw);
+    if (raw != null && dueDate == null) return jsonError('dueDate im Format JJJJ-MM-TT.');
+    try {
+      final updated = await business.setPaymentInfo(
+        companyId: companyId,
+        id: id,
+        dueDate: () => dueDate,
+        now: DateTime.now().toUtc(),
+      );
+      await auth.audit(check.auth!, 'document.dueDate', existing.kind, id);
+      return await _documentResponse(companyId, updated!);
     } on BusinessConflict catch (e) {
       return jsonError(e.message, status: 409);
     }

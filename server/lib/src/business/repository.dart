@@ -58,4 +58,19 @@ abstract class BusinessRepository {
     required CompanySnapshot company,
     required DateTime now,
   });
+
+  /// Dokumente, die per Umwandlung aus [sourceId] entstanden sind.
+  Future<List<Document>> listConvertedFrom(String companyId, String sourceId);
+
+  /// Zahlungsstatus (`open`/`paid`, setzt/löscht `paidAt`) und/oder
+  /// Fälligkeit eines **finalisierten** Dokuments; wirft
+  /// [BusinessConflict] bei einem Entwurf. `dueDate: () => null` löscht
+  /// die Fälligkeit, `dueDate: null` lässt sie unverändert.
+  Future<Document?> setPaymentInfo({
+    required String companyId,
+    required String id,
+    String? paymentStatus,
+    DateTime? Function()? dueDate,
+    required DateTime now,
+  });
 }

@@ -1,6 +1,7 @@
 import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
+import 'package:werkkern_core/werkkern_core.dart' show documentConversionTargets;
 
 import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
@@ -82,10 +83,11 @@ class StockWarning {
 /// Proforma-Rechnung ist in eine echte Rechnung umwandelbar — anders als
 /// Angebot/Auftrag ist sie aber selbst kein gültiges Umwandlungsziel
 /// (eine Rechnung wird nicht "zu einer Proforma zurückgewandelt").
-const allowedConversionTargets = <DocumentKind, Set<DocumentKind>>{
-  DocumentKind.quote: {DocumentKind.order, DocumentKind.deliveryNote, DocumentKind.invoice},
-  DocumentKind.order: {DocumentKind.deliveryNote, DocumentKind.invoice},
-  DocumentKind.proforma: {DocumentKind.invoice},
+// Seit Phase B aus `werkkern_core` abgeleitet — Server und App teilen
+// dieselbe Tabelle (`documentConversionTargets`).
+final allowedConversionTargets = <DocumentKind, Set<DocumentKind>>{
+  for (final entry in documentConversionTargets.entries)
+    DocumentKind.values.byName(entry.key): {for (final target in entry.value) DocumentKind.values.byName(target)},
 };
 
 /// Rechnungen als Entwurf (A2) — Finalisierung/Nummernvergabe kommt erst

@@ -48,7 +48,15 @@ void main() {
     await client.selectCompany(login.identityToken, companyId);
 
     final me = jsonDecode((await http.get(baseUrl.resolve('/me'), headers: {'authorization': 'Bearer ${client.token}'})).body) as Map;
-    for (final p in ['customers.read', 'customers.write', 'articles.read', 'invoices.read', 'invoices.write', 'invoices.finalize']) {
+    for (final p in [
+      'customers.read',
+      'customers.write',
+      'articles.read',
+      'invoices.read',
+      'invoices.write',
+      'invoices.finalize',
+      'invoices.payment',
+    ]) {
       await raw('PUT', '/groups/${me['groupId']}/permissions/$p', {'granted': true}, client.token);
     }
     return client;
@@ -94,6 +102,18 @@ void main() {
     expect(finalized.customerSnapshotName, 'Müller & Söhne');
     final listed = await client.documents(status: 'finalized');
     expect(listed.single.grossCents, finalized.grossCents);
+
+    final paid = await client.setPaid(finalized.id, paid: true);
+    expect(paid.isPaid, isTrue);
+    expect(paid.paidAt, isNotNull);
+    final due = await client.setDueDate(finalized.id, DateTime(2026, 11, 7));
+    expect(due.dueDate, DateTime(2026, 11, 7));
+    expect((await client.setDueDate(finalized.id, null)).dueDate, isNull);
+    await expectLater(
+      client.convertDocument(finalized.id, 'order'),
+      throwsA(isA<ApiException>()),
+      reason: 'Rechnung ist nie Quelle einer Umwandlung',
+    );
 
     await client.logout();
     expect(client.token, isNull);

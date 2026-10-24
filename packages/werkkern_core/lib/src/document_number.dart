@@ -25,3 +25,13 @@ const documentNumberPrefixes = <String, String>{
   'proforma': 'PF',
   'creditNote': 'G',
 };
+
+/// Erlaubte Umwandlungen (Quelle -> Ziele), Schlüssel = `DocumentKind`-
+/// Name. Gemeinsame Quelle für Offline-App und Server. Rechnung,
+/// Lieferschein und Gutschrift sind nie Quelle einer Umwandlung
+/// (Gutschriften entstehen über einen eigenen Weg aus der Rechnung).
+const documentConversionTargets = <String, Set<String>>{
+  'quote': {'order', 'deliveryNote', 'invoice'},
+  'order': {'deliveryNote', 'invoice'},
+  'proforma': {'invoice'},
+};

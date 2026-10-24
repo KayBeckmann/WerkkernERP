@@ -170,7 +170,8 @@ class PostgresBusinessRepository implements BusinessRepository {
       'd.id, d.company_id, d.customer_id, d.kind, d.status, d.number, d.number_year, d.issue_date, d.service_date, '
       'd.payment_terms, d.notes, d.customer_snapshot_name, d.customer_snapshot_address, d.customer_snapshot_vat_id, '
       'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version, '
-      'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban';
+      'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban, '
+      'd.converted_from_id, d.payment_status, d.paid_at, d.due_date';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -197,6 +198,10 @@ class PostgresBusinessRepository implements BusinessRepository {
         companySnapshotTaxNumber: r[21] as String?,
         companySnapshotVatId: r[22] as String?,
         companySnapshotIban: r[23] as String?,
+        convertedFromId: r[24] as String?,
+        paymentStatus: r[25] as String,
+        paidAt: r[26] as DateTime?,
+        dueDate: r[27] as DateTime?,
       );
 
   @override
@@ -282,8 +287,9 @@ class PostgresBusinessRepository implements BusinessRepository {
       await s.execute(
         Sql.named(
           'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
-          'notes, created_by_user_id, created_at, updated_at, version) VALUES (@id, @companyId, @customerId, @kind, '
-          '@status, @issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version)',
+          'notes, created_by_user_id, created_at, updated_at, version, converted_from_id) VALUES (@id, @companyId, '
+          '@customerId, @kind, @status, @issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, '
+          '@updatedAt, @version, @convertedFromId)',
         ),
         parameters: {
           'id': d.id,
@@ -299,6 +305,7 @@ class PostgresBusinessRepository implements BusinessRepository {
           'createdAt': d.createdAt,
           'updatedAt': d.updatedAt,
           'version': d.version,
+          'convertedFromId': d.convertedFromId,
         },
       );
       await _insertItems(s, items);
@@ -425,5 +432,45 @@ class PostgresBusinessRepository implements BusinessRepository {
       return true;
     });
     return finalized ? findDocument(companyId, id) : null;
+  }
+
+  @override
+  Future<List<Document>> listConvertedFrom(String companyId, String sourceId) async {
+    final result = await _q(
+      'SELECT $_documentColumns FROM documents d WHERE d.company_id = @companyId AND d.converted_from_id = @sourceId '
+      'ORDER BY d.created_at',
+      {'companyId': companyId, 'sourceId': sourceId},
+    );
+    return [for (final r in result) _toDocument(r)];
+  }
+
+  @override
+  Future<Document?> setPaymentInfo({
+    required String companyId,
+    required String id,
+    String? paymentStatus,
+    DateTime? Function()? dueDate,
+    required DateTime now,
+  }) async {
+    final existing = await findDocument(companyId, id);
+    if (existing == null) return null;
+    if (existing.isDraft) throw const BusinessConflict('Zahlungsangaben gibt es erst für finalisierte Dokumente.');
+    final newDue = dueDate != null ? dueDate() : existing.dueDate;
+    final newStatus = paymentStatus ?? existing.paymentStatus;
+    final newPaidAt = paymentStatus == null ? existing.paidAt : (paymentStatus == 'paid' ? now : null);
+    // Status in der WHERE-Klausel: nur finalisierte Dokumente.
+    await _q(
+      'UPDATE documents SET payment_status = @status, paid_at = @paidAt, due_date = @due, updated_at = @now, '
+      "version = version + 1 WHERE company_id = @companyId AND id = @id AND status = 'finalized'",
+      {
+        'status': newStatus,
+        'paidAt': newPaidAt,
+        'due': TypedValue(Type.date, newDue),
+        'now': now,
+        'companyId': companyId,
+        'id': id,
+      },
+    );
+    return findDocument(companyId, id);
   }
 }
