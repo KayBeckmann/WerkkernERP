@@ -12,6 +12,10 @@ import 'util/tokens.dart';
 /// sofort, nicht erst nach Ablauf der Sitzung (Abnahme B).
 typedef AuthContext = ({CompanySession session, Membership membership});
 
+/// Präfix der Agent-Token — unterscheidet sie ohne DB-Zugriff von
+/// App-Sitzungstoken.
+const agentTokenPrefix = 'wka_';
+
 /// Gemeinsame Sitzungs-/Rechteprüfung für alle Router (B1 Punkt 3:
 /// "Jede API-... Aktion serverseitig auf Firma, Mitgliedschaft,
 /// Funktion und wirksames Recht prüfen").
@@ -28,6 +32,7 @@ class SessionAuthenticator {
   Future<AuthContext?> requireSession(Request request) async {
     final token = bearerToken(request);
     if (token == null) return null;
+    if (token.startsWith(agentTokenPrefix)) return _agentSession(token);
     final session = await repository.findSession(Tokens.hashOf(token));
     if (session == null) return null;
     if (session.isExpired(DateTime.now().toUtc())) {
@@ -39,9 +44,44 @@ class SessionAuthenticator {
     return (session: session, membership: membership);
   }
 
+  /// C8: Agent-Token wirkt nur bei aktiver Mitgliedschaft UND
+  /// aktiviertem Firmenmodul `aiAgents`; beides wird bei jedem Aufruf
+  /// neu geprüft (Entzug wirkt sofort).
+  Future<AuthContext?> _agentSession(String token) async {
+    final agent = await repository.findAgentTokenByHash(Tokens.hashOf(token));
+    if (agent == null) return null;
+    final membership = await repository.findMembershipById(agent.membershipId);
+    if (membership == null || !membership.active) return null;
+    final company = await repository.findCompanyById(agent.companyId);
+    if (company == null || !company.enabledModules.contains('aiAgents')) return null;
+    final now = DateTime.now().toUtc();
+    await repository.touchAgentToken(agent.id, now);
+    return (
+      session: CompanySession(
+        tokenHash: agent.tokenHash,
+        membershipId: agent.membershipId,
+        userId: agent.userId,
+        companyId: agent.companyId,
+        createdAt: agent.createdAt,
+        expiresAt: now.add(const Duration(minutes: 1)),
+        isAgent: true,
+      ),
+      membership: membership,
+    );
+  }
+
+  /// Admin-Funktionen sind über ein Agent-Token nie erreichbar.
   Future<AuthContext?> requireAdmin(Request request) async {
     final auth = await requireSession(request);
-    if (auth == null || !auth.membership.isAdmin) return null;
+    if (auth == null || !auth.membership.isAdmin || auth.session.isAgent) return null;
+    return auth;
+  }
+
+  /// Nur eine echte App-Sitzung (kein Agent-Token) — z. B. zum
+  /// Bestätigen von Freigaben oder Verwalten von Agent-Token.
+  Future<AuthContext?> requireHumanSession(Request request) async {
+    final auth = await requireSession(request);
+    if (auth == null || auth.session.isAgent) return null;
     return auth;
   }
 
@@ -87,7 +127,8 @@ class SessionAuthenticator {
       repository.recordAudit(AuditEntry(
         companyId: auth.session.companyId,
         userId: auth.session.userId,
-        action: action,
+        // Agent-Aktionen bleiben im Protokoll klar erkennbar (C8 Audit).
+        action: auth.session.isAgent ? '$action [agent]' : action,
         entityType: entityType,
         entityId: entityId,
         at: DateTime.now().toUtc(),

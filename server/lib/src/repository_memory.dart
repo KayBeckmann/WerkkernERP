@@ -14,6 +14,85 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
   final Map<String, CompanyProfile> _profiles = {};
   final List<AuditEntry> _audit = [];
   final Map<String, StoredResponse> _idempotent = {};
+  final List<AgentToken> _agentTokens = [];
+  final List<PendingApproval> _approvals = [];
+
+  @override
+  Future<void> createAgentToken(AgentToken token) async => _agentTokens.add(token);
+
+  @override
+  Future<AgentToken?> findAgentTokenByHash(String tokenHash) async =>
+      _agentTokens.where((t) => t.tokenHash == tokenHash).firstOrNull;
+
+  @override
+  Future<List<AgentToken>> listAgentTokens({required String companyId, required String userId}) async =>
+      _agentTokens.where((t) => t.companyId == companyId && t.userId == userId).toList();
+
+  @override
+  Future<bool> revokeAgentToken({required String companyId, required String userId, required String id}) async {
+    final before = _agentTokens.length;
+    _agentTokens.removeWhere((t) => t.id == id && t.companyId == companyId && t.userId == userId);
+    return _agentTokens.length < before;
+  }
+
+  @override
+  Future<void> touchAgentToken(String id, DateTime at) async {
+    final i = _agentTokens.indexWhere((t) => t.id == id);
+    if (i == -1) return;
+    final t = _agentTokens[i];
+    _agentTokens[i] = AgentToken(
+      id: t.id,
+      tokenHash: t.tokenHash,
+      membershipId: t.membershipId,
+      userId: t.userId,
+      companyId: t.companyId,
+      label: t.label,
+      createdAt: t.createdAt,
+      lastUsedAt: at,
+    );
+  }
+
+  @override
+  Future<void> createApproval(PendingApproval approval) async => _approvals.add(approval);
+
+  @override
+  Future<PendingApproval?> findApproval({required String companyId, required String userId, required String id}) async =>
+      _approvals.where((a) => a.id == id && a.companyId == companyId && a.userId == userId).firstOrNull;
+
+  @override
+  Future<List<PendingApproval>> listApprovals({required String companyId, required String userId, String? status}) async =>
+      _approvals.where((a) => a.companyId == companyId && a.userId == userId && (status == null || a.status == status)).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+  @override
+  Future<bool> decideApproval({
+    required String id,
+    required String status,
+    required DateTime at,
+    int? resultStatus,
+    String? resultBody,
+    String fromStatus = 'pending',
+  }) async {
+    final i = _approvals.indexWhere((a) => a.id == id);
+    if (i == -1 || _approvals[i].status != fromStatus) return false;
+    final a = _approvals[i];
+    _approvals[i] = PendingApproval(
+      id: a.id,
+      companyId: a.companyId,
+      userId: a.userId,
+      agentTokenId: a.agentTokenId,
+      method: a.method,
+      path: a.path,
+      body: a.body,
+      summary: a.summary,
+      status: status,
+      createdAt: a.createdAt,
+      decidedAt: at,
+      resultStatus: resultStatus,
+      resultBody: resultBody,
+    );
+    return true;
+  }
 
   @override
   Future<StoredResponse?> findIdempotentResponse({

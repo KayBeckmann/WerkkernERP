@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../auth.dart';
+import '../models.dart' show PendingApproval;
 import '../repository.dart';
 import '../util/responses.dart';
 import 'models.dart';
@@ -467,6 +468,15 @@ class BusinessRoutes {
     if (existing == null) return jsonError('Dokument nicht gefunden.', status: 404);
     final check = await _requireDocumentPermission(request, 'invoices.write', existing.kind);
     if (check.error != null) return check.error!;
+    if (check.auth!.session.isAgent) {
+      return _requestApproval(
+        check.auth!,
+        method: 'DELETE',
+        path: '/documents/$id',
+        body: const {},
+        summary: '${await _documentSummary(session.session.companyId, existing)} (Entwurf) löschen',
+      );
+    }
     try {
       await business.deleteDraft(session.session.companyId, id);
       await auth.audit(check.auth!, 'document.delete', existing.kind, id);
@@ -474,6 +484,54 @@ class BusinessRoutes {
     } on BusinessConflict catch (e) {
       return jsonError(e.message, status: 409);
     }
+  }
+
+  static const _kindLabels = {
+    'invoice': 'Rechnung',
+    'quote': 'Angebot',
+    'order': 'Auftrag',
+    'deliveryNote': 'Lieferschein',
+    'proforma': 'Proforma-Rechnung',
+    'creditNote': 'Gutschrift',
+  };
+
+  /// C8: irreversible Aktion eines Agenten -> nur Freigabe-Anfrage
+  /// (202). Ausgeführt wird erst, wenn der Nutzer sie in der App
+  /// bestätigt — dann mit SEINER Sitzung und erneuter Rechteprüfung.
+  Future<Response> _requestApproval(
+    AuthContext ctx, {
+    required String method,
+    required String path,
+    required Map<String, Object?> body,
+    required String summary,
+  }) async {
+    final agent = await repository.findAgentTokenByHash(ctx.session.tokenHash);
+    final approval = PendingApproval(
+      id: _uuid.v4(),
+      companyId: ctx.session.companyId,
+      userId: ctx.session.userId,
+      agentTokenId: agent?.id ?? '',
+      method: method,
+      path: path,
+      body: jsonEncode(body),
+      summary: summary,
+      status: 'pending',
+      createdAt: DateTime.now().toUtc(),
+    );
+    await repository.createApproval(approval);
+    await auth.audit(ctx, 'approval.request', 'approval', approval.id);
+    return jsonOk({
+      'approvalId': approval.id,
+      'status': 'pending',
+      'summary': summary,
+      'message': 'Irreversible Aktion: wartet auf Bestätigung durch den Nutzer in der App.',
+    }, status: 202);
+  }
+
+  Future<String> _documentSummary(String companyId, Document d) async {
+    final customer = await business.findCustomer(companyId, d.customerId);
+    final gross = _totals(await business.itemsFor(companyId, d.id)).totalGross;
+    return '${_kindLabels[d.kind] ?? d.kind} für ${customer?.name ?? 'unbekannten Kunden'} über $gross';
   }
 
   Future<Response> _finalizeDocument(Request request, String id) async {
@@ -490,6 +548,16 @@ class BusinessRoutes {
     if (version is! int) return jsonError('version (Ganzzahl) ist Pflicht — bestätigt den geprüften Stand.');
     if ((await business.itemsFor(companyId, id)).isEmpty) {
       return jsonError('Ein Dokument ohne Positionen kann nicht finalisiert werden.');
+    }
+    if (!existing.isDraft) return jsonError('Dokument ist finalisiert und unveränderlich.', status: 409);
+    if (check.auth!.session.isAgent) {
+      return _requestApproval(
+        check.auth!,
+        method: 'POST',
+        path: '/documents/$id/finalize',
+        body: body,
+        summary: '${await _documentSummary(companyId, existing)} finalisieren (Version $version)',
+      );
     }
     final company = await repository.findCompanyById(companyId);
     final profile = await repository.getCompanyProfile(companyId);

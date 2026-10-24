@@ -40,6 +40,10 @@ class PhaseBRouter {
   /// mitsendet (keine Cookies, kein CSRF-Risiko).
   final Set<String> corsAllowedOrigins;
 
+  /// Router ohne CORS/Idempotenz-Hülle — für die Ausführung bestätigter
+  /// Freigaben (C8) mit der Sitzung des bestätigenden Nutzers.
+  late final Handler _innerHandler;
+
   final PhaseBRepository repository;
 
   /// Fachdaten (B1 Punkt 3) — optional, damit reine Mitgliedschafts-
@@ -67,6 +71,7 @@ class PhaseBRouter {
       }
     }
 
+    _innerHandler = handle;
     final idempotent = _withIdempotency(handle);
     return (Request request) async {
       final origin = request.headers['origin'];
@@ -184,6 +189,13 @@ class PhaseBRouter {
     router.post('/invitations', _createInvitation);
     router.get('/invitations', _listInvitations);
     router.delete('/invitations/<id>', _revokeInvitation);
+
+    router.post('/agent-tokens', _createAgentToken);
+    router.get('/agent-tokens', _listAgentTokens);
+    router.delete('/agent-tokens/<id>', _revokeAgentToken);
+    router.get('/approvals', _listApprovals);
+    router.post('/approvals/<id>/confirm', _confirmApproval);
+    router.post('/approvals/<id>/reject', _rejectApproval);
 
     router.get('/permissions/catalog', _permissionCatalog);
     router.get('/permissions/effective', _effectivePermission);
@@ -613,6 +625,126 @@ class PhaseBRouter {
     await repository.setCompanyModules(companyId: auth.session.companyId, enabledModules: modules);
     await _auth.audit(auth, 'company.modules', 'company', auth.session.companyId);
     return jsonOk({'modules': modules.toList()..sort()});
+  }
+
+  // ---- Agent-Token und Freigaben (C8) ---------------------------------------------
+
+  /// Eigenes Token für einen LLM-Agenten (MCP/API) — nur aus einer echten
+  /// App-Sitzung, nur bei aktiviertem Modul `aiAgents`. Der Agent hat
+  /// genau die wirksamen Rechte dieses Nutzers, aber nie Admin-Funktionen.
+  Future<Response> _createAgentToken(Request request) async {
+    final auth = await _auth.requireHumanSession(request);
+    if (auth == null) return jsonError('Nur aus einer angemeldeten App-Sitzung möglich.', status: 403);
+    final company = await repository.findCompanyById(auth.session.companyId);
+    if (company == null || !company.enabledModules.contains('aiAgents')) {
+      return jsonError('Modul "aiAgents" ist für diese Firma nicht aktiviert.', status: 403);
+    }
+    final label = ((await _bodyJson(request))['label'] as String?)?.trim();
+    if (label == null || label.isEmpty) return jsonError('label ist Pflicht (z. B. "Claude Desktop").');
+    final raw = '$agentTokenPrefix${Tokens.generate()}';
+    final token = AgentToken(
+      id: _uuid.v4(),
+      tokenHash: Tokens.hashOf(raw),
+      membershipId: auth.membership.id,
+      userId: auth.session.userId,
+      companyId: auth.session.companyId,
+      label: label,
+      createdAt: DateTime.now().toUtc(),
+    );
+    await repository.createAgentToken(token);
+    await _auth.audit(auth, 'agentToken.create', 'agentToken', token.id);
+    return jsonOk({'id': token.id, 'label': label, 'token': raw}, status: 201);
+  }
+
+  Future<Response> _listAgentTokens(Request request) async {
+    final auth = await _auth.requireHumanSession(request);
+    if (auth == null) return jsonError('Nur aus einer angemeldeten App-Sitzung möglich.', status: 403);
+    final tokens = await repository.listAgentTokens(companyId: auth.session.companyId, userId: auth.session.userId);
+    return jsonOk({
+      'tokens': [
+        for (final t in tokens)
+          {
+            'id': t.id,
+            'label': t.label,
+            'createdAt': t.createdAt.toIso8601String(),
+            'lastUsedAt': t.lastUsedAt?.toIso8601String(),
+          },
+      ],
+    });
+  }
+
+  Future<Response> _revokeAgentToken(Request request, String id) async {
+    final auth = await _auth.requireHumanSession(request);
+    if (auth == null) return jsonError('Nur aus einer angemeldeten App-Sitzung möglich.', status: 403);
+    final revoked = await repository.revokeAgentToken(companyId: auth.session.companyId, userId: auth.session.userId, id: id);
+    if (!revoked) return jsonError('Token nicht gefunden.', status: 404);
+    await _auth.audit(auth, 'agentToken.revoke', 'agentToken', id);
+    return Response(204);
+  }
+
+  Map<String, Object?> _approvalJson(PendingApproval a) => {
+        'id': a.id,
+        'summary': a.summary,
+        'status': a.status,
+        'createdAt': a.createdAt.toIso8601String(),
+        'decidedAt': a.decidedAt?.toIso8601String(),
+        'resultStatus': a.resultStatus,
+      };
+
+  /// Eigene Freigabe-Anfragen — auch für das Agent-Token lesbar, damit
+  /// der Agent den Stand abfragen kann (bestätigen kann er nie).
+  Future<Response> _listApprovals(Request request) async {
+    final auth = await _requireSession(request);
+    if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
+    final approvals = await repository.listApprovals(
+      companyId: auth.session.companyId,
+      userId: auth.session.userId,
+      status: request.url.queryParameters['status'],
+    );
+    return jsonOk({'approvals': [for (final a in approvals) _approvalJson(a)]});
+  }
+
+  /// Führt die angefragte Aktion mit der Sitzung des Nutzers aus — Recht,
+  /// Modul, Version usw. werden dabei vollständig neu geprüft. Eine
+  /// Freigabe wirkt höchstens einmal (atomarer Statuswechsel).
+  Future<Response> _confirmApproval(Request request, String id) async {
+    final auth = await _auth.requireHumanSession(request);
+    if (auth == null) return jsonError('Freigaben bestätigt nur der Nutzer selbst in der App.', status: 403);
+    final approval = await repository.findApproval(companyId: auth.session.companyId, userId: auth.session.userId, id: id);
+    if (approval == null) return jsonError('Freigabe nicht gefunden.', status: 404);
+    final now = DateTime.now().toUtc();
+    if (!await repository.decideApproval(id: id, status: 'executing', at: now)) {
+      return jsonError('Freigabe wurde bereits entschieden.', status: 409);
+    }
+    final response = await _innerHandler(Request(
+      approval.method,
+      request.requestedUri.replace(path: approval.path, query: ''),
+      body: approval.body,
+      headers: {'authorization': request.headers['authorization']!},
+    ));
+    final body = await response.readAsString();
+    await repository.decideApproval(
+      id: id,
+      status: 'confirmed',
+      at: now,
+      resultStatus: response.statusCode,
+      resultBody: body,
+      fromStatus: 'executing',
+    );
+    await _auth.audit(auth, 'approval.confirm', 'approval', id);
+    return Response(response.statusCode, body: body, headers: {'content-type': 'application/json; charset=utf-8'});
+  }
+
+  Future<Response> _rejectApproval(Request request, String id) async {
+    final auth = await _auth.requireHumanSession(request);
+    if (auth == null) return jsonError('Freigaben entscheidet nur der Nutzer selbst in der App.', status: 403);
+    final approval = await repository.findApproval(companyId: auth.session.companyId, userId: auth.session.userId, id: id);
+    if (approval == null) return jsonError('Freigabe nicht gefunden.', status: 404);
+    if (!await repository.decideApproval(id: id, status: 'rejected', at: DateTime.now().toUtc())) {
+      return jsonError('Freigabe wurde bereits entschieden.', status: 409);
+    }
+    await _auth.audit(auth, 'approval.reject', 'approval', id);
+    return Response(204);
   }
 
   // ---- Firmen-Stammdaten / Audit ------------------------------------------------
