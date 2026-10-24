@@ -21,13 +21,37 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
   late Future<List<OnlineDocument>> _future;
   String _query = '';
 
+  /// Server nicht erreichbar -> Liste zeigt nur den Offline-Bestand.
+  bool _showingOffline = false;
+
   @override
   void initState() {
     super.initState();
     _future = _load();
   }
 
-  Future<List<OnlineDocument>> _load() => widget.session.client.documents(query: _query);
+  Future<List<OnlineDocument>> _load() async {
+    final offline = widget.session.offline;
+    if (widget.session.offlineOnly && offline != null) return _offlineDocuments(offline);
+    try {
+      final documents = await widget.session.client.documents(query: _query);
+      _showingOffline = false;
+      return documents;
+    } on ApiUnreachable {
+      if (offline == null || offline.isEmpty) rethrow;
+      return _offlineDocuments(offline);
+    }
+  }
+
+  List<OnlineDocument> _offlineDocuments(OfflineStore offline) {
+    _showingOffline = true;
+    final q = _query.toLowerCase();
+    return [
+      for (final d in offline.documents)
+        if (q.isEmpty || (d.number ?? '').toLowerCase().contains(q) || (d.displayCustomerName ?? '').toLowerCase().contains(q))
+          d,
+    ];
+  }
 
   void _reload() => setState(() {
         _future = _load();
@@ -94,8 +118,13 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final documents = snapshot.data!;
-                if (documents.isEmpty) return const Center(child: Text('Keine Dokumente gefunden.'));
-                return RefreshIndicator(
+                final offline = widget.session.offline;
+                if (documents.isEmpty) {
+                  return Center(
+                    child: Text(_showingOffline ? 'Keine offline verfügbaren Dokumente.' : 'Keine Dokumente gefunden.'),
+                  );
+                }
+                final list = RefreshIndicator(
                   onRefresh: () async => _reload(),
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
@@ -104,9 +133,18 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
                     itemBuilder: (context, index) {
                       final d = documents[index];
                       final label = onlineDocumentKindLabels[d.kind] ?? d.kind;
+                      final pending = offline?.pendingFor(d.id).length ?? 0;
                       return Card(
                         child: ListTile(
-                          leading: Icon(d.isDraft ? Icons.edit_note : Icons.lock_outline),
+                          leading: Icon(
+                            pending > 0
+                                ? Icons.sync_problem_outlined
+                                : offline?.isPinned(d.id) ?? false
+                                    ? Icons.offline_pin_outlined
+                                    : d.isDraft
+                                        ? Icons.edit_note
+                                        : Icons.lock_outline,
+                          ),
                           title: Text(d.number ?? '$label (Entwurf)'),
                           subtitle: Text(
                             [label, ?d.displayCustomerName, dateFormat.format(d.issueDate)].join(' · '),
@@ -118,12 +156,24 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
                     },
                   ),
                 );
+                if (!_showingOffline || widget.session.offlineOnly) return list;
+                return Column(
+                  children: [
+                    const ListTile(
+                      leading: Icon(Icons.cloud_off_outlined),
+                      title: Text('Server nicht erreichbar — angezeigt werden nur offline verfügbare Dokumente.'),
+                    ),
+                    Expanded(child: list),
+                  ],
+                );
               },
             ),
           ),
         ],
       ),
-      floatingActionButton: widget.session.can('invoices.write') && widget.session.can('customers.read')
+      floatingActionButton: !widget.session.offlineOnly &&
+              widget.session.can('invoices.write') &&
+              widget.session.can('customers.read')
           ? FloatingActionButton.extended(
               heroTag: 'online-documents-fab',
               onPressed: _create,

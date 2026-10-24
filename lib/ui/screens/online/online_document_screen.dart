@@ -31,8 +31,21 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   String? _error;
 
   WerkkernApiClient get _client => widget.session.client;
+  OfflineStore? get _store => widget.session.offline;
+
+  /// Aus dem Offline-Bestand geladen (keine Verbindung) — Speichern
+  /// landet in der Outbox, serverpflichtige Aktionen sind gesperrt.
+  bool _offlineView = false;
+
   bool get _editable =>
       (_document?.isDraft ?? false) && widget.session.can('invoices.write');
+
+  bool get _pinned => _store?.isPinned(widget.documentId) ?? false;
+  List<OutboxEntry> get _pending => _store?.pendingFor(widget.documentId) ?? const [];
+
+  /// Finalisieren/Umwandeln/Zahlung/Löschen brauchen den Server und einen
+  /// abgeglichenen Stand.
+  bool get _serverActionsAllowed => !_offlineView && _pending.isEmpty;
 
   @override
   void initState() {
@@ -52,14 +65,111 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       _error = null;
     });
     try {
-      final document = await _client.document(widget.documentId);
+      if (widget.session.offlineOnly) {
+        _loadFromStore();
+        return;
+      }
+      final json = await _client.documentJson(widget.documentId);
+      final store = _store;
+      // Markierte Kopie aktuell halten — aber nie über noch nicht
+      // übertragene Offline-Änderungen hinweg.
+      if (store != null && store.isPinned(widget.documentId) && _pending.isEmpty) {
+        await store.pin(json, store.customer(json['customerId'] as String));
+      }
       if (!mounted) return;
-      setState(() => _apply(document));
+      setState(() {
+        _offlineView = false;
+        _apply(OnlineDocument.fromJson(json));
+      });
+    } on ApiUnreachable catch (e) {
+      if (_pinned) {
+        _loadFromStore();
+      } else if (mounted) {
+        setState(() => _error = describeOnlineError(e));
+      }
     } on Exception catch (e) {
       if (mounted) setState(() => _error = describeOnlineError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _loadFromStore() {
+    final cached = _store?.document(widget.documentId);
+    setState(() {
+      if (cached == null) {
+        _error = 'Dieses Dokument ist nicht offline verfügbar.';
+      } else {
+        _offlineView = true;
+        _apply(cached);
+      }
+    });
+  }
+
+  Future<void> _togglePinned() async {
+    final store = _store!;
+    final document = _document!;
+    try {
+      if (store.isPinned(document.id)) {
+        await store.unpin(document.id);
+        _snack('Nicht mehr offline verfügbar — vom Gerät entfernt.');
+      } else {
+        OnlineCustomer? customer;
+        if (widget.session.can('customers.read')) {
+          customer = (await _client.customers()).where((c) => c.id == document.customerId).firstOrNull;
+        }
+        await store.pin(await _client.documentJson(document.id), customer);
+        _snack('Offline verfügbar — verschlüsselt auf diesem Gerät.');
+      }
+      widget.session.offlineChanged();
+      if (mounted) setState(() {});
+    } on StateError catch (e) {
+      _snack(e.message);
+    } on Exception catch (e) {
+      _snack(describeOnlineError(e));
+    }
+  }
+
+  /// Änderung in die Outbox (offline). [sentOpId]/[sentVersion]: online
+  /// bereits gesendet, Antwort verloren — unter derselben ID nachreichen.
+  Future<void> _saveOffline({String? sentOpId, int? sentVersion}) async {
+    final notes = _notes.text.trim().isEmpty ? null : _notes.text.trim();
+    await _store!.enqueueUpdate(
+      widget.documentId,
+      items: _items,
+      notes: notes,
+      sentOpId: sentOpId,
+      sentVersion: sentVersion,
+    );
+    widget.session.offlineChanged();
+    if (!mounted) return;
+    setState(() {
+      _offlineView = sentOpId == null ? _offlineView : true;
+      _dirty = false;
+    });
+    _snack('Offline gespeichert — wird beim nächsten Abgleich übertragen.');
+  }
+
+  Future<void> _discardPending(OutboxEntry entry) async {
+    await _store!.discard(entry.opId);
+    widget.session.offlineChanged();
+    if (widget.session.offlineOnly) {
+      _snack('Änderung verworfen. Der Serverstand wird beim nächsten Abgleich geladen.');
+      if (mounted) setState(() {});
+    } else {
+      await _reload();
+    }
+  }
+
+  Future<void> _syncNow() async {
+    setState(() => _busy = true);
+    try {
+      final result = await widget.session.sync();
+      if (mounted) _snack(describeSyncResult(result));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    await _reload();
   }
 
   void _apply(OnlineDocument document) {
@@ -69,7 +179,10 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     _dirty = false;
   }
 
-  void _snack(String message) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  /// Neue Statusmeldung ersetzt eine noch sichtbare/wartende ältere.
+  void _snack(String message) => ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(SnackBar(content: Text(message)));
 
   /// 409 -> Nutzer entscheidet ausdrücklich; nichts wird überschrieben.
   Future<void> _handleConflict(ApiException e) async {
@@ -90,14 +203,29 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     if (reload == true) await _reload();
   }
 
-  Future<void> _run(Future<OnlineDocument> Function() action, String success) async {
+  Future<void> _run(
+    Future<OnlineDocument> Function() action,
+    String success, {
+    bool rethrowUnreachable = false,
+  }) async {
     setState(() => _busy = true);
     Object? failure;
     try {
       final document = await action();
       if (!mounted) return;
+      final store = _store;
+      if (store != null && store.isPinned(document.id) && _pending.isEmpty) {
+        await store.pin(document.rawJson, store.customer(document.customerId));
+      }
+      if (!mounted) return;
       setState(() => _apply(document));
       _snack(success);
+    } on ApiUnreachable {
+      if (rethrowUnreachable) {
+        if (mounted) setState(() => _busy = false);
+        rethrow;
+      }
+      failure = const ApiUnreachable('keine Verbindung');
     } on Exception catch (e) {
       failure = e;
     } finally {
@@ -113,15 +241,29 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     }
   }
 
-  Future<void> _save() => _run(
+  Future<void> _save() async {
+    if (_offlineView) return _saveOffline();
+    final version = _document!.version;
+    // Mit Operations-ID senden: geht die Antwort verloren, wird genau
+    // diese Änderung später unter derselben ID nachgereicht.
+    final opId = _pinned ? OfflineStore.newOpId() : null;
+    final notes = _notes.text.trim().isEmpty ? null : _notes.text.trim();
+    try {
+      await _run(
         () => _client.updateDocument(
           id: widget.documentId,
-          version: _document!.version,
+          version: version,
           items: _items,
-          notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+          notes: notes,
+          idempotencyKey: opId,
         ),
         'Gespeichert.',
+        rethrowUnreachable: _pinned,
       );
+    } on ApiUnreachable {
+      await _saveOffline(sentOpId: opId, sentVersion: version);
+    }
+  }
 
   Future<void> _finalize() async {
     final label = onlineDocumentKindLabels[_document!.kind] ?? 'Dokument';
@@ -375,13 +517,19 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
         appBar: AppBar(
           title: Text(document?.number ?? '$label (Entwurf)'),
           actions: [
+            if (document != null && _store != null && !widget.session.offlineOnly && !_offlineView)
+              IconButton(
+                tooltip: _pinned ? 'Nicht mehr offline verfügbar' : 'Offline verfügbar machen',
+                icon: Icon(_pinned ? Icons.offline_pin : Icons.download_for_offline_outlined),
+                onPressed: _busy ? null : _togglePinned,
+              ),
             if (document != null && !_dirty)
               IconButton(
                 tooltip: document.isDraft ? 'PDF-Vorschau (Entwurf)' : 'PDF',
                 icon: const Icon(Icons.picture_as_pdf_outlined),
                 onPressed: _busy ? null : _showPdf,
               ),
-            if (_editable)
+            if (_editable && _serverActionsAllowed)
               IconButton(tooltip: 'Entwurf löschen', icon: const Icon(Icons.delete_outline), onPressed: _busy ? null : _delete),
           ],
         ),
@@ -402,6 +550,37 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       padding: const EdgeInsets.all(12),
       children: [
         if (_busy) const LinearProgressIndicator(),
+        if (_offlineView)
+          const Card(
+            child: ListTile(
+              leading: Icon(Icons.cloud_off_outlined),
+              title: Text('Offline-Kopie'),
+              subtitle: Text('Bearbeiten möglich; Finalisieren, Umwandeln und Zahlungen erst mit Verbindung.'),
+            ),
+          ),
+        for (final entry in _pending)
+          Card(
+            color: entry.status == OutboxStatus.pending ? null : Theme.of(context).colorScheme.errorContainer,
+            child: ListTile(
+              leading: Icon(entry.status == OutboxStatus.pending ? Icons.sync : Icons.sync_problem),
+              title: Text(switch (entry.status) {
+                OutboxStatus.pending => 'Offline-Änderung, noch nicht übertragen',
+                OutboxStatus.conflict => 'Konflikt: inzwischen anders gespeichert',
+                OutboxStatus.rejected => 'Vom Server abgewiesen',
+              }),
+              subtitle: entry.message == null ? null : Text(entry.message!),
+              trailing: Wrap(
+                children: [
+                  if (entry.status == OutboxStatus.pending && !widget.session.offlineOnly)
+                    TextButton(onPressed: _busy ? null : _syncNow, child: const Text('Abgleichen')),
+                  TextButton(
+                    onPressed: _busy ? null : () => _discardPending(entry),
+                    child: const Text('Verwerfen'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         Card(
           child: ListTile(
             title: Text(document.isDraft ? '$label · Entwurf' : '$label · finalisiert'),
@@ -414,7 +593,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             ),
           ),
         ),
-        if (!document.isDraft) _buildFinalizedSection(document),
+        if (!document.isDraft && _serverActionsAllowed) _buildFinalizedSection(document),
         const SizedBox(height: 8),
         Text('Positionen', style: Theme.of(context).textTheme.titleMedium),
         if (_items.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Noch keine Positionen.')),
@@ -495,7 +674,10 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           children: [
             if (_editable)
               Expanded(
-                child: OutlinedButton(onPressed: _busy || !_dirty ? null : _save, child: const Text('Speichern')),
+                child: OutlinedButton(
+                  onPressed: _busy || !_dirty ? null : _save,
+                  child: Text(_offlineView ? 'Offline speichern' : 'Speichern'),
+                ),
               ),
             if (_editable && canFinalize) const SizedBox(width: 12),
             if (canFinalize)
@@ -503,7 +685,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                 child: FilledButton(
                   // Erst speichern, dann finalisieren — finalisiert wird
                   // genau der Stand, den der Server kennt.
-                  onPressed: _busy || _dirty || _items.isEmpty ? null : _finalize,
+                  onPressed: _busy || _dirty || _items.isEmpty || !_serverActionsAllowed ? null : _finalize,
                   child: const Text('Finalisieren'),
                 ),
               ),

@@ -26,22 +26,43 @@ class InMemoryOfflineVault implements OfflineVault {
 /// Wem der Offline-Bestand gehört. Ein Abgleich ist nur mit genau
 /// diesem Server/Konto/dieser Firma erlaubt — nie mit einer anderen.
 class OfflineScope {
-  const OfflineScope({required this.serverUrl, required this.email, required this.companyId, required this.companyName});
+  const OfflineScope({
+    required this.serverUrl,
+    required this.email,
+    required this.companyId,
+    required this.companyName,
+    this.permissions = const {},
+    this.modules = const {},
+  });
   factory OfflineScope.fromJson(Map<String, Object?> j) => OfflineScope(
         serverUrl: j['serverUrl'] as String,
         email: j['email'] as String,
         companyId: j['companyId'] as String,
         companyName: j['companyName'] as String,
+        permissions: {for (final p in j['permissions'] as List? ?? const []) p as String},
+        modules: {for (final m in j['modules'] as List? ?? const []) m as String},
       );
   final String serverUrl;
   final String email;
   final String companyId;
   final String companyName;
 
+  /// Zuletzt online gültige Rechte/Module — **nur** um offline Aktionen
+  /// sinnvoll ein-/auszublenden. Beim Abgleich entscheidet der Server neu.
+  final Set<String> permissions;
+  final Set<String> modules;
+
   bool matches(OfflineScope other) =>
       serverUrl == other.serverUrl && email.toLowerCase() == other.email.toLowerCase() && companyId == other.companyId;
 
-  Map<String, Object?> toJson() => {'serverUrl': serverUrl, 'email': email, 'companyId': companyId, 'companyName': companyName};
+  Map<String, Object?> toJson() => {
+        'serverUrl': serverUrl,
+        'email': email,
+        'companyId': companyId,
+        'companyName': companyName,
+        'permissions': permissions.toList(),
+        'modules': modules.toList(),
+      };
 }
 
 enum OutboxStatus { pending, conflict, rejected }
@@ -192,13 +213,36 @@ class OfflineStore {
 
   /// Offline-Änderung eines markierten Entwurfs. Aktualisiert die lokale
   /// Kopie sofort; die Übertragung erfolgt mit [SyncService].
-  Future<void> enqueueUpdate(String documentId, {required List<OnlineDocumentItem> items, String? notes}) async {
+  ///
+  /// [sentOpId]: die Änderung wurde online bereits mit dieser
+  /// Operations-ID (Idempotency-Key) gesendet, die Antwort ging aber
+  /// verloren — sie wird unverändert unter derselben ID nachgereicht,
+  /// damit sie auf dem Server höchstens einmal wirkt.
+  Future<void> enqueueUpdate(
+    String documentId, {
+    required List<OnlineDocumentItem> items,
+    String? notes,
+    String? sentOpId,
+    int? sentVersion,
+  }) async {
     final raw = _documents[documentId];
     if (raw == null) throw StateError('Dokument ist nicht offline verfügbar.');
     if (raw['status'] != 'draft') throw StateError('Finalisierte Dokumente sind unveränderlich.');
     final pending = pendingFor(documentId);
     final open = pending.where((o) => o.status == OutboxStatus.pending && !o.attempted).lastOrNull;
-    if (open != null) {
+    if (sentOpId != null) {
+      outbox.add(OutboxEntry(
+        opId: sentOpId,
+        documentId: documentId,
+        // Exakt die gesendete Version — sonst passte der Inhalt nicht mehr
+        // zum Idempotency-Key (Server: 422).
+        baseVersion: sentVersion ?? (pending.isEmpty ? raw['version'] as int : pending.last.baseVersion + 1),
+        items: items,
+        notes: notes,
+        createdAt: DateTime.now().toUtc(),
+        attempted: true,
+      ));
+    } else if (open != null) {
       // Noch nie gesendet -> zusammenfassen statt Kette.
       open.items = items;
       open.notes = notes;
@@ -251,6 +295,9 @@ class OfflineStore {
   }
 
   Future<void> _persist() => _save();
+
+  /// Neue Operations-ID (auch für Online-Speichern, siehe [enqueueUpdate]).
+  static String newOpId() => _newOpId();
 
   static String _newOpId() =>
       List<int>.generate(16, (_) => _random.nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0')).join();

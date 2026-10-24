@@ -13,7 +13,11 @@ import 'package:werkkernerp_server/src/router.dart';
 class OnlineTestServer {
   final handler = PhaseBRouter(repository: InMemoryPhaseBRepository(), business: InMemoryBusinessRepository()).handler;
 
+  /// Funkloch simulieren: jede Anfrage scheitert wie ohne Netz.
+  bool offline = false;
+
   late final http.Client httpClient = MockClient((request) async {
+    if (offline) throw http.ClientException('Netz weg');
     final response = await handler(shelf.Request(
       request.method,
       Uri.parse('http://localhost${request.url.path}${request.url.hasQuery ? '?${request.url.query}' : ''}'),

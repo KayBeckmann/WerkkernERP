@@ -83,6 +83,20 @@ Ausnahme → Gruppenrecht.
   (Startgruppen ohne vorbelegte Rechte) — der Admin vergibt sie seiner
   Gruppe über `PUT /groups/:id/permissions/:key`.
 
+## Offline-Arbeit und Abgleich (B2)
+
+- Schreibaufrufe mit Header `Idempotency-Key` wirken höchstens einmal
+  je Firma + Nutzer (Wiederholung -> gespeicherte Antwort,
+  `idempotent-replay: true`; anderer Inhalt -> 422; in Bearbeitung ->
+  409). Grundlage der Offline-Outbox der App.
+- Die Offline-Logik selbst (Bestand, Outbox, Abgleich) liegt im
+  Client-Paket `packages/werkkern_client/lib/src/offline.dart`; ihre
+  Abnahmetests laufen hier gegen den echten Router:
+  `test/offline_sync_test.dart` (Netzausfall, verlorene Antwort,
+  konkurrierende Geräte, entzogene Rechte, deaktivierte Mitgliedschaft).
+- Offline erlaubt: nur Entwürfe ausdrücklich markierter Dokumente
+  bearbeiten. Finalisieren/Umwandeln/Zahlung nur online.
+
 ## Firmen-Stammdaten und Audit
 
 - `GET /company/profile` (alle), `PUT /company/profile` (Admin):
