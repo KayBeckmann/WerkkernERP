@@ -72,3 +72,46 @@ String describeOnlineError(Object error) => switch (error) {
       ApiException(:final message) => message,
       _ => 'Unerwarteter Fehler: $error',
     };
+
+/// Anzeigenamen der Firmenmodule (Schlüssel wie offline `*Enabled`).
+const onlineModuleLabels = <String, String>{
+  'quotes': 'Angebote',
+  'orders': 'Aufträge',
+  'deliveryNotes': 'Lieferscheine',
+  'proforma': 'Proforma-Rechnungen',
+  'creditNotes': 'Gutschriften',
+  'advancePaymentInvoices': 'Abschlagsrechnungen',
+  'projects': 'Projekte',
+  'fleet': 'Fuhrpark',
+  'recurringInvoices': 'Wiederkehrende Rechnungen',
+  'dunning': 'Mahnwesen',
+  'smtp': 'E-Mail-Versand',
+  'buchhaltung': 'Buchhaltung',
+  'lagerbestand': 'Lagerbestand',
+  'bestellwesen': 'Bestellwesen',
+  'timeTracking': 'Zeiterfassung',
+};
+
+/// Anzeigenamen der Berechtigungen; unbekannte Schlüssel werden roh
+/// angezeigt (der Server kann neuere Schlüssel kennen als die App).
+const onlinePermissionLabels = <String, String>{
+  'customers.read': 'Kunden ansehen',
+  'customers.write': 'Kunden bearbeiten',
+  'articles.read': 'Artikel ansehen',
+  'articles.write': 'Artikel bearbeiten',
+  'invoices.read': 'Dokumente ansehen',
+  'invoices.write': 'Dokumente bearbeiten',
+  'invoices.finalize': 'Dokumente finalisieren',
+  'projects.read': 'Projekte ansehen',
+  'projects.write': 'Projekte bearbeiten',
+  'timeTracking.read': 'Zeiten ansehen',
+  'timeTracking.write': 'Zeiten buchen',
+  'fleet.read': 'Fuhrpark ansehen',
+  'fleet.write': 'Fuhrpark bearbeiten',
+  'accounting.read': 'Buchhaltung ansehen',
+  'accounting.write': 'Buchhaltung bearbeiten',
+  'stock.read': 'Lager ansehen',
+  'stock.write': 'Lager buchen',
+  'purchaseOrders.read': 'Bestellungen ansehen',
+  'purchaseOrders.write': 'Bestellungen bearbeiten',
+};

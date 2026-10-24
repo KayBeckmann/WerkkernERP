@@ -109,6 +109,7 @@ class PhaseBRouter {
     router.get('/memberships', _listMemberships);
     router.post('/memberships', _createMembership);
     router.patch('/memberships/<id>', _updateMembership);
+    router.get('/memberships/<id>/overrides', _listOverrides);
     router.put('/memberships/<id>/overrides/<permission>', _setOverride);
     router.delete('/memberships/<id>/overrides/<permission>', _removeOverride);
 
@@ -432,6 +433,19 @@ class PhaseBRouter {
     await repository.updateMembership(id: id, groupId: newGroupId, active: newActive, isAdmin: newIsAdmin);
     await _auth.audit(auth, 'membership.update', 'membership', id);
     return jsonOk({'id': id});
+  }
+
+  Future<Response> _listOverrides(Request request, String id) async {
+    final auth = await _requireAdmin(request);
+    if (auth == null) return jsonError('Nicht angemeldet oder keine Admin-Rechte.', status: 403);
+    final target = await repository.findMembershipById(id);
+    if (target == null || target.companyId != auth.session.companyId) {
+      return jsonError('Mitgliedschaft nicht gefunden.', status: 404);
+    }
+    final overrides = await repository.listMembershipOverrides(id);
+    return jsonOk({
+      'overrides': [for (final o in overrides) {'permission': o.permission, 'allowed': o.allowed}],
+    });
   }
 
   Future<Response> _setOverride(Request request, String id, String permission) async {

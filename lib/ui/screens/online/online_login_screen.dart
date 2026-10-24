@@ -4,6 +4,7 @@ import 'package:werkkern_client/werkkern_client.dart';
 
 import '../../../domain/services/online_session.dart';
 import 'online_home_screen.dart';
+import 'online_text_prompt.dart';
 
 /// Einstieg in den Online-Modus (Phase B): Server-Adresse, E-Mail,
 /// Passwort → Firmenwahl aus den eigenen Mitgliedschaften. Der
@@ -97,6 +98,73 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
     }
   }
 
+  /// Gemeinsamer Rahmen für Konto-Aktionen vor der Anmeldung: Eingaben
+  /// prüfen, [action] ausführen, danach normal anmelden.
+  Future<void> _accountAction(Future<void> Function(WerkkernApiClient client) action) async {
+    final url = _parseServerUrl();
+    if (url == null) {
+      setState(() => _error = 'Bitte eine gültige Server-Adresse eingeben, z. B. https://erp.example.org');
+      return;
+    }
+    if (_emailCtrl.text.trim().isEmpty || _passwordCtrl.text.length < 8) {
+      setState(() => _error = 'E-Mail und Passwort (mind. 8 Zeichen) eingeben.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action((widget.clientFactory ?? (u) => WerkkernApiClient(baseUrl: u))(url));
+    } on Exception catch (e) {
+      if (mounted) setState(() => _error = describeOnlineError(e));
+      return;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    await _submit();
+  }
+
+  Future<void> _register() => _accountAction(
+        (client) => client.register(_emailCtrl.text.trim(), _passwordCtrl.text),
+      );
+
+  Future<void> _acceptInvitation() async {
+    final code = await showOnlineTextPrompt(
+      context,
+      title: 'Einladung einlösen',
+      label: 'Einladungscode',
+      confirm: 'Einlösen',
+      fieldKey: const Key('online-invitation-code'),
+      intro: 'Server, E-Mail und Passwort oben ausfüllen. Neue E-Mail: das Passwort wird dein neues. Bestehendes '
+          'Konto: dein bisheriges Passwort.',
+    );
+    if (code == null || code.isEmpty) return;
+    await _accountAction((client) => client.acceptInvitation(code, _passwordCtrl.text));
+  }
+
+  /// Neue Firma mit dem angemeldeten Konto als Admin. Verbraucht das
+  /// Login-Zwischentoken — danach wird automatisch neu angemeldet.
+  Future<void> _createCompany() async {
+    final name = await showOnlineTextPrompt(
+      context,
+      title: 'Neue Online-Firma',
+      label: 'Firmenname',
+      confirm: 'Anlegen',
+      fieldKey: const Key('online-new-company-name'),
+    );
+    if (name == null || name.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      await _client!.createCompany(_login!.identityToken, name);
+    } on Exception catch (e) {
+      if (mounted) setState(() => _error = describeOnlineError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+    await _submit();
+  }
+
   Future<void> _selectCompany(OnlineMembership membership) async {
     final client = _client!;
     setState(() {
@@ -170,9 +238,20 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 FilledButton(onPressed: _busy ? null : _submit, child: const Text('Anmelden')),
-              ] else if (login.memberships.isEmpty)
-                const Text('Dieses Konto ist noch keiner Firma zugeordnet. Bitte den Firmen-Admin um eine Einladung.')
-              else
+                const SizedBox(height: 8),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  children: [
+                    TextButton(onPressed: _busy ? null : _register, child: const Text('Konto registrieren')),
+                    TextButton(onPressed: _busy ? null : _acceptInvitation, child: const Text('Einladung einlösen')),
+                  ],
+                ),
+              ] else ...[
+                if (login.memberships.isEmpty)
+                  const Text(
+                    'Dieses Konto ist noch keiner Firma zugeordnet. Lege eine eigene Firma an oder lass dich vom '
+                    'Firmen-Admin einladen.',
+                  ),
                 for (final m in login.memberships)
                   Card(
                     child: ListTile(
@@ -183,6 +262,13 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
                       onTap: _busy ? null : () => _selectCompany(m),
                     ),
                   ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _createCompany,
+                  icon: const Icon(Icons.add_business_outlined),
+                  label: const Text('Neue Firma anlegen'),
+                ),
+              ],
               if (_busy) const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())),
               if (_error != null)
                 Padding(
