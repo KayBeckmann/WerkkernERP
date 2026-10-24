@@ -38,6 +38,9 @@ services:
       DB_NAME: werkkernerp_server
       DB_USER: werkkernerp_server
       DB_PASSWORD: ${SERVER_DB_PASSWORD:-werkkernerp_server}
+      # Web-Vorschau (:8085) darf den Server ansprechen; kommagetrennt,
+      # z. B. "http://10.10.2.123:8085". Leer = nur native Apps.
+      CORS_ALLOWED_ORIGINS: ${SERVER_CORS_ALLOWED_ORIGINS:-*}
     ports:
       - "8190:8090"
 

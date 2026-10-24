@@ -29,7 +29,15 @@ class PhaseBRouter {
     this.business,
     this.sessionTtl = const Duration(hours: 8),
     this.invitationTtl = const Duration(days: 7),
+    this.corsAllowedOrigins = const {},
   });
+
+  /// Origins, die den Server aus dem Browser ansprechen dürfen (Flutter-
+  /// Web-Build). Leer = kein CORS (nur native Apps). `*` erlaubt alle —
+  /// vertretbar, weil die Authentifizierung über den
+  /// Authorization-Header läuft, den ein Browser nie automatisch
+  /// mitsendet (keine Cookies, kein CSRF-Risiko).
+  final Set<String> corsAllowedOrigins;
 
   final PhaseBRepository repository;
 
@@ -48,7 +56,7 @@ class PhaseBRouter {
   /// abzusichern.
   Handler get handler {
     final router = _buildRouter();
-    return (Request request) async {
+    Future<Response> handle(Request request) async {
       try {
         return await router.call(request);
       } on FormatException {
@@ -56,6 +64,22 @@ class PhaseBRouter {
       } on TypeError {
         return jsonError('Ungültiger Feldtyp im JSON-Body.');
       }
+    }
+
+    return (Request request) async {
+      final origin = request.headers['origin'];
+      final allowed = origin != null &&
+          (corsAllowedOrigins.contains('*') || corsAllowedOrigins.contains(origin));
+      if (!allowed) return handle(request);
+      final corsHeaders = {
+        'access-control-allow-origin': corsAllowedOrigins.contains('*') ? '*' : origin,
+        'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+        'access-control-allow-headers': 'authorization, content-type',
+        'access-control-max-age': '600',
+        'vary': 'origin',
+      };
+      if (request.method == 'OPTIONS') return Response(204, headers: corsHeaders);
+      return (await handle(request)).change(headers: corsHeaders);
     };
   }
 

@@ -243,9 +243,16 @@ class BusinessRoutes {
       query: params['q'],
     );
     final result = <Map<String, Object?>>[];
+    final customerNames = {
+      for (final c in await business.listCustomers(check.auth!.session.companyId)) c.id: c.name,
+    };
     for (final d in documents.where((d) => kindVisible(d.kind))) {
       final items = await business.itemsFor(check.auth!.session.companyId, d.id);
-      result.add({...d.toJson(), 'totalGrossCents': _totals(items).totalGross.cents});
+      result.add({
+        ...d.toJson(),
+        'customerName': customerNames[d.customerId],
+        'totalGrossCents': _totals(items).totalGross.cents,
+      });
     }
     return jsonOk({'documents': result});
   }
@@ -272,8 +279,13 @@ class BusinessRoutes {
 
   Future<Response> _documentResponse(String companyId, Document document, {int status = 200}) async {
     final items = await business.itemsFor(companyId, document.id);
+    // Aktueller Kundenname zur Anzeige (Entwürfe haben noch keinen
+    // Schnappschuss); maßgeblich für finalisierte Dokumente bleibt
+    // customerSnapshot.
+    final customer = await business.findCustomer(companyId, document.customerId);
     return jsonOk({
       ...document.toJson(),
+      'customerName': customer?.name,
       'items': [for (final i in items) i.toJson()],
       'totals': _totalsJson(_totals(items)),
     }, status: status);

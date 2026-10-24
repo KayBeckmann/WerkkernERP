@@ -1,0 +1,5 @@
+/// Client für den WerkkernERP-Online-Server — siehe pubspec.
+library;
+
+export 'src/api_client.dart';
+export 'src/models.dart';

@@ -72,6 +72,30 @@ Migrationsstufe in `MigrationStrategy.onUpgrade` ergänzen — nie eine
 bestehende Stufe nachträglich ändern (A0-Vorgabe: "schema-versionierte
 Migrationen").
 
+## Phase B: Server, gemeinsame Pakete, Online-Modus
+
+Struktur: `server/` (Dart/shelf + Postgres, eigener Dienst),
+`packages/werkkern_core` (Money/Summen/Nummernformat — App UND Server),
+`packages/werkkern_client` (HTTP-Client, von der App genutzt).
+Online-Bildschirme unter `lib/ui/screens/online/`.
+
+```bash
+(cd server && dart analyze && dart test)            # In-Memory
+docker run -d --rm --name werkkern-test-pg -e POSTGRES_PASSWORD=test \
+  -e POSTGRES_USER=test -e POSTGRES_DB=test -p 127.0.0.1:55432:5432 postgres:16-alpine
+(cd server && WERKKERN_TEST_DB=localhost:55432:test:test:test dart test)   # + echtes Postgres
+(cd packages/werkkern_core && dart test); (cd packages/werkkern_client && dart test)
+docker compose up -d --build server-db server      # :8190, Migrationen laufen beim Start
+```
+
+- DB-Code **immer** auch gegen echtes Postgres testen — mehrere Fehler
+  (überzählige SQL-Parameter, Sortierreihenfolge) fielen nur dort auf.
+- Neue Server-Spalten nur als neue Stufe in `server/lib/src/db/migrations.dart`.
+- Online-Widget-Tests laufen gegen den echten Router (In-Memory) über
+  `test/ui/online/online_test_server.dart` — keine Fake-Antworten.
+- Docker hier = klassischer Builder ohne BuildKit: `<Dockerfile>.dockerignore`
+  wirkt nicht, die Root-`.dockerignore` gilt für alle Images.
+
 ## Web-Build + Docker-Vorschau fürs LAN
 
 Das öffentliche `ghcr.io/cirruslabs/flutter:stable`-Image hinkt der
