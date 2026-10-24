@@ -1,10 +1,12 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../../pdf/online_document_pdf.dart';
 
 /// Detail/Bearbeitung eines Online-Dokuments. Lokale Änderungen werden
 /// erst mit "Speichern" übertragen — immer mit der zuletzt gelesenen
@@ -161,6 +163,42 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     }
   }
 
+  /// PDF aus dem gespeicherten Serverstand. Finalisierte Dokumente
+  /// dürfen geteilt/gedruckt werden, Entwürfe nur angesehen (wie
+  /// offline: kein unfertiges Dokument verschicken).
+  Future<void> _showPdf() async {
+    final document = _document!;
+    OnlineCompanyProfile? company;
+    OnlineCustomer? customer;
+    if (document.isDraft) {
+      try {
+        company = await _client.companyProfile();
+        if (widget.session.can('customers.read')) {
+          customer = (await _client.customers()).where((c) => c.id == document.customerId).firstOrNull;
+        }
+      } on Exception catch (e) {
+        if (mounted) _snack(describeOnlineError(e));
+        return;
+      }
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text(document.isDraft ? 'Vorschau (Entwurf, nicht final)' : document.number!)),
+          body: PdfPreview(
+            build: (_) => buildOnlineDocumentPdf(document, liveCompany: company, liveCustomer: customer),
+            canChangeOrientation: false,
+            canChangePageFormat: false,
+            allowSharing: !document.isDraft,
+            allowPrinting: !document.isDraft,
+            pdfFileName: '${document.number ?? 'entwurf'}.pdf',
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _addItem() async {
     List<OnlineArticle> articles = const [];
     if (widget.session.can('articles.read')) {
@@ -219,6 +257,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
         appBar: AppBar(
           title: Text(document?.number ?? '$label (Entwurf)'),
           actions: [
+            if (document != null && !_dirty)
+              IconButton(
+                tooltip: document.isDraft ? 'PDF-Vorschau (Entwurf)' : 'PDF',
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                onPressed: _busy ? null : _showPdf,
+              ),
             if (_editable)
               IconButton(tooltip: 'Entwurf löschen', icon: const Icon(Icons.delete_outline), onPressed: _busy ? null : _delete),
           ],

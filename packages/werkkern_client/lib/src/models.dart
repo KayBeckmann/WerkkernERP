@@ -150,6 +150,9 @@ class OnlineDocument {
     this.paymentTerms,
     this.notes,
     this.customerSnapshotName,
+    this.customerSnapshotAddress,
+    this.customerSnapshotVatId,
+    this.companySnapshot,
     this.customerName,
     required this.version,
     this.items = const [],
@@ -161,6 +164,8 @@ class OnlineDocument {
 
   factory OnlineDocument.fromJson(Map<String, Object?> j) {
     final totals = j['totals'] as Map<String, Object?>?;
+    final customerSnapshot = j['customerSnapshot'] as Map<String, Object?>?;
+    final companySnapshot = j['companySnapshot'] as Map<String, Object?>?;
     return OnlineDocument(
       id: j['id'] as String,
       customerId: j['customerId'] as String,
@@ -171,7 +176,10 @@ class OnlineDocument {
       serviceDate: DateTime.parse(j['serviceDate'] as String),
       paymentTerms: j['paymentTerms'] as String?,
       notes: j['notes'] as String?,
-      customerSnapshotName: (j['customerSnapshot'] as Map<String, Object?>?)?['name'] as String?,
+      customerSnapshotName: customerSnapshot?['name'] as String?,
+      customerSnapshotAddress: customerSnapshot?['address'] as String?,
+      customerSnapshotVatId: customerSnapshot?['vatId'] as String?,
+      companySnapshot: companySnapshot == null ? null : OnlineCompanyProfile.fromJson(companySnapshot),
       customerName: j['customerName'] as String?,
       version: j['version'] as int,
       items: [
@@ -201,6 +209,11 @@ class OnlineDocument {
   final String? paymentTerms;
   final String? notes;
   final String? customerSnapshotName;
+  final String? customerSnapshotAddress;
+  final String? customerSnapshotVatId;
+
+  /// Beim Finalisieren eingefrorene Firmendaten (`null` im Entwurf).
+  final OnlineCompanyProfile? companySnapshot;
 
   /// Aktueller Name aus den Stammdaten (nur Anzeige).
   final String? customerName;
