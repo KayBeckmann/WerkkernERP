@@ -5,16 +5,21 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:test/test.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:werkkernerp_server/src/repository.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
-void main() {
-  late InMemoryPhaseBRepository repository;
+void main() => runRouterTests(() async => InMemoryPhaseBRepository());
+
+/// Gemeinsame Suite für beide Repository-Implementierungen — siehe
+/// `router_postgres_test.dart` für denselben Lauf gegen echtes Postgres.
+void runRouterTests(Future<PhaseBRepository> Function() createRepository) {
+  late PhaseBRepository repository;
   late HttpServer server;
   late Uri baseUrl;
 
   setUp(() async {
-    repository = InMemoryPhaseBRepository();
+    repository = await createRepository();
     final router = PhaseBRouter(repository: repository);
     server = await shelf_io.serve(router.handler.call, 'localhost', 0);
     baseUrl = Uri.parse('http://localhost:${server.port}');
@@ -375,8 +380,11 @@ void main() {
     final company = await setUpCompanyWithAdmin('admin@example.com', 'Firma A');
     final auth = {'authorization': 'Bearer ${company.token}'};
     final groupId = await firstGroupId(company.token);
+    // Recht der EIGENEN Gruppe des Admins geben — die Gruppenliste ist
+    // nicht in Anlage-Reihenfolge sortiert (Postgres: nach Name).
+    final me = jsonDecode((await http.get(baseUrl.resolve('/me'), headers: auth)).body) as Map<String, Object?>;
     await http.put(
-      baseUrl.resolve('/groups/$groupId/permissions/projects.read'),
+      baseUrl.resolve('/groups/${me['groupId']}/permissions/projects.read'),
       headers: auth,
       body: jsonEncode({'granted': true}),
     );

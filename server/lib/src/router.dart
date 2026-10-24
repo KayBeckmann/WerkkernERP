@@ -202,6 +202,7 @@ class PhaseBRouter {
     return jsonOk({
       'email': user?.email,
       'companyName': company?.name,
+      'groupId': auth.membership.groupId,
       'groupName': group?.name,
       'isAdmin': auth.membership.isAdmin,
     });
