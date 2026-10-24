@@ -47,9 +47,16 @@ class WerkkernApiClient {
     return _baseUrl.replace(path: '$base$path', queryParameters: (query == null || query.isEmpty) ? null : query);
   }
 
-  Future<Object?> _send(String method, String path, {Object? body, Map<String, String>? query}) async {
+  Future<Object?> _send(
+    String method,
+    String path, {
+    Object? body,
+    Map<String, String>? query,
+    String? idempotencyKey,
+  }) async {
     final request = http.Request(method, _uri(path, query));
     if (token != null) request.headers['authorization'] = 'Bearer $token';
+    if (idempotencyKey != null) request.headers['idempotency-key'] = idempotencyKey;
     if (body != null) {
       request.headers['content-type'] = 'application/json; charset=utf-8';
       request.body = jsonEncode(body);
@@ -140,7 +147,10 @@ class WerkkernApiClient {
     return [for (final d in j['documents'] as List) OnlineDocument.fromJson(d as Map<String, Object?>)];
   }
 
-  Future<OnlineDocument> document(String id) async => OnlineDocument.fromJson(_map(await _send('GET', '/documents/$id')));
+  Future<OnlineDocument> document(String id) async => OnlineDocument.fromJson(await documentJson(id));
+
+  /// Rohe Serverantwort eines Dokuments (für den Offline-Bestand).
+  Future<Map<String, Object?>> documentJson(String id) async => _map(await _send('GET', '/documents/$id'));
 
   Future<OnlineDocument> createDocument({
     required String customerId,
@@ -157,14 +167,18 @@ class WerkkernApiClient {
 
   /// Wirft [ApiException] mit 409, wenn [version] veraltet ist — dann
   /// neu laden und erneut entscheiden, nie blind wiederholen.
+  ///
+  /// [idempotencyKey]: Operations-ID aus der Offline-Outbox — eine
+  /// Wiederholung nach verlorener Antwort wirkt nicht doppelt.
   Future<OnlineDocument> updateDocument({
     required String id,
     required int version,
     required List<OnlineDocumentItem> items,
     String? customerId,
     String? notes,
+    String? idempotencyKey,
   }) async =>
-      OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', body: {
+      OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', idempotencyKey: idempotencyKey, body: {
         'version': version,
         'items': [for (final i in items) i.toJson()],
         'customerId': ?customerId,

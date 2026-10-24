@@ -165,6 +165,7 @@ class OnlineDocument {
     this.taxCents,
     this.grossCents,
     this.taxLines = const [],
+    this.rawJson = const {},
   });
 
   factory OnlineDocument.fromJson(Map<String, Object?> j) {
@@ -213,8 +214,12 @@ class OnlineDocument {
             taxCents: r['taxCents'] as int,
           ),
       ],
+      rawJson: j,
     );
   }
+
+  /// Unveränderte Serverantwort — wird so in den Offline-Bestand gelegt.
+  final Map<String, Object?> rawJson;
 
   final String id;
   final String customerId;
