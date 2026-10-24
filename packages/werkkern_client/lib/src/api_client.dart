@@ -96,6 +96,10 @@ class WerkkernApiClient {
     token = j['token'] as String;
   }
 
+  /// Eigenes Passwort ändern; beendet alle anderen Sitzungen des Kontos.
+  Future<void> changePassword(String currentPassword, String newPassword) =>
+      _send('POST', '/auth/change-password', body: {'currentPassword': currentPassword, 'newPassword': newPassword});
+
   Future<void> logout() async {
     try {
       await _send('POST', '/auth/logout');

@@ -631,6 +631,38 @@ class PostgresPhaseBRepository implements PhaseBRepository {
       );
 
   @override
+  Future<void> deleteSessionsForUser(String userId, {String? exceptTokenHash}) async {
+    await _db.execute(
+      Sql.named("DELETE FROM company_sessions WHERE user_id = @userId AND token_hash <> coalesce(@except, '')"),
+      parameters: {'userId': userId, 'except': exceptTokenHash},
+    );
+  }
+
+  @override
+  Future<void> updatePasswordHash(String userId, String passwordHash) async {
+    await _db.execute(
+      Sql.named('UPDATE app_users SET password_hash = @hash WHERE id = @id'),
+      parameters: {'hash': passwordHash, 'id': userId},
+    );
+  }
+
+  @override
+  Future<void> purgeExpired(DateTime now) async {
+    await _db.execute(Sql.named('DELETE FROM company_sessions WHERE expires_at < @now'), parameters: {'now': now});
+    await _db.execute(Sql.named('DELETE FROM pending_logins WHERE expires_at < @now'), parameters: {'now': now});
+    // Stichtage in Dart berechnen: bei "@now - interval" leitet Postgres
+    // den Parametertyp falsch als interval ab (42883).
+    await _db.execute(
+      Sql.named('DELETE FROM invitations WHERE expires_at < @cutoff'),
+      parameters: {'cutoff': now.subtract(const Duration(days: 30))},
+    );
+    await _db.execute(
+      Sql.named('DELETE FROM idempotency_keys WHERE created_at < @cutoff'),
+      parameters: {'cutoff': now.subtract(const Duration(days: 7))},
+    );
+  }
+
+  @override
   Future<void> saveSession(CompanySession session) async {
     await _db.execute(
       Sql.named('''

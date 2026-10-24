@@ -144,6 +144,16 @@ abstract class PhaseBRepository {
   Future<List<Invitation>> listInvitationsForCompany(String companyId);
 
   Future<void> saveSession(CompanySession session);
+
+  /// Beendet alle Sitzungen eines Nutzers außer [exceptTokenHash] (z. B.
+  /// nach Passwortänderung).
+  Future<void> deleteSessionsForUser(String userId, {String? exceptTokenHash});
+
+  Future<void> updatePasswordHash(String userId, String passwordHash);
+
+  /// Räumt Abgelaufenes auf: Sitzungen, Login-Zwischentoken, seit 30
+  /// Tagen abgelaufene Einladungen, Idempotenz-Einträge älter als 7 Tage.
+  Future<void> purgeExpired(DateTime now);
   Future<CompanySession?> findSession(String tokenHash);
   Future<void> deleteSession(String tokenHash);
 }
