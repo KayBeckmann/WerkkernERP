@@ -22,7 +22,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   Future<void> login(WidgetTester tester, OnlineTestServer server, {String email = 'kay@example.com'}) async {
-    await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => server.client())));
+    await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => server.client(), offlineStoreFactory: () => null)));
     await tester.enterText(find.byKey(const Key('online-server')), 'erp.example.org');
     await tester.enterText(find.byKey(const Key('online-email')), email);
     await tester.enterText(find.byKey(const Key('online-password')), 'passwort-12345');
@@ -143,7 +143,7 @@ void main() {
     expect(find.textContaining('noch keine Rechte zugewiesen'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
 
-    await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => server.client())));
+    await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => server.client(), offlineStoreFactory: () => null)));
     await tester.enterText(find.byKey(const Key('online-server')), 'erp.example.org');
     await tester.enterText(find.byKey(const Key('online-email')), 'monteur@example.com');
     await tester.enterText(find.byKey(const Key('online-password')), 'falsch');
@@ -155,7 +155,7 @@ void main() {
       baseUrl: Uri.parse('http://localhost'),
       httpClient: MockClient((_) async => throw http.ClientException('connection refused')),
     );
-    await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => offline)));
+    await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => offline, offlineStoreFactory: () => null)));
     await tester.enterText(find.byKey(const Key('online-server')), 'erp.example.org');
     await tester.enterText(find.byKey(const Key('online-email')), 'monteur@example.com');
     await tester.enterText(find.byKey(const Key('online-password')), 'passwort-12345');

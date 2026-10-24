@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 
+import '../../../domain/services/offline_vault.dart';
 import '../../../domain/services/online_session.dart';
 import 'online_home_screen.dart';
 import 'online_text_prompt.dart';
@@ -10,10 +11,14 @@ import 'online_text_prompt.dart';
 /// Passwort → Firmenwahl aus den eigenen Mitgliedschaften. Der
 /// Offline-Modus bleibt davon völlig unberührt.
 class OnlineLoginScreen extends StatefulWidget {
-  const OnlineLoginScreen({super.key, this.clientFactory});
+  const OnlineLoginScreen({super.key, this.clientFactory, this.offlineStoreFactory});
 
   /// Für Widget-Tests (MockClient statt echtem Netzwerk).
   final WerkkernApiClient Function(Uri baseUrl)? clientFactory;
+
+  /// Für Widget-Tests (In-Memory statt Gerätedatei/Keystore). Standard:
+  /// verschlüsselte Gerätedatei, im Web kein Offline-Bestand.
+  final OfflineStore? Function()? offlineStoreFactory;
 
   @override
   State<OnlineLoginScreen> createState() => _OnlineLoginScreenState();
@@ -30,11 +35,57 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
   String? _error;
   WerkkernApiClient? _client;
   OnlineLogin? _login;
+  OfflineStore? _offline;
 
   @override
   void initState() {
     super.initState();
     _restoreLastInput();
+    _openOfflineStore();
+  }
+
+  /// Lädt den Offline-Bestand des Geräts (B2). Ist er nicht lesbar
+  /// (Schlüssel verloren/Datei beschädigt), ist er wertlos — er wird
+  /// entfernt und das ausdrücklich angezeigt.
+  Future<void> _openOfflineStore() async {
+    final store = widget.offlineStoreFactory != null
+        ? widget.offlineStoreFactory!()
+        : (offlineCacheSupported
+            ? OfflineStore(EncryptedOfflineVault(blobs: createDeviceOfflineBlobStore()!, keys: SecureOfflineKeyStore()))
+            : null);
+    if (store == null) return;
+    try {
+      await store.load();
+    } on OfflineVaultUnreadable catch (e) {
+      await store.wipe();
+      if (mounted) setState(() => _error = '$e Der Offline-Bestand wurde entfernt.');
+    } on Exception {
+      // z. B. Keystore im Test nicht verfügbar — dann ohne Offline-Bestand.
+      return;
+    }
+    if (mounted) setState(() => _offline = store);
+  }
+
+  /// Ohne Verbindung direkt in die markierten Dokumente (B2) — Abgleich
+  /// erst nach der nächsten Anmeldung.
+  Future<void> _openOffline() async {
+    final store = _offline!;
+    final scope = store.scope!;
+    final session = OnlineSession(
+      client: (widget.clientFactory ?? (u) => WerkkernApiClient(baseUrl: u))(Uri.parse(scope.serverUrl)),
+      serverUrl: Uri.parse(scope.serverUrl),
+      email: scope.email,
+      companyId: scope.companyId,
+      companyName: scope.companyName,
+      isAdmin: false,
+      permissions: scope.permissions,
+      modules: scope.modules,
+      offline: store,
+      offlineOnly: true,
+    );
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => OnlineHomeScreen(session: session)),
+    );
   }
 
   /// Server-Adresse und E-Mail der letzten Anmeldung vorbelegen — das
@@ -175,15 +226,43 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
       await client.selectCompany(_login!.identityToken, membership.companyId);
       final mine = await client.myPermissions();
       final modules = await client.modules();
+      final serverUrl = _parseServerUrl()!;
+      var offline = _offline;
+      String? offlineWarning;
+      if (offline != null) {
+        try {
+          await offline.bind(OfflineScope(
+            serverUrl: serverUrl.toString(),
+            email: _emailCtrl.text.trim(),
+            companyId: membership.companyId,
+            companyName: membership.companyName,
+            permissions: mine.permissions,
+            modules: modules,
+          ));
+        } on StateError catch (e) {
+          // Fremde, noch nicht übertragene Änderungen auf diesem Gerät:
+          // nie still verwerfen — Offline-Funktion in dieser Sitzung aus.
+          offlineWarning = e.message;
+          offline = null;
+        }
+      }
       if (!mounted) return;
       final session = OnlineSession(
         client: client,
-        serverUrl: _parseServerUrl()!,
+        serverUrl: serverUrl,
+        email: _emailCtrl.text.trim(),
+        companyId: membership.companyId,
         companyName: membership.companyName,
         isAdmin: mine.isAdmin,
         permissions: mine.permissions,
         modules: modules,
+        offline: offline,
       );
+      if (offlineWarning != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Offline-Funktion nicht verfügbar: $offlineWarning'), duration: const Duration(seconds: 8)),
+        );
+      }
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(builder: (_) => OnlineHomeScreen(session: session)),
       );
@@ -246,6 +325,18 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
                     TextButton(onPressed: _busy ? null : _acceptInvitation, child: const Text('Einladung einlösen')),
                   ],
                 ),
+                if (_offline?.scope != null && !_offline!.isEmpty)
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.offline_pin_outlined),
+                      title: Text('Offline-Bestand: ${_offline!.scope!.companyName}'),
+                      subtitle: Text(
+                        '${_offline!.documents.length} Dokument(e), ${_offline!.outbox.length} nicht übertragene '
+                        'Änderung(en) · ${_offline!.scope!.email}',
+                      ),
+                      trailing: TextButton(onPressed: _busy ? null : _openOffline, child: const Text('Ohne Verbindung öffnen')),
+                    ),
+                  ),
               ] else ...[
                 if (login.memberships.isEmpty)
                   const Text(

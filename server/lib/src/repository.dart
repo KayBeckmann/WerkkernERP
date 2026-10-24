@@ -23,6 +23,35 @@ abstract class PhaseBRepository {
   /// Neueste zuerst.
   Future<List<AuditEntry>> listAudit(String companyId, {int limit = 100});
 
+  // ---- Idempotenz (B2) -------------------------------------------------
+  Future<StoredResponse?> findIdempotentResponse({
+    required String companyId,
+    required String userId,
+    required String key,
+  });
+
+  /// Reserviert den Schlüssel **vor** der Ausführung (Antwort noch
+  /// leer, status 0). `false` = bereits reserviert/erledigt — zwei
+  /// gleichzeitig eintreffende Doppelsendungen führen so nie beide aus.
+  Future<bool> claimIdempotencyKey({
+    required String companyId,
+    required String userId,
+    required String key,
+    required String requestFingerprint,
+  });
+
+  Future<void> completeIdempotencyKey({
+    required String companyId,
+    required String userId,
+    required String key,
+    required int status,
+    required String body,
+  });
+
+  /// Gibt eine Reservierung frei (Serverfehler — erneuter Versuch muss
+  /// möglich bleiben).
+  Future<void> releaseIdempotencyKey({required String companyId, required String userId, required String key});
+
   // ---- Gruppen ------------------------------------------------------------
   Future<Group> createGroup({required String id, required String companyId, required String name});
   Future<Group?> findGroupById(String id);

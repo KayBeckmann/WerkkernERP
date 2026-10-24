@@ -193,3 +193,13 @@ class AuditEntry {
   final String? entityId;
   final DateTime at;
 }
+
+/// Gespeicherte Antwort zu einem `Idempotency-Key` (B2).
+/// [requestFingerprint] verhindert, dass derselbe Schlüssel für einen
+/// anderen Aufruf wiederverwendet wird (dann 422 statt falscher Antwort).
+class StoredResponse {
+  const StoredResponse({required this.requestFingerprint, required this.status, required this.body});
+  final String requestFingerprint;
+  final int status;
+  final String body;
+}

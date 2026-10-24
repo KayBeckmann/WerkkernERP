@@ -18,6 +18,17 @@ class OnlineHomeScreen extends StatefulWidget {
 
 class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
   int _index = 0;
+  bool _syncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Nach der Anmeldung liegengebliebene Offline-Änderungen sofort
+    // übertragen (B2: Rückkehr online).
+    if (!widget.session.offlineOnly && widget.session.pendingChanges > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+    }
+  }
 
   @override
   void dispose() {
@@ -25,8 +36,56 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
     super.dispose();
   }
 
+  Future<void> _sync() async {
+    if (widget.session.offlineOnly) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Abgleich erst nach Anmeldung möglich — Änderungen bleiben auf dem Gerät gespeichert.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _syncing = true);
+    try {
+      final result = await widget.session.sync();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(describeSyncResult(result)), duration: const Duration(seconds: 6)));
+      }
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
+  }
+
   Future<void> _logout() async {
-    await widget.session.logout();
+    final session = widget.session;
+    var wipe = false;
+    final offline = session.offline;
+    if (offline != null && !offline.isEmpty) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Abmelden'),
+          content: Text(
+            session.pendingChanges > 0
+                ? 'Auf diesem Gerät liegen ${session.pendingChanges} noch nicht übertragene Offline-Änderung(en). '
+                      'Beim Löschen gehen sie verloren.'
+                : 'Offline verfügbare Dokumente auf diesem Gerät behalten oder löschen?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+            TextButton(onPressed: () => Navigator.pop(context, 'wipe'), child: const Text('Offline-Daten löschen')),
+            FilledButton(onPressed: () => Navigator.pop(context, 'keep'), child: const Text('Behalten')),
+          ],
+        ),
+      );
+      if (choice == null) return;
+      wipe = choice == 'wipe';
+    }
+    await session.logout(wipeOffline: wipe);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -39,33 +98,46 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
         final tabs = <({String label, IconData icon, Widget body})>[
           if (session.can('invoices.read'))
             (label: 'Dokumente', icon: Icons.receipt_long_outlined, body: OnlineDocumentsScreen(session: session)),
-          if (session.can('customers.read'))
+          if (session.can('customers.read') && !session.offlineOnly)
             (label: 'Kunden', icon: Icons.people_outline, body: OnlineCustomersScreen(session: session)),
-          if (session.can('articles.read'))
+          if (session.can('articles.read') && !session.offlineOnly)
             (label: 'Artikel', icon: Icons.inventory_2_outlined, body: OnlineArticlesScreen(session: session)),
         ];
         final index = _index.clamp(0, tabs.isEmpty ? 0 : tabs.length - 1);
         return Scaffold(
           appBar: AppBar(
-            title: Text('${session.companyName} · online'),
+            title: Text('${session.companyName} · ${session.offlineOnly ? 'offline' : 'online'}'),
             actions: [
-              if (session.isAdmin)
+              if (session.offline != null)
+                IconButton(
+                  tooltip: session.pendingChanges > 0
+                      ? '${session.pendingChanges} Offline-Änderung(en) abgleichen'
+                      : 'Abgleichen',
+                  icon: Badge(
+                    isLabelVisible: session.pendingChanges > 0,
+                    label: Text('${session.pendingChanges}'),
+                    child: const Icon(Icons.sync),
+                  ),
+                  onPressed: _syncing ? null : _sync,
+                ),
+              if (session.isAdmin && !session.offlineOnly)
                 IconButton(
                   tooltip: 'Verwaltung',
                   icon: const Icon(Icons.admin_panel_settings_outlined),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => OnlineAdminScreen(session: session)),
-                  ),
+                  onPressed: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute<void>(builder: (_) => OnlineAdminScreen(session: session))),
                 ),
-              IconButton(
-                tooltip: 'Rechte neu laden',
-                icon: const Icon(Icons.refresh),
-                onPressed: () => session.refreshPermissions().catchError((Object e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
-                  }
-                }),
-              ),
+              if (!session.offlineOnly)
+                IconButton(
+                  tooltip: 'Rechte neu laden',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => session.refreshPermissions().catchError((Object e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+                    }
+                  }),
+                ),
               IconButton(tooltip: 'Abmelden', icon: const Icon(Icons.logout), onPressed: _logout),
             ],
           ),
@@ -75,13 +147,21 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
               // (noch) keinen lokalen Cache — ohne Netz keine Daten.
               Material(
                 color: Theme.of(context).colorScheme.secondaryContainer,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   child: Row(
                     children: [
-                      Icon(Icons.cloud_outlined, size: 16),
-                      SizedBox(width: 8),
-                      Expanded(child: Text('Online-Modus: Daten liegen auf dem Server, keine lokale Kopie.')),
+                      Icon(session.offlineOnly ? Icons.cloud_off_outlined : Icons.cloud_outlined, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          session.offlineOnly
+                              ? 'Ohne Verbindung: nur offline markierte Dokumente. Entwürfe bearbeitbar, Abgleich nach Anmeldung.'
+                              : session.offline == null
+                              ? 'Online-Modus: Daten liegen auf dem Server, keine lokale Kopie.'
+                              : 'Online-Modus: nur ausdrücklich offline markierte Dokumente liegen verschlüsselt auf dem Gerät.',
+                        ),
+                      ),
                     ],
                   ),
                 ),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:uuid/uuid.dart';
@@ -66,11 +67,12 @@ class PhaseBRouter {
       }
     }
 
+    final idempotent = _withIdempotency(handle);
     return (Request request) async {
       final origin = request.headers['origin'];
       final allowed = origin != null &&
           (corsAllowedOrigins.contains('*') || corsAllowedOrigins.contains(origin));
-      if (!allowed) return handle(request);
+      if (!allowed) return idempotent(request);
       final corsHeaders = {
         'access-control-allow-origin': corsAllowedOrigins.contains('*') ? '*' : origin,
         'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
@@ -79,8 +81,74 @@ class PhaseBRouter {
         'vary': 'origin',
       };
       if (request.method == 'OPTIONS') return Response(204, headers: corsHeaders);
-      return (await handle(request)).change(headers: corsHeaders);
+      return (await idempotent(request)).change(headers: corsHeaders);
     };
+  }
+
+  /// B2: Schreibaufrufe mit `Idempotency-Key`-Header (z. B. aus der
+  /// Offline-Outbox) wirken höchstens einmal. Der Schlüssel gilt je
+  /// Firma + Nutzer; dieselbe Anfrage erneut -> gespeicherte Antwort
+  /// (`idempotent-replay: true`), anderer Inhalt unter demselben
+  /// Schlüssel -> 422, noch in Bearbeitung -> 409. Ohne gültige Sitzung
+  /// wird nichts gespeichert (der Aufruf scheitert ohnehin mit 401).
+  Handler _withIdempotency(Handler inner) => (Request request) async {
+        final key = request.headers['idempotency-key'];
+        if (key == null || request.method == 'GET' || request.method == 'OPTIONS') return inner(request);
+        if (key.isEmpty || key.length > 200) return jsonError('Idempotency-Key ungültig.');
+        final auth = await _auth.requireSession(request);
+        if (auth == null) return inner(request);
+        final companyId = auth.session.companyId;
+        final userId = auth.session.userId;
+
+        final body = await request.readAsString();
+        final fingerprint = sha256.convert(utf8.encode('${request.method} ${request.url.path}\n$body')).toString();
+        final replay = request.change(body: body);
+
+        final existing = await repository.findIdempotentResponse(companyId: companyId, userId: userId, key: key);
+        if (existing != null) return _replay(existing, fingerprint);
+        final claimed = await repository.claimIdempotencyKey(
+          companyId: companyId,
+          userId: userId,
+          key: key,
+          requestFingerprint: fingerprint,
+        );
+        if (!claimed) {
+          final raced = await repository.findIdempotentResponse(companyId: companyId, userId: userId, key: key);
+          return raced == null ? jsonError('Bitte erneut senden.', status: 409) : _replay(raced, fingerprint);
+        }
+
+        final Response response;
+        try {
+          response = await inner(replay);
+        } catch (_) {
+          await repository.releaseIdempotencyKey(companyId: companyId, userId: userId, key: key);
+          rethrow;
+        }
+        final responseBody = await response.readAsString();
+        if (response.statusCode >= 500) {
+          await repository.releaseIdempotencyKey(companyId: companyId, userId: userId, key: key);
+        } else {
+          await repository.completeIdempotencyKey(
+            companyId: companyId,
+            userId: userId,
+            key: key,
+            status: response.statusCode,
+            body: responseBody,
+          );
+        }
+        return Response(response.statusCode, body: responseBody, headers: response.headers);
+      };
+
+  Response _replay(StoredResponse stored, String fingerprint) {
+    if (stored.requestFingerprint != fingerprint) {
+      return jsonError('Idempotency-Key wurde bereits für eine andere Anfrage verwendet.', status: 422);
+    }
+    if (stored.status == 0) return jsonError('Anfrage mit diesem Idempotency-Key wird noch verarbeitet.', status: 409);
+    return Response(
+      stored.status,
+      body: stored.body,
+      headers: {'content-type': 'application/json; charset=utf-8', 'idempotent-replay': 'true'},
+    );
   }
 
   Router _buildRouter() {

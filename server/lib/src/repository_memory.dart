@@ -13,6 +13,46 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
   final List<Invitation> _invitations = [];
   final Map<String, CompanyProfile> _profiles = {};
   final List<AuditEntry> _audit = [];
+  final Map<String, StoredResponse> _idempotent = {};
+
+  @override
+  Future<StoredResponse?> findIdempotentResponse({
+    required String companyId,
+    required String userId,
+    required String key,
+  }) async =>
+      _idempotent['$companyId|$userId|$key'];
+
+  @override
+  Future<bool> claimIdempotencyKey({
+    required String companyId,
+    required String userId,
+    required String key,
+    required String requestFingerprint,
+  }) async {
+    final id = '$companyId|$userId|$key';
+    if (_idempotent.containsKey(id)) return false;
+    _idempotent[id] = StoredResponse(requestFingerprint: requestFingerprint, status: 0, body: '');
+    return true;
+  }
+
+  @override
+  Future<void> completeIdempotencyKey({
+    required String companyId,
+    required String userId,
+    required String key,
+    required int status,
+    required String body,
+  }) async {
+    final id = '$companyId|$userId|$key';
+    final claimed = _idempotent[id];
+    if (claimed == null) return;
+    _idempotent[id] = StoredResponse(requestFingerprint: claimed.requestFingerprint, status: status, body: body);
+  }
+
+  @override
+  Future<void> releaseIdempotencyKey({required String companyId, required String userId, required String key}) async =>
+      _idempotent.remove('$companyId|$userId|$key');
 
   @override
   Future<CompanyProfile> getCompanyProfile(String companyId) async =>

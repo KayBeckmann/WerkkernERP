@@ -17,6 +17,7 @@ final List<Future<void> Function(Session db)> _steps = [
   ensureBusinessSchema, // 2: B1.3 Kunden/Artikel/Dokumente/Nummernkreise
   _step3CompanyProfileAuditSnapshots,
   _step4ConversionAndPayment,
+  _step5IdempotencyKeys,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -69,4 +70,22 @@ Future<void> _step4ConversionAndPayment(Session db) async {
   await db.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS payment_status TEXT NOT NULL DEFAULT 'open'");
   await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ');
   await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS due_date DATE');
+}
+
+/// B2: Antworten auf Schreibaufrufe mit `Idempotency-Key` — eine
+/// erneut gesendete Offline-Änderung (Antwort ging verloren) liefert
+/// die gespeicherte Antwort statt ein zweites Mal zu wirken.
+Future<void> _step5IdempotencyKeys(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS idempotency_keys (
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      key TEXT NOT NULL,
+      request_fingerprint TEXT NOT NULL,
+      status INTEGER NOT NULL,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (company_id, user_id, key)
+    );
+  ''');
 }

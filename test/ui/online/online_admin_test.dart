@@ -12,7 +12,7 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   Future<void> fillLogin(WidgetTester tester, OnlineTestServer server, String email) async {
-    await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => server.client())));
+    await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => server.client(), offlineStoreFactory: () => null)));
     await tester.enterText(find.byKey(const Key('online-server')), 'erp.example.org');
     await tester.enterText(find.byKey(const Key('online-email')), email);
     await tester.enterText(find.byKey(const Key('online-password')), 'passwort-12345');
