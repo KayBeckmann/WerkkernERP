@@ -326,7 +326,7 @@ class _GroupsTabState extends State<_GroupsTab> {
             const Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
-                'Startgruppen haben bewusst keine vorbelegten Rechte — welche Gruppe was darf, legst du hier fest. '
+                'Startgruppen kommen mit Standardrechten — welche Gruppe was darf, passt du hier an. '
                 'Admins brauchen für Fachdaten ebenfalls Rechte über ihre Gruppe.',
               ),
             ),

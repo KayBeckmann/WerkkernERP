@@ -11,6 +11,8 @@ import 'package:werkkernerp_server/src/business/repository_memory.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
+import 'support/starter_groups.dart';
+
 /// C8: MCP-Tools als dünne Schicht über der REST-API, gegen den echten
 /// Router. Regelgleichheit UI/API/MCP: dieselben Endpunkte, dieselbe
 /// Rechteprüfung; Finalisieren nur über die Freigabe in der App.
@@ -29,6 +31,7 @@ void main() {
     await user.register('kay@example.com', 'passwort-12345');
     final companyId = await user.createCompany((await user.login('kay@example.com', 'passwort-12345')).identityToken, 'Elektro Kay');
     await user.selectCompany((await user.login('kay@example.com', 'passwort-12345')).identityToken, companyId);
+    await clearGroupPermissions(user);
     final groups = await user.groups();
     final own = groups.firstWhere((g) => g.name == 'Projektleiter');
     monteurGroup = groups.firstWhere((g) => g.name == 'Monteur').id;

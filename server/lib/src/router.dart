@@ -18,8 +18,8 @@ import 'util/passwords.dart';
 import 'util/responses.dart';
 import 'util/tokens.dart';
 
-/// Startvorlagen laut Roadmap B1 Punkt 1 — bewusst nur Namen, keine
-/// vorbelegten Rechte (siehe Klassendoc bei [Group]).
+/// Startvorlagen laut Roadmap B1 Punkt 1; Rechte siehe
+/// [starterGroupPermissions].
 const _starterGroupNames = ['Projektleiter', 'Monteur', 'Buchhaltung'];
 
 /// B1 Mitgliedschaften, Gruppen, Backend-Isolation. Siehe
@@ -401,8 +401,8 @@ class PhaseBRouter {
   /// B keinen solchen Gatekeeper, Firmenanlage bleibt hier bewusst
   /// einfacher (siehe docs/phase-b-server.md, "Erstadmin/Recovery
   /// offen" laut Roadmap). Der anlegende Nutzer wird automatisch
-  /// Admin, zugeordnete Gruppe per Default "Projektleiter" (reine
-  /// technische Vorbelegung, keine fachliche Aussage).
+  /// Admin, zugeordnete Gruppe per Default "Projektleiter" samt deren
+  /// Standardrechten.
   Future<Response> _createCompany(Request request) async {
     final body = await _bodyJson(request);
     final identityToken = body['identityToken'] as String?;
@@ -417,6 +417,9 @@ class PhaseBRouter {
     Group? defaultGroup;
     for (final groupName in _starterGroupNames) {
       final group = await repository.createGroup(id: _uuid.v4(), companyId: company.id, name: groupName);
+      for (final permission in starterGroupPermissions[groupName]!) {
+        await repository.setGroupPermission(groupId: group.id, permission: permission, granted: true);
+      }
       defaultGroup ??= group;
     }
     await repository.createMembership(

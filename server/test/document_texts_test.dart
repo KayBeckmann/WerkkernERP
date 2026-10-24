@@ -10,6 +10,8 @@ import 'package:werkkernerp_server/src/repository.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
+import 'support/starter_groups.dart';
+
 void main() => runDocumentTextTests(() async => (InMemoryPhaseBRepository(), InMemoryBusinessRepository()));
 
 void runDocumentTextTests(Future<(PhaseBRepository, BusinessRepository)> Function() create) {
@@ -24,6 +26,7 @@ void runDocumentTextTests(Future<(PhaseBRepository, BusinessRepository)> Functio
     await c.register('chef@example.com', 'passwort-12345');
     final companyId = await c.createCompany((await c.login('chef@example.com', 'passwort-12345')).identityToken, 'Firma');
     await c.selectCompany((await c.login('chef@example.com', 'passwort-12345')).identityToken, companyId);
+    await clearGroupPermissions(c);
     final own = (await c.groups()).firstWhere((g) => g.name == 'Projektleiter').id;
     for (final p in ['customers.read', 'customers.write', 'invoices.read', 'invoices.write', 'invoices.finalize']) {
       await c.setGroupPermission(own, p, granted: true);

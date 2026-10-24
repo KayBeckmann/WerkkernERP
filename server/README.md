@@ -97,9 +97,12 @@ Ausnahme → Gruppenrecht.
 - Finalisierung ist eine Transaktion mit Zeilensperre + Nummernkreis-
   UPSERT (Firma/Art/Jahr); Summen und Nummernformat kommen aus
   `packages/werkkern_core` — identisch zur Offline-App.
-- **Hinweis:** Auch der Firmen-Ersteller hat zunächst keine Fachrechte
-  (Startgruppen ohne vorbelegte Rechte) — der Admin vergibt sie seiner
-  Gruppe über `PUT /groups/:id/permissions/:key`.
+- **Standardrechte:** Die Startgruppen Projektleiter/Monteur/Buchhaltung
+  werden mit Standardrechten angelegt (`starterGroupPermissions` in
+  `lib/src/permission_catalog.dart`). Der Firmen-Ersteller landet in
+  „Projektleiter“; Admins brauchen Fachrechte weiterhin über ihre Gruppe
+  und ändern sie über `PUT /groups/:id/permissions/:key`. Bestehende
+  Firmen behalten ihre bisherigen Gruppenrechte.
 
 ## Offline-Arbeit und Abgleich (B2)
 

@@ -30,9 +30,8 @@ class Company {
 
 /// Startvorlagen laut Roadmap: "Projektleiter", "Monteur",
 /// "Buchhaltung" — frei umbenennbar/ergänzbar wie `StaffRoles` in der
-/// Offline-App. **Keine** vorbelegten Berechtigungen (siehe
-/// [GroupPermission]) — "konkrete Startrechte sind nicht entschieden
-/// und müssen vor Rollout fachlich festgelegt werden" (Roadmap B1).
+/// Offline-App. Bei Firmenanlage mit den Standardrechten aus
+/// `starterGroupPermissions` vorbelegt (Kay-Entscheidung 2026-10-24).
 class Group {
   const Group({required this.id, required this.companyId, required this.name});
   final String id;

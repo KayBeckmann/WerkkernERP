@@ -10,6 +10,8 @@ import 'package:werkkernerp_server/src/repository.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
+import 'support/starter_groups.dart';
+
 void main() => runTimeTrackingTests(() async => (InMemoryPhaseBRepository(), InMemoryBusinessRepository()));
 
 /// C3 online: echte Nutzer buchen eigene Zeiten; Stundensatz je
@@ -30,6 +32,7 @@ void runTimeTrackingTests(Future<(PhaseBRepository, BusinessRepository)> Functio
     await chef.register('chef@example.com', 'passwort-12345');
     companyId = await chef.createCompany((await chef.login('chef@example.com', 'passwort-12345')).identityToken, 'Firma');
     await chef.selectCompany((await chef.login('chef@example.com', 'passwort-12345')).identityToken, companyId);
+    await clearGroupPermissions(chef);
     final groups = await chef.groups();
     final own = groups.firstWhere((g) => g.name == 'Projektleiter').id;
     monteurGroup = groups.firstWhere((g) => g.name == 'Monteur').id;

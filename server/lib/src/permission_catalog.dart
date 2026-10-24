@@ -2,12 +2,9 @@
 /// Firmenmodule (B1 Punkt 3: "Jede API-... Aktion serverseitig auf
 /// Firma, Mitgliedschaft, Funktion und wirksames Recht prüfen").
 ///
-/// Bewusst nur der **Mechanismus** — welche Startgruppe welche Rechte
-/// standardmäßig bekommt, ist laut Roadmap B1 Punkt 1 "nicht
-/// entschieden und muss vor Rollout fachlich festgelegt werden". Die
-/// Startgruppen werden deshalb weiterhin ohne vorbelegte Rechte
-/// angelegt; dieser Katalog legt nur fest, welche Schlüssel es
-/// überhaupt gibt, damit ein Tippfehler (z. B. `invoice.read` statt
+/// Legt fest, welche Schlüssel es überhaupt gibt (und welche
+/// Startgruppe welche davon standardmäßig bekommt, siehe
+/// [starterGroupPermissions]), damit ein Tippfehler (z. B. `invoice.read` statt
 /// `invoices.read`) beim Vergeben abgewiesen wird, statt still ein
 /// nie geprüftes Recht anzulegen.
 library;
@@ -78,3 +75,42 @@ bool isKnownPermission(String permission) => permissionCatalog.containsKey(permi
 /// **und** bei unbekannten Schlüsseln (die bereits vorher über
 /// [isKnownPermission] abgewiesen werden).
 String? requiredModuleFor(String permission) => permissionCatalog[permission];
+
+/// Standardrechte der Startgruppen bei Firmenanlage — Kay-Entscheidung
+/// 2026-10-24 (Roadmap B1 Punkt 1). Nur eine Vorbelegung: Admins ändern
+/// sie danach frei, Module bleiben vorrangig (ein `fleet.*`-Recht wirkt
+/// nicht, solange Fuhrpark abgeschaltet ist).
+const starterGroupPermissions = <String, Set<String>>{
+  'Projektleiter': {
+    'customers.read', 'customers.write',
+    'articles.read', 'articles.write',
+    'invoices.read', 'invoices.write', 'invoices.finalize',
+    'projects.read', 'projects.write',
+    'timeTracking.read', 'timeTracking.write',
+    'fleet.read', 'fleet.write',
+    'stock.read', 'stock.write',
+    'purchaseOrders.read', 'purchaseOrders.write',
+  },
+  // Monteur erstellt Entwürfe und bucht Zeiten/Lager, finalisiert aber
+  // nicht und sieht keine Finanzen. Kein `timeTracking.read`: das hieße
+  // „sieht die Zeiten aller“ — eigene sieht er über `timeTracking.write`.
+  'Monteur': {
+    'customers.read',
+    'articles.read',
+    'invoices.read', 'invoices.write',
+    'projects.read',
+    'timeTracking.write',
+    'fleet.read',
+    'stock.read', 'stock.write',
+  },
+  'Buchhaltung': {
+    'customers.read', 'customers.write',
+    'articles.read',
+    'invoices.read', 'invoices.write', 'invoices.finalize', 'invoices.payment',
+    'projects.read',
+    'timeTracking.read',
+    'fleet.read', 'fleet.write',
+    'accounting.read', 'accounting.write',
+    'purchaseOrders.read',
+  },
+};

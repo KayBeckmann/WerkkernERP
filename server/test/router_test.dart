@@ -5,6 +5,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:test/test.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:werkkernerp_server/src/permission_catalog.dart';
 import 'package:werkkernerp_server/src/repository.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
@@ -90,8 +91,8 @@ void runRouterTests(Future<PhaseBRepository> Function() createRepository) {
   });
 
   test(
-    'Firmenanlage seedet die drei Startgruppen (Projektleiter/Monteur/Buchhaltung) ohne '
-    'vorbelegte Rechte, der Ersteller wird Admin',
+    'Firmenanlage seedet die drei Startgruppen (Projektleiter/Monteur/Buchhaltung) mit ihren '
+    'Standardrechten, der Ersteller wird Admin',
     () async {
       final setup = await setUpCompanyWithAdmin('admin@a.example', 'Firma A');
 
@@ -108,11 +109,21 @@ void runRouterTests(Future<PhaseBRepository> Function() createRepository) {
         unorderedEquals(['Projektleiter', 'Monteur', 'Buchhaltung']),
       );
 
-      final permissionsResponse = await http.get(
-        baseUrl.resolve('/groups/${(groups.first as Map<String, Object?>)['id']}/permissions'),
-        headers: {'authorization': 'Bearer ${setup.token}'},
-      );
-      expect((jsonDecode(permissionsResponse.body) as Map<String, Object?>)['permissions'], isEmpty);
+      for (final group in groups.cast<Map<String, Object?>>()) {
+        final permissionsResponse = await http.get(
+          baseUrl.resolve('/groups/${group['id']}/permissions'),
+          headers: {'authorization': 'Bearer ${setup.token}'},
+        );
+        final permissions = (jsonDecode(permissionsResponse.body) as Map<String, Object?>)['permissions'] as List;
+        expect(permissions.toSet(), starterGroupPermissions[group['name']], reason: '${group['name']}');
+      }
+      // Stichproben der Matrix: Monteur finalisiert nicht und sieht nicht
+      // die Zeiten aller, nur die Buchhaltung markiert Zahlungen.
+      expect(starterGroupPermissions['Monteur'], isNot(contains('invoices.finalize')));
+      expect(starterGroupPermissions['Monteur'], isNot(contains('timeTracking.read')));
+      expect(starterGroupPermissions['Projektleiter'], isNot(contains('invoices.payment')));
+      expect(starterGroupPermissions['Buchhaltung'], contains('invoices.payment'));
+      expect(starterGroupPermissions.values.expand((p) => p).every(isKnownPermission), isTrue);
     },
   );
 
@@ -197,8 +208,8 @@ void runRouterTests(Future<PhaseBRepository> Function() createRepository) {
 
       final groupsResponse =
           await http.get(baseUrl.resolve('/groups'), headers: {'authorization': 'Bearer ${company.token}'});
-      final groupId = ((jsonDecode(groupsResponse.body) as Map<String, Object?>)['groups'] as List).first['id']
-          as String;
+      final groupId = ((jsonDecode(groupsResponse.body) as Map<String, Object?>)['groups'] as List)
+          .firstWhere((g) => (g as Map<String, Object?>)['name'] == 'Projektleiter')['id'] as String;
 
       await http.post(
         baseUrl.resolve('/memberships'),
@@ -213,35 +224,35 @@ void runRouterTests(Future<PhaseBRepository> Function() createRepository) {
               as List)
           .firstWhere((m) => (m as Map<String, Object?>)['email'] == 'drafter@example.com')['id'] as String;
 
-      // Ohne Gruppenrecht und ohne Override: verweigert.
+      // Projektleiter hat kein Zahlungsrecht; ohne Override: verweigert.
       final before = await http.get(
-        baseUrl.resolve('/permissions/effective?permission=customers.read'),
+        baseUrl.resolve('/permissions/effective?permission=invoices.payment'),
         headers: {'authorization': 'Bearer $drafterToken'},
       );
       expect((jsonDecode(before.body) as Map<String, Object?>)['granted'], isFalse);
 
       // Admin gewährt eine individuelle Ausnahme.
       final overrideResponse = await http.put(
-        baseUrl.resolve('/memberships/$drafterMembershipId/overrides/customers.read'),
+        baseUrl.resolve('/memberships/$drafterMembershipId/overrides/invoices.payment'),
         headers: {'authorization': 'Bearer ${company.token}'},
         body: jsonEncode({'allowed': true}),
       );
       expect(overrideResponse.statusCode, 200);
 
       final after = await http.get(
-        baseUrl.resolve('/permissions/effective?permission=customers.read'),
+        baseUrl.resolve('/permissions/effective?permission=invoices.payment'),
         headers: {'authorization': 'Bearer $drafterToken'},
       );
       expect((jsonDecode(after.body) as Map<String, Object?>)['granted'], isTrue);
 
       // Override wieder entfernen -> zurück auf Gruppenvorgabe (weiterhin verweigert).
       final removeResponse = await http.delete(
-        baseUrl.resolve('/memberships/$drafterMembershipId/overrides/customers.read'),
+        baseUrl.resolve('/memberships/$drafterMembershipId/overrides/invoices.payment'),
         headers: {'authorization': 'Bearer ${company.token}'},
       );
       expect(removeResponse.statusCode, 204);
       final afterRemoval = await http.get(
-        baseUrl.resolve('/permissions/effective?permission=customers.read'),
+        baseUrl.resolve('/permissions/effective?permission=invoices.payment'),
         headers: {'authorization': 'Bearer $drafterToken'},
       );
       expect((jsonDecode(afterRemoval.body) as Map<String, Object?>)['granted'], isFalse);

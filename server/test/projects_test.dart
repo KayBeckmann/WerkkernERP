@@ -10,6 +10,8 @@ import 'package:werkkernerp_server/src/repository.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
+import 'support/starter_groups.dart';
+
 void main() => runProjectTests(() async => (InMemoryPhaseBRepository(), InMemoryBusinessRepository()));
 
 /// C1/C2/C3.3 online — gleiche Regeln wie offline.
@@ -30,6 +32,7 @@ void runProjectTests(Future<(PhaseBRepository, BusinessRepository)> Function() c
     await client.register(email, 'passwort-12345');
     final companyId = await client.createCompany((await client.login(email, 'passwort-12345')).identityToken, 'Firma $email');
     await client.selectCompany((await client.login(email, 'passwort-12345')).identityToken, companyId);
+    await clearGroupPermissions(client);
     final own = (await client.groups()).firstWhere((g) => g.name == 'Projektleiter').id;
     for (final p in permissions ??
         [
