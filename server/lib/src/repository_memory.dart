@@ -11,6 +11,22 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
   final List<({String tokenHash, String userId, DateTime expiresAt})> _pendingLogins = [];
   final List<CompanySession> _sessions = [];
   final List<Invitation> _invitations = [];
+  final Map<String, CompanyProfile> _profiles = {};
+  final List<AuditEntry> _audit = [];
+
+  @override
+  Future<CompanyProfile> getCompanyProfile(String companyId) async =>
+      _profiles[companyId] ?? CompanyProfile(companyId: companyId);
+
+  @override
+  Future<void> saveCompanyProfile(CompanyProfile profile) async => _profiles[profile.companyId] = profile;
+
+  @override
+  Future<void> recordAudit(AuditEntry entry) async => _audit.add(entry);
+
+  @override
+  Future<List<AuditEntry>> listAudit(String companyId, {int limit = 100}) async =>
+      _audit.reversed.where((e) => e.companyId == companyId).take(limit).toList();
 
   @override
   Future<AppUser> createUser({required String id, required String email, required String passwordHash}) async {

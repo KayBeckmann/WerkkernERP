@@ -232,7 +232,7 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
     expect(quote['number'], 'An-${year}001', reason: 'eigener Kreis je Dokumentart');
     expect(firstB['number'], 'R-${year}001', reason: 'gleicher Zählerwert nur in getrennter Firma');
     expect((first['customerSnapshot'] as Map)['name'], 'Kunde Alt');
-    expect(first['companySnapshotName'], 'Firma A');
+    expect((first['companySnapshot'] as Map)['name'], 'Firma A');
 
     // Stammdatenänderung danach verändert das finalisierte Dokument nicht.
     await http.put(baseUrl.resolve('/customers/${customer['id']}'), headers: a.auth, body: jsonEncode({'name': 'Kunde Neu'}));
@@ -315,6 +315,47 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
     expect(active['articles'], isEmpty);
     final all = jsonDecode((await http.get(baseUrl.resolve('/articles?includeInactive=true'), headers: a.auth)).body) as Map;
     expect((all['articles'] as List).single['active'], isFalse);
+  });
+
+  test('Firmen-Stammdaten werden beim Finalisieren eingefroren; Audit protokolliert jede Schreibaktion', () async {
+    final a = await company('a@example.com', 'Firma A');
+    final profile = await http.put(baseUrl.resolve('/company/profile'), headers: a.auth, body: jsonEncode({
+      'address': 'Werkstraße 1, 12345 Stadt',
+      'taxNumber': '12/345/67890',
+      'iban': 'DE00 0000',
+    }));
+    expectStatus(profile, 200);
+    final customer = await post('/customers', a.auth, {'name': 'Kunde'}, expect: 201);
+    final draft = await post('/documents', a.auth, invoiceBody(customer['id'] as String), expect: 201);
+    final finalized = await post('/documents/${draft['id']}/finalize', a.auth, {'version': 1});
+    final snapshot = finalized['companySnapshot'] as Map;
+    expect(snapshot['address'], 'Werkstraße 1, 12345 Stadt');
+    expect(snapshot['taxNumber'], '12/345/67890');
+
+    await http.put(baseUrl.resolve('/company/profile'), headers: a.auth, body: jsonEncode({'address': 'Neue Straße 9'}));
+    final reloaded = jsonDecode((await http.get(baseUrl.resolve('/documents/${draft['id']}'), headers: a.auth)).body) as Map;
+    expect((reloaded['companySnapshot'] as Map)['address'], 'Werkstraße 1, 12345 Stadt');
+
+    final audit = jsonDecode((await http.get(baseUrl.resolve('/audit'), headers: a.auth)).body) as Map;
+    final actions = (audit['entries'] as List).map((e) => (e as Map)['action']).toList();
+    expect(actions.first, 'company.profile', reason: 'neueste zuerst');
+    expect(actions, containsAll(['document.finalize', 'document.create', 'customer.create', 'company.create']));
+    expect((audit['entries'] as List).first['userEmail'], 'a@example.com');
+  });
+
+  test('Stammdaten und Audit: nur Admin ändert/liest, Audit zeigt nie Einträge anderer Firmen', () async {
+    final a = await company('a@example.com', 'Firma A');
+    final b = await company('b@example.com', 'Firma B');
+    await post('/customers', b.auth, {'name': 'Geheimkunde B'}, expect: 201);
+    final monteur = await member(a, 'monteur@example.com', ['customers.read']);
+
+    expectStatus(await http.get(baseUrl.resolve('/company/profile'), headers: monteur), 200);
+    expectStatus(await http.put(baseUrl.resolve('/company/profile'), headers: monteur, body: jsonEncode({'address': 'x'})), 403);
+    expectStatus(await http.get(baseUrl.resolve('/audit'), headers: monteur), 403);
+
+    final auditA = jsonDecode((await http.get(baseUrl.resolve('/audit?limit=1000'), headers: a.auth)).body) as Map;
+    final emails = (auditA['entries'] as List).map((e) => (e as Map)['userEmail']).toSet();
+    expect(emails.contains('b@example.com'), isFalse);
   });
 }
 

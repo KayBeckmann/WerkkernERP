@@ -14,6 +14,15 @@ abstract class PhaseBRepository {
   Future<Company?> findCompanyById(String id);
   Future<void> setCompanyModules({required String companyId, required Set<String> enabledModules});
 
+  Future<CompanyProfile> getCompanyProfile(String companyId);
+  Future<void> saveCompanyProfile(CompanyProfile profile);
+
+  // ---- Audit -----------------------------------------------------------
+  Future<void> recordAudit(AuditEntry entry);
+
+  /// Neueste zuerst.
+  Future<List<AuditEntry>> listAudit(String companyId, {int limit = 100});
+
   // ---- Gruppen ------------------------------------------------------------
   Future<Group> createGroup({required String id, required String companyId, required String name});
   Future<Group?> findGroupById(String id);

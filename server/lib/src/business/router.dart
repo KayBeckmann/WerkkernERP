@@ -105,6 +105,7 @@ class BusinessRoutes {
     );
     if (customer == null) return jsonError('name ist Pflicht.');
     await business.createCustomer(customer);
+    await auth.audit(check.auth!, 'customer.create', 'customer', customer.id);
     return jsonOk(customer.toJson(), status: 201);
   }
 
@@ -117,6 +118,7 @@ class BusinessRoutes {
     final customer = _customerFromBody(await _body(request), id: id, companyId: companyId, createdAt: existing.createdAt);
     if (customer == null) return jsonError('name ist Pflicht.');
     await business.updateCustomer(customer);
+    await auth.audit(check.auth!, 'customer.update', 'customer', id);
     return jsonOk(customer.toJson());
   }
 
@@ -126,6 +128,7 @@ class BusinessRoutes {
     try {
       final deleted = await business.deleteCustomer(check.auth!.session.companyId, id);
       if (!deleted) return jsonError('Kunde nicht gefunden.', status: 404);
+      await auth.audit(check.auth!, 'customer.delete', 'customer', id);
       return Response(204);
     } on BusinessConflict catch (e) {
       return jsonError(e.message, status: 409);
@@ -181,6 +184,7 @@ class BusinessRoutes {
     );
     if (article == null) return jsonError('name ist Pflicht, salePriceCents (falls gesetzt) >= 0.');
     await business.createArticle(article);
+    await auth.audit(check.auth!, 'article.create', 'article', article.id);
     return jsonOk(article.toJson(), status: 201);
   }
 
@@ -199,6 +203,7 @@ class BusinessRoutes {
     );
     if (article == null) return jsonError('name ist Pflicht, salePriceCents (falls gesetzt) >= 0.');
     await business.updateArticle(article);
+    await auth.audit(check.auth!, 'article.update', 'article', id);
     return jsonOk(article.toJson());
   }
 
@@ -389,6 +394,7 @@ class BusinessRoutes {
       version: 1,
     );
     await business.createDocument(document, parsed.items!);
+    await auth.audit(check.auth!, 'document.create', document.kind, id);
     return _documentResponse(companyId, document, status: 201);
   }
 
@@ -428,6 +434,7 @@ class BusinessRoutes {
         now: DateTime.now().toUtc(),
       );
       if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
+      await auth.audit(check.auth!, 'document.update', existing.kind, id);
       return await _documentResponse(companyId, updated);
     } on BusinessConflict catch (e) {
       return jsonError(e.message, status: 409);
@@ -443,6 +450,7 @@ class BusinessRoutes {
     if (check.error != null) return check.error!;
     try {
       await business.deleteDraft(session.session.companyId, id);
+      await auth.audit(check.auth!, 'document.delete', existing.kind, id);
       return Response(204);
     } on BusinessConflict catch (e) {
       return jsonError(e.message, status: 409);
@@ -465,15 +473,23 @@ class BusinessRoutes {
       return jsonError('Ein Dokument ohne Positionen kann nicht finalisiert werden.');
     }
     final company = await repository.findCompanyById(companyId);
+    final profile = await repository.getCompanyProfile(companyId);
     try {
       final finalized = await business.finalize(
         companyId: companyId,
         id: id,
         expectedVersion: version,
-        companySnapshotName: company?.name ?? '',
+        company: CompanySnapshot(
+          name: company?.name ?? '',
+          address: profile.address,
+          taxNumber: profile.taxNumber,
+          vatId: profile.vatId,
+          iban: profile.iban,
+        ),
         now: DateTime.now().toUtc(),
       );
       if (finalized == null) return jsonError('Dokument nicht gefunden.', status: 404);
+      await auth.audit(check.auth!, 'document.finalize', existing.kind, id);
       return await _documentResponse(companyId, finalized);
     } on BusinessConflict catch (e) {
       return jsonError(e.message, status: 409);

@@ -55,7 +55,7 @@ abstract class BusinessRepository {
     required String companyId,
     required String id,
     required int expectedVersion,
-    required String companySnapshotName,
+    required CompanySnapshot company,
     required DateTime now,
   });
 }

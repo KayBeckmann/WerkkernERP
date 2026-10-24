@@ -83,6 +83,21 @@ Ausnahme → Gruppenrecht.
   (Startgruppen ohne vorbelegte Rechte) — der Admin vergibt sie seiner
   Gruppe über `PUT /groups/:id/permissions/:key`.
 
+## Firmen-Stammdaten und Audit
+
+- `GET /company/profile` (alle), `PUT /company/profile` (Admin):
+  Anschrift, Steuernummer, USt-IdNr., IBAN, E-Mail, Telefon — werden
+  beim Finalisieren unveränderlich ins Dokument übernommen.
+- `GET /audit?limit=` (Admin): wer hat wann was an welchem Objekt
+  getan, neueste zuerst. Bewusst **ohne Inhalte** (Datenminimierung).
+
+## Schema-Migrationen
+
+`lib/src/db/migrations.dart`: versionierte Stufen (Tabelle
+`schema_migrations`), beim Serverstart in einer Transaktion mit
+Advisory-Lock ausgeführt. Stufen werden nur angehängt, nie geändert —
+wie in der Offline-App.
+
 ## Erstadmin-Recovery (Betreiber)
 
 Kein API-Endpunkt — nur mit direktem DB-Zugriff:

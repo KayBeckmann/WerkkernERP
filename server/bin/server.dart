@@ -5,8 +5,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'package:werkkernerp_server/src/business/repository_postgres.dart';
-import 'package:werkkernerp_server/src/business/schema.dart';
-import 'package:werkkernerp_server/src/db/schema.dart';
+import 'package:werkkernerp_server/src/db/migrations.dart';
 import 'package:werkkernerp_server/src/repository_postgres.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
@@ -31,13 +30,12 @@ Future<void> main() async {
     ],
     settings: PoolSettings(sslMode: SslMode.disable, maxConnectionCount: 10),
   );
-  await ensureSchema(db);
-  await ensureBusinessSchema(db);
+  final schemaVersion = await migrate(db);
 
   final repository = PostgresPhaseBRepository(db);
   final router = PhaseBRouter(repository: repository, business: PostgresBusinessRepository(db));
   final handler = const Pipeline().addMiddleware(logRequests()).addHandler(router.handler.call);
 
   final server = await shelf_io.serve(handler, InternetAddress.anyIPv4, port);
-  stdout.writeln('werkkernerp-server (Phase B) läuft auf Port ${server.port}');
+  stdout.writeln('werkkernerp-server (Phase B) läuft auf Port ${server.port}, Schemastufe $schemaVersion');
 }

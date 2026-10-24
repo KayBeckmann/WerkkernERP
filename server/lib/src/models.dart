@@ -141,3 +141,55 @@ class Invitation {
 
   bool isExpired(DateTime now) => now.isAfter(expiresAt);
 }
+
+/// Firmen-Stammdaten für Dokumente (F1-Pflichtangaben: Anschrift,
+/// Steuernummer/USt-IdNr.) — wie `Companies` in der Offline-App. Werden
+/// beim Finalisieren in das Dokument eingefroren.
+class CompanyProfile {
+  const CompanyProfile({
+    required this.companyId,
+    this.address,
+    this.taxNumber,
+    this.vatId,
+    this.iban,
+    this.email,
+    this.phone,
+  });
+  final String companyId;
+  final String? address;
+  final String? taxNumber;
+  final String? vatId;
+  final String? iban;
+  final String? email;
+  final String? phone;
+
+  Map<String, Object?> toJson() => {
+        'address': address,
+        'taxNumber': taxNumber,
+        'vatId': vatId,
+        'iban': iban,
+        'email': email,
+        'phone': phone,
+      };
+}
+
+/// Audit-Eintrag (ADR-0001 B0.3 "Audit-/Betriebskonzept"): **wer** hat
+/// **was** an **welchem** Objekt getan — bewusst ohne Inhalte
+/// (Datenminimierung; Inhalte stehen im Objekt selbst bzw. sind nach
+/// Finalisierung ohnehin unveränderlich).
+class AuditEntry {
+  const AuditEntry({
+    required this.companyId,
+    required this.userId,
+    required this.action,
+    required this.entityType,
+    this.entityId,
+    required this.at,
+  });
+  final String companyId;
+  final String? userId;
+  final String action;
+  final String entityType;
+  final String? entityId;
+  final DateTime at;
+}
