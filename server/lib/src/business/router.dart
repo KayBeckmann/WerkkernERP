@@ -44,6 +44,7 @@ class BusinessRoutes {
     router.delete('/documents/<id>', _deleteDocument);
     router.post('/documents/<id>/finalize', _finalizeDocument);
     router.post('/documents/<id>/convert', _convertDocument);
+    router.post('/documents/<id>/credit-note', _createCreditNote);
     router.post('/documents/<id>/payment', _setPayment);
     router.put('/documents/<id>/due-date', _setDueDate);
 
@@ -301,6 +302,25 @@ class BusinessRoutes {
     final customer = await business.findCustomer(companyId, document.customerId);
     final convertedTo = await business.listConvertedFrom(companyId, document.id);
     final booked = await business.listTimeEntries(companyId, documentId: document.id);
+    final totals = _totals(items);
+    final source = document.convertedFromId == null ? null : await business.findDocument(companyId, document.convertedFromId!);
+
+    Future<List<Map<String, Object?>>> finalizedSummaries(Iterable<Document> docs) async => [
+          for (final d in docs.where((d) => !d.isDraft))
+            {'id': d.id, 'number': d.number, 'grossCents': _totals(await business.itemsFor(companyId, d.id)).totalGross.cents},
+        ];
+    // C13: Schlussrechnung (aus demselben Auftrag, selbst kein Abschlag)
+    // listet jede finalisierte Abschlagsrechnung einzeln mit Nummer.
+    final advancePayments = (document.kind == 'invoice' && !document.isAdvancePayment && source != null)
+        ? await finalizedSummaries(
+            (await business.listConvertedFrom(companyId, source.id))
+                .where((d) => d.kind == 'invoice' && d.isAdvancePayment && d.id != document.id),
+          )
+        : const <Map<String, Object?>>[];
+    final creditNotes = document.kind == 'invoice'
+        ? await finalizedSummaries((await business.listConvertedFrom(companyId, document.id)).where((d) => d.kind == 'creditNote'))
+        : const <Map<String, Object?>>[];
+    final advanceSum = advancePayments.fold<int>(0, (sum, a) => sum + (a['grossCents'] as int));
     return jsonOk({
       ...document.toJson(),
       'customerName': customer?.name,
@@ -311,7 +331,11 @@ class BusinessRoutes {
         for (final d in convertedTo) {'id': d.id, 'kind': d.kind, 'number': d.number, 'status': d.status},
       ],
       'items': [for (final i in items) i.toJson()],
-      'totals': _totalsJson(_totals(items)),
+      'totals': _totalsJson(totals),
+      'convertedFromNumber': source?.number,
+      'advancePayments': advancePayments,
+      if (advancePayments.isNotEmpty) 'remainingCents': totals.totalGross.cents - advanceSum,
+      'creditNotes': creditNotes,
     }, status: status);
   }
 
@@ -461,6 +485,17 @@ class BusinessRoutes {
     if (issueDate == null || serviceDate == null) return jsonError('issueDate/serviceDate im Format JJJJ-MM-TT.');
     final parsed = await _parseItems(body['items'], companyId, id);
     if (parsed.error != null) return jsonError(parsed.error!);
+    final isAdvancePayment = body['isAdvancePayment'] as bool?;
+    if (isAdvancePayment == true) {
+      if (existing.kind != 'invoice') return jsonError('Abschlagsrechnung gibt es nur bei Rechnungen.');
+      if (!(await _enabledModules(check.auth!)).contains('advancePaymentInvoices')) {
+        return jsonError('Modul "advancePaymentInvoices" ist für diese Firma nicht aktiviert.', status: 403);
+      }
+    }
+    final isFixedPrice = body['isFixedPrice'] as bool?;
+    if (isFixedPrice != null && !{'quote', 'order'}.contains(existing.kind)) {
+      return jsonError('Festpreis-Kennzeichen gibt es nur bei Angebot/Auftrag.');
+    }
 
     try {
       final updated = await business.updateDraft(
@@ -474,6 +509,8 @@ class BusinessRoutes {
         notes: body.containsKey('notes') ? _trimmed(body['notes']) : existing.notes,
         items: parsed.items!,
         now: DateTime.now().toUtc(),
+        isAdvancePayment: isAdvancePayment,
+        isFixedPrice: isFixedPrice,
       );
       if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
       await auth.audit(check.auth!, 'document.update', existing.kind, id);
@@ -639,10 +676,25 @@ class BusinessRoutes {
     final now = DateTime.now().toUtc();
     final newId = _uuid.v4();
     final sourceItems = await business.itemsFor(companyId, id);
+    // C3.2 Zeit und Material: Auftrag ohne Festpreis -> Rechnung ersetzt
+    // die geplanten Stunden-Positionen durch EINE Position mit den
+    // gebuchten Ist-Stunden (Preis/USt/Einheit der ersten Stunden-
+    // Position) — wie offline, nur bei aktiver Zeiterfassung.
+    final hoursItems = sourceItems.where((i) => i.kind == 'hours').toList();
+    final timeAndMaterial = source.kind == 'order' &&
+        targetKind == 'invoice' &&
+        !source.isFixedPrice &&
+        hoursItems.isNotEmpty &&
+        (await _enabledModules(session)).contains('timeTracking');
+    Decimal? bookedHours;
+    if (timeAndMaterial) {
+      bookedHours = (await business.listTimeEntries(companyId, documentId: id))
+          .fold<Decimal>(Decimal.zero, (sum, t) => sum + Decimal.parse(t.hours));
+    }
     var sortOrder = 0;
     final items = [
       for (final item in sourceItems)
-        if (!(targetKind == 'deliveryNote' && item.kind == 'hours'))
+        if (!(targetKind == 'deliveryNote' && item.kind == 'hours') && !(timeAndMaterial && item.kind == 'hours'))
           DocumentItem(
             id: _uuid.v4(),
             documentId: newId,
@@ -657,6 +709,19 @@ class BusinessRoutes {
             groupLabel: item.groupLabel,
             sortOrder: sortOrder++,
           ),
+      if (timeAndMaterial)
+        DocumentItem(
+          id: _uuid.v4(),
+          documentId: newId,
+          kind: 'hours',
+          description: 'Geleistete Stunden (Ist-Zeit)',
+          quantity: bookedHours.toString(),
+          unitPriceCents: hoursItems.first.unitPriceCents,
+          vatRatePercent: hoursItems.first.vatRatePercent,
+          unit: hoursItems.first.unit,
+          groupLabel: hoursItems.first.groupLabel,
+          sortOrder: sortOrder++,
+        ),
     ];
     final draft = Document(
       id: newId,
@@ -673,8 +738,9 @@ class BusinessRoutes {
       updatedAt: now,
       version: 1,
       convertedFromId: source.id,
-      // Projektzuordnung wandert mit (wie offline convertTo()).
+      // Projektzuordnung und Festpreis wandern mit (wie offline convertTo()).
       projectId: source.projectId,
+      isFixedPrice: source.isFixedPrice,
     );
     await business.createDocument(draft, items);
     await auth.audit(session, 'document.convert', targetKind, newId);
@@ -1078,5 +1144,57 @@ class BusinessRoutes {
     } on BusinessConflict catch (e) {
       return jsonError(e.message, status: 409);
     }
+  }
+
+  /// Gutschrift zu einer finalisierten Rechnung (eigener Kreis "G",
+  /// Modul creditNotes): kopiert alle Positionen als Entwurf, der vor dem
+  /// Finalisieren auf eine Teil-Gutschrift gekürzt werden kann — wie
+  /// offline, bewusst nicht über die allgemeine Umwandlung.
+  Future<Response> _createCreditNote(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'invoices.write', requiredModule: 'creditNotes');
+    if (check.error != null) return check.error!;
+    final ctx = check.auth!;
+    final companyId = ctx.session.companyId;
+    final source = await business.findDocument(companyId, id);
+    if (source == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    if (source.kind != 'invoice') return jsonError('Eine Gutschrift gibt es nur zu einer Rechnung.', status: 409);
+    if (source.isDraft) return jsonError('Nur eine finalisierte Rechnung kann eine Gutschrift erhalten.', status: 409);
+    final now = DateTime.now().toUtc();
+    final newId = _uuid.v4();
+    final items = [
+      for (final item in await business.itemsFor(companyId, id))
+        DocumentItem(
+          id: _uuid.v4(),
+          documentId: newId,
+          kind: item.kind,
+          articleId: item.articleId,
+          description: item.description,
+          quantity: item.quantity,
+          unitPriceCents: item.unitPriceCents,
+          vatRatePercent: item.vatRatePercent,
+          unit: item.unit,
+          discountPercent: item.discountPercent,
+          groupLabel: item.groupLabel,
+          sortOrder: item.sortOrder,
+        ),
+    ];
+    final draft = Document(
+      id: newId,
+      companyId: companyId,
+      customerId: source.customerId,
+      kind: 'creditNote',
+      status: 'draft',
+      issueDate: DateTime.utc(now.year, now.month, now.day),
+      serviceDate: source.serviceDate,
+      createdByUserId: ctx.session.userId,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      convertedFromId: source.id,
+      projectId: source.projectId,
+    );
+    await business.createDocument(draft, items);
+    await auth.audit(ctx, 'document.creditNote', 'creditNote', newId);
+    return _documentResponse(companyId, draft, status: 201);
   }
 }

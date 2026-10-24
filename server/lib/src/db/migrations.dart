@@ -21,6 +21,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step6AgentTokensApprovals,
   _step7TimeTracking,
   _step8Projects,
+  _step9AdvanceFixedPrice,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -172,4 +173,10 @@ Future<void> _step8Projects(Session db) async {
   await db.execute(
     'ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS project_id TEXT REFERENCES projects(id) ON DELETE RESTRICT',
   );
+}
+
+/// C13 Abschlagsrechnung + C3.2 Festpreis-Kennzeichen online.
+Future<void> _step9AdvanceFixedPrice(Session db) async {
+  await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_advance_payment BOOLEAN NOT NULL DEFAULT false');
+  await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_fixed_price BOOLEAN NOT NULL DEFAULT false');
 }

@@ -194,13 +194,21 @@ class WerkkernApiClient {
     String? customerId,
     String? notes,
     String? idempotencyKey,
+    bool? isAdvancePayment,
+    bool? isFixedPrice,
   }) async =>
       OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', idempotencyKey: idempotencyKey, body: {
         'version': version,
         'items': [for (final i in items) i.toJson()],
         'customerId': ?customerId,
         'notes': notes,
+        'isAdvancePayment': ?isAdvancePayment,
+        'isFixedPrice': ?isFixedPrice,
       })));
+
+  /// Gutschrift-Entwurf zu einer finalisierten Rechnung (Modul creditNotes).
+  Future<OnlineDocument> createCreditNote(String invoiceId) async =>
+      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$invoiceId/credit-note')));
 
   Future<void> deleteDocument(String id) => _send('DELETE', '/documents/$id');
 

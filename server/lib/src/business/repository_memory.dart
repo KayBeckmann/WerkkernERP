@@ -232,6 +232,8 @@ class InMemoryBusinessRepository implements BusinessRepository {
     required String? notes,
     required List<DocumentItem> items,
     required DateTime now,
+    bool? isAdvancePayment,
+    bool? isFixedPrice,
   }) async {
     // Bewusst ohne await zwischen Prüfung und Schreiben — damit ist der
     // Abschnitt in Dart (single-threaded) atomar, wie die
@@ -248,6 +250,8 @@ class InMemoryBusinessRepository implements BusinessRepository {
       notes: () => notes,
       updatedAt: now,
       version: existing.version + 1,
+      isAdvancePayment: isAdvancePayment,
+      isFixedPrice: isFixedPrice,
     );
     _documents[index] = updated;
     _items.removeWhere((i) => i.documentId == id);
