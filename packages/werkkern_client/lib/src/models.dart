@@ -160,6 +160,12 @@ class OnlineDocument {
     this.paidAt,
     this.dueDate,
     this.projectId,
+    this.isAdvancePayment = false,
+    this.isFixedPrice = false,
+    this.convertedFromNumber,
+    this.advancePayments = const [],
+    this.remainingCents,
+    this.creditNotes = const [],
     required this.version,
     this.items = const [],
     this.netCents,
@@ -189,6 +195,12 @@ class OnlineDocument {
       companySnapshot: companySnapshot == null ? null : OnlineCompanyProfile.fromJson(companySnapshot),
       customerName: j['customerName'] as String?,
       convertedFromId: j['convertedFromId'] as String?,
+      isAdvancePayment: j['isAdvancePayment'] as bool? ?? false,
+      isFixedPrice: j['isFixedPrice'] as bool? ?? false,
+      convertedFromNumber: j['convertedFromNumber'] as String?,
+      advancePayments: _summaries(j['advancePayments']),
+      remainingCents: j['remainingCents'] as int?,
+      creditNotes: _summaries(j['creditNotes']),
       convertedTo: [
         for (final c in (j['convertedTo'] as List? ?? const []))
           (
@@ -256,6 +268,33 @@ class OnlineDocument {
 
   /// Projektzuordnung (C1 online).
   final String? projectId;
+
+  /// C13: diese Rechnung ist eine Abschlagsrechnung.
+  final bool isAdvancePayment;
+
+  /// C3.2: Festpreis vereinbart (Angebot/Auftrag).
+  final bool isFixedPrice;
+
+  /// Nummer des Quelldokuments (z. B. Rechnung einer Gutschrift).
+  final String? convertedFromNumber;
+
+  /// Schlussrechnung: bereits finalisierte Abschläge desselben Auftrags.
+  final List<({String id, String? number, int grossCents})> advancePayments;
+
+  /// Brutto abzüglich [advancePayments] (nur wenn es Abschläge gibt).
+  final int? remainingCents;
+
+  /// Rechnung: finalisierte Gutschriften dazu.
+  final List<({String id, String? number, int grossCents})> creditNotes;
+
+  static List<({String id, String? number, int grossCents})> _summaries(Object? raw) => [
+        for (final s in (raw as List? ?? const []))
+          (
+            id: (s as Map<String, Object?>)['id'] as String,
+            number: s['number'] as String?,
+            grossCents: s['grossCents'] as int,
+          ),
+      ];
 
   /// Was angezeigt wird: bei finalisierten Dokumenten der eingefrorene
   /// Schnappschuss, bei Entwürfen der aktuelle Stammdatenname.

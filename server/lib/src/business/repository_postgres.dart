@@ -171,7 +171,7 @@ class PostgresBusinessRepository implements BusinessRepository {
       'd.payment_terms, d.notes, d.customer_snapshot_name, d.customer_snapshot_address, d.customer_snapshot_vat_id, '
       'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version, '
       'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban, '
-      'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id';
+      'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -203,6 +203,8 @@ class PostgresBusinessRepository implements BusinessRepository {
         paidAt: r[26] as DateTime?,
         dueDate: r[27] as DateTime?,
         projectId: r[28] as String?,
+        isAdvancePayment: r[29] as bool,
+        isFixedPrice: r[30] as bool,
       );
 
   @override
@@ -288,9 +290,10 @@ class PostgresBusinessRepository implements BusinessRepository {
       await s.execute(
         Sql.named(
           'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
-          'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id) VALUES (@id, '
-          '@companyId, @customerId, @kind, @status, @issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, '
-          '@createdAt, @updatedAt, @version, @convertedFromId, @projectId)',
+          'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id, '
+          'is_advance_payment, is_fixed_price) VALUES (@id, @companyId, @customerId, @kind, @status, @issueDate, '
+          '@serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version, @convertedFromId, '
+          '@projectId, @advance, @fixed)',
         ),
         parameters: {
           'id': d.id,
@@ -308,6 +311,8 @@ class PostgresBusinessRepository implements BusinessRepository {
           'version': d.version,
           'convertedFromId': d.convertedFromId,
           'projectId': d.projectId,
+          'advance': d.isAdvancePayment,
+          'fixed': d.isFixedPrice,
         },
       );
       await _insertItems(s, items);
@@ -343,14 +348,17 @@ class PostgresBusinessRepository implements BusinessRepository {
     required String? notes,
     required List<DocumentItem> items,
     required DateTime now,
+    bool? isAdvancePayment,
+    bool? isFixedPrice,
   }) async {
     final updated = await _db.runTx((s) async {
       if (await _lockDraft(s, companyId, id, expectedVersion) == null) return false;
       await s.execute(
         Sql.named(
           'UPDATE documents SET customer_id = @customerId, issue_date = @issueDate, service_date = @serviceDate, '
-          'payment_terms = @paymentTerms, notes = @notes, updated_at = @now, version = version + 1 '
-          'WHERE company_id = @companyId AND id = @id',
+          'payment_terms = @paymentTerms, notes = @notes, updated_at = @now, version = version + 1, '
+          'is_advance_payment = coalesce(@advance, is_advance_payment), '
+          'is_fixed_price = coalesce(@fixed, is_fixed_price) WHERE company_id = @companyId AND id = @id',
         ),
         parameters: {
           'customerId': customerId,
@@ -361,6 +369,8 @@ class PostgresBusinessRepository implements BusinessRepository {
           'now': now,
           'companyId': companyId,
           'id': id,
+          'advance': TypedValue(Type.boolean, isAdvancePayment),
+          'fixed': TypedValue(Type.boolean, isFixedPrice),
         },
       );
       await s.execute(Sql.named('DELETE FROM document_items WHERE document_id = @id'), parameters: {'id': id});

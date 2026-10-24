@@ -28,6 +28,8 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   late final _notes = TextEditingController();
   bool _dirty = false;
   bool _busy = true;
+  bool _isAdvancePayment = false;
+  bool _isFixedPrice = false;
   String? _error;
 
   WerkkernApiClient get _client => widget.session.client;
@@ -176,6 +178,8 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     _document = document;
     _items = [...document.items];
     _notes.text = document.notes ?? '';
+    _isAdvancePayment = document.isAdvancePayment;
+    _isFixedPrice = document.isFixedPrice;
     _dirty = false;
   }
 
@@ -256,6 +260,8 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           items: _items,
           notes: notes,
           idempotencyKey: opId,
+          isAdvancePayment: _document!.kind == 'invoice' ? _isAdvancePayment : null,
+          isFixedPrice: {'quote', 'order'}.contains(_document!.kind) ? _isFixedPrice : null,
         ),
         'Gespeichert.',
         rethrowUnreachable: _pinned,
@@ -358,6 +364,22 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     }
   }
 
+  Future<void> _createCreditNote() async {
+    setState(() => _busy = true);
+    try {
+      final created = await _client.createCreditNote(widget.documentId);
+      if (!mounted) return;
+      _snack('Gutschrift als Entwurf angelegt — vor dem Finalisieren ggf. kürzen.');
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: created.id)),
+      );
+    } on Exception catch (e) {
+      if (mounted) _snack(describeOnlineError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _togglePaid() =>
       _run(() => _client.setPaid(widget.documentId, paid: !_document!.isPaid), 'Zahlungsstatus gespeichert.');
 
@@ -441,6 +463,29 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                     ),
                   ),
               ],
+            ),
+          ),
+        if (document.creditNotes.isNotEmpty)
+          Card(
+            child: Column(
+              children: [
+                for (final c in document.creditNotes)
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.undo),
+                    title: Text('Gutschrift ${c.number ?? ''}'),
+                    trailing: Text('− ${Money.fromCents(c.grossCents)}'),
+                  ),
+              ],
+            ),
+          ),
+        if (document.kind == 'invoice' && session.modules.contains('creditNotes') && session.can('invoices.write'))
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : _createCreditNote,
+              icon: const Icon(Icons.undo),
+              label: const Text('Gutschrift erstellen'),
             ),
           ),
         if (canConvert)
@@ -583,7 +628,10 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           ),
         Card(
           child: ListTile(
-            title: Text(document.isDraft ? '$label · Entwurf' : '$label · finalisiert'),
+            title: Text(
+              '${document.isAdvancePayment ? 'Abschlagsrechnung' : label} · ${document.isDraft ? 'Entwurf' : 'finalisiert'}'
+              '${document.kind == 'creditNote' && document.convertedFromNumber != null ? ' · zu ${document.convertedFromNumber}' : ''}',
+            ),
             subtitle: Text(
               [
                 'Datum ${dateFormat.format(document.issueDate)}',
@@ -625,6 +673,30 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Position hinzufügen')),
           ),
+        if (_editable && document.kind == 'invoice' && widget.session.modules.contains('advancePaymentInvoices'))
+          SwitchListTile(
+            title: const Text('Abschlagsrechnung'),
+            subtitle: const Text('Eine spätere Schlussrechnung aus demselben Auftrag zieht sie einzeln ab.'),
+            value: _isAdvancePayment,
+            onChanged: _offlineView
+                ? null
+                : (v) => setState(() {
+                      _isAdvancePayment = v;
+                      _dirty = true;
+                    }),
+          ),
+        if (_editable && {'quote', 'order'}.contains(document.kind))
+          SwitchListTile(
+            title: const Text('Festpreis vereinbart'),
+            subtitle: const Text('Ohne Festpreis übernimmt die Rechnung die gebuchten Ist-Stunden.'),
+            value: _isFixedPrice,
+            onChanged: _offlineView
+                ? null
+                : (v) => setState(() {
+                      _isFixedPrice = v;
+                      _dirty = true;
+                    }),
+          ),
         const SizedBox(height: 8),
         TextField(
           controller: _notes,
@@ -645,6 +717,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                 _row('Netto', totals.totalNet.toString()),
                 _row('USt', totals.totalTax.toString()),
                 _row('Brutto', totals.totalGross.toString(), bold: true),
+                // C13: jede Abschlagsrechnung einzeln mit Nummer (wie offline).
+                for (final a in document.advancePayments)
+                  _row('Abschlagsrechnung ${a.number ?? ''}', '− ${Money.fromCents(a.grossCents)}'),
+                if (document.remainingCents != null && !_dirty)
+                  _row('Restbetrag', Money.fromCents(document.remainingCents!).toString(), bold: true),
               ],
             ),
           ),

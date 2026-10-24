@@ -96,11 +96,14 @@ void runProjectTests(Future<(PhaseBRepository, BusinessRepository)> Function() c
     final detail = await a.client.request('GET', '/projects/${project['id']}') as Map;
     expect((detail['documents'] as List), hasLength(2));
     final result = detail['result'] as Map;
-    expect(result['invoiceGrossCents'], 77350); // 10 x 65 € + 19 %
+    // Auftrag ohne Festpreis -> Rechnung mit den auf den AUFTRAG gebuchten
+    // Ist-Stunden (2,5 h; die 1 h direkt aufs Projekt zählt dort nicht):
+    // 2,5 × 65 € × 1,19 = 193,375 € -> kaufmännisch 193,38 €.
+    expect(result['invoiceGrossCents'], 19338);
     expect(result['plannedHours'], '10');
     expect(result['bookedHours'], '3.5');
     expect(result['hoursCostCents'], 14000); // 3,5 h x 40 €
-    expect(result['resultCents'], 77350 - 14000);
+    expect(result['resultCents'], 19338 - 14000);
   });
 
   test('Mandantentrennung, Löschschutz, Archiv und Rechte', () async {

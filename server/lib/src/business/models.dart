@@ -122,6 +122,8 @@ class Document {
     this.paidAt,
     this.dueDate,
     this.projectId,
+    this.isAdvancePayment = false,
+    this.isFixedPrice = false,
   });
   final String id;
   final String companyId;
@@ -160,6 +162,15 @@ class Document {
   /// C1 online: optionale Projektzuordnung (jede Dokumentart).
   final String? projectId;
 
+  /// C13: Abschlagsrechnung (nur Rechnung) — eine spätere Schlussrechnung
+  /// aus demselben Auftrag zieht sie einzeln ab.
+  final bool isAdvancePayment;
+
+  /// C3.2: Festpreis vereinbart (Angebot/Auftrag). Ohne Festpreis ersetzt
+  /// die Umwandlung Auftrag -> Rechnung die geplanten Stunden durch die
+  /// gebuchten Ist-Stunden (Zeit und Material).
+  final bool isFixedPrice;
+
   bool get isDraft => status == 'draft';
 
   /// Kopie mit geänderten Feldern — verhindert, dass beim Aktualisieren
@@ -184,6 +195,8 @@ class Document {
     DateTime? Function()? paidAt,
     DateTime? Function()? dueDate,
     String? Function()? projectId,
+    bool? isAdvancePayment,
+    bool? isFixedPrice,
   }) =>
       Document(
         id: id,
@@ -215,6 +228,8 @@ class Document {
         paidAt: paidAt != null ? paidAt() : this.paidAt,
         dueDate: dueDate != null ? dueDate() : this.dueDate,
         projectId: projectId != null ? projectId() : this.projectId,
+        isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
+        isFixedPrice: isFixedPrice ?? this.isFixedPrice,
       );
 
   Map<String, Object?> toJson() => {
@@ -249,6 +264,8 @@ class Document {
         'paidAt': paidAt?.toIso8601String(),
         'dueDate': dueDate == null ? null : _date(dueDate!),
         'projectId': projectId,
+        'isAdvancePayment': isAdvancePayment,
+        'isFixedPrice': isFixedPrice,
       };
 }
 

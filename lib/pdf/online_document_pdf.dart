@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:werkkern_client/werkkern_client.dart';
 
 import '../data/database/tables.dart' show DocumentKind;
+import '../data/repositories/invoice_repository.dart' show AdvancePaymentEntry;
+import '../domain/models/money.dart';
 import 'invoice_pdf_builder.dart';
 
 /// PDF eines Online-Dokuments (Phase B) — derselbe Generator wie
@@ -24,6 +26,13 @@ Future<Uint8List> buildOnlineDocumentPdf(
     liveCustomer: liveCustomer,
   ),
   isPreview: document.isDraft,
+  // C13: Schlussrechnung listet jede Abschlagsrechnung einzeln (wie offline).
+  priorAdvancePayments: [
+    for (final a in document.advancePayments)
+      AdvancePaymentEntry(invoiceNumber: a.number ?? '', amountGross: Money.fromCents(a.grossCents)),
+  ],
+  // Gutschrift: "Gutschrift zur Rechnung <Nummer>" im Kopf.
+  referencedDocumentNumber: document.kind == 'creditNote' ? document.convertedFromNumber : null,
 );
 
 /// Abbildung auf das neutrale PDF-Modell — separat, damit testbar ist,
@@ -37,6 +46,7 @@ PdfDocumentData onlineDocumentPdfData(
   final company = isPreview ? liveCompany : document.companySnapshot;
   return PdfDocumentData(
     kind: DocumentKind.values.byName(document.kind),
+    isAdvancePayment: document.isAdvancePayment,
     invoiceNumber: document.number,
     issueDate: document.issueDate,
     serviceDate: document.serviceDate,

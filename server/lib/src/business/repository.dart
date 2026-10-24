@@ -43,6 +43,8 @@ abstract class BusinessRepository {
     required String? notes,
     required List<DocumentItem> items,
     required DateTime now,
+    bool? isAdvancePayment,
+    bool? isFixedPrice,
   });
 
   Future<bool> deleteDraft(String companyId, String id);
