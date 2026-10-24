@@ -323,6 +323,7 @@ class BusinessRoutes {
     final advanceSum = advancePayments.fold<int>(0, (sum, a) => sum + (a['grossCents'] as int));
     return jsonOk({
       ...document.toJson(),
+      'editable': isDocumentEditable(kind: document.kind, isDraft: document.isDraft, hasConversions: convertedTo.isNotEmpty),
       'customerName': customer?.name,
       // C3: "Geplant laut Angebot vs. gebucht" — Summe aller auf dieses
       // Dokument gebuchten Stunden (Firmensicht, ohne Personenbezug).
@@ -484,6 +485,10 @@ class BusinessRoutes {
     final version = body['version'];
     if (version is! int) return jsonError('version (Ganzzahl) ist Pflicht — Schutz vor stillem Überschreiben.');
     final customerId = body['customerId'] as String? ?? existing.customerId;
+    // Finalisiert ist der Kunde als Schnappschuss eingefroren.
+    if (!existing.isDraft && customerId != existing.customerId) {
+      return jsonError('Der Kunde eines finalisierten Dokuments kann nicht gewechselt werden.', status: 409);
+    }
     if (await business.findCustomer(companyId, customerId) == null) {
       return jsonError('Kunde nicht gefunden.', status: 404);
     }
@@ -759,7 +764,11 @@ class BusinessRoutes {
       projectId: source.projectId,
       isFixedPrice: source.isFixedPrice,
     );
-    await business.createDocument(draft, items);
+    try {
+      await business.createDocument(draft, items, expectedSourceVersion: source.version);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
     await auth.audit(session, 'document.convert', targetKind, newId);
     return _documentResponse(companyId, draft, status: 201);
   }

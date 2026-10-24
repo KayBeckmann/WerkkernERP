@@ -35,3 +35,12 @@ const documentConversionTargets = <String, Set<String>>{
   'order': {'deliveryNote', 'invoice'},
   'proforma': {'invoice'},
 };
+
+/// Ob ein Dokument noch bearbeitet werden darf — dieselbe Regel wie
+/// `InvoiceRepository.isEditable()` der Offline-App (F3-Verfeinerung,
+/// online bestätigt durch Kay 2026-10-24): Entwürfe immer; ein
+/// finalisiertes Dokument nur, wenn es Quelle einer Umwandlung sein
+/// kann (Angebot/Auftrag/Proforma) und noch keine daraus entstanden ist.
+/// Nummer und Schnappschüsse bleiben beim Bearbeiten unverändert.
+bool isDocumentEditable({required String kind, required bool isDraft, required bool hasConversions}) =>
+    isDraft || (documentConversionTargets.containsKey(kind) && !hasConversions);

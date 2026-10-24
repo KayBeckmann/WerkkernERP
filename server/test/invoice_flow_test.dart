@@ -4,6 +4,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:test/test.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 
+import 'package:werkkernerp_server/src/business/models.dart';
 import 'package:werkkernerp_server/src/business/repository.dart';
 import 'package:werkkernerp_server/src/business/repository_memory.dart';
 import 'package:werkkernerp_server/src/repository.dart';
@@ -18,16 +19,19 @@ void main() => runInvoiceFlowTests(() async => (InMemoryPhaseBRepository(), InMe
 /// nach denselben Regeln wie offline.
 void runInvoiceFlowTests(Future<(PhaseBRepository, BusinessRepository)> Function() create) {
   late HttpServer server;
+  late (PhaseBRepository, BusinessRepository) repositories;
   late WerkkernApiClient c;
   late String customerId;
+  late String companyId;
   final yy = (DateTime.now().toUtc().year % 100).toString().padLeft(2, '0');
 
   setUp(() async {
-    final (repository, business) = await create();
+    repositories = await create();
+    final (repository, business) = repositories;
     server = await shelf_io.serve(PhaseBRouter(repository: repository, business: business).handler.call, InternetAddress.loopbackIPv4, 0);
     c = WerkkernApiClient(baseUrl: Uri.parse('http://127.0.0.1:${server.port}'));
     await c.register('chef@example.com', 'passwort-12345');
-    final companyId = await c.createCompany((await c.login('chef@example.com', 'passwort-12345')).identityToken, 'Firma');
+    companyId = await c.createCompany((await c.login('chef@example.com', 'passwort-12345')).identityToken, 'Firma');
     await c.selectCompany((await c.login('chef@example.com', 'passwort-12345')).identityToken, companyId);
     await clearGroupPermissions(c);
     final own = (await c.groups()).firstWhere((g) => g.name == 'Projektleiter').id;
@@ -57,6 +61,69 @@ void runInvoiceFlowTests(Future<(PhaseBRepository, BusinessRepository)> Function
     }
     return post('/documents/${order['id']}/finalize', {'version': version});
   }
+
+  test('Finalisierter Auftrag bleibt bearbeitbar bis zur ersten Umwandlung (wie offline)', () async {
+    Matcher conflict() => throwsA(isA<ApiException>().having((e) => e.isConflict, '409', isTrue));
+    final order = await finalizedOrder();
+    expect(order['editable'], isTrue);
+    final number = order['number'];
+    final edited = await put('/documents/${order['id']}', {
+      'version': order['version'],
+      'items': [orderItems.first],
+      'notes': 'Nachtrag',
+    });
+    expect(edited['status'], 'finalized');
+    expect(edited['number'], number, reason: 'Nummer bleibt beim Bearbeiten');
+    expect(edited['notes'], 'Nachtrag');
+    expect((edited['items'] as List), hasLength(1));
+
+    // Kundenwechsel: Schnappschuss ist eingefroren.
+    final other = (await c.createCustomer(const OnlineCustomer(id: '', name: 'Schulz'))).id;
+    await expectLater(
+        put('/documents/${order['id']}', {'version': edited['version'], 'items': orderItems, 'customerId': other}), conflict());
+
+    // Umwandlung übernimmt die bearbeitete Fassung, danach gesperrt.
+    final invoice = await post('/documents/${order['id']}/convert', {'kind': 'invoice'});
+    expect((invoice['items'] as List).map((i) => (i as Map)['description']), ['Kabel']);
+    final reloaded = await c.request('GET', '/documents/${order['id']}') as Map<String, Object?>;
+    expect(reloaded['editable'], isFalse);
+    await expectLater(put('/documents/${order['id']}', {'version': reloaded['version'], 'items': orderItems}), conflict());
+
+    // Finalisierte Rechnung ist nie bearbeitbar.
+    final finalInvoice = await post('/documents/${invoice['id']}/finalize', {'version': invoice['version']});
+    expect(finalInvoice['editable'], isFalse);
+    await expectLater(put('/documents/${invoice['id']}', {'version': finalInvoice['version'], 'items': orderItems}), conflict());
+  });
+
+  test('Umwandlung mit veralteter Quelle wird abgewiesen, Bearbeitung rutscht nicht durch', () async {
+    final order = await finalizedOrder();
+    final edited = await put('/documents/${order['id']}', {'version': order['version'], 'items': orderItems, 'notes': 'neu'});
+    expect(edited['version'], (order['version'] as int) + 1);
+    // Direkt am Repository: Umwandlung, die noch die alte Quellversion kennt.
+    final (_, business) = repositories;
+    final stale = (await business.findDocument(companyId, order['id'] as String))!;
+    final draft = Document(
+      id: 'stale-conversion',
+      companyId: stale.companyId,
+      customerId: stale.customerId,
+      kind: 'invoice',
+      status: 'draft',
+      issueDate: stale.issueDate,
+      serviceDate: stale.serviceDate,
+      paymentTerms: null,
+      notes: null,
+      createdByUserId: stale.createdByUserId,
+      createdAt: stale.createdAt,
+      updatedAt: stale.updatedAt,
+      version: 1,
+      convertedFromId: stale.id,
+    );
+    await expectLater(
+      business.createDocument(draft, const [], expectedSourceVersion: order['version'] as int),
+      throwsA(isA<BusinessConflict>()),
+    );
+    expect(await business.listConvertedFrom(stale.companyId, stale.id), isEmpty);
+  });
 
   test('Ohne Festpreis: Rechnung übernimmt die gebuchten Ist-Stunden statt der geplanten', () async {
     final order = await finalizedOrder();

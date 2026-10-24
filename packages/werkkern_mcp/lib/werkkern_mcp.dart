@@ -116,7 +116,8 @@ final List<_Tool> _tools = [
   ),
   _Tool(
     'update_document_draft',
-    'Entwurf ersetzen (alle Positionen). version = zuletzt gelesene Version; bei Konflikt neu lesen.',
+    'Dokument ersetzen (alle Positionen), nur wenn get_document editable=true liefert: Entwurf, oder finalisiertes '
+        'Angebot/Auftrag/Proforma ohne Umwandlung (Nummer bleibt). version = zuletzt gelesene Version; bei Konflikt neu lesen.',
     _object({
       'id': _string,
       'version': {'type': 'integer'},
