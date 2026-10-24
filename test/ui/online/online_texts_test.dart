@@ -46,6 +46,8 @@ void main() {
     await tester.tap(find.text('Firmendaten speichern'));
     await tester.pumpAndSettle();
     expect(find.text('Firmendaten gespeichert.'), findsOneWidget);
+    // Die Snackbar wandert mit zurück und verdeckt sonst „Neues Dokument“.
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar();
     await tester.pageBack();
     await tester.pumpAndSettle();
 
