@@ -19,6 +19,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step4ConversionAndPayment,
   _step5IdempotencyKeys,
   _step6AgentTokensApprovals,
+  _step7TimeTracking,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -123,4 +124,26 @@ Future<void> _step6AgentTokensApprovals(Session db) async {
     );
   ''');
   await db.execute('CREATE INDEX IF NOT EXISTS pending_approvals_user_idx ON pending_approvals (company_id, user_id, status)');
+}
+
+/// C3 online: Zeiterfassung mit echten Benutzerkonten und Stundensatz je
+/// Mitgliedschaft (beim Buchen eingefroren).
+Future<void> _step7TimeTracking(Session db) async {
+  await db.execute('ALTER TABLE memberships ADD COLUMN IF NOT EXISTS hourly_cost_cents BIGINT');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS time_entries (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES app_users(id),
+      document_id TEXT REFERENCES documents(id) ON DELETE RESTRICT,
+      work_date DATE NOT NULL,
+      hours TEXT NOT NULL,
+      note TEXT,
+      hourly_cost_cents BIGINT,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS time_entries_company_idx ON time_entries (company_id, work_date)');
+  await db.execute('CREATE INDEX IF NOT EXISTS time_entries_document_idx ON time_entries (document_id)');
 }

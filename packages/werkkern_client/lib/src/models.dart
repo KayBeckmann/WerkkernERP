@@ -283,6 +283,7 @@ class OnlineMember {
     required this.groupName,
     required this.isAdmin,
     required this.active,
+    this.hourlyCostCents,
   });
   factory OnlineMember.fromJson(Map<String, Object?> j) => OnlineMember(
         id: j['id'] as String,
@@ -291,7 +292,11 @@ class OnlineMember {
         groupName: j['groupName'] as String? ?? '?',
         isAdmin: j['isAdmin'] as bool,
         active: j['active'] as bool,
+        hourlyCostCents: j['hourlyCostCents'] as int?,
       );
+
+  /// Stundenkostensatz dieses Mitglieds (Zeiterfassung), `null` = nicht gepflegt.
+  final int? hourlyCostCents;
   final String id;
   final String email;
   final String groupId;
@@ -352,4 +357,40 @@ class OnlineAuditEntry {
   final String? userEmail;
   final String action;
   final String entityType;
+}
+
+/// Zeitbuchung (C3 online) eines Nutzers auf einen Auftrag/eine Rechnung.
+class OnlineTimeEntry {
+  const OnlineTimeEntry({
+    required this.id,
+    required this.userId,
+    this.userEmail,
+    this.documentId,
+    required this.date,
+    required this.hours,
+    this.note,
+    this.hourlyCostCents,
+  });
+  factory OnlineTimeEntry.fromJson(Map<String, Object?> j) => OnlineTimeEntry(
+        id: j['id'] as String,
+        userId: j['userId'] as String,
+        userEmail: j['userEmail'] as String?,
+        documentId: j['documentId'] as String?,
+        date: DateTime.parse(j['date'] as String),
+        hours: j['hours'] as String,
+        note: j['note'] as String?,
+        hourlyCostCents: j['hourlyCostCents'] as int?,
+      );
+  final String id;
+  final String userId;
+  final String? userEmail;
+  final String? documentId;
+  final DateTime date;
+
+  /// Dezimal als Text ("1.5").
+  final String hours;
+  final String? note;
+
+  /// Beim Buchen eingefrorener Stundensatz des Mitglieds (`null` = nicht gepflegt).
+  final int? hourlyCostCents;
 }

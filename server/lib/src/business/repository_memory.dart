@@ -9,6 +9,47 @@ class InMemoryBusinessRepository implements BusinessRepository {
   final List<Document> _documents = [];
   final List<DocumentItem> _items = [];
   final Map<String, int> _sequences = {};
+  final List<TimeEntry> _timeEntries = [];
+
+  @override
+  Future<List<TimeEntry>> listTimeEntries(
+    String companyId, {
+    String? userId,
+    String? documentId,
+    DateTime? from,
+    DateTime? to,
+  }) async =>
+      _timeEntries
+          .where((t) =>
+              t.companyId == companyId &&
+              (userId == null || t.userId == userId) &&
+              (documentId == null || t.documentId == documentId) &&
+              (from == null || !t.workDate.isBefore(from)) &&
+              (to == null || !t.workDate.isAfter(to)))
+          .toList()
+        ..sort((a, b) => b.workDate.compareTo(a.workDate));
+
+  @override
+  Future<TimeEntry?> findTimeEntry(String companyId, String id) async =>
+      _timeEntries.where((t) => t.companyId == companyId && t.id == id).firstOrNull;
+
+  @override
+  Future<void> createTimeEntry(TimeEntry entry) async => _timeEntries.add(entry);
+
+  @override
+  Future<bool> updateTimeEntry(TimeEntry entry) async {
+    final i = _timeEntries.indexWhere((t) => t.companyId == entry.companyId && t.id == entry.id);
+    if (i == -1) return false;
+    _timeEntries[i] = entry;
+    return true;
+  }
+
+  @override
+  Future<bool> deleteTimeEntry(String companyId, String id) async {
+    final before = _timeEntries.length;
+    _timeEntries.removeWhere((t) => t.companyId == companyId && t.id == id);
+    return _timeEntries.length < before;
+  }
 
   bool _matches(String? value, String? query) =>
       query == null || query.isEmpty || (value ?? '').toLowerCase().contains(query.toLowerCase());
@@ -140,6 +181,9 @@ class InMemoryBusinessRepository implements BusinessRepository {
     final existing = await findDocument(companyId, id);
     if (existing == null) return false;
     if (!existing.isDraft) throw const BusinessConflict('Finalisierte Dokumente können nicht gelöscht werden.');
+    if (_timeEntries.any((t) => t.documentId == id)) {
+      throw const BusinessConflict('Auf diesen Entwurf sind Zeiten gebucht — erst umbuchen oder löschen.');
+    }
     _documents.removeWhere((d) => d.id == id);
     _items.removeWhere((i) => i.documentId == id);
     return true;

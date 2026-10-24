@@ -305,6 +305,47 @@ class CompanySnapshot {
 String _date(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+/// C3 online: Zeitbuchung eines echten Nutzers auf einen Auftrag bzw.
+/// eine Rechnung. [hourlyCostCents] ist der beim Buchen eingefrorene
+/// Stundensatz des Mitglieds (spätere Satzänderungen ändern keine
+/// gebuchten Kosten).
+class TimeEntry {
+  const TimeEntry({
+    required this.id,
+    required this.companyId,
+    required this.userId,
+    required this.documentId,
+    required this.workDate,
+    required this.hours,
+    this.note,
+    this.hourlyCostCents,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  final String id;
+  final String companyId;
+  final String userId;
+  final String? documentId;
+  final DateTime workDate;
+
+  /// Dezimal als Text (z. B. "1.5") — nie double.
+  final String hours;
+  final String? note;
+  final int? hourlyCostCents;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'userId': userId,
+        'documentId': documentId,
+        'date': _date(workDate),
+        'hours': hours,
+        'note': note,
+        'hourlyCostCents': hourlyCostCents,
+      };
+}
+
 /// Fachlicher Konflikt (409) — z. B. Bearbeiten eines finalisierten
 /// Dokuments, veraltete Version, Löschen eines referenzierten Kunden.
 class BusinessConflict implements Exception {

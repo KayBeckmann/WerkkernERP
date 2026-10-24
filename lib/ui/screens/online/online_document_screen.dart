@@ -588,6 +588,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
               [
                 'Datum ${dateFormat.format(document.issueDate)}',
                 if (document.displayCustomerName != null) 'Kunde ${document.displayCustomerName}',
+                // C3: gebuchte Ist-Stunden neben den geplanten Positionen.
+                if (document.rawJson['bookedHours'] is String && document.rawJson['bookedHours'] != '0')
+                  'Gebucht ${(document.rawJson['bookedHours'] as String).replaceAll('.', ',')} Std.',
                 'Version ${document.version}',
               ].join(' · '),
             ),
