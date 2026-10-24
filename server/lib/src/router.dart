@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import 'models.dart';
 import 'auth.dart';
 import 'business/repository.dart';
+import 'business/models.dart' show documentKindModules;
 import 'business/router.dart';
 import 'login_throttle.dart';
 import 'permission_catalog.dart';
@@ -843,6 +844,18 @@ class PhaseBRouter {
       return (value == null || value.isEmpty) ? null : value;
     }
 
+    final current = await repository.getCompanyProfile(auth.session.companyId);
+    final rawTexts = body['documentTexts'];
+    final documentTexts = rawTexts is Map<String, Object?>
+        ? {
+            for (final e in rawTexts.entries)
+              if (documentKindModules.containsKey(e.key))
+                e.key: (
+                  intro: ((e.value as Map<String, Object?>)['intro'] as String?)?.trim(),
+                  closing: ((e.value as Map<String, Object?>)['closing'] as String?)?.trim(),
+                ),
+          }
+        : current.documentTexts;
     final profile = CompanyProfile(
       companyId: auth.session.companyId,
       address: field('address'),
@@ -851,6 +864,10 @@ class PhaseBRouter {
       iban: field('iban'),
       email: field('email'),
       phone: field('phone'),
+      // Felder, die im Body fehlen, bleiben unverändert (ältere Clients).
+      footerText: body.containsKey('footerText') ? field('footerText') : current.footerText,
+      documentTexts: documentTexts,
+      smallBusinessExempt: body['smallBusinessExempt'] as bool? ?? current.smallBusinessExempt,
     );
     await repository.saveCompanyProfile(profile);
     await _auth.audit(auth, 'company.profile', 'company', auth.session.companyId);

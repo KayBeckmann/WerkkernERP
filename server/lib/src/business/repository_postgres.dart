@@ -171,7 +171,8 @@ class PostgresBusinessRepository implements BusinessRepository {
       'd.payment_terms, d.notes, d.customer_snapshot_name, d.customer_snapshot_address, d.customer_snapshot_vat_id, '
       'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version, '
       'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban, '
-      'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price';
+      'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
+      'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -205,6 +206,10 @@ class PostgresBusinessRepository implements BusinessRepository {
         projectId: r[28] as String?,
         isAdvancePayment: r[29] as bool,
         isFixedPrice: r[30] as bool,
+        introTextSnapshot: r[31] as String?,
+        closingTextSnapshot: r[32] as String?,
+        footerTextSnapshot: r[33] as String?,
+        smallBusinessExemptSnapshot: r[34] as bool,
       );
 
   @override
@@ -440,6 +445,8 @@ class PostgresBusinessRepository implements BusinessRepository {
           'updated_at = @now, version = d.version + 1, company_snapshot_name = @companyName, '
           'company_snapshot_address = @companyAddress, company_snapshot_tax_number = @companyTaxNumber, '
           'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, '
+          'intro_text_snapshot = @intro, closing_text_snapshot = @closing, footer_text_snapshot = @footer, '
+          'small_business_exempt_snapshot = @exempt, '
           'customer_snapshot_name = c.name, customer_snapshot_address = c.address, customer_snapshot_vat_id = c.vat_id '
           'FROM customers c WHERE c.id = d.customer_id AND d.company_id = @companyId AND d.id = @id',
         ),
@@ -452,6 +459,10 @@ class PostgresBusinessRepository implements BusinessRepository {
           'companyTaxNumber': company.taxNumber,
           'companyVatId': company.vatId,
           'companyIban': company.iban,
+          'intro': company.introText,
+          'closing': company.closingText,
+          'footer': company.footerText,
+          'exempt': company.smallBusinessExempt,
           'companyId': companyId,
           'id': id,
         },

@@ -124,6 +124,10 @@ class Document {
     this.projectId,
     this.isAdvancePayment = false,
     this.isFixedPrice = false,
+    this.introTextSnapshot,
+    this.closingTextSnapshot,
+    this.footerTextSnapshot,
+    this.smallBusinessExemptSnapshot = false,
   });
   final String id;
   final String companyId;
@@ -170,6 +174,11 @@ class Document {
   /// die Umwandlung Auftrag -> Rechnung die geplanten Stunden durch die
   /// gebuchten Ist-Stunden (Zeit und Material).
   final bool isFixedPrice;
+
+  final String? introTextSnapshot;
+  final String? closingTextSnapshot;
+  final String? footerTextSnapshot;
+  final bool smallBusinessExemptSnapshot;
 
   bool get isDraft => status == 'draft';
 
@@ -230,6 +239,10 @@ class Document {
         projectId: projectId != null ? projectId() : this.projectId,
         isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
         isFixedPrice: isFixedPrice ?? this.isFixedPrice,
+        introTextSnapshot: company != null ? company.introText : introTextSnapshot,
+        closingTextSnapshot: company != null ? company.closingText : closingTextSnapshot,
+        footerTextSnapshot: company != null ? company.footerText : footerTextSnapshot,
+        smallBusinessExemptSnapshot: company != null ? company.smallBusinessExempt : smallBusinessExemptSnapshot,
       );
 
   Map<String, Object?> toJson() => {
@@ -266,6 +279,14 @@ class Document {
         'projectId': projectId,
         'isAdvancePayment': isAdvancePayment,
         'isFixedPrice': isFixedPrice,
+        'textSnapshot': isDraft
+            ? null
+            : {
+                'intro': introTextSnapshot,
+                'closing': closingTextSnapshot,
+                'footer': footerTextSnapshot,
+                'smallBusinessExempt': smallBusinessExemptSnapshot,
+              },
       };
 }
 
@@ -318,12 +339,29 @@ class DocumentItem {
 /// spätere Änderung der Stammdaten verändert ein finalisiertes Dokument
 /// nicht mehr (gleicher Audit-Befund wie offline, Abweichungen.md 2.1).
 class CompanySnapshot {
-  const CompanySnapshot({required this.name, this.address, this.taxNumber, this.vatId, this.iban});
+  const CompanySnapshot({
+    required this.name,
+    this.address,
+    this.taxNumber,
+    this.vatId,
+    this.iban,
+    this.introText,
+    this.closingText,
+    this.footerText,
+    this.smallBusinessExempt = false,
+  });
   final String name;
   final String? address;
   final String? taxNumber;
   final String? vatId;
   final String? iban;
+
+  /// Texte der Dokumentart + Fußzeile + § 19 zum Finalisierungszeitpunkt
+  /// (spätere Änderungen verändern das PDF nicht — Audit-Befund 2.1).
+  final String? introText;
+  final String? closingText;
+  final String? footerText;
+  final bool smallBusinessExempt;
 }
 
 String _date(DateTime d) =>

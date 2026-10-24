@@ -84,4 +84,31 @@ void main() {
     final dumpDir = Platform.environment['PDF_DUMP_DIR'];
     if (dumpDir != null) File('$dumpDir/online-draft.pdf').writeAsBytesSync(bytes);
   });
+
+  test('Texte und § 19 kommen bei finalisierten Dokumenten aus dem Schnappschuss, beim Entwurf live', () {
+    final finalized = OnlineDocument.fromJson({
+      'id': 'd1', 'customerId': 'c1', 'kind': 'invoice', 'status': 'finalized', 'number': 'R-26001',
+      'issueDate': '2026-10-24', 'serviceDate': '2026-10-24', 'version': 2, 'items': <Object>[],
+      'textSnapshot': {'intro': 'Alt', 'closing': 'Schluss alt', 'footer': 'Fuß alt', 'smallBusinessExempt': true},
+    });
+    const live = OnlineCompanyProfile(
+      name: 'Firma',
+      footerText: 'Fuß neu',
+      smallBusinessExempt: false,
+      documentTexts: {'invoice': (intro: 'Neu', closing: null)},
+    );
+    final data = onlineDocumentPdfData(finalized, liveCompany: live);
+    expect(data.introText, 'Alt');
+    expect(data.footerText, 'Fuß alt');
+    expect(data.isSmallBusinessExempt, isTrue);
+
+    final draft = OnlineDocument.fromJson({
+      'id': 'd2', 'customerId': 'c1', 'kind': 'invoice', 'status': 'draft',
+      'issueDate': '2026-10-24', 'serviceDate': '2026-10-24', 'version': 1, 'items': <Object>[],
+    });
+    final preview = onlineDocumentPdfData(draft, liveCompany: live);
+    expect(preview.introText, 'Neu');
+    expect(preview.footerText, 'Fuß neu');
+    expect(preview.isSmallBusinessExempt, isFalse);
+  });
 }

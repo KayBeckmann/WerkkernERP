@@ -368,6 +368,10 @@ class BusinessRoutes {
   ) async {
     if (raw == null) return (items: <DocumentItem>[], error: null);
     if (raw is! List) return (items: null, error: 'items muss eine Liste sein.');
+    // § 19 UStG: Kleinunternehmer weisen keine USt aus — serverseitig
+    // erzwungen statt nur in der Oberfläche (Arbeitsvorgabe, keine
+    // Rechtsprüfung).
+    final smallBusiness = (await repository.getCompanyProfile(companyId)).smallBusinessExempt;
     final items = <DocumentItem>[];
     for (var index = 0; index < raw.length; index++) {
       final entry = raw[index];
@@ -388,6 +392,9 @@ class BusinessRoutes {
       final vat = entry['vatRatePercent'];
       if (vat is! num || vat < 0 || vat > 100) {
         return (items: null, error: 'Position ${index + 1}: vatRatePercent 0–100 ist Pflicht.');
+      }
+      if (smallBusiness && vat != 0) {
+        return (items: null, error: 'Position ${index + 1}: Kleinunternehmerregelung (§ 19 UStG) — USt muss 0 % sein.');
       }
       final discount = entry['discountPercent'] ?? 0;
       if (discount is! num || discount < 0 || discount > 100) {
@@ -620,6 +627,12 @@ class BusinessRoutes {
     }
     final company = await repository.findCompanyById(companyId);
     final profile = await repository.getCompanyProfile(companyId);
+    if (profile.smallBusinessExempt && (await business.itemsFor(companyId, id)).any((i) => i.vatRatePercent != 0)) {
+      return jsonError(
+        'Kleinunternehmerregelung (§ 19 UStG) aktiv, aber Positionen enthalten USt — Entwurf vorher auf 0 % ändern.',
+        status: 409,
+      );
+    }
     try {
       final finalized = await business.finalize(
         companyId: companyId,
@@ -631,6 +644,10 @@ class BusinessRoutes {
           taxNumber: profile.taxNumber,
           vatId: profile.vatId,
           iban: profile.iban,
+          introText: profile.documentTexts[existing.kind]?.intro,
+          closingText: profile.documentTexts[existing.kind]?.closing,
+          footerText: profile.footerText,
+          smallBusinessExempt: profile.smallBusinessExempt,
         ),
         now: DateTime.now().toUtc(),
       );

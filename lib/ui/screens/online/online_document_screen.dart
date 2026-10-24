@@ -30,6 +30,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   bool _busy = true;
   bool _isAdvancePayment = false;
   bool _isFixedPrice = false;
+
+  /// § 19 UStG der Firma — neue Positionen dann fest 0 % USt.
+  bool _smallBusiness = false;
   String? _error;
 
   WerkkernApiClient get _client => widget.session.client;
@@ -53,6 +56,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   void initState() {
     super.initState();
     _reload();
+    if (!widget.session.offlineOnly) {
+      _client.companyProfile().then((p) {
+        if (mounted) setState(() => _smallBusiness = p.smallBusinessExempt);
+      }, onError: (Object _) {});
+    }
   }
 
   @override
@@ -516,7 +524,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     if (!mounted) return;
     final item = await showDialog<OnlineDocumentItem>(
       context: context,
-      builder: (_) => _ItemDialog(articles: articles),
+      builder: (_) => _ItemDialog(articles: articles, forceZeroVat: _smallBusiness),
     );
     if (item == null) return;
     setState(() {
@@ -777,8 +785,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
 }
 
 class _ItemDialog extends StatefulWidget {
-  const _ItemDialog({required this.articles});
+  const _ItemDialog({required this.articles, this.forceZeroVat = false});
   final List<OnlineArticle> articles;
+
+  /// Kleinunternehmerregelung: USt fest 0 % (der Server erzwingt es ohnehin).
+  final bool forceZeroVat;
 
   @override
   State<_ItemDialog> createState() => _ItemDialogState();
@@ -792,7 +803,7 @@ class _ItemDialogState extends State<_ItemDialog> {
   final _price = TextEditingController();
   final _unit = TextEditingController();
   final _group = TextEditingController();
-  double _vat = 19;
+  late double _vat = widget.forceZeroVat ? 0 : 19;
   String? _error;
 
   @override
@@ -901,8 +912,10 @@ class _ItemDialogState extends State<_ItemDialog> {
                   DropdownMenuItem(value: 7, child: Text('7 %')),
                   DropdownMenuItem(value: 0, child: Text('0 %')),
                 ],
-                onChanged: (v) => setState(() => _vat = v!),
+                onChanged: widget.forceZeroVat ? null : (v) => setState(() => _vat = v!),
               ),
+              if (widget.forceZeroVat)
+                const Text('Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer.', style: TextStyle(fontSize: 12)),
               TextField(controller: _group, decoration: const InputDecoration(labelText: 'Positionsgruppe (optional)')),
               if (_error != null)
                 Padding(
