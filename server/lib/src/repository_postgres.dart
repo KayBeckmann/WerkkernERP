@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:postgres/postgres.dart';
 
 import 'models.dart';
@@ -69,7 +71,10 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   @override
   Future<CompanyProfile> getCompanyProfile(String companyId) async {
     final result = await _db.execute(
-      Sql.named('SELECT address, tax_number, vat_id, iban, email, phone FROM companies WHERE id = @id'),
+      Sql.named(
+        'SELECT address, tax_number, vat_id, iban, email, phone, pdf_footer_text, document_texts, small_business_exempt '
+        'FROM companies WHERE id = @id',
+      ),
       parameters: {'id': companyId},
     );
     if (result.isEmpty) return CompanyProfile(companyId: companyId);
@@ -82,6 +87,15 @@ class PostgresPhaseBRepository implements PhaseBRepository {
       iban: r[3] as String?,
       email: r[4] as String?,
       phone: r[5] as String?,
+      footerText: r[6] as String?,
+      documentTexts: {
+        for (final e in (jsonDecode(r[7] as String) as Map<String, Object?>).entries)
+          e.key: (
+            intro: (e.value as Map<String, Object?>)['intro'] as String?,
+            closing: (e.value as Map<String, Object?>)['closing'] as String?,
+          ),
+      },
+      smallBusinessExempt: r[8] as bool,
     );
   }
 
@@ -90,7 +104,8 @@ class PostgresPhaseBRepository implements PhaseBRepository {
     await _db.execute(
       Sql.named(
         'UPDATE companies SET address = @address, tax_number = @taxNumber, vat_id = @vatId, iban = @iban, '
-        'email = @email, phone = @phone WHERE id = @id',
+        'email = @email, phone = @phone, pdf_footer_text = @footer, document_texts = @texts, '
+        'small_business_exempt = @exempt WHERE id = @id',
       ),
       parameters: {
         'address': p.address,
@@ -99,6 +114,11 @@ class PostgresPhaseBRepository implements PhaseBRepository {
         'iban': p.iban,
         'email': p.email,
         'phone': p.phone,
+        'footer': p.footerText,
+        'texts': jsonEncode({
+          for (final e in p.documentTexts.entries) e.key: {'intro': e.value.intro, 'closing': e.value.closing},
+        }),
+        'exempt': p.smallBusinessExempt,
         'id': p.companyId,
       },
     );

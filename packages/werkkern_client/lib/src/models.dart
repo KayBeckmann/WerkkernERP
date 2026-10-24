@@ -166,6 +166,10 @@ class OnlineDocument {
     this.advancePayments = const [],
     this.remainingCents,
     this.creditNotes = const [],
+    this.introTextSnapshot,
+    this.closingTextSnapshot,
+    this.footerTextSnapshot,
+    this.smallBusinessExemptSnapshot = false,
     required this.version,
     this.items = const [],
     this.netCents,
@@ -201,6 +205,10 @@ class OnlineDocument {
       advancePayments: _summaries(j['advancePayments']),
       remainingCents: j['remainingCents'] as int?,
       creditNotes: _summaries(j['creditNotes']),
+      introTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['intro'] as String?,
+      closingTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['closing'] as String?,
+      footerTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['footer'] as String?,
+      smallBusinessExemptSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['smallBusinessExempt'] as bool? ?? false,
       convertedTo: [
         for (final c in (j['convertedTo'] as List? ?? const []))
           (
@@ -283,6 +291,12 @@ class OnlineDocument {
 
   /// Brutto abzüglich [advancePayments] (nur wenn es Abschläge gibt).
   final int? remainingCents;
+
+  /// Beim Finalisieren eingefrorene Texte und § 19-Status (nur finalisiert).
+  final String? introTextSnapshot;
+  final String? closingTextSnapshot;
+  final String? footerTextSnapshot;
+  final bool smallBusinessExemptSnapshot;
 
   /// Rechnung: finalisierte Gutschriften dazu.
   final List<({String id, String? number, int grossCents})> creditNotes;
@@ -367,7 +381,18 @@ class OnlineInvitation {
 }
 
 class OnlineCompanyProfile {
-  const OnlineCompanyProfile({this.name, this.address, this.taxNumber, this.vatId, this.iban, this.email, this.phone});
+  const OnlineCompanyProfile({
+    this.name,
+    this.address,
+    this.taxNumber,
+    this.vatId,
+    this.iban,
+    this.email,
+    this.phone,
+    this.footerText,
+    this.documentTexts = const {},
+    this.smallBusinessExempt = false,
+  });
   factory OnlineCompanyProfile.fromJson(Map<String, Object?> j) => OnlineCompanyProfile(
         name: j['name'] as String?,
         address: j['address'] as String?,
@@ -376,6 +401,15 @@ class OnlineCompanyProfile {
         iban: j['iban'] as String?,
         email: j['email'] as String?,
         phone: j['phone'] as String?,
+        footerText: j['footerText'] as String?,
+        documentTexts: {
+          for (final e in ((j['documentTexts'] as Map<String, Object?>?) ?? const {}).entries)
+            e.key: (
+              intro: (e.value as Map<String, Object?>)['intro'] as String?,
+              closing: (e.value as Map<String, Object?>)['closing'] as String?,
+            ),
+        },
+        smallBusinessExempt: j['smallBusinessExempt'] as bool? ?? false,
       );
   final String? name;
   final String? address;
@@ -384,6 +418,13 @@ class OnlineCompanyProfile {
   final String? iban;
   final String? email;
   final String? phone;
+  final String? footerText;
+
+  /// Einleitungs-/Schlusstext je Dokumentart (`invoice`, `quote`, ...).
+  final Map<String, ({String? intro, String? closing})> documentTexts;
+
+  /// Kleinunternehmerregelung § 19 UStG (Server erzwingt 0 % USt).
+  final bool smallBusinessExempt;
 
   Map<String, Object?> toJson() => {
         'address': address,
@@ -392,6 +433,11 @@ class OnlineCompanyProfile {
         'iban': iban,
         'email': email,
         'phone': phone,
+        'footerText': footerText,
+        'documentTexts': {
+          for (final e in documentTexts.entries) e.key: {'intro': e.value.intro, 'closing': e.value.closing},
+        },
+        'smallBusinessExempt': smallBusinessExempt,
       };
 }
 

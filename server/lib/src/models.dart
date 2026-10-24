@@ -167,6 +167,9 @@ class CompanyProfile {
     this.iban,
     this.email,
     this.phone,
+    this.footerText,
+    this.documentTexts = const {},
+    this.smallBusinessExempt = false,
   });
   final String companyId;
   final String? address;
@@ -176,6 +179,17 @@ class CompanyProfile {
   final String? email;
   final String? phone;
 
+  /// PDF-Fußzeile (alle Dokumentarten).
+  final String? footerText;
+
+  /// Einleitungs-/Schlusstext je Dokumentart (`invoice`, `quote`, ...),
+  /// wie offline "pro Dokument abweichend".
+  final Map<String, ({String? intro, String? closing})> documentTexts;
+
+  /// Kleinunternehmerregelung § 19 UStG: Server erzwingt 0 % USt, PDF
+  /// zeigt den festen Hinweis. Arbeitsvorgabe, keine Rechtsprüfung.
+  final bool smallBusinessExempt;
+
   Map<String, Object?> toJson() => {
         'address': address,
         'taxNumber': taxNumber,
@@ -183,6 +197,11 @@ class CompanyProfile {
         'iban': iban,
         'email': email,
         'phone': phone,
+        'footerText': footerText,
+        'documentTexts': {
+          for (final e in documentTexts.entries) e.key: {'intro': e.value.intro, 'closing': e.value.closing},
+        },
+        'smallBusinessExempt': smallBusinessExempt,
       };
 }
 

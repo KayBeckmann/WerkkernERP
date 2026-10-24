@@ -66,6 +66,11 @@ PdfDocumentData onlineDocumentPdfData(
         : document.customerSnapshotVatId,
     paymentTerms: document.paymentTerms,
     notes: document.notes,
+    // Finalisiert nur aus den Schnappschüssen, Entwurf aus den aktuellen Firmendaten.
+    introText: isPreview ? liveCompany?.documentTexts[document.kind]?.intro : document.introTextSnapshot,
+    closingText: isPreview ? liveCompany?.documentTexts[document.kind]?.closing : document.closingTextSnapshot,
+    footerText: isPreview ? liveCompany?.footerText : document.footerTextSnapshot,
+    isSmallBusinessExempt: isPreview ? (liveCompany?.smallBusinessExempt ?? false) : document.smallBusinessExemptSnapshot,
     lines: [
       for (final item in document.items)
         PdfLine(

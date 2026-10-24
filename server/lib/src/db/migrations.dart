@@ -22,6 +22,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step7TimeTracking,
   _step8Projects,
   _step9AdvanceFixedPrice,
+  _step10DocumentTextsSmallBusiness,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -179,4 +180,18 @@ Future<void> _step8Projects(Session db) async {
 Future<void> _step9AdvanceFixedPrice(Session db) async {
   await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_advance_payment BOOLEAN NOT NULL DEFAULT false');
   await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_fixed_price BOOLEAN NOT NULL DEFAULT false');
+}
+
+/// Dokumenttexte je Art, Fußzeile, Kleinunternehmerregelung (§ 19 UStG)
+/// — und deren Schnappschuss im finalisierten Dokument.
+Future<void> _step10DocumentTextsSmallBusiness(Session db) async {
+  await db.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS document_texts TEXT NOT NULL DEFAULT '{}'");
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS pdf_footer_text TEXT');
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS small_business_exempt BOOLEAN NOT NULL DEFAULT false');
+  for (final column in ['intro_text_snapshot', 'closing_text_snapshot', 'footer_text_snapshot']) {
+    await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS $column TEXT');
+  }
+  await db.execute(
+    'ALTER TABLE documents ADD COLUMN IF NOT EXISTS small_business_exempt_snapshot BOOLEAN NOT NULL DEFAULT false',
+  );
 }

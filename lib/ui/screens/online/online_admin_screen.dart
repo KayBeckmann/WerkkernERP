@@ -644,8 +644,17 @@ class _ProfileTabState extends State<_ProfileTab> {
   final _iban = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  final _footer = TextEditingController();
+  final Map<String, ({TextEditingController intro, TextEditingController closing})> _texts = {};
+  bool _smallBusiness = false;
   bool _loading = true;
   bool _busy = false;
+
+  /// Texte für Rechnung + alle Dokumentarten mit aktivem Modul.
+  List<String> get _kinds => [
+        for (final entry in onlineDocumentKindModules.entries)
+          if (entry.value == null || widget.session.modules.contains(entry.value)) entry.key,
+      ];
 
   @override
   void initState() {
@@ -655,8 +664,12 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   @override
   void dispose() {
-    for (final c in [_address, _taxNumber, _vatId, _iban, _email, _phone]) {
+    for (final c in [_address, _taxNumber, _vatId, _iban, _email, _phone, _footer]) {
       c.dispose();
+    }
+    for (final t in _texts.values) {
+      t.intro.dispose();
+      t.closing.dispose();
     }
     super.dispose();
   }
@@ -671,6 +684,15 @@ class _ProfileTabState extends State<_ProfileTab> {
       _iban.text = p.iban ?? '';
       _email.text = p.email ?? '';
       _phone.text = p.phone ?? '';
+      _footer.text = p.footerText ?? '';
+      _smallBusiness = p.smallBusinessExempt;
+      // Auch Texte inaktiver Arten behalten (werden unverändert zurückgeschickt).
+      for (final kind in {..._kinds, ...p.documentTexts.keys}) {
+        _texts[kind] = (
+          intro: TextEditingController(text: p.documentTexts[kind]?.intro ?? ''),
+          closing: TextEditingController(text: p.documentTexts[kind]?.closing ?? ''),
+        );
+      }
     } on Exception catch (e) {
       if (mounted) _showError(context, e);
     } finally {
@@ -690,6 +712,11 @@ class _ProfileTabState extends State<_ProfileTab> {
         iban: _v(_iban),
         email: _v(_email),
         phone: _v(_phone),
+        footerText: _v(_footer),
+        documentTexts: {
+          for (final e in _texts.entries) e.key: (intro: _v(e.value.intro), closing: _v(e.value.closing)),
+        },
+        smallBusinessExempt: _smallBusiness,
       ));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Firmendaten gespeichert.')));
     } on Exception catch (e) {
@@ -712,6 +739,34 @@ class _ProfileTabState extends State<_ProfileTab> {
         TextField(controller: _iban, decoration: const InputDecoration(labelText: 'IBAN')),
         TextField(controller: _email, decoration: const InputDecoration(labelText: 'E-Mail')),
         TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Telefon')),
+        SwitchListTile(
+          key: const Key('online-profile-small-business'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Kleinunternehmerregelung (§ 19 UStG)'),
+          subtitle: const Text('Alle Positionen 0 % USt, fester Hinweis im PDF. Bitte mit dem Steuerberater klären.'),
+          value: _smallBusiness,
+          onChanged: (v) => setState(() => _smallBusiness = v),
+        ),
+        TextField(controller: _footer, maxLines: 2, decoration: const InputDecoration(labelText: 'PDF-Fußzeile')),
+        const SizedBox(height: 12),
+        Text('Texte je Dokumentart', style: Theme.of(context).textTheme.titleSmall),
+        for (final kind in _kinds)
+          ExpansionTile(
+            title: Text(onlineDocumentKindLabels[kind] ?? kind),
+            children: [
+              TextField(
+                key: Key('online-profile-intro-$kind'),
+                controller: _texts[kind]!.intro,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Einleitungstext'),
+              ),
+              TextField(
+                controller: _texts[kind]!.closing,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Schlusstext'),
+              ),
+            ],
+          ),
         const SizedBox(height: 12),
         FilledButton(onPressed: _busy ? null : _save, child: const Text('Firmendaten speichern')),
       ],
