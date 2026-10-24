@@ -26,7 +26,8 @@ services:
 
   server:
     build:
-      context: ./server
+      context: .
+      dockerfile: server/Dockerfile
     depends_on:
       server-db:
         condition: service_healthy

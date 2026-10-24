@@ -5,8 +5,10 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models.dart';
+import 'auth.dart';
+import 'business/repository.dart';
+import 'business/router.dart';
 import 'permission_catalog.dart';
-import 'permission_resolver.dart';
 import 'repository.dart';
 import 'util/passwords.dart';
 import 'util/responses.dart';
@@ -24,11 +26,17 @@ const _starterGroupNames = ['Projektleiter', 'Monteur', 'Buchhaltung'];
 class PhaseBRouter {
   PhaseBRouter({
     required this.repository,
+    this.business,
     this.sessionTtl = const Duration(hours: 8),
     this.invitationTtl = const Duration(days: 7),
   });
 
   final PhaseBRepository repository;
+
+  /// Fachdaten (B1 Punkt 3) — optional, damit reine Mitgliedschafts-
+  /// Tests ohne Fach-Repository auskommen.
+  final BusinessRepository? business;
+  late final SessionAuthenticator _auth = SessionAuthenticator(repository);
   final Duration sessionTtl;
   final Duration invitationTtl;
   static const _uuid = Uuid();
@@ -84,6 +92,10 @@ class PhaseBRouter {
     router.get('/permissions/catalog', _permissionCatalog);
     router.get('/permissions/effective', _effectivePermission);
     router.get('/permissions/mine', _myPermissions);
+
+    if (business != null) {
+      BusinessRoutes(repository: repository, business: business!, auth: _auth).mount(router);
+    }
 
     return router;
   }
@@ -447,22 +459,8 @@ class PhaseBRouter {
     });
   }
 
-  Future<bool> _isGranted(
-    ({CompanySession session, Membership membership}) auth,
-    String permission, {
-    String? requiredModule,
-  }) async {
-    final company = await repository.findCompanyById(auth.session.companyId);
-    if (company == null) return false;
-    return PermissionResolver.hasPermission(
-      membership: auth.membership,
-      company: company,
-      permission: permission,
-      groupPermissions: await repository.listGroupPermissions(auth.membership.groupId),
-      overrides: await repository.listMembershipOverrides(auth.membership.id),
-      requiredModule: requiredModule ?? requiredModuleFor(permission),
-    );
-  }
+  Future<bool> _isGranted(AuthContext auth, String permission, {String? requiredModule}) =>
+      _auth.isGranted(auth, permission, requiredModule: requiredModule);
 
   // ---- Firmenmodule ----------------------------------------------------------
 
@@ -617,31 +615,9 @@ class PhaseBRouter {
     return jsonOk({'membershipId': membership.id, 'companyId': invitation.companyId}, status: 201);
   }
 
-  // ---- Auth-Helfer --------------------------------------------------------------
+  // ---- Auth-Helfer (siehe SessionAuthenticator) ---------------------------------
 
-  String? _bearerToken(Request request) {
-    final header = request.headers['authorization'];
-    if (header == null || !header.startsWith('Bearer ')) return null;
-    return header.substring('Bearer '.length);
-  }
-
-  Future<({CompanySession session, Membership membership})?> _requireSession(Request request) async {
-    final token = _bearerToken(request);
-    if (token == null) return null;
-    final session = await repository.findSession(Tokens.hashOf(token));
-    if (session == null) return null;
-    if (session.isExpired(DateTime.now().toUtc())) {
-      await repository.deleteSession(session.tokenHash);
-      return null;
-    }
-    final membership = await repository.findMembershipById(session.membershipId);
-    if (membership == null || !membership.active) return null;
-    return (session: session, membership: membership);
-  }
-
-  Future<({CompanySession session, Membership membership})?> _requireAdmin(Request request) async {
-    final auth = await _requireSession(request);
-    if (auth == null || !auth.membership.isAdmin) return null;
-    return auth;
-  }
+  String? _bearerToken(Request request) => _auth.bearerToken(request);
+  Future<AuthContext?> _requireSession(Request request) => _auth.requireSession(request);
+  Future<AuthContext?> _requireAdmin(Request request) => _auth.requireAdmin(request);
 }

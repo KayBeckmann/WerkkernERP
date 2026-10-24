@@ -1,0 +1,482 @@
+import 'dart:convert';
+
+import 'package:decimal/decimal.dart';
+import 'package:shelf/shelf.dart';
+import 'package:shelf_router/shelf_router.dart';
+import 'package:uuid/uuid.dart';
+import 'package:werkkern_core/werkkern_core.dart';
+
+import '../auth.dart';
+import '../repository.dart';
+import '../util/responses.dart';
+import 'models.dart';
+import 'repository.dart';
+
+/// Fach-Endpunkte (B1 Punkt 3). Jeder Endpunkt prüft serverseitig
+/// Sitzung → Recht → Modul, bevor er die (ausnahmslos firmengebundene)
+/// Repository-Methode aufruft. Eine fremde ID ergibt dieselbe 404 wie
+/// eine nicht existierende.
+class BusinessRoutes {
+  BusinessRoutes({required this.repository, required this.business, required this.auth});
+
+  final PhaseBRepository repository;
+  final BusinessRepository business;
+  final SessionAuthenticator auth;
+  static const _uuid = Uuid();
+
+  void mount(Router router) {
+    router.get('/customers', _listCustomers);
+    router.post('/customers', _createCustomer);
+    router.get('/customers/<id>', _getCustomer);
+    router.put('/customers/<id>', _updateCustomer);
+    router.delete('/customers/<id>', _deleteCustomer);
+
+    router.get('/articles', _listArticles);
+    router.post('/articles', _createArticle);
+    router.get('/articles/<id>', _getArticle);
+    router.put('/articles/<id>', _updateArticle);
+
+    router.get('/documents', _listDocuments);
+    router.post('/documents', _createDocument);
+    router.get('/documents/<id>', _getDocument);
+    router.put('/documents/<id>', _updateDocument);
+    router.delete('/documents/<id>', _deleteDocument);
+    router.post('/documents/<id>/finalize', _finalizeDocument);
+  }
+
+  Future<Map<String, Object?>> _body(Request request) async {
+    final raw = await request.readAsString();
+    if (raw.isEmpty) return const {};
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map<String, Object?>) throw const FormatException('JSON-Objekt erwartet');
+    return decoded;
+  }
+
+  String? _trimmed(Object? value) {
+    final s = (value as String?)?.trim();
+    return (s == null || s.isEmpty) ? null : s;
+  }
+
+  // ---- Kunden -------------------------------------------------------------
+
+  Future<Response> _listCustomers(Request request) async {
+    final check = await auth.requirePermission(request, 'customers.read');
+    if (check.error != null) return check.error!;
+    final customers = await business.listCustomers(
+      check.auth!.session.companyId,
+      query: request.url.queryParameters['q'],
+    );
+    return jsonOk({'customers': [for (final c in customers) c.toJson()]});
+  }
+
+  Future<Response> _getCustomer(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'customers.read');
+    if (check.error != null) return check.error!;
+    final customer = await business.findCustomer(check.auth!.session.companyId, id);
+    if (customer == null) return jsonError('Kunde nicht gefunden.', status: 404);
+    return jsonOk(customer.toJson());
+  }
+
+  Customer? _customerFromBody(Map<String, Object?> body, {required String id, required String companyId, required DateTime createdAt}) {
+    final name = _trimmed(body['name']);
+    if (name == null) return null;
+    return Customer(
+      id: id,
+      companyId: companyId,
+      name: name,
+      address: _trimmed(body['address']),
+      email: _trimmed(body['email']),
+      phone: _trimmed(body['phone']),
+      vatId: _trimmed(body['vatId']),
+      contactPerson: _trimmed(body['contactPerson']),
+      notes: _trimmed(body['notes']),
+      createdAt: createdAt,
+    );
+  }
+
+  Future<Response> _createCustomer(Request request) async {
+    final check = await auth.requirePermission(request, 'customers.write');
+    if (check.error != null) return check.error!;
+    final customer = _customerFromBody(
+      await _body(request),
+      id: _uuid.v4(),
+      companyId: check.auth!.session.companyId,
+      createdAt: DateTime.now().toUtc(),
+    );
+    if (customer == null) return jsonError('name ist Pflicht.');
+    await business.createCustomer(customer);
+    return jsonOk(customer.toJson(), status: 201);
+  }
+
+  Future<Response> _updateCustomer(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'customers.write');
+    if (check.error != null) return check.error!;
+    final companyId = check.auth!.session.companyId;
+    final existing = await business.findCustomer(companyId, id);
+    if (existing == null) return jsonError('Kunde nicht gefunden.', status: 404);
+    final customer = _customerFromBody(await _body(request), id: id, companyId: companyId, createdAt: existing.createdAt);
+    if (customer == null) return jsonError('name ist Pflicht.');
+    await business.updateCustomer(customer);
+    return jsonOk(customer.toJson());
+  }
+
+  Future<Response> _deleteCustomer(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'customers.write');
+    if (check.error != null) return check.error!;
+    try {
+      final deleted = await business.deleteCustomer(check.auth!.session.companyId, id);
+      if (!deleted) return jsonError('Kunde nicht gefunden.', status: 404);
+      return Response(204);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
+  }
+
+  // ---- Artikel --------------------------------------------------------------
+
+  Future<Response> _listArticles(Request request) async {
+    final check = await auth.requirePermission(request, 'articles.read');
+    if (check.error != null) return check.error!;
+    final articles = await business.listArticles(
+      check.auth!.session.companyId,
+      query: request.url.queryParameters['q'],
+      includeInactive: request.url.queryParameters['includeInactive'] == 'true',
+    );
+    return jsonOk({'articles': [for (final a in articles) a.toJson()]});
+  }
+
+  Future<Response> _getArticle(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'articles.read');
+    if (check.error != null) return check.error!;
+    final article = await business.findArticle(check.auth!.session.companyId, id);
+    if (article == null) return jsonError('Artikel nicht gefunden.', status: 404);
+    return jsonOk(article.toJson());
+  }
+
+  Article? _articleFromBody(Map<String, Object?> body, {required String id, required String companyId, required DateTime createdAt, required bool defaultActive}) {
+    final name = _trimmed(body['name']);
+    if (name == null) return null;
+    final price = body['salePriceCents'] as int?;
+    if (price != null && price < 0) return null;
+    return Article(
+      id: id,
+      companyId: companyId,
+      name: name,
+      unit: _trimmed(body['unit']),
+      salePriceCents: price,
+      active: body['active'] as bool? ?? defaultActive,
+      createdAt: createdAt,
+    );
+  }
+
+  Future<Response> _createArticle(Request request) async {
+    final check = await auth.requirePermission(request, 'articles.write');
+    if (check.error != null) return check.error!;
+    final article = _articleFromBody(
+      await _body(request),
+      id: _uuid.v4(),
+      companyId: check.auth!.session.companyId,
+      createdAt: DateTime.now().toUtc(),
+      defaultActive: true,
+    );
+    if (article == null) return jsonError('name ist Pflicht, salePriceCents (falls gesetzt) >= 0.');
+    await business.createArticle(article);
+    return jsonOk(article.toJson(), status: 201);
+  }
+
+  Future<Response> _updateArticle(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'articles.write');
+    if (check.error != null) return check.error!;
+    final companyId = check.auth!.session.companyId;
+    final existing = await business.findArticle(companyId, id);
+    if (existing == null) return jsonError('Artikel nicht gefunden.', status: 404);
+    final article = _articleFromBody(
+      await _body(request),
+      id: id,
+      companyId: companyId,
+      createdAt: existing.createdAt,
+      defaultActive: existing.active,
+    );
+    if (article == null) return jsonError('name ist Pflicht, salePriceCents (falls gesetzt) >= 0.');
+    await business.updateArticle(article);
+    return jsonOk(article.toJson());
+  }
+
+  // ---- Dokumente --------------------------------------------------------------
+
+  /// Prüft Recht UND das Modul der Dokumentart (z. B. "quotes" für ein
+  /// Angebot) — eine deaktivierte Firmenfunktion bleibt vorrangig.
+  Future<({AuthContext? auth, Response? error})> _requireDocumentPermission(
+    Request request,
+    String permission,
+    String kind,
+  ) =>
+      auth.requirePermission(request, permission, requiredModule: documentKindModules[kind]);
+
+  Future<Set<String>> _enabledModules(AuthContext ctx) async =>
+      (await repository.findCompanyById(ctx.session.companyId))?.enabledModules ?? const {};
+
+  Future<Response> _listDocuments(Request request) async {
+    final check = await auth.requirePermission(request, 'invoices.read');
+    if (check.error != null) return check.error!;
+    final params = request.url.queryParameters;
+    final kind = params['kind'];
+    if (kind != null && !documentKindModules.containsKey(kind)) return jsonError('Unbekannte Dokumentart: $kind');
+    final status = params['status'];
+    if (status != null && !documentStatuses.contains(status)) return jsonError('Unbekannter Status: $status');
+
+    final modules = await _enabledModules(check.auth!);
+    bool kindVisible(String k) => documentKindModules[k] == null || modules.contains(documentKindModules[k]);
+    if (kind != null && !kindVisible(kind)) {
+      return jsonError('Modul "${documentKindModules[kind]}" ist für diese Firma nicht aktiviert.', status: 403);
+    }
+
+    final documents = await business.listDocuments(
+      check.auth!.session.companyId,
+      kind: kind,
+      status: status,
+      query: params['q'],
+    );
+    final result = <Map<String, Object?>>[];
+    for (final d in documents.where((d) => kindVisible(d.kind))) {
+      final items = await business.itemsFor(check.auth!.session.companyId, d.id);
+      result.add({...d.toJson(), 'totalGrossCents': _totals(items).totalGross.cents});
+    }
+    return jsonOk({'documents': result});
+  }
+
+  InvoiceTotals _totals(List<DocumentItem> items) => calculateInvoiceTotals([
+        for (final i in items)
+          InvoiceLineInput(
+            quantity: Decimal.parse(i.quantity),
+            unitPriceCents: i.unitPriceCents,
+            vatRatePercent: i.vatRatePercent,
+            discountPercent: i.discountPercent,
+          ),
+      ]);
+
+  Map<String, Object?> _totalsJson(InvoiceTotals totals) => {
+        'netCents': totals.totalNet.cents,
+        'taxCents': totals.totalTax.cents,
+        'grossCents': totals.totalGross.cents,
+        'byRate': [
+          for (final rate in totals.sortedRates)
+            {'vatRatePercent': rate, 'netCents': totals.netByRate[rate]!.cents, 'taxCents': totals.taxByRate[rate]!.cents},
+        ],
+      };
+
+  Future<Response> _documentResponse(String companyId, Document document, {int status = 200}) async {
+    final items = await business.itemsFor(companyId, document.id);
+    return jsonOk({
+      ...document.toJson(),
+      'items': [for (final i in items) i.toJson()],
+      'totals': _totalsJson(_totals(items)),
+    }, status: status);
+  }
+
+  Future<Response> _getDocument(Request request, String id) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return jsonError('Nicht angemeldet.', status: 401);
+    // Erst laden (firmengebunden), dann Recht + Modul der konkreten Art
+    // prüfen. Fremd/nicht vorhanden -> 404 VOR der Rechteprüfung wäre
+    // ein Oracle für Nutzer ohne Leserecht nicht nötig: beide Fälle
+    // bleiben 404, egal ob mit oder ohne Recht.
+    final document = await business.findDocument(session.session.companyId, id);
+    if (document == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final check = await _requireDocumentPermission(request, 'invoices.read', document.kind);
+    if (check.error != null) return check.error!;
+    return _documentResponse(session.session.companyId, document);
+  }
+
+  DateTime? _parseDate(Object? value) {
+    if (value is! String) return null;
+    final parsed = DateTime.tryParse(value);
+    return parsed == null ? null : DateTime.utc(parsed.year, parsed.month, parsed.day);
+  }
+
+  /// Validiert die Positionen inkl. Firmenbindung referenzierter
+  /// Artikel. Liefert entweder die Positionen oder eine Fehlermeldung.
+  Future<({List<DocumentItem>? items, String? error})> _parseItems(
+    Object? raw,
+    String companyId,
+    String documentId,
+  ) async {
+    if (raw == null) return (items: <DocumentItem>[], error: null);
+    if (raw is! List) return (items: null, error: 'items muss eine Liste sein.');
+    final items = <DocumentItem>[];
+    for (var index = 0; index < raw.length; index++) {
+      final entry = raw[index];
+      if (entry is! Map<String, Object?>) return (items: null, error: 'Position ${index + 1}: Objekt erwartet.');
+      final kind = entry['kind'] as String?;
+      if (!itemKinds.contains(kind)) return (items: null, error: 'Position ${index + 1}: kind article|hours|text.');
+      final description = _trimmed(entry['description']);
+      if (description == null) return (items: null, error: 'Position ${index + 1}: description ist Pflicht.');
+      final rawQuantity = entry['quantity'];
+      final quantity = rawQuantity is num
+          ? Decimal.tryParse(rawQuantity.toString())
+          : rawQuantity is String
+              ? Decimal.tryParse(rawQuantity.replaceAll(',', '.'))
+              : null;
+      if (quantity == null) return (items: null, error: 'Position ${index + 1}: quantity ist keine Zahl.');
+      final price = entry['unitPriceCents'];
+      if (price is! int) return (items: null, error: 'Position ${index + 1}: unitPriceCents (Cent, Ganzzahl) ist Pflicht.');
+      final vat = entry['vatRatePercent'];
+      if (vat is! num || vat < 0 || vat > 100) {
+        return (items: null, error: 'Position ${index + 1}: vatRatePercent 0–100 ist Pflicht.');
+      }
+      final discount = entry['discountPercent'] ?? 0;
+      if (discount is! num || discount < 0 || discount > 100) {
+        return (items: null, error: 'Position ${index + 1}: discountPercent 0–100.');
+      }
+      final articleId = entry['articleId'] as String?;
+      if (articleId != null && await business.findArticle(companyId, articleId) == null) {
+        // Fremder Artikel wird exakt wie ein nicht existierender behandelt.
+        return (items: null, error: 'Position ${index + 1}: Artikel nicht gefunden.');
+      }
+      items.add(DocumentItem(
+        id: _uuid.v4(),
+        documentId: documentId,
+        kind: kind!,
+        articleId: articleId,
+        description: description,
+        quantity: quantity.toString(),
+        unitPriceCents: price,
+        vatRatePercent: vat.toDouble(),
+        unit: _trimmed(entry['unit']),
+        discountPercent: discount.toDouble(),
+        groupLabel: _trimmed(entry['groupLabel']),
+        sortOrder: index,
+      ));
+    }
+    return (items: items, error: null);
+  }
+
+  Future<Response> _createDocument(Request request) async {
+    final body = await _body(request);
+    final kind = body['kind'] as String? ?? 'invoice';
+    if (!documentKindModules.containsKey(kind)) return jsonError('Unbekannte Dokumentart: $kind');
+    final check = await _requireDocumentPermission(request, 'invoices.write', kind);
+    if (check.error != null) return check.error!;
+    final companyId = check.auth!.session.companyId;
+
+    final customerId = body['customerId'] as String?;
+    if (customerId == null || await business.findCustomer(companyId, customerId) == null) {
+      return jsonError('Kunde nicht gefunden.', status: 404);
+    }
+    final now = DateTime.now().toUtc();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final issueDate = body['issueDate'] == null ? today : _parseDate(body['issueDate']);
+    final serviceDate = body['serviceDate'] == null ? issueDate : _parseDate(body['serviceDate']);
+    if (issueDate == null || serviceDate == null) return jsonError('issueDate/serviceDate im Format JJJJ-MM-TT.');
+
+    final id = _uuid.v4();
+    final parsed = await _parseItems(body['items'], companyId, id);
+    if (parsed.error != null) return jsonError(parsed.error!);
+
+    final document = Document(
+      id: id,
+      companyId: companyId,
+      customerId: customerId,
+      kind: kind,
+      status: 'draft',
+      issueDate: issueDate,
+      serviceDate: serviceDate,
+      paymentTerms: _trimmed(body['paymentTerms']),
+      notes: _trimmed(body['notes']),
+      createdByUserId: check.auth!.session.userId,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    );
+    await business.createDocument(document, parsed.items!);
+    return _documentResponse(companyId, document, status: 201);
+  }
+
+  Future<Response> _updateDocument(Request request, String id) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return jsonError('Nicht angemeldet.', status: 401);
+    final companyId = session.session.companyId;
+    final existing = await business.findDocument(companyId, id);
+    if (existing == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final check = await _requireDocumentPermission(request, 'invoices.write', existing.kind);
+    if (check.error != null) return check.error!;
+
+    final body = await _body(request);
+    final version = body['version'];
+    if (version is! int) return jsonError('version (Ganzzahl) ist Pflicht — Schutz vor stillem Überschreiben.');
+    final customerId = body['customerId'] as String? ?? existing.customerId;
+    if (await business.findCustomer(companyId, customerId) == null) {
+      return jsonError('Kunde nicht gefunden.', status: 404);
+    }
+    final issueDate = body['issueDate'] == null ? existing.issueDate : _parseDate(body['issueDate']);
+    final serviceDate = body['serviceDate'] == null ? existing.serviceDate : _parseDate(body['serviceDate']);
+    if (issueDate == null || serviceDate == null) return jsonError('issueDate/serviceDate im Format JJJJ-MM-TT.');
+    final parsed = await _parseItems(body['items'], companyId, id);
+    if (parsed.error != null) return jsonError(parsed.error!);
+
+    try {
+      final updated = await business.updateDraft(
+        companyId: companyId,
+        id: id,
+        expectedVersion: version,
+        customerId: customerId,
+        issueDate: issueDate,
+        serviceDate: serviceDate,
+        paymentTerms: body.containsKey('paymentTerms') ? _trimmed(body['paymentTerms']) : existing.paymentTerms,
+        notes: body.containsKey('notes') ? _trimmed(body['notes']) : existing.notes,
+        items: parsed.items!,
+        now: DateTime.now().toUtc(),
+      );
+      if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
+      return await _documentResponse(companyId, updated);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
+  }
+
+  Future<Response> _deleteDocument(Request request, String id) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return jsonError('Nicht angemeldet.', status: 401);
+    final existing = await business.findDocument(session.session.companyId, id);
+    if (existing == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final check = await _requireDocumentPermission(request, 'invoices.write', existing.kind);
+    if (check.error != null) return check.error!;
+    try {
+      await business.deleteDraft(session.session.companyId, id);
+      return Response(204);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
+  }
+
+  Future<Response> _finalizeDocument(Request request, String id) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return jsonError('Nicht angemeldet.', status: 401);
+    final companyId = session.session.companyId;
+    final existing = await business.findDocument(companyId, id);
+    if (existing == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final check = await _requireDocumentPermission(request, 'invoices.finalize', existing.kind);
+    if (check.error != null) return check.error!;
+
+    final body = await _body(request);
+    final version = body['version'];
+    if (version is! int) return jsonError('version (Ganzzahl) ist Pflicht — bestätigt den geprüften Stand.');
+    if ((await business.itemsFor(companyId, id)).isEmpty) {
+      return jsonError('Ein Dokument ohne Positionen kann nicht finalisiert werden.');
+    }
+    final company = await repository.findCompanyById(companyId);
+    try {
+      final finalized = await business.finalize(
+        companyId: companyId,
+        id: id,
+        expectedVersion: version,
+        companySnapshotName: company?.name ?? '',
+        now: DateTime.now().toUtc(),
+      );
+      if (finalized == null) return jsonError('Dokument nicht gefunden.', status: 404);
+      return await _documentResponse(companyId, finalized);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
+  }
+}

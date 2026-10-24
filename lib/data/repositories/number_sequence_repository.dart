@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:werkkern_core/werkkern_core.dart' show documentNumberPrefixes, formatNumberWithPrefix;
 
 import '../database/database.dart';
 import '../database/tables.dart';
@@ -62,14 +63,7 @@ class NumberSequenceRepository {
 
 /// Präfix je Dokumentart (Roadmap: "An" Angebot, "A" Auftrag, "R"
 /// Rechnung — nie mit dem Rechnungszähler vermischt, siehe A5).
-String _prefixFor(DocumentKind kind) => switch (kind) {
-      DocumentKind.invoice => 'R',
-      DocumentKind.quote => 'An',
-      DocumentKind.order => 'A',
-      DocumentKind.deliveryNote => 'LS',
-      DocumentKind.proforma => 'PF',
-      DocumentKind.creditNote => 'G',
-    };
+String _prefixFor(DocumentKind kind) => documentNumberPrefixes[kind.name]!;
 
 /// `R-JJxxx`/`An-JJxxx`/`A-JJxxx`, z. B. `R-26054` — mindestens drei
 /// Stellen, wächst darüber hinaus ohne Begrenzung (F5).
@@ -85,10 +79,7 @@ String formatDocumentNumber({
   required int number,
   int? projectNumber,
 }) {
-  final shortYear = (year % 100).toString().padLeft(2, '0');
-  final paddedNumber = number.toString().padLeft(3, '0');
-  final ppPart = projectNumber == null ? '' : projectNumber.toString().padLeft(2, '0');
-  return '${_prefixFor(kind)}-$shortYear$ppPart$paddedNumber';
+  return formatNumberWithPrefix(prefix: _prefixFor(kind), year: year, number: number, projectNumber: projectNumber);
 }
 
 /// C5.2 Bestellwesen (Nachtrag 2026-10-19) — `documentType`-Wert für
@@ -103,7 +94,5 @@ const purchaseOrderDocumentType = 'purchaseOrder';
 /// bislang unbelegt) — gleiches Format/Wachstumsprinzip wie
 /// [formatDocumentNumber], nur ohne [DocumentKind] als Eingabe.
 String formatPurchaseOrderNumber({required int year, required int number}) {
-  final shortYear = (year % 100).toString().padLeft(2, '0');
-  final paddedNumber = number.toString().padLeft(3, '0');
-  return 'B-$shortYear$paddedNumber';
+  return formatNumberWithPrefix(prefix: 'B', year: year, number: number);
 }

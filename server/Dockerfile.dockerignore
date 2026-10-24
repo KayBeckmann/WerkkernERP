@@ -1,0 +1,6 @@
+# Nur Server und gemeinsames Paket in den Build-Kontext — nicht den
+# kompletten Flutter-Build (build/, android/, ...).
+*
+!server/
+!packages/
+**/.dart_tool/
