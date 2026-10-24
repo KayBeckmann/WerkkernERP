@@ -13,7 +13,7 @@ Architektur-Entscheidungen: siehe das Vault-ADR
 
 ```bash
 cp ../.env.example ../.env   # Secrets anpassen, NIE committen
-docker compose up -d --build server-db server
+docker compose up -d --build server-db server   # Build-Kontext: Repo-Root
 curl http://localhost:8190/health
 ```
 
@@ -61,6 +61,28 @@ Schlüssel werden beim Vergeben abgewiesen. Reihenfolge der Prüfung:
 fehlende/inaktive Mitgliedschaft → deaktiviertes Modul → individuelle
 Ausnahme → Gruppenrecht.
 
+## Fachdaten (B1 Punkt 3)
+
+| Endpunkt | Recht (Modul) |
+|---|---|
+| `GET/POST /customers`, `GET/PUT/DELETE /customers/:id` (`?q=` Suche) | `customers.read` / `customers.write` |
+| `GET/POST /articles`, `GET/PUT /articles/:id` (`?q=`, `?includeInactive=true`) | `articles.read` / `articles.write` |
+| `GET/POST /documents`, `GET/PUT/DELETE /documents/:id` (`?kind=`, `?status=`, `?q=`) | `invoices.read` / `invoices.write` + Modul der Dokumentart |
+| `POST /documents/:id/finalize` | `invoices.finalize` + Modul der Dokumentart |
+
+- Jede Repository-Methode ist firmengebunden; fremde IDs → 404 wie
+  nicht existierende, Suche liefert nie Fremddaten.
+- Dokumentarten wie offline (`invoice`, `quote`, `order`, `deliveryNote`,
+  `proforma`, `creditNote`); alle außer `invoice` brauchen ihr Modul.
+- **Kein stilles Überschreiben:** `PUT` und `finalize` verlangen die
+  zuletzt gelesene `version`, sonst 409 (Grundlage für B2-Konflikte).
+- Finalisierung ist eine Transaktion mit Zeilensperre + Nummernkreis-
+  UPSERT (Firma/Art/Jahr); Summen und Nummernformat kommen aus
+  `packages/werkkern_core` — identisch zur Offline-App.
+- **Hinweis:** Auch der Firmen-Ersteller hat zunächst keine Fachrechte
+  (Startgruppen ohne vorbelegte Rechte) — der Admin vergibt sie seiner
+  Gruppe über `PUT /groups/:id/permissions/:key`.
+
 ## Erstadmin-Recovery (Betreiber)
 
 Kein API-Endpunkt — nur mit direktem DB-Zugriff:
@@ -76,3 +98,6 @@ docker compose exec server /app/recover_admin <email> <companyId>
   werden". Der Katalog definiert nur, welche Schlüssel es gibt.
 - Mailversand von Einladungen durch den Server.
 - Flutter-Client-Integration (Online-Verbindungsmodus).
+- Server-seitig noch fehlende Fachteile: Lieferanten/Artikelgruppen-
+  Kalkulation, Umwandlung Angebot→Auftrag→Rechnung, Projekte,
+  Zahlungsstatus, PDF-Erzeugung, Firmen-Stammdaten (Adresse/Steuernr.).

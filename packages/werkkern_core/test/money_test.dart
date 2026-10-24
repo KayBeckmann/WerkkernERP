@@ -1,6 +1,6 @@
 import 'package:decimal/decimal.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:werkkernerp/domain/models/money.dart';
+import 'package:test/test.dart';
+import 'package:werkkern_core/werkkern_core.dart';
 
 void main() {
   test('Roadmap-Referenzfall: 100 € EK + 30 % Aufschlag = 130 € netto', () {

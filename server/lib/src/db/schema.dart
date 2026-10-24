@@ -3,7 +3,7 @@ import 'package:postgres/postgres.dart';
 /// Idempotentes Schema-Bootstrap (gleiches Prinzip wie LibreECAD M1,
 /// siehe ADR-0001) — für B1 ohne Bestandsdaten ausreichend; ein
 /// echtes Migrationswerkzeug kommt vor B2/Produktivbetrieb.
-Future<void> ensureSchema(Connection db) async {
+Future<void> ensureSchema(Session db) async {
   await db.execute('''
     CREATE TABLE IF NOT EXISTS app_users (
       id TEXT PRIMARY KEY,

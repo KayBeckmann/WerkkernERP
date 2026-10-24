@@ -29,3 +29,13 @@ Future<void> resetSchema(Connection db) async {
   await db.execute('CREATE SCHEMA public');
   await ensureSchema(db);
 }
+
+/// Pool mit mehreren Verbindungen — nur so laufen parallele Requests
+/// in Tests wirklich gleichzeitig gegen die Datenbank (wie im Betrieb).
+Pool<void> openTestPool() {
+  final parts = testDbConfig!.split(':');
+  return Pool.withEndpoints(
+    [Endpoint(host: parts[0], port: int.parse(parts[1]), database: parts[2], username: parts[3], password: parts[4])],
+    settings: PoolSettings(sslMode: SslMode.disable, maxConnectionCount: 5),
+  );
+}

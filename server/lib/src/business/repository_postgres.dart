@@ -1,0 +1,418 @@
+import 'package:postgres/postgres.dart';
+import 'package:werkkern_core/werkkern_core.dart';
+
+import 'models.dart';
+import 'repository.dart';
+
+/// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
+/// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
+/// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
+class PostgresBusinessRepository implements BusinessRepository {
+  PostgresBusinessRepository(this._db);
+  final SessionExecutor _db;
+
+  Future<Result> _q(String sql, [Map<String, Object?> parameters = const {}]) =>
+      _db.run((s) => s.execute(Sql.named(sql), parameters: parameters));
+
+  // ---- Kunden -------------------------------------------------------------
+
+  static const _customerColumns = 'id, company_id, name, address, email, phone, vat_id, contact_person, notes, created_at';
+
+  Customer _toCustomer(ResultRow r) => Customer(
+        id: r[0] as String,
+        companyId: r[1] as String,
+        name: r[2] as String,
+        address: r[3] as String?,
+        email: r[4] as String?,
+        phone: r[5] as String?,
+        vatId: r[6] as String?,
+        contactPerson: r[7] as String?,
+        notes: r[8] as String?,
+        createdAt: r[9] as DateTime,
+      );
+
+  @override
+  Future<List<Customer>> listCustomers(String companyId, {String? query}) async {
+    // position() statt LIKE: Nutzereingaben mit % oder _ werden nicht
+    // als Platzhalter interpretiert.
+    final result = await _q(
+      'SELECT $_customerColumns FROM customers WHERE company_id = @companyId '
+      "AND (@q = '' OR position(lower(@q) in lower(name)) > 0) ORDER BY lower(name)",
+      {'companyId': companyId, 'q': query ?? ''},
+    );
+    return [for (final r in result) _toCustomer(r)];
+  }
+
+  @override
+  Future<Customer?> findCustomer(String companyId, String id) async {
+    final result = await _q(
+      'SELECT $_customerColumns FROM customers WHERE company_id = @companyId AND id = @id',
+      {'companyId': companyId, 'id': id},
+    );
+    return result.isEmpty ? null : _toCustomer(result.first);
+  }
+
+  Map<String, Object?> _customerParams(Customer c) => {
+        'id': c.id,
+        'companyId': c.companyId,
+        'name': c.name,
+        'address': c.address,
+        'email': c.email,
+        'phone': c.phone,
+        'vatId': c.vatId,
+        'contactPerson': c.contactPerson,
+        'notes': c.notes,
+        'createdAt': c.createdAt,
+      };
+
+  @override
+  Future<void> createCustomer(Customer customer) async {
+    await _q(
+      'INSERT INTO customers ($_customerColumns) VALUES '
+      '(@id, @companyId, @name, @address, @email, @phone, @vatId, @contactPerson, @notes, @createdAt)',
+      _customerParams(customer),
+    );
+  }
+
+  @override
+  Future<bool> updateCustomer(Customer customer) async {
+    final result = await _q(
+      'UPDATE customers SET name = @name, address = @address, email = @email, phone = @phone, vat_id = @vatId, '
+      'contact_person = @contactPerson, notes = @notes WHERE company_id = @companyId AND id = @id',
+      // createdAt ist unveränderlich — der Treiber lehnt überzählige
+      // Parameter ab, daher explizit entfernen.
+      _customerParams(customer)..remove('createdAt'),
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<bool> deleteCustomer(String companyId, String id) async {
+    if (await findCustomer(companyId, id) == null) return false;
+    final referenced = await _q(
+      'SELECT 1 FROM documents WHERE company_id = @companyId AND customer_id = @id LIMIT 1',
+      {'companyId': companyId, 'id': id},
+    );
+    if (referenced.isNotEmpty) {
+      throw const BusinessConflict('Kunde ist noch Dokumenten zugeordnet und kann nicht gelöscht werden.');
+    }
+    final result = await _q('DELETE FROM customers WHERE company_id = @companyId AND id = @id', {
+      'companyId': companyId,
+      'id': id,
+    });
+    return result.affectedRows > 0;
+  }
+
+  // ---- Artikel --------------------------------------------------------------
+
+  static const _articleColumns = 'id, company_id, name, unit, sale_price_cents, active, created_at';
+
+  Article _toArticle(ResultRow r) => Article(
+        id: r[0] as String,
+        companyId: r[1] as String,
+        name: r[2] as String,
+        unit: r[3] as String?,
+        salePriceCents: r[4] as int?,
+        active: r[5] as bool,
+        createdAt: r[6] as DateTime,
+      );
+
+  @override
+  Future<List<Article>> listArticles(String companyId, {String? query, bool includeInactive = false}) async {
+    final result = await _q(
+      'SELECT $_articleColumns FROM articles WHERE company_id = @companyId AND (@all OR active) '
+      "AND (@q = '' OR position(lower(@q) in lower(name)) > 0) ORDER BY lower(name)",
+      {'companyId': companyId, 'q': query ?? '', 'all': includeInactive},
+    );
+    return [for (final r in result) _toArticle(r)];
+  }
+
+  @override
+  Future<Article?> findArticle(String companyId, String id) async {
+    final result = await _q(
+      'SELECT $_articleColumns FROM articles WHERE company_id = @companyId AND id = @id',
+      {'companyId': companyId, 'id': id},
+    );
+    return result.isEmpty ? null : _toArticle(result.first);
+  }
+
+  Map<String, Object?> _articleParams(Article a) => {
+        'id': a.id,
+        'companyId': a.companyId,
+        'name': a.name,
+        'unit': a.unit,
+        'price': a.salePriceCents,
+        'active': a.active,
+        'createdAt': a.createdAt,
+      };
+
+  @override
+  Future<void> createArticle(Article article) async {
+    await _q(
+      'INSERT INTO articles ($_articleColumns) VALUES (@id, @companyId, @name, @unit, @price, @active, @createdAt)',
+      _articleParams(article),
+    );
+  }
+
+  @override
+  Future<bool> updateArticle(Article article) async {
+    final result = await _q(
+      'UPDATE articles SET name = @name, unit = @unit, sale_price_cents = @price, active = @active '
+      'WHERE company_id = @companyId AND id = @id',
+      _articleParams(article)..remove('createdAt'),
+    );
+    return result.affectedRows > 0;
+  }
+
+  // ---- Dokumente --------------------------------------------------------------
+
+  static const _documentColumns =
+      'd.id, d.company_id, d.customer_id, d.kind, d.status, d.number, d.number_year, d.issue_date, d.service_date, '
+      'd.payment_terms, d.notes, d.customer_snapshot_name, d.customer_snapshot_address, d.customer_snapshot_vat_id, '
+      'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version';
+
+  Document _toDocument(ResultRow r) => Document(
+        id: r[0] as String,
+        companyId: r[1] as String,
+        customerId: r[2] as String,
+        kind: r[3] as String,
+        status: r[4] as String,
+        number: r[5] as String?,
+        numberYear: r[6] as int?,
+        issueDate: r[7] as DateTime,
+        serviceDate: r[8] as DateTime,
+        paymentTerms: r[9] as String?,
+        notes: r[10] as String?,
+        customerSnapshotName: r[11] as String?,
+        customerSnapshotAddress: r[12] as String?,
+        customerSnapshotVatId: r[13] as String?,
+        companySnapshotName: r[14] as String?,
+        createdByUserId: r[15] as String,
+        createdAt: r[16] as DateTime,
+        updatedAt: r[17] as DateTime,
+        finalizedAt: r[18] as DateTime?,
+        version: r[19] as int,
+      );
+
+  @override
+  Future<List<Document>> listDocuments(String companyId, {String? kind, String? status, String? query}) async {
+    final result = await _q(
+      'SELECT $_documentColumns FROM documents d JOIN customers c ON c.id = d.customer_id '
+      'WHERE d.company_id = @companyId AND (@kind = \'\' OR d.kind = @kind) AND (@status = \'\' OR d.status = @status) '
+      "AND (@q = '' OR position(lower(@q) in lower(coalesce(d.number, ''))) > 0 "
+      'OR position(lower(@q) in lower(c.name)) > 0) ORDER BY d.created_at DESC',
+      {'companyId': companyId, 'kind': kind ?? '', 'status': status ?? '', 'q': query ?? ''},
+    );
+    return [for (final r in result) _toDocument(r)];
+  }
+
+  @override
+  Future<Document?> findDocument(String companyId, String id) async {
+    final result = await _q(
+      'SELECT $_documentColumns FROM documents d WHERE d.company_id = @companyId AND d.id = @id',
+      {'companyId': companyId, 'id': id},
+    );
+    return result.isEmpty ? null : _toDocument(result.first);
+  }
+
+  static const _itemColumns =
+      'i.id, i.document_id, i.kind, i.article_id, i.description, i.quantity, i.unit_price_cents, i.vat_rate_percent, '
+      'i.unit, i.discount_percent, i.group_label, i.sort_order';
+
+  DocumentItem _toItem(ResultRow r) => DocumentItem(
+        id: r[0] as String,
+        documentId: r[1] as String,
+        kind: r[2] as String,
+        articleId: r[3] as String?,
+        description: r[4] as String,
+        quantity: r[5] as String,
+        unitPriceCents: r[6] as int,
+        vatRatePercent: r[7] as double,
+        unit: r[8] as String?,
+        discountPercent: r[9] as double,
+        groupLabel: r[10] as String?,
+        sortOrder: r[11] as int,
+      );
+
+  @override
+  Future<List<DocumentItem>> itemsFor(String companyId, String documentId) async {
+    // JOIN auf documents erzwingt die Firmenbindung auch für Positionen.
+    final result = await _q(
+      'SELECT $_itemColumns FROM document_items i JOIN documents d ON d.id = i.document_id '
+      'WHERE d.company_id = @companyId AND d.id = @documentId ORDER BY i.sort_order',
+      {'companyId': companyId, 'documentId': documentId},
+    );
+    return [for (final r in result) _toItem(r)];
+  }
+
+  Future<void> _insertItems(Session s, List<DocumentItem> items) async {
+    for (final i in items) {
+      await s.execute(
+        Sql.named(
+          'INSERT INTO document_items (id, document_id, kind, article_id, description, quantity, unit_price_cents, '
+          'vat_rate_percent, unit, discount_percent, group_label, sort_order) VALUES (@id, @documentId, @kind, '
+          '@articleId, @description, @quantity, @price, @vat, @unit, @discount, @groupLabel, @sortOrder)',
+        ),
+        parameters: {
+          'id': i.id,
+          'documentId': i.documentId,
+          'kind': i.kind,
+          'articleId': i.articleId,
+          'description': i.description,
+          'quantity': i.quantity,
+          'price': i.unitPriceCents,
+          'vat': i.vatRatePercent,
+          'unit': i.unit,
+          'discount': i.discountPercent,
+          'groupLabel': i.groupLabel,
+          'sortOrder': i.sortOrder,
+        },
+      );
+    }
+  }
+
+  @override
+  Future<void> createDocument(Document d, List<DocumentItem> items) async {
+    await _db.runTx((s) async {
+      await s.execute(
+        Sql.named(
+          'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
+          'notes, created_by_user_id, created_at, updated_at, version) VALUES (@id, @companyId, @customerId, @kind, '
+          '@status, @issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version)',
+        ),
+        parameters: {
+          'id': d.id,
+          'companyId': d.companyId,
+          'customerId': d.customerId,
+          'kind': d.kind,
+          'status': d.status,
+          'issueDate': TypedValue(Type.date, d.issueDate),
+          'serviceDate': TypedValue(Type.date, d.serviceDate),
+          'paymentTerms': d.paymentTerms,
+          'notes': d.notes,
+          'createdBy': d.createdByUserId,
+          'createdAt': d.createdAt,
+          'updatedAt': d.updatedAt,
+          'version': d.version,
+        },
+      );
+      await _insertItems(s, items);
+    });
+  }
+
+  /// Sperrt die Dokumentzeile bis Transaktionsende (`FOR UPDATE`) und
+  /// prüft Entwurfsstatus + Version — gemeinsamer Schutz für Update und
+  /// Finalisierung gegen parallele Änderungen.
+  Future<ResultRow?> _lockDraft(TxSession s, String companyId, String id, int expectedVersion) async {
+    final result = await s.execute(
+      Sql.named('SELECT status, version, kind, customer_id FROM documents WHERE company_id = @companyId AND id = @id FOR UPDATE'),
+      parameters: {'companyId': companyId, 'id': id},
+    );
+    if (result.isEmpty) return null;
+    final row = result.first;
+    if (row[0] != 'draft') throw const BusinessConflict('Dokument ist finalisiert und unveränderlich.');
+    if (row[1] != expectedVersion) {
+      throw BusinessConflict('Dokument wurde zwischenzeitlich geändert (Version ${row[1]}, erwartet $expectedVersion).');
+    }
+    return row;
+  }
+
+  @override
+  Future<Document?> updateDraft({
+    required String companyId,
+    required String id,
+    required int expectedVersion,
+    required String customerId,
+    required DateTime issueDate,
+    required DateTime serviceDate,
+    required String? paymentTerms,
+    required String? notes,
+    required List<DocumentItem> items,
+    required DateTime now,
+  }) async {
+    final updated = await _db.runTx((s) async {
+      if (await _lockDraft(s, companyId, id, expectedVersion) == null) return false;
+      await s.execute(
+        Sql.named(
+          'UPDATE documents SET customer_id = @customerId, issue_date = @issueDate, service_date = @serviceDate, '
+          'payment_terms = @paymentTerms, notes = @notes, updated_at = @now, version = version + 1 '
+          'WHERE company_id = @companyId AND id = @id',
+        ),
+        parameters: {
+          'customerId': customerId,
+          'issueDate': TypedValue(Type.date, issueDate),
+          'serviceDate': TypedValue(Type.date, serviceDate),
+          'paymentTerms': paymentTerms,
+          'notes': notes,
+          'now': now,
+          'companyId': companyId,
+          'id': id,
+        },
+      );
+      await s.execute(Sql.named('DELETE FROM document_items WHERE document_id = @id'), parameters: {'id': id});
+      await _insertItems(s, items);
+      return true;
+    });
+    return updated ? findDocument(companyId, id) : null;
+  }
+
+  @override
+  Future<bool> deleteDraft(String companyId, String id) async {
+    final existing = await findDocument(companyId, id);
+    if (existing == null) return false;
+    // Status in der WHERE-Klausel: ein zwischenzeitlich finalisiertes
+    // Dokument wird nie gelöscht, auch nicht bei einem Wettlauf.
+    final result = await _q("DELETE FROM documents WHERE company_id = @companyId AND id = @id AND status = 'draft'", {
+      'companyId': companyId,
+      'id': id,
+    });
+    if (result.affectedRows == 0) throw const BusinessConflict('Finalisierte Dokumente können nicht gelöscht werden.');
+    return true;
+  }
+
+  @override
+  Future<Document?> finalize({
+    required String companyId,
+    required String id,
+    required int expectedVersion,
+    required String companySnapshotName,
+    required DateTime now,
+  }) async {
+    final finalized = await _db.runTx((s) async {
+      final row = await _lockDraft(s, companyId, id, expectedVersion);
+      if (row == null) return false;
+      final kind = row[2] as String;
+      final sequence = await s.execute(
+        Sql.named(
+          'INSERT INTO number_sequences (company_id, document_type, year, last_number) VALUES (@companyId, @kind, @year, 1) '
+          'ON CONFLICT (company_id, document_type, year) DO UPDATE SET last_number = number_sequences.last_number + 1 '
+          'RETURNING last_number',
+        ),
+        parameters: {'companyId': companyId, 'kind': kind, 'year': now.year},
+      );
+      final number = formatNumberWithPrefix(
+        prefix: documentNumberPrefixes[kind]!,
+        year: now.year,
+        number: sequence.first.first as int,
+      );
+      await s.execute(
+        Sql.named(
+          "UPDATE documents d SET status = 'finalized', number = @number, number_year = @year, finalized_at = @now, "
+          'updated_at = @now, version = d.version + 1, company_snapshot_name = @companyName, '
+          'customer_snapshot_name = c.name, customer_snapshot_address = c.address, customer_snapshot_vat_id = c.vat_id '
+          'FROM customers c WHERE c.id = d.customer_id AND d.company_id = @companyId AND d.id = @id',
+        ),
+        parameters: {
+          'number': number,
+          'year': now.year,
+          'now': now,
+          'companyName': companySnapshotName,
+          'companyId': companyId,
+          'id': id,
+        },
+      );
+      return true;
+    });
+    return finalized ? findDocument(companyId, id) : null;
+  }
+}

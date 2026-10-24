@@ -15,6 +15,10 @@ dependencies:
   bcrypt: ^1.2.0
   crypto: ^3.0.6
   uuid: ^4.6.0
+  decimal: ^3.2.6
+  # Gemeinsamer Rechenkern mit der Offline-App (Money, Summen, Nummernformat).
+  werkkern_core:
+    path: ../packages/werkkern_core
 
 dev_dependencies:
   test: ^1.26.2

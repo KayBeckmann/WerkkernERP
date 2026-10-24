@@ -1,0 +1,6 @@
+# Die Postgres-Suiten (Tag "postgres") setzen vor jedem Test das
+# gemeinsame Schema zurück — parallel laufende Testdateien würden sich
+# gegenseitig die Datenbank leeren. Daher Dateien nacheinander.
+concurrency: 1
+tags:
+  postgres:

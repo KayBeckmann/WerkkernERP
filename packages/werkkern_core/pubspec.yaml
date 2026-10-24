@@ -1,0 +1,16 @@
+name: werkkern_core
+description: >
+  Gemeinsamer, reiner Dart-Kern (ohne Flutter) für die WerkkernERP-App
+  und den Online-Server (server/): Geldwerte in Cent und die
+  Summenberechnung je Steuersatz — damit Offline-App und Server
+  garantiert identisch rechnen (Roadmap C8/B: "dieselbe erlaubte
+  Fachaktion funktioniert über UI/API regelgleich").
+publish_to: none
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  decimal: ^3.2.6
+
+dev_dependencies:
+  test: ^1.26.2

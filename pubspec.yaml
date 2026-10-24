@@ -66,6 +66,9 @@ dependencies:
   uuid: ^4.6.0
   intl: ^0.20.3
   decimal: ^3.2.6
+  # Gemeinsamer Rechenkern mit dem Server (Phase B), siehe packages/werkkern_core.
+  werkkern_core:
+    path: packages/werkkern_core
 
   # Backup-Export/-Import über Android-Dateiauswahl (A4).
   file_picker: ^13.1.0

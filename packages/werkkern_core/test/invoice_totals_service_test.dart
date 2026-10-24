@@ -1,7 +1,6 @@
 import 'package:decimal/decimal.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:werkkernerp/domain/models/money.dart';
-import 'package:werkkernerp/domain/services/invoice_totals_service.dart';
+import 'package:test/test.dart';
+import 'package:werkkern_core/werkkern_core.dart';
 
 void main() {
   test('A2-Abnahme: drei Positionstypen mit 19/7/0% — Summen je Steuersatz korrekt', () {

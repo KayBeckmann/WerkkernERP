@@ -1133,6 +1133,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.3"
+  werkkern_core:
+    dependency: "direct main"
+    description:
+      path: "packages/werkkern_core"
+      relative: true
+    source: path
+    version: "0.0.0"
   win32:
     dependency: transitive
     description:

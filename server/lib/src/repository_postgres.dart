@@ -5,7 +5,8 @@ import 'repository.dart';
 
 class PostgresPhaseBRepository implements PhaseBRepository {
   PostgresPhaseBRepository(this._db);
-  final Connection _db;
+  // Session: im Betrieb ein Pool, in Tests eine einzelne Connection.
+  final Session _db;
 
   @override
   Future<AppUser> createUser({required String id, required String email, required String passwordHash}) async {
