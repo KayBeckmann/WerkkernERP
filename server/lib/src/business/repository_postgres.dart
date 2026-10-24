@@ -171,7 +171,7 @@ class PostgresBusinessRepository implements BusinessRepository {
       'd.payment_terms, d.notes, d.customer_snapshot_name, d.customer_snapshot_address, d.customer_snapshot_vat_id, '
       'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version, '
       'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban, '
-      'd.converted_from_id, d.payment_status, d.paid_at, d.due_date';
+      'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -202,6 +202,7 @@ class PostgresBusinessRepository implements BusinessRepository {
         paymentStatus: r[25] as String,
         paidAt: r[26] as DateTime?,
         dueDate: r[27] as DateTime?,
+        projectId: r[28] as String?,
       );
 
   @override
@@ -287,9 +288,9 @@ class PostgresBusinessRepository implements BusinessRepository {
       await s.execute(
         Sql.named(
           'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
-          'notes, created_by_user_id, created_at, updated_at, version, converted_from_id) VALUES (@id, @companyId, '
-          '@customerId, @kind, @status, @issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, '
-          '@updatedAt, @version, @convertedFromId)',
+          'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id) VALUES (@id, '
+          '@companyId, @customerId, @kind, @status, @issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, '
+          '@createdAt, @updatedAt, @version, @convertedFromId, @projectId)',
         ),
         parameters: {
           'id': d.id,
@@ -306,6 +307,7 @@ class PostgresBusinessRepository implements BusinessRepository {
           'updatedAt': d.updatedAt,
           'version': d.version,
           'convertedFromId': d.convertedFromId,
+          'projectId': d.projectId,
         },
       );
       await _insertItems(s, items);
@@ -398,18 +400,29 @@ class PostgresBusinessRepository implements BusinessRepository {
       final row = await _lockDraft(s, companyId, id, expectedVersion);
       if (row == null) return false;
       final kind = row[2] as String;
+      // C2: projektbezogen -> JJ = Gründungsjahr + PP (wie offline).
+      final projectRow = await s.execute(
+        Sql.named(
+          'SELECT p.founding_year, p.project_number FROM documents d JOIN projects p ON p.id = d.project_id '
+          'WHERE d.id = @id',
+        ),
+        parameters: {'id': id},
+      );
+      final year = projectRow.isEmpty ? now.year : projectRow.first[0] as int;
+      final projectNumber = projectRow.isEmpty ? null : projectRow.first[1] as int;
       final sequence = await s.execute(
         Sql.named(
           'INSERT INTO number_sequences (company_id, document_type, year, last_number) VALUES (@companyId, @kind, @year, 1) '
           'ON CONFLICT (company_id, document_type, year) DO UPDATE SET last_number = number_sequences.last_number + 1 '
           'RETURNING last_number',
         ),
-        parameters: {'companyId': companyId, 'kind': kind, 'year': now.year},
+        parameters: {'companyId': companyId, 'kind': kind, 'year': year},
       );
       final number = formatNumberWithPrefix(
         prefix: documentNumberPrefixes[kind]!,
-        year: now.year,
+        year: year,
         number: sequence.first.first as int,
+        projectNumber: projectNumber,
       );
       await s.execute(
         Sql.named(
@@ -422,7 +435,7 @@ class PostgresBusinessRepository implements BusinessRepository {
         ),
         parameters: {
           'number': number,
-          'year': now.year,
+          'year': year,
           'now': now,
           'companyName': company.name,
           'companyAddress': company.address,
@@ -481,7 +494,7 @@ class PostgresBusinessRepository implements BusinessRepository {
   // ---- Zeiterfassung ------------------------------------------------------
 
   static const _timeColumns =
-      'id, company_id, user_id, document_id, work_date, hours, note, hourly_cost_cents, created_at, updated_at';
+      'id, company_id, user_id, document_id, work_date, hours, note, hourly_cost_cents, created_at, updated_at, project_id';
 
   TimeEntry _toTimeEntry(ResultRow r) => TimeEntry(
         id: r[0] as String,
@@ -494,6 +507,7 @@ class PostgresBusinessRepository implements BusinessRepository {
         hourlyCostCents: r[7] as int?,
         createdAt: r[8] as DateTime,
         updatedAt: r[9] as DateTime,
+        projectId: r[10] as String?,
       );
 
   @override
@@ -501,18 +515,21 @@ class PostgresBusinessRepository implements BusinessRepository {
     String companyId, {
     String? userId,
     String? documentId,
+    String? projectId,
     DateTime? from,
     DateTime? to,
   }) async {
     final result = await _q(
       'SELECT $_timeColumns FROM time_entries WHERE company_id = @companyId '
       "AND (@userId = '' OR user_id = @userId) AND (@documentId = '' OR document_id = @documentId) "
+      "AND (@projectId = '' OR project_id = @projectId) "
       'AND (@from::date IS NULL OR work_date >= @from::date) AND (@to::date IS NULL OR work_date <= @to::date) '
       'ORDER BY work_date DESC, created_at DESC',
       {
         'companyId': companyId,
         'userId': userId ?? '',
         'documentId': documentId ?? '',
+        'projectId': projectId ?? '',
         'from': TypedValue(Type.date, from),
         'to': TypedValue(Type.date, to),
       },
@@ -534,6 +551,7 @@ class PostgresBusinessRepository implements BusinessRepository {
         'companyId': t.companyId,
         'userId': t.userId,
         'documentId': t.documentId,
+        'projectId': t.projectId,
         'workDate': TypedValue(Type.date, t.workDate),
         'hours': t.hours,
         'note': t.note,
@@ -546,7 +564,7 @@ class PostgresBusinessRepository implements BusinessRepository {
   Future<void> createTimeEntry(TimeEntry entry) async {
     await _q(
       'INSERT INTO time_entries ($_timeColumns) VALUES (@id, @companyId, @userId, @documentId, @workDate, @hours, '
-      '@note, @rate, @createdAt, @updatedAt)',
+      '@note, @rate, @createdAt, @updatedAt, @projectId)',
       _timeParams(entry),
     );
   }
@@ -554,8 +572,8 @@ class PostgresBusinessRepository implements BusinessRepository {
   @override
   Future<bool> updateTimeEntry(TimeEntry entry) async {
     final result = await _q(
-      'UPDATE time_entries SET document_id = @documentId, work_date = @workDate, hours = @hours, note = @note, '
-      'updated_at = @updatedAt WHERE company_id = @companyId AND id = @id',
+      'UPDATE time_entries SET document_id = @documentId, project_id = @projectId, work_date = @workDate, '
+      'hours = @hours, note = @note, updated_at = @updatedAt WHERE company_id = @companyId AND id = @id',
       _timeParams(entry)
         ..remove('userId')
         ..remove('rate')
@@ -571,5 +589,141 @@ class PostgresBusinessRepository implements BusinessRepository {
       'id': id,
     });
     return result.affectedRows > 0;
+  }
+
+  // ---- Projekte -------------------------------------------------------------
+
+  static const _projectColumns = 'id, company_id, name, customer_id, status, founding_year, project_number, created_at';
+
+  Project _toProject(ResultRow r) => Project(
+        id: r[0] as String,
+        companyId: r[1] as String,
+        name: r[2] as String,
+        customerId: r[3] as String?,
+        status: r[4] as String,
+        foundingYear: r[5] as int,
+        projectNumber: r[6] as int,
+        createdAt: r[7] as DateTime,
+      );
+
+  @override
+  Future<List<Project>> listProjects(String companyId, {bool includeArchived = false}) async {
+    final result = await _q(
+      "SELECT $_projectColumns FROM projects WHERE company_id = @companyId AND (@all OR status = 'active') "
+      'ORDER BY founding_year DESC, project_number DESC',
+      {'companyId': companyId, 'all': includeArchived},
+    );
+    return [for (final r in result) _toProject(r)];
+  }
+
+  @override
+  Future<Project?> findProject(String companyId, String id) async {
+    final result = await _q(
+      'SELECT $_projectColumns FROM projects WHERE company_id = @companyId AND id = @id',
+      {'companyId': companyId, 'id': id},
+    );
+    return result.isEmpty ? null : _toProject(result.first);
+  }
+
+  @override
+  Future<Project> createProject({
+    required String id,
+    required String companyId,
+    required String name,
+    String? customerId,
+    required DateTime now,
+  }) =>
+      _db.runTx((s) async {
+        final sequence = await s.execute(
+          Sql.named(
+            "INSERT INTO number_sequences (company_id, document_type, year, last_number) VALUES (@companyId, 'project', "
+            '@year, 1) ON CONFLICT (company_id, document_type, year) DO UPDATE SET last_number = '
+            'number_sequences.last_number + 1 RETURNING last_number',
+          ),
+          parameters: {'companyId': companyId, 'year': now.year},
+        );
+        final project = Project(
+          id: id,
+          companyId: companyId,
+          name: name,
+          customerId: customerId,
+          status: 'active',
+          foundingYear: now.year,
+          projectNumber: sequence.first.first as int,
+          createdAt: now,
+        );
+        await s.execute(
+          Sql.named(
+            'INSERT INTO projects ($_projectColumns) VALUES (@id, @companyId, @name, @customerId, @status, @year, '
+            '@number, @createdAt)',
+          ),
+          parameters: {
+            'id': id,
+            'companyId': companyId,
+            'name': name,
+            'customerId': customerId,
+            'status': 'active',
+            'year': project.foundingYear,
+            'number': project.projectNumber,
+            'createdAt': now,
+          },
+        );
+        return project;
+      });
+
+  @override
+  Future<bool> updateProject(Project p) async {
+    final result = await _q(
+      'UPDATE projects SET name = @name, customer_id = @customerId, status = @status '
+      'WHERE company_id = @companyId AND id = @id',
+      {'name': p.name, 'customerId': p.customerId, 'status': p.status, 'companyId': p.companyId, 'id': p.id},
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<bool> deleteProject(String companyId, String id) async {
+    if (await findProject(companyId, id) == null) return false;
+    final used = await _q(
+      'SELECT 1 FROM documents WHERE project_id = @id UNION ALL SELECT 1 FROM time_entries WHERE project_id = @id LIMIT 1',
+      {'id': id},
+    );
+    if (used.isNotEmpty) {
+      throw const BusinessConflict('Dem Projekt sind noch Dokumente oder Zeiten zugeordnet — archivieren statt löschen.');
+    }
+    final result = await _q('DELETE FROM projects WHERE company_id = @companyId AND id = @id', {'companyId': companyId, 'id': id});
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<List<Document>> listDocumentsForProject(String companyId, String projectId) async {
+    final result = await _q(
+      'SELECT $_documentColumns FROM documents d WHERE d.company_id = @companyId AND d.project_id = @projectId '
+      'ORDER BY d.created_at DESC',
+      {'companyId': companyId, 'projectId': projectId},
+    );
+    return [for (final r in result) _toDocument(r)];
+  }
+
+  @override
+  Future<Document?> setDocumentProject({
+    required String companyId,
+    required String id,
+    required int expectedVersion,
+    required String? projectId,
+    required DateTime now,
+  }) async {
+    final updated = await _db.runTx((s) async {
+      if (await _lockDraft(s, companyId, id, expectedVersion) == null) return false;
+      await s.execute(
+        Sql.named(
+          'UPDATE documents SET project_id = @projectId, updated_at = @now, version = version + 1 '
+          'WHERE company_id = @companyId AND id = @id',
+        ),
+        parameters: {'projectId': projectId, 'now': now, 'companyId': companyId, 'id': id},
+      );
+      return true;
+    });
+    return updated ? findDocument(companyId, id) : null;
   }
 }

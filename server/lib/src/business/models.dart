@@ -121,6 +121,7 @@ class Document {
     this.paymentStatus = 'open',
     this.paidAt,
     this.dueDate,
+    this.projectId,
   });
   final String id;
   final String companyId;
@@ -156,6 +157,9 @@ class Document {
   final DateTime? paidAt;
   final DateTime? dueDate;
 
+  /// C1 online: optionale Projektzuordnung (jede Dokumentart).
+  final String? projectId;
+
   bool get isDraft => status == 'draft';
 
   /// Kopie mit geänderten Feldern — verhindert, dass beim Aktualisieren
@@ -179,6 +183,7 @@ class Document {
     String? paymentStatus,
     DateTime? Function()? paidAt,
     DateTime? Function()? dueDate,
+    String? Function()? projectId,
   }) =>
       Document(
         id: id,
@@ -209,6 +214,7 @@ class Document {
         paymentStatus: paymentStatus ?? this.paymentStatus,
         paidAt: paidAt != null ? paidAt() : this.paidAt,
         dueDate: dueDate != null ? dueDate() : this.dueDate,
+        projectId: projectId != null ? projectId() : this.projectId,
       );
 
   Map<String, Object?> toJson() => {
@@ -242,6 +248,7 @@ class Document {
         'paymentStatus': paymentStatus,
         'paidAt': paidAt?.toIso8601String(),
         'dueDate': dueDate == null ? null : _date(dueDate!),
+        'projectId': projectId,
       };
 }
 
@@ -305,6 +312,46 @@ class CompanySnapshot {
 String _date(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+/// C1 online: Projekt. [foundingYear] + [projectNumber] (PP) werden bei
+/// Anlage eingefroren und nie neu vergeben (C2-Entscheidung).
+class Project {
+  const Project({
+    required this.id,
+    required this.companyId,
+    required this.name,
+    this.customerId,
+    required this.status,
+    required this.foundingYear,
+    required this.projectNumber,
+    required this.createdAt,
+  });
+  final String id;
+  final String companyId;
+  final String name;
+  final String? customerId;
+
+  /// `active` | `archived`
+  final String status;
+  final int foundingYear;
+  final int projectNumber;
+  final DateTime createdAt;
+
+  /// Anzeige "JJ/PP", z. B. "26/03".
+  String get displayNumber =>
+      '${(foundingYear % 100).toString().padLeft(2, '0')}/${projectNumber.toString().padLeft(2, '0')}';
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'name': name,
+        'customerId': customerId,
+        'status': status,
+        'foundingYear': foundingYear,
+        'projectNumber': projectNumber,
+        'displayNumber': displayNumber,
+        'createdAt': createdAt.toIso8601String(),
+      };
+}
+
 /// C3 online: Zeitbuchung eines echten Nutzers auf einen Auftrag bzw.
 /// eine Rechnung. [hourlyCostCents] ist der beim Buchen eingefrorene
 /// Stundensatz des Mitglieds (spätere Satzänderungen ändern keine
@@ -315,6 +362,7 @@ class TimeEntry {
     required this.companyId,
     required this.userId,
     required this.documentId,
+    this.projectId,
     required this.workDate,
     required this.hours,
     this.note,
@@ -326,6 +374,7 @@ class TimeEntry {
   final String companyId;
   final String userId;
   final String? documentId;
+  final String? projectId;
   final DateTime workDate;
 
   /// Dezimal als Text (z. B. "1.5") — nie double.
@@ -339,6 +388,7 @@ class TimeEntry {
         'id': id,
         'userId': userId,
         'documentId': documentId,
+        'projectId': projectId,
         'date': _date(workDate),
         'hours': hours,
         'note': note,

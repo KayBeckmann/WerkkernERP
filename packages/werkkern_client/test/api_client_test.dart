@@ -47,4 +47,15 @@ void main() {
     );
     await expectLater(client.health(), throwsA(isA<ApiUnreachable>()));
   });
+
+  test('Nicht-JSON-Fehlerantwort (z. B. HTML-502 eines Proxys) wird zu ApiException statt FormatException', () async {
+    final client = WerkkernApiClient(
+      baseUrl: Uri.parse('http://x'),
+      httpClient: MockClient((_) async => http.Response('<html>502 Bad Gateway</html>', 502)),
+    );
+    await expectLater(
+      client.health(),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 502)),
+    );
+  });
 }

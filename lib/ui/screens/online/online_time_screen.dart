@@ -52,10 +52,18 @@ class _OnlineTimeScreenState extends State<OnlineTimeScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
       return;
     }
+    var projects = const <OnlineProject>[];
+    if (widget.session.modules.contains('projects') && widget.session.can('projects.read')) {
+      try {
+        projects = await widget.session.client.projects();
+      } on Exception {
+        // Dann nur Buchung auf Auftrag/Rechnung.
+      }
+    }
     if (!mounted) return;
     final result = await showDialog<_TimeResult>(
       context: context,
-      builder: (_) => _TimeEntryDialog(documents: documents, existing: existing, label: _label),
+      builder: (_) => _TimeEntryDialog(documents: documents, projects: projects, existing: existing, label: _label),
     );
     if (result == null) return;
     try {
@@ -67,6 +75,7 @@ class _OnlineTimeScreenState extends State<OnlineTimeScreen> {
           date: result.date,
           hours: result.hours,
           documentId: result.documentId,
+          projectId: result.projectId,
           note: result.note,
         );
       }
@@ -133,17 +142,26 @@ class _OnlineTimeScreenState extends State<OnlineTimeScreen> {
 }
 
 class _TimeResult {
-  const _TimeResult({required this.date, required this.hours, required this.documentId, this.note, this.delete = false});
+  const _TimeResult({
+    required this.date,
+    required this.hours,
+    this.documentId,
+    this.projectId,
+    this.note,
+    this.delete = false,
+  });
   final DateTime date;
   final String hours;
-  final String documentId;
+  final String? documentId;
+  final String? projectId;
   final String? note;
   final bool delete;
 }
 
 class _TimeEntryDialog extends StatefulWidget {
-  const _TimeEntryDialog({required this.documents, required this.label, this.existing});
+  const _TimeEntryDialog({required this.documents, required this.label, this.projects = const [], this.existing});
   final List<OnlineDocument> documents;
+  final List<OnlineProject> projects;
   final String Function(OnlineDocument) label;
   final OnlineTimeEntry? existing;
 
@@ -154,6 +172,7 @@ class _TimeEntryDialog extends StatefulWidget {
 class _TimeEntryDialogState extends State<_TimeEntryDialog> {
   late DateTime _date = widget.existing?.date ?? DateTime.now();
   late String? _documentId = widget.existing?.documentId;
+  late String? _projectId = widget.existing?.projectId;
   late final _hours = TextEditingController(text: widget.existing?.hours.replaceAll('.', ','));
   late final _note = TextEditingController(text: widget.existing?.note);
   String? _error;
@@ -167,8 +186,8 @@ class _TimeEntryDialogState extends State<_TimeEntryDialog> {
 
   void _submit() {
     final hours = Decimal.tryParse(_hours.text.trim().replaceAll(',', '.'));
-    if (_documentId == null || hours == null || hours <= Decimal.zero || hours > Decimal.fromInt(24)) {
-      setState(() => _error = 'Auftrag/Rechnung wählen und Stunden zwischen 0 und 24 angeben.');
+    if ((_documentId == null && _projectId == null) || hours == null || hours <= Decimal.zero || hours > Decimal.fromInt(24)) {
+      setState(() => _error = 'Auftrag/Rechnung oder Projekt wählen und Stunden zwischen 0 und 24 angeben.');
       return;
     }
     Navigator.pop(
@@ -176,7 +195,8 @@ class _TimeEntryDialogState extends State<_TimeEntryDialog> {
       _TimeResult(
         date: _date,
         hours: hours.toString(),
-        documentId: _documentId!,
+        documentId: _documentId,
+        projectId: _projectId,
         note: _note.text.trim().isEmpty ? null : _note.text.trim(),
       ),
     );
@@ -192,19 +212,36 @@ class _TimeEntryDialogState extends State<_TimeEntryDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (widget.documents.isEmpty)
-              const Text('Keine Aufträge/Rechnungen sichtbar — Zeiten werden immer auf einen Vorgang gebucht.')
-            else
-              DropdownButtonFormField<String>(
+            if (widget.documents.isEmpty && widget.projects.isEmpty)
+              const Text('Keine Aufträge/Rechnungen oder Projekte sichtbar — Zeiten brauchen immer einen Bezug.'),
+            if (widget.documents.isNotEmpty)
+              DropdownButtonFormField<String?>(
                 key: const Key('online-time-document'),
                 initialValue: _documentId,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Auftrag/Rechnung'),
                 items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('— keiner —')),
                   for (final d in widget.documents)
-                    DropdownMenuItem(value: d.id, child: Text(widget.label(d), overflow: TextOverflow.ellipsis)),
+                    DropdownMenuItem<String?>(value: d.id, child: Text(widget.label(d), overflow: TextOverflow.ellipsis)),
                 ],
                 onChanged: (v) => setState(() => _documentId = v),
+              ),
+            if (widget.projects.isNotEmpty)
+              DropdownButtonFormField<String?>(
+                key: const Key('online-time-project'),
+                initialValue: _projectId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Projekt',
+                  helperText: 'Leer lassen: wird vom Auftrag übernommen, falls dieser einem Projekt gehört.',
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('— keins —')),
+                  for (final p in widget.projects)
+                    DropdownMenuItem<String?>(value: p.id, child: Text('${p.displayNumber} · ${p.name}', overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (v) => setState(() => _projectId = v),
               ),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -240,7 +277,7 @@ class _TimeEntryDialogState extends State<_TimeEntryDialog> {
           TextButton(
             onPressed: () => Navigator.pop(
               context,
-              _TimeResult(date: _date, hours: '0', documentId: _documentId ?? '', delete: true),
+              _TimeResult(date: _date, hours: '0', delete: true),
             ),
             child: const Text('Löschen'),
           ),

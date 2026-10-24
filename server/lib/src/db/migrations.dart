@@ -20,6 +20,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step5IdempotencyKeys,
   _step6AgentTokensApprovals,
   _step7TimeTracking,
+  _step8Projects,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -146,4 +147,29 @@ Future<void> _step7TimeTracking(Session db) async {
   ''');
   await db.execute('CREATE INDEX IF NOT EXISTS time_entries_company_idx ON time_entries (company_id, work_date)');
   await db.execute('CREATE INDEX IF NOT EXISTS time_entries_document_idx ON time_entries (document_id)');
+}
+
+/// C1/C2 online: Projekte mit eingefrorener Projektnummer (PP je Firma
+/// und Gründungsjahr), Zuordnung von Dokumenten und Zeitbuchungen.
+Future<void> _step8Projects(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      customer_id TEXT REFERENCES customers(id) ON DELETE SET NULL,
+      status TEXT NOT NULL,
+      founding_year INTEGER NOT NULL,
+      project_number INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      UNIQUE (company_id, founding_year, project_number)
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS projects_company_idx ON projects (company_id)');
+  await db.execute(
+    'ALTER TABLE documents ADD COLUMN IF NOT EXISTS project_id TEXT REFERENCES projects(id) ON DELETE RESTRICT',
+  );
+  await db.execute(
+    'ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS project_id TEXT REFERENCES projects(id) ON DELETE RESTRICT',
+  );
 }
