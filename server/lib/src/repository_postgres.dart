@@ -145,6 +145,66 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   }
 
   @override
+  Future<StoredResponse?> findIdempotentResponse({
+    required String companyId,
+    required String userId,
+    required String key,
+  }) async {
+    final result = await _db.execute(
+      Sql.named(
+        'SELECT request_fingerprint, status, body FROM idempotency_keys '
+        'WHERE company_id = @companyId AND user_id = @userId AND key = @key',
+      ),
+      parameters: {'companyId': companyId, 'userId': userId, 'key': key},
+    );
+    if (result.isEmpty) return null;
+    final r = result.first;
+    return StoredResponse(requestFingerprint: r[0] as String, status: r[1] as int, body: r[2] as String);
+  }
+
+  @override
+  Future<bool> claimIdempotencyKey({
+    required String companyId,
+    required String userId,
+    required String key,
+    required String requestFingerprint,
+  }) async {
+    final result = await _db.execute(
+      Sql.named(
+        'INSERT INTO idempotency_keys (company_id, user_id, key, request_fingerprint, status, body, created_at) '
+        "VALUES (@companyId, @userId, @key, @fingerprint, 0, '', now()) ON CONFLICT DO NOTHING",
+      ),
+      parameters: {'companyId': companyId, 'userId': userId, 'key': key, 'fingerprint': requestFingerprint},
+    );
+    return result.affectedRows == 1;
+  }
+
+  @override
+  Future<void> completeIdempotencyKey({
+    required String companyId,
+    required String userId,
+    required String key,
+    required int status,
+    required String body,
+  }) async {
+    await _db.execute(
+      Sql.named(
+        'UPDATE idempotency_keys SET status = @status, body = @body '
+        'WHERE company_id = @companyId AND user_id = @userId AND key = @key',
+      ),
+      parameters: {'status': status, 'body': body, 'companyId': companyId, 'userId': userId, 'key': key},
+    );
+  }
+
+  @override
+  Future<void> releaseIdempotencyKey({required String companyId, required String userId, required String key}) async {
+    await _db.execute(
+      Sql.named('DELETE FROM idempotency_keys WHERE company_id = @companyId AND user_id = @userId AND key = @key'),
+      parameters: {'companyId': companyId, 'userId': userId, 'key': key},
+    );
+  }
+
+  @override
   Future<Group> createGroup({required String id, required String companyId, required String name}) async {
     await _db.execute(
       Sql.named('INSERT INTO groups (id, company_id, name) VALUES (@id, @companyId, @name)'),
