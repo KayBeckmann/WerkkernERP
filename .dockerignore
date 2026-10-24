@@ -7,3 +7,9 @@ linux/
 windows/
 .idea/
 *.iml
+**/.dart_tool/
+# Der klassische Docker-Builder (ohne BuildKit) kennt keine
+# <Dockerfile>.dockerignore — diese Datei gilt daher für web UND server.
+# Vom Flutter-Build braucht nur das Web-Image build/web.
+build/*
+!build/web
