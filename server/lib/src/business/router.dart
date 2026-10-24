@@ -46,6 +46,11 @@ class BusinessRoutes {
     router.post('/documents/<id>/convert', _convertDocument);
     router.post('/documents/<id>/payment', _setPayment);
     router.put('/documents/<id>/due-date', _setDueDate);
+
+    router.get('/time-entries', _listTimeEntries);
+    router.post('/time-entries', _createTimeEntry);
+    router.put('/time-entries/<id>', _updateTimeEntry);
+    router.delete('/time-entries/<id>', _deleteTimeEntry);
   }
 
   Future<Map<String, Object?>> _body(Request request) async {
@@ -288,9 +293,13 @@ class BusinessRoutes {
     // customerSnapshot.
     final customer = await business.findCustomer(companyId, document.customerId);
     final convertedTo = await business.listConvertedFrom(companyId, document.id);
+    final booked = await business.listTimeEntries(companyId, documentId: document.id);
     return jsonOk({
       ...document.toJson(),
       'customerName': customer?.name,
+      // C3: "Geplant laut Angebot vs. gebucht" — Summe aller auf dieses
+      // Dokument gebuchten Stunden (Firmensicht, ohne Personenbezug).
+      'bookedHours': booked.fold<Decimal>(Decimal.zero, (sum, t) => sum + Decimal.parse(t.hours)).toString(),
       'convertedTo': [
         for (final d in convertedTo) {'id': d.id, 'kind': d.kind, 'number': d.number, 'status': d.status},
       ],
@@ -706,5 +715,154 @@ class BusinessRoutes {
     } on BusinessConflict catch (e) {
       return jsonError(e.message, status: 409);
     }
+  }
+
+  // ---- Zeiterfassung (C3 online) -------------------------------------------------
+
+  /// Sichtbarkeit: mit `timeTracking.read` alle Buchungen der Firma, mit
+  /// nur `timeTracking.write` ausschließlich die eigenen.
+  Future<({AuthContext? auth, bool seesAll, Response? error})> _timeAccess(Request request) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return (auth: null, seesAll: false, error: jsonError('Nicht angemeldet.', status: 401));
+    final seesAll = await auth.isGranted(session, 'timeTracking.read');
+    final canBook = await auth.isGranted(session, 'timeTracking.write');
+    if (!seesAll && !canBook) {
+      return (auth: null, seesAll: false, error: jsonError('Keine Berechtigung für die Zeiterfassung (oder Modul aus).', status: 403));
+    }
+    return (auth: session, seesAll: seesAll, error: null);
+  }
+
+  Future<Map<String, Object?>> _timeEntryJson(TimeEntry t) async => {
+        ...t.toJson(),
+        'userEmail': (await repository.findUserById(t.userId))?.email,
+      };
+
+  Future<Response> _listTimeEntries(Request request) async {
+    final access = await _timeAccess(request);
+    if (access.error != null) return access.error!;
+    final ctx = access.auth!;
+    final params = request.url.queryParameters;
+    final mineOnly = !access.seesAll || params['mine'] == 'true';
+    final entries = await business.listTimeEntries(
+      ctx.session.companyId,
+      userId: mineOnly ? ctx.session.userId : params['userId'],
+      documentId: params['documentId'],
+      from: _parseDate(params['from']),
+      to: _parseDate(params['to']),
+    );
+    final total = entries.fold<Decimal>(Decimal.zero, (sum, t) => sum + Decimal.parse(t.hours));
+    return jsonOk({
+      'entries': [for (final t in entries) await _timeEntryJson(t)],
+      'totalHours': total.toString(),
+      'scope': mineOnly ? 'mine' : 'company',
+    });
+  }
+
+  /// Validiert Datum/Stunden/Bezug. Bezug ist Pflicht (Auftrag oder
+  /// Rechnung der eigenen Firma) — Projekte gibt es online noch nicht.
+  Future<({DateTime? date, Decimal? hours, String? documentId, String? error})> _parseTimeBody(
+    Map<String, Object?> body,
+    String companyId,
+  ) async {
+    final date = _parseDate(body['date']);
+    if (date == null) return (date: null, hours: null, documentId: null, error: 'date (JJJJ-MM-TT) ist Pflicht.');
+    final rawHours = body['hours'];
+    final hours = rawHours is num
+        ? Decimal.tryParse(rawHours.toString())
+        : rawHours is String
+            ? Decimal.tryParse(rawHours.replaceAll(',', '.'))
+            : null;
+    if (hours == null || hours <= Decimal.zero || hours > Decimal.fromInt(24)) {
+      return (date: null, hours: null, documentId: null, error: 'hours muss größer 0 und höchstens 24 sein.');
+    }
+    final documentId = body['documentId'] as String?;
+    if (documentId == null) return (date: null, hours: null, documentId: null, error: 'documentId (Auftrag/Rechnung) ist Pflicht.');
+    final document = await business.findDocument(companyId, documentId);
+    if (document == null || !{'order', 'invoice'}.contains(document.kind)) {
+      return (date: null, hours: null, documentId: null, error: 'Auftrag/Rechnung nicht gefunden.');
+    }
+    return (date: date, hours: hours, documentId: documentId, error: null);
+  }
+
+  Future<Response> _createTimeEntry(Request request) async {
+    final check = await auth.requirePermission(request, 'timeTracking.write');
+    if (check.error != null) return check.error!;
+    final ctx = check.auth!;
+    final body = await _body(request);
+    final parsed = await _parseTimeBody(body, ctx.session.companyId);
+    if (parsed.error != null) {
+      return jsonError(parsed.error!, status: parsed.error!.contains('nicht gefunden') ? 404 : 400);
+    }
+    final now = DateTime.now().toUtc();
+    final entry = TimeEntry(
+      id: _uuid.v4(),
+      companyId: ctx.session.companyId,
+      userId: ctx.session.userId,
+      documentId: parsed.documentId,
+      workDate: parsed.date!,
+      hours: parsed.hours!.toString(),
+      note: _trimmed(body['note']),
+      hourlyCostCents: ctx.membership.hourlyCostCents,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await business.createTimeEntry(entry);
+    await auth.audit(ctx, 'timeEntry.create', 'timeEntry', entry.id);
+    return jsonOk(await _timeEntryJson(entry), status: 201);
+  }
+
+  /// Nur eigene Buchungen ändern/löschen. Fremde, aber sichtbare -> 403;
+  /// nicht sichtbare (ohne Leserecht) -> 404 wie nicht existierend.
+  Future<({AuthContext? auth, TimeEntry? entry, Response? error})> _ownEntry(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'timeTracking.write');
+    if (check.error != null) return (auth: null, entry: null, error: check.error);
+    final ctx = check.auth!;
+    final entry = await business.findTimeEntry(ctx.session.companyId, id);
+    if (entry == null) return (auth: null, entry: null, error: jsonError('Buchung nicht gefunden.', status: 404));
+    if (entry.userId != ctx.session.userId) {
+      final seesAll = await auth.isGranted(ctx, 'timeTracking.read');
+      return (
+        auth: null,
+        entry: null,
+        error: seesAll
+            ? jsonError('Nur eigene Buchungen können geändert werden.', status: 403)
+            : jsonError('Buchung nicht gefunden.', status: 404),
+      );
+    }
+    return (auth: ctx, entry: entry, error: null);
+  }
+
+  Future<Response> _updateTimeEntry(Request request, String id) async {
+    final own = await _ownEntry(request, id);
+    if (own.error != null) return own.error!;
+    final body = await _body(request);
+    final parsed = await _parseTimeBody(body, own.auth!.session.companyId);
+    if (parsed.error != null) {
+      return jsonError(parsed.error!, status: parsed.error!.contains('nicht gefunden') ? 404 : 400);
+    }
+    final e = own.entry!;
+    final updated = TimeEntry(
+      id: e.id,
+      companyId: e.companyId,
+      userId: e.userId,
+      documentId: parsed.documentId,
+      workDate: parsed.date!,
+      hours: parsed.hours!.toString(),
+      note: _trimmed(body['note']),
+      hourlyCostCents: e.hourlyCostCents,
+      createdAt: e.createdAt,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await business.updateTimeEntry(updated);
+    await auth.audit(own.auth!, 'timeEntry.update', 'timeEntry', id);
+    return jsonOk(await _timeEntryJson(updated));
+  }
+
+  Future<Response> _deleteTimeEntry(Request request, String id) async {
+    final own = await _ownEntry(request, id);
+    if (own.error != null) return own.error!;
+    await business.deleteTimeEntry(own.auth!.session.companyId, id);
+    await auth.audit(own.auth!, 'timeEntry.delete', 'timeEntry', id);
+    return Response(204);
   }
 }

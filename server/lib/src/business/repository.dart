@@ -73,4 +73,17 @@ abstract class BusinessRepository {
     DateTime? Function()? dueDate,
     required DateTime now,
   });
+
+  // ---- Zeiterfassung (C3 online) ----------------------------------------
+  Future<List<TimeEntry>> listTimeEntries(
+    String companyId, {
+    String? userId,
+    String? documentId,
+    DateTime? from,
+    DateTime? to,
+  });
+  Future<TimeEntry?> findTimeEntry(String companyId, String id);
+  Future<void> createTimeEntry(TimeEntry entry);
+  Future<bool> updateTimeEntry(TimeEntry entry);
+  Future<bool> deleteTimeEntry(String companyId, String id);
 }

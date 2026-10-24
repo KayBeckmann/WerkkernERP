@@ -261,11 +261,20 @@ class WerkkernApiClient {
     return [for (final m in j['memberships'] as List) OnlineMember.fromJson(m as Map<String, Object?>)];
   }
 
-  /// 409 = letzter aktiver Admin würde ausgesperrt.
-  Future<void> updateMember(String id, {String? groupId, bool? active, bool? isAdmin}) => _send('PATCH', '/memberships/$id', body: {
+  /// 409 = letzter aktiver Admin würde ausgesperrt. [hourlyCostCents]:
+  /// `null` = unverändert, `() => null` = Satz löschen.
+  Future<void> updateMember(
+    String id, {
+    String? groupId,
+    bool? active,
+    bool? isAdmin,
+    int? Function()? hourlyCostCents,
+  }) =>
+      _send('PATCH', '/memberships/$id', body: {
         'groupId': ?groupId,
         'active': ?active,
         'isAdmin': ?isAdmin,
+        if (hourlyCostCents != null) 'hourlyCostCents': hourlyCostCents(),
       });
 
   /// Individuelle Ausnahmen: Schlüssel -> erlaubt (true) / gesperrt (false).
@@ -321,6 +330,44 @@ class WerkkernApiClient {
         ),
     ];
   }
+
+  // ---- Zeiterfassung (C3 online) ------------------------------------------------
+
+  /// Eigene Buchungen bzw. (mit `timeTracking.read`) die der ganzen Firma.
+  Future<({List<OnlineTimeEntry> entries, String totalHours, bool companyScope})> timeEntries({
+    bool mineOnly = false,
+    String? documentId,
+  }) async {
+    final j = _map(await _send('GET', '/time-entries', query: {
+      if (mineOnly) 'mine': 'true',
+      'documentId': ?documentId,
+    }));
+    return (
+      entries: [for (final e in j['entries'] as List) OnlineTimeEntry.fromJson(e as Map<String, Object?>)],
+      totalHours: j['totalHours'] as String,
+      companyScope: j['scope'] == 'company',
+    );
+  }
+
+  Future<OnlineTimeEntry> saveTimeEntry({
+    String? id,
+    required DateTime date,
+    required String hours,
+    required String documentId,
+    String? note,
+  }) async {
+    final body = {
+      'date': '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+      'hours': hours,
+      'documentId': documentId,
+      'note': note,
+    };
+    return OnlineTimeEntry.fromJson(
+      _map(await (id == null ? _send('POST', '/time-entries', body: body) : _send('PUT', '/time-entries/$id', body: body))),
+    );
+  }
+
+  Future<void> deleteTimeEntry(String id) => _send('DELETE', '/time-entries/$id');
 
   // ---- KI-Agenten (C8) ------------------------------------------------------------
 

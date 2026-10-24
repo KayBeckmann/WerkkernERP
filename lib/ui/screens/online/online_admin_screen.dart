@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:werkkern_client/werkkern_client.dart';
+import 'package:werkkern_core/werkkern_core.dart' show Money;
 
 import '../../../domain/services/online_session.dart';
 import 'online_text_prompt.dart';
@@ -160,6 +161,15 @@ class _MemberDialogState extends State<_MemberDialog> {
   late String _groupId = widget.member.groupId;
   late bool _active = widget.member.active;
   late bool _isAdmin = widget.member.isAdmin;
+  late final _rate = TextEditingController(
+    text: widget.member.hourlyCostCents == null ? '' : Money.fromCents(widget.member.hourlyCostCents!).formatEuro(),
+  );
+
+  @override
+  void dispose() {
+    _rate.dispose();
+    super.dispose();
+  }
   late final Map<String, bool?> _overrides = {
     for (final p in widget.catalog) p.key: widget.overrides[p.key],
   };
@@ -170,12 +180,25 @@ class _MemberDialogState extends State<_MemberDialog> {
     setState(() => _busy = true);
     try {
       final m = widget.member;
-      if (_groupId != m.groupId || _active != m.active || _isAdmin != m.isAdmin) {
+      final rateText = _rate.text.trim();
+      final int? rate;
+      try {
+        rate = rateText.isEmpty ? null : Money.fromEuroString(rateText).cents;
+      } on FormatException {
+        if (mounted) {
+          setState(() => _busy = false);
+          _showError(context, const FormatException('Stundensatz ist keine gültige Zahl.'));
+        }
+        return;
+      }
+      final rateChanged = rate != m.hourlyCostCents;
+      if (_groupId != m.groupId || _active != m.active || _isAdmin != m.isAdmin || rateChanged) {
         await client.updateMember(
           m.id,
           groupId: _groupId != m.groupId ? _groupId : null,
           active: _active != m.active ? _active : null,
           isAdmin: _isAdmin != m.isAdmin ? _isAdmin : null,
+          hourlyCostCents: rateChanged ? () => rate : null,
         );
       }
       for (final entry in _overrides.entries) {
@@ -208,6 +231,15 @@ class _MemberDialogState extends State<_MemberDialog> {
               onChanged: (v) => setState(() => _groupId = v!),
             ),
             SwitchListTile(title: const Text('Aktiv'), value: _active, onChanged: (v) => setState(() => _active = v)),
+            TextField(
+              key: const Key('online-member-rate'),
+              controller: _rate,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Stundenkostensatz (€)',
+                helperText: 'Für die Zeiterfassung; wird beim Buchen eingefroren. Leer = nicht gepflegt.',
+              ),
+            ),
             SwitchListTile(
               title: const Text('Firmen-Admin'),
               subtitle: const Text('Verwaltet Mitglieder, Gruppen, Rechte und Module'),

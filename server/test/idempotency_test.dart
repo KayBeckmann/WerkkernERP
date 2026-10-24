@@ -22,8 +22,8 @@ void runIdempotencyTests(Future<(PhaseBRepository, BusinessRepository)> Function
 
   setUp(() async {
     final (repository, business) = await create();
-    server = await shelf_io.serve(PhaseBRouter(repository: repository, business: business).handler.call, 'localhost', 0);
-    base = Uri.parse('http://localhost:${server.port}');
+    server = await shelf_io.serve(PhaseBRouter(repository: repository, business: business).handler.call, InternetAddress.loopbackIPv4, 0);
+    base = Uri.parse('http://127.0.0.1:${server.port}');
     Future<Map<String, Object?>> post(String path, Object body, [Map<String, String>? headers]) async =>
         jsonDecode((await http.post(base.resolve(path), headers: headers, body: jsonEncode(body))).body) as Map<String, Object?>;
     await post('/auth/register', {'email': 'a@example.com', 'password': 'passwort-12345'});

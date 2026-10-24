@@ -228,7 +228,13 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
       _memberships.where((m) => m.userId == userId).toList();
 
   @override
-  Future<bool> updateMembership({required String id, String? groupId, bool? active, bool? isAdmin}) async {
+  Future<bool> updateMembership({
+    required String id,
+    String? groupId,
+    bool? active,
+    bool? isAdmin,
+    int? Function()? hourlyCostCents,
+  }) async {
     final index = _memberships.indexWhere((m) => m.id == id);
     if (index == -1) return false;
     final existing = _memberships[index];
@@ -239,6 +245,7 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
       groupId: groupId ?? existing.groupId,
       isAdmin: isAdmin ?? existing.isAdmin,
       active: active ?? existing.active,
+      hourlyCostCents: hourlyCostCents != null ? hourlyCostCents() : existing.hourlyCostCents,
     );
     return true;
   }

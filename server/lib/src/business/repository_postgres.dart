@@ -372,6 +372,10 @@ class PostgresBusinessRepository implements BusinessRepository {
   Future<bool> deleteDraft(String companyId, String id) async {
     final existing = await findDocument(companyId, id);
     if (existing == null) return false;
+    final booked = await _q('SELECT 1 FROM time_entries WHERE document_id = @id LIMIT 1', {'id': id});
+    if (booked.isNotEmpty) {
+      throw const BusinessConflict('Auf diesen Entwurf sind Zeiten gebucht — erst umbuchen oder löschen.');
+    }
     // Status in der WHERE-Klausel: ein zwischenzeitlich finalisiertes
     // Dokument wird nie gelöscht, auch nicht bei einem Wettlauf.
     final result = await _q("DELETE FROM documents WHERE company_id = @companyId AND id = @id AND status = 'draft'", {
@@ -472,5 +476,100 @@ class PostgresBusinessRepository implements BusinessRepository {
       },
     );
     return findDocument(companyId, id);
+  }
+
+  // ---- Zeiterfassung ------------------------------------------------------
+
+  static const _timeColumns =
+      'id, company_id, user_id, document_id, work_date, hours, note, hourly_cost_cents, created_at, updated_at';
+
+  TimeEntry _toTimeEntry(ResultRow r) => TimeEntry(
+        id: r[0] as String,
+        companyId: r[1] as String,
+        userId: r[2] as String,
+        documentId: r[3] as String?,
+        workDate: r[4] as DateTime,
+        hours: r[5] as String,
+        note: r[6] as String?,
+        hourlyCostCents: r[7] as int?,
+        createdAt: r[8] as DateTime,
+        updatedAt: r[9] as DateTime,
+      );
+
+  @override
+  Future<List<TimeEntry>> listTimeEntries(
+    String companyId, {
+    String? userId,
+    String? documentId,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final result = await _q(
+      'SELECT $_timeColumns FROM time_entries WHERE company_id = @companyId '
+      "AND (@userId = '' OR user_id = @userId) AND (@documentId = '' OR document_id = @documentId) "
+      'AND (@from::date IS NULL OR work_date >= @from::date) AND (@to::date IS NULL OR work_date <= @to::date) '
+      'ORDER BY work_date DESC, created_at DESC',
+      {
+        'companyId': companyId,
+        'userId': userId ?? '',
+        'documentId': documentId ?? '',
+        'from': TypedValue(Type.date, from),
+        'to': TypedValue(Type.date, to),
+      },
+    );
+    return [for (final r in result) _toTimeEntry(r)];
+  }
+
+  @override
+  Future<TimeEntry?> findTimeEntry(String companyId, String id) async {
+    final result = await _q(
+      'SELECT $_timeColumns FROM time_entries WHERE company_id = @companyId AND id = @id',
+      {'companyId': companyId, 'id': id},
+    );
+    return result.isEmpty ? null : _toTimeEntry(result.first);
+  }
+
+  Map<String, Object?> _timeParams(TimeEntry t) => {
+        'id': t.id,
+        'companyId': t.companyId,
+        'userId': t.userId,
+        'documentId': t.documentId,
+        'workDate': TypedValue(Type.date, t.workDate),
+        'hours': t.hours,
+        'note': t.note,
+        'rate': t.hourlyCostCents,
+        'createdAt': t.createdAt,
+        'updatedAt': t.updatedAt,
+      };
+
+  @override
+  Future<void> createTimeEntry(TimeEntry entry) async {
+    await _q(
+      'INSERT INTO time_entries ($_timeColumns) VALUES (@id, @companyId, @userId, @documentId, @workDate, @hours, '
+      '@note, @rate, @createdAt, @updatedAt)',
+      _timeParams(entry),
+    );
+  }
+
+  @override
+  Future<bool> updateTimeEntry(TimeEntry entry) async {
+    final result = await _q(
+      'UPDATE time_entries SET document_id = @documentId, work_date = @workDate, hours = @hours, note = @note, '
+      'updated_at = @updatedAt WHERE company_id = @companyId AND id = @id',
+      _timeParams(entry)
+        ..remove('userId')
+        ..remove('rate')
+        ..remove('createdAt'),
+    );
+    return result.affectedRows > 0;
+  }
+
+  @override
+  Future<bool> deleteTimeEntry(String companyId, String id) async {
+    final result = await _q('DELETE FROM time_entries WHERE company_id = @companyId AND id = @id', {
+      'companyId': companyId,
+      'id': id,
+    });
+    return result.affectedRows > 0;
   }
 }

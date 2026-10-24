@@ -74,6 +74,7 @@ class Membership {
     required this.groupId,
     required this.isAdmin,
     required this.active,
+    this.hourlyCostCents,
   });
   final String id;
   final String userId;
@@ -81,6 +82,12 @@ class Membership {
   final String groupId;
   final bool isAdmin;
   final bool active;
+
+  /// C3 online: eigener Stundenkostensatz dieses Mitglieds in dieser
+  /// Firma (Kay-Vorgabe 2026-10-20: "echte Benutzerkonten mit je
+  /// eigenem/abweichendem Stundensatz"). `null` = nicht gepflegt, die
+  /// Buchung trägt dann keine Kosten bei (nicht geraten).
+  final int? hourlyCostCents;
 }
 
 class MembershipPermissionOverride {

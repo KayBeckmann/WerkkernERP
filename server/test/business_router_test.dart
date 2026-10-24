@@ -21,8 +21,8 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
 
   setUp(() async {
     final (repository, business) = await createRepositories();
-    server = await shelf_io.serve(PhaseBRouter(repository: repository, business: business).handler.call, 'localhost', 0);
-    baseUrl = Uri.parse('http://localhost:${server.port}');
+    server = await shelf_io.serve(PhaseBRouter(repository: repository, business: business).handler.call, InternetAddress.loopbackIPv4, 0);
+    baseUrl = Uri.parse('http://127.0.0.1:${server.port}');
   });
 
   tearDown(() => server.close(force: true));

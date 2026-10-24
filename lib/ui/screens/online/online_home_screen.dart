@@ -7,6 +7,7 @@ import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
 import 'online_documents_screen.dart';
 import 'online_password_dialog.dart';
+import 'online_time_screen.dart';
 
 /// Hauptansicht im Online-Modus. Tabs erscheinen nur bei wirksamem
 /// Leserecht — der Server prüft trotzdem jede Aktion selbst.
@@ -102,6 +103,10 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             (label: 'Dokumente', icon: Icons.receipt_long_outlined, body: OnlineDocumentsScreen(session: session)),
           if (session.can('customers.read') && !session.offlineOnly)
             (label: 'Kunden', icon: Icons.people_outline, body: OnlineCustomersScreen(session: session)),
+          if (session.modules.contains('timeTracking') &&
+              (session.can('timeTracking.write') || session.can('timeTracking.read')) &&
+              !session.offlineOnly)
+            (label: 'Zeiten', icon: Icons.timer_outlined, body: OnlineTimeScreen(session: session)),
           if (session.can('articles.read') && !session.offlineOnly)
             (label: 'Artikel', icon: Icons.inventory_2_outlined, body: OnlineArticlesScreen(session: session)),
         ];

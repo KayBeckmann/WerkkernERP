@@ -407,7 +407,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   Future<Membership?> findMembershipById(String id) async {
     final result = await _db.execute(
       Sql.named(
-        'SELECT id, user_id, company_id, group_id, is_admin, active FROM memberships WHERE id = @id',
+        'SELECT id, user_id, company_id, group_id, is_admin, active, hourly_cost_cents FROM memberships WHERE id = @id',
       ),
       parameters: {'id': id},
     );
@@ -419,7 +419,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   Future<Membership?> findMembership({required String userId, required String companyId}) async {
     final result = await _db.execute(
       Sql.named(
-        'SELECT id, user_id, company_id, group_id, is_admin, active FROM memberships '
+        'SELECT id, user_id, company_id, group_id, is_admin, active, hourly_cost_cents FROM memberships '
         'WHERE user_id = @userId AND company_id = @companyId',
       ),
       parameters: {'userId': userId, 'companyId': companyId},
@@ -432,7 +432,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   Future<List<Membership>> listMembershipsForCompany(String companyId) async {
     final result = await _db.execute(
       Sql.named(
-        'SELECT id, user_id, company_id, group_id, is_admin, active FROM memberships WHERE company_id = @companyId',
+        'SELECT id, user_id, company_id, group_id, is_admin, active, hourly_cost_cents FROM memberships WHERE company_id = @companyId',
       ),
       parameters: {'companyId': companyId},
     );
@@ -443,7 +443,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   Future<List<Membership>> listMembershipsForUser(String userId) async {
     final result = await _db.execute(
       Sql.named(
-        'SELECT id, user_id, company_id, group_id, is_admin, active FROM memberships WHERE user_id = @userId',
+        'SELECT id, user_id, company_id, group_id, is_admin, active, hourly_cost_cents FROM memberships WHERE user_id = @userId',
       ),
       parameters: {'userId': userId},
     );
@@ -451,15 +451,25 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   }
 
   @override
-  Future<bool> updateMembership({required String id, String? groupId, bool? active, bool? isAdmin}) async {
+  Future<bool> updateMembership({
+    required String id,
+    String? groupId,
+    bool? active,
+    bool? isAdmin,
+    int? Function()? hourlyCostCents,
+  }) async {
     final existing = await findMembershipById(id);
     if (existing == null) return false;
     final result = await _db.execute(
-      Sql.named('UPDATE memberships SET group_id = @groupId, active = @active, is_admin = @isAdmin WHERE id = @id'),
+      Sql.named(
+        'UPDATE memberships SET group_id = @groupId, active = @active, is_admin = @isAdmin, '
+        'hourly_cost_cents = @rate WHERE id = @id',
+      ),
       parameters: {
         'groupId': groupId ?? existing.groupId,
         'active': active ?? existing.active,
         'isAdmin': isAdmin ?? existing.isAdmin,
+        'rate': hourlyCostCents != null ? hourlyCostCents() : existing.hourlyCostCents,
         'id': id,
       },
     );
@@ -726,5 +736,6 @@ class PostgresPhaseBRepository implements PhaseBRepository {
         groupId: row[3] as String,
         isAdmin: row[4] as bool,
         active: row[5] as bool,
+        hourlyCostCents: row[6] as int?,
       );
 }

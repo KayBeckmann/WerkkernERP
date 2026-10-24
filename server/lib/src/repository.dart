@@ -96,11 +96,13 @@ abstract class PhaseBRepository {
   Future<List<Membership>> listMembershipsForCompany(String companyId);
   Future<List<Membership>> listMembershipsForUser(String userId);
 
+  /// [hourlyCostCents]: `null` = unverändert, `() => null` = löschen.
   Future<bool> updateMembership({
     required String id,
     String? groupId,
     bool? active,
     bool? isAdmin,
+    int? Function()? hourlyCostCents,
   });
 
   /// Wie viele **aktive** Admin-Mitgliedschaften diese Firma hat — für

@@ -500,6 +500,7 @@ class PhaseBRouter {
         'groupName': group?.name,
         'isAdmin': m.isAdmin,
         'active': m.active,
+        'hourlyCostCents': m.hourlyCostCents,
       });
     }
     return jsonOk({'memberships': result});
@@ -554,6 +555,10 @@ class PhaseBRouter {
     final newGroupId = body['groupId'] as String?;
     final newActive = body['active'] as bool?;
     final newIsAdmin = body['isAdmin'] as bool?;
+    // Stundenkostensatz (Cent) — nur wenn im Body enthalten; null löscht.
+    final hasRate = body.containsKey('hourlyCostCents');
+    final newRate = body['hourlyCostCents'] as int?;
+    if (newRate != null && newRate < 0) return jsonError('hourlyCostCents darf nicht negativ sein.');
 
     if (newGroupId != null) {
       final group = await repository.findGroupById(newGroupId);
@@ -574,7 +579,13 @@ class PhaseBRouter {
       }
     }
 
-    await repository.updateMembership(id: id, groupId: newGroupId, active: newActive, isAdmin: newIsAdmin);
+    await repository.updateMembership(
+      id: id,
+      groupId: newGroupId,
+      active: newActive,
+      isAdmin: newIsAdmin,
+      hourlyCostCents: hasRate ? () => newRate : null,
+    );
     await _auth.audit(auth, 'membership.update', 'membership', id);
     return jsonOk({'id': id});
   }

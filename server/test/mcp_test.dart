@@ -23,8 +23,8 @@ void main() {
 
   setUp(() async {
     final router = PhaseBRouter(repository: InMemoryPhaseBRepository(), business: InMemoryBusinessRepository());
-    server = await shelf_io.serve(router.handler.call, 'localhost', 0);
-    base = Uri.parse('http://localhost:${server.port}');
+    server = await shelf_io.serve(router.handler.call, InternetAddress.loopbackIPv4, 0);
+    base = Uri.parse('http://127.0.0.1:${server.port}');
     user = WerkkernApiClient(baseUrl: base);
     await user.register('kay@example.com', 'passwort-12345');
     final companyId = await user.createCompany((await user.login('kay@example.com', 'passwort-12345')).identityToken, 'Elektro Kay');
