@@ -162,6 +162,158 @@ class PostgresPhaseBRepository implements PhaseBRepository {
     return StoredResponse(requestFingerprint: r[0] as String, status: r[1] as int, body: r[2] as String);
   }
 
+  static const _agentColumns = 'id, token_hash, membership_id, user_id, company_id, label, created_at, last_used_at';
+
+  AgentToken _toAgentToken(ResultRow r) => AgentToken(
+        id: r[0] as String,
+        tokenHash: r[1] as String,
+        membershipId: r[2] as String,
+        userId: r[3] as String,
+        companyId: r[4] as String,
+        label: r[5] as String,
+        createdAt: r[6] as DateTime,
+        lastUsedAt: r[7] as DateTime?,
+      );
+
+  @override
+  Future<void> createAgentToken(AgentToken t) async {
+    await _db.execute(
+      Sql.named(
+        'INSERT INTO agent_tokens ($_agentColumns) VALUES '
+        '(@id, @hash, @membershipId, @userId, @companyId, @label, @createdAt, NULL)',
+      ),
+      parameters: {
+        'id': t.id,
+        'hash': t.tokenHash,
+        'membershipId': t.membershipId,
+        'userId': t.userId,
+        'companyId': t.companyId,
+        'label': t.label,
+        'createdAt': t.createdAt,
+      },
+    );
+  }
+
+  @override
+  Future<AgentToken?> findAgentTokenByHash(String tokenHash) async {
+    final r = await _db.execute(
+      Sql.named('SELECT $_agentColumns FROM agent_tokens WHERE token_hash = @hash'),
+      parameters: {'hash': tokenHash},
+    );
+    return r.isEmpty ? null : _toAgentToken(r.first);
+  }
+
+  @override
+  Future<List<AgentToken>> listAgentTokens({required String companyId, required String userId}) async {
+    final r = await _db.execute(
+      Sql.named('SELECT $_agentColumns FROM agent_tokens WHERE company_id = @companyId AND user_id = @userId ORDER BY created_at'),
+      parameters: {'companyId': companyId, 'userId': userId},
+    );
+    return [for (final row in r) _toAgentToken(row)];
+  }
+
+  @override
+  Future<bool> revokeAgentToken({required String companyId, required String userId, required String id}) async {
+    final r = await _db.execute(
+      Sql.named('DELETE FROM agent_tokens WHERE id = @id AND company_id = @companyId AND user_id = @userId'),
+      parameters: {'id': id, 'companyId': companyId, 'userId': userId},
+    );
+    return r.affectedRows > 0;
+  }
+
+  @override
+  Future<void> touchAgentToken(String id, DateTime at) async {
+    await _db.execute(Sql.named('UPDATE agent_tokens SET last_used_at = @at WHERE id = @id'), parameters: {'at': at, 'id': id});
+  }
+
+  static const _approvalColumns =
+      'id, company_id, user_id, agent_token_id, method, path, body, summary, status, created_at, decided_at, result_status, result_body';
+
+  PendingApproval _toApproval(ResultRow r) => PendingApproval(
+        id: r[0] as String,
+        companyId: r[1] as String,
+        userId: r[2] as String,
+        agentTokenId: r[3] as String,
+        method: r[4] as String,
+        path: r[5] as String,
+        body: r[6] as String,
+        summary: r[7] as String,
+        status: r[8] as String,
+        createdAt: r[9] as DateTime,
+        decidedAt: r[10] as DateTime?,
+        resultStatus: r[11] as int?,
+        resultBody: r[12] as String?,
+      );
+
+  @override
+  Future<void> createApproval(PendingApproval a) async {
+    await _db.execute(
+      Sql.named(
+        'INSERT INTO pending_approvals ($_approvalColumns) VALUES (@id, @companyId, @userId, @agentTokenId, @method, '
+        '@path, @body, @summary, @status, @createdAt, NULL, NULL, NULL)',
+      ),
+      parameters: {
+        'id': a.id,
+        'companyId': a.companyId,
+        'userId': a.userId,
+        'agentTokenId': a.agentTokenId,
+        'method': a.method,
+        'path': a.path,
+        'body': a.body,
+        'summary': a.summary,
+        'status': a.status,
+        'createdAt': a.createdAt,
+      },
+    );
+  }
+
+  @override
+  Future<PendingApproval?> findApproval({required String companyId, required String userId, required String id}) async {
+    final r = await _db.execute(
+      Sql.named('SELECT $_approvalColumns FROM pending_approvals WHERE id = @id AND company_id = @companyId AND user_id = @userId'),
+      parameters: {'id': id, 'companyId': companyId, 'userId': userId},
+    );
+    return r.isEmpty ? null : _toApproval(r.first);
+  }
+
+  @override
+  Future<List<PendingApproval>> listApprovals({required String companyId, required String userId, String? status}) async {
+    final r = await _db.execute(
+      Sql.named(
+        'SELECT $_approvalColumns FROM pending_approvals WHERE company_id = @companyId AND user_id = @userId '
+        "AND (@status = '' OR status = @status) ORDER BY created_at DESC",
+      ),
+      parameters: {'companyId': companyId, 'userId': userId, 'status': status ?? ''},
+    );
+    return [for (final row in r) _toApproval(row)];
+  }
+
+  @override
+  Future<bool> decideApproval({
+    required String id,
+    required String status,
+    required DateTime at,
+    int? resultStatus,
+    String? resultBody,
+    String fromStatus = 'pending',
+  }) async {
+    final r = await _db.execute(
+      Sql.named(
+        'UPDATE pending_approvals SET status = @status, decided_at = @at, result_status = @resultStatus, '
+        'result_body = @resultBody WHERE id = @id AND status = @fromStatus',
+      ),
+      parameters: {
+        'status': status,
+        'at': at,
+        'resultStatus': resultStatus,
+        'resultBody': resultBody,
+        'id': id,
+        'fromStatus': fromStatus,
+      },
+    );
+    return r.affectedRows > 0;
+  }
+
   @override
   Future<bool> claimIdempotencyKey({
     required String companyId,

@@ -133,6 +133,7 @@ const onlineModuleLabels = <String, String>{
   'lagerbestand': 'Lagerbestand',
   'bestellwesen': 'Bestellwesen',
   'timeTracking': 'Zeiterfassung',
+  'aiAgents': 'KI-Agenten (MCP/API)',
 };
 
 /// Anzeigenamen der Berechtigungen; unbekannte Schlüssel werden roh

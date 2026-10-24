@@ -105,7 +105,13 @@ class CompanySession {
     required this.companyId,
     required this.createdAt,
     required this.expiresAt,
+    this.isAgent = false,
   });
+
+  /// C8: Zugriff über ein Agent-Token (LLM/MCP) statt einer
+  /// App-Sitzung — gleiche Fachrechte wie der Nutzer, aber nie
+  /// Admin-Funktionen und irreversible Aktionen nur nach Freigabe.
+  final bool isAgent;
   final String tokenHash;
   final String membershipId;
   final String userId;
@@ -202,4 +208,65 @@ class StoredResponse {
   final String requestFingerprint;
   final int status;
   final String body;
+}
+
+/// C8: persönliches Token für einen LLM-Agenten (MCP/API). Gebunden an
+/// genau eine Mitgliedschaft; der Agent hat dadurch exakt die aktuell
+/// wirksamen Rechte des Nutzers in dieser Firma — Entzug wirkt sofort.
+class AgentToken {
+  const AgentToken({
+    required this.id,
+    required this.tokenHash,
+    required this.membershipId,
+    required this.userId,
+    required this.companyId,
+    required this.label,
+    required this.createdAt,
+    this.lastUsedAt,
+  });
+  final String id;
+  final String tokenHash;
+  final String membershipId;
+  final String userId;
+  final String companyId;
+  final String label;
+  final DateTime createdAt;
+  final DateTime? lastUsedAt;
+}
+
+/// C8: vom Agenten angefragte irreversible Aktion, die erst nach
+/// Bestätigung durch den Nutzer in der App ausgeführt wird.
+class PendingApproval {
+  const PendingApproval({
+    required this.id,
+    required this.companyId,
+    required this.userId,
+    required this.agentTokenId,
+    required this.method,
+    required this.path,
+    required this.body,
+    required this.summary,
+    required this.status,
+    required this.createdAt,
+    this.decidedAt,
+    this.resultStatus,
+    this.resultBody,
+  });
+  final String id;
+  final String companyId;
+  final String userId;
+  final String agentTokenId;
+  final String method;
+  final String path;
+  final String body;
+
+  /// Menschlich lesbare Beschreibung für den Bestätigungsdialog.
+  final String summary;
+
+  /// `pending` | `confirmed` | `rejected`
+  final String status;
+  final DateTime createdAt;
+  final DateTime? decidedAt;
+  final int? resultStatus;
+  final String? resultBody;
 }

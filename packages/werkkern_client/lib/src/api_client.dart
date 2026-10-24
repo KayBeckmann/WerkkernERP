@@ -318,5 +318,57 @@ class WerkkernApiClient {
     ];
   }
 
+  // ---- KI-Agenten (C8) ------------------------------------------------------------
+
+  /// Neues Agent-Token (nur aus einer App-Sitzung; Firmenmodul
+  /// `aiAgents` muss aktiv sein). Das Token wird genau einmal geliefert.
+  Future<({String id, String token})> createAgentToken(String label) async {
+    final j = _map(await _send('POST', '/agent-tokens', body: {'label': label}));
+    return (id: j['id'] as String, token: j['token'] as String);
+  }
+
+  Future<List<({String id, String label, DateTime createdAt, DateTime? lastUsedAt})>> agentTokens() async {
+    final j = _map(await _send('GET', '/agent-tokens'));
+    return [
+      for (final t in j['tokens'] as List)
+        (
+          id: (t as Map<String, Object?>)['id'] as String,
+          label: t['label'] as String,
+          createdAt: DateTime.parse(t['createdAt'] as String),
+          lastUsedAt: t['lastUsedAt'] == null ? null : DateTime.parse(t['lastUsedAt'] as String),
+        ),
+    ];
+  }
+
+  Future<void> revokeAgentToken(String id) => _send('DELETE', '/agent-tokens/$id');
+
+  /// Freigabe-Anfragen irreversibler Agent-Aktionen.
+  Future<List<({String id, String summary, String status, DateTime createdAt, int? resultStatus})>> approvals({
+    String? status,
+  }) async {
+    final j = _map(await _send('GET', '/approvals', query: {'status': ?status}));
+    return [
+      for (final a in j['approvals'] as List)
+        (
+          id: (a as Map<String, Object?>)['id'] as String,
+          summary: a['summary'] as String,
+          status: a['status'] as String,
+          createdAt: DateTime.parse(a['createdAt'] as String),
+          resultStatus: a['resultStatus'] as int?,
+        ),
+    ];
+  }
+
+  /// Führt die angefragte Aktion mit der eigenen Sitzung aus (Server
+  /// prüft dabei alles neu) und liefert dessen Antwort.
+  Future<Object?> confirmApproval(String id) => _send('POST', '/approvals/$id/confirm');
+
+  Future<void> rejectApproval(String id) => _send('POST', '/approvals/$id/reject');
+
+  /// Roh-Aufruf für dünne Adapter (MCP): Server-JSON unverändert, Fehler
+  /// wie gewohnt als [ApiException]/[ApiUnreachable].
+  Future<Object?> request(String method, String path, {Object? body, Map<String, String>? query}) =>
+      _send(method, path, body: body, query: query);
+
   void close() => _http.close();
 }

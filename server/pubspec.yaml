@@ -24,5 +24,7 @@ dev_dependencies:
   # Vertragstests: der echte App-Client gegen den echten Router.
   werkkern_client:
     path: ../packages/werkkern_client
+  werkkern_mcp:
+    path: ../packages/werkkern_mcp
   test: ^1.26.2
   http: ^1.5.0

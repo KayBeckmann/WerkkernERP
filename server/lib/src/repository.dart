@@ -23,6 +23,29 @@ abstract class PhaseBRepository {
   /// Neueste zuerst.
   Future<List<AuditEntry>> listAudit(String companyId, {int limit = 100});
 
+  // ---- Agent-Token und Freigaben (C8) ---------------------------------
+  Future<void> createAgentToken(AgentToken token);
+  Future<AgentToken?> findAgentTokenByHash(String tokenHash);
+  Future<List<AgentToken>> listAgentTokens({required String companyId, required String userId});
+  Future<bool> revokeAgentToken({required String companyId, required String userId, required String id});
+  Future<void> touchAgentToken(String id, DateTime at);
+
+  Future<void> createApproval(PendingApproval approval);
+  Future<PendingApproval?> findApproval({required String companyId, required String userId, required String id});
+  Future<List<PendingApproval>> listApprovals({required String companyId, required String userId, String? status});
+
+  /// Setzt den Status nur, wenn die Freigabe noch [fromStatus] hat —
+  /// atomarer Übergang, eine Freigabe kann nie zweimal ausgeführt
+  /// werden. `false` = schon entschieden/in Ausführung.
+  Future<bool> decideApproval({
+    required String id,
+    required String status,
+    required DateTime at,
+    int? resultStatus,
+    String? resultBody,
+    String fromStatus = 'pending',
+  });
+
   // ---- Idempotenz (B2) -------------------------------------------------
   Future<StoredResponse?> findIdempotentResponse({
     required String companyId,

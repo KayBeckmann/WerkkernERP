@@ -18,6 +18,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step3CompanyProfileAuditSnapshots,
   _step4ConversionAndPayment,
   _step5IdempotencyKeys,
+  _step6AgentTokensApprovals,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -88,4 +89,38 @@ Future<void> _step5IdempotencyKeys(Session db) async {
       PRIMARY KEY (company_id, user_id, key)
     );
   ''');
+}
+
+/// C8: Agent-Token (LLM/MCP) und Freigaben irreversibler Aktionen.
+Future<void> _step6AgentTokensApprovals(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS agent_tokens (
+      id TEXT PRIMARY KEY,
+      token_hash TEXT NOT NULL UNIQUE,
+      membership_id TEXT NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      last_used_at TIMESTAMPTZ
+    );
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS pending_approvals (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      agent_token_id TEXT NOT NULL,
+      method TEXT NOT NULL,
+      path TEXT NOT NULL,
+      body TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      decided_at TIMESTAMPTZ,
+      result_status INTEGER,
+      result_body TEXT
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS pending_approvals_user_idx ON pending_approvals (company_id, user_id, status)');
 }

@@ -1,0 +1,16 @@
+name: werkkern_mcp
+description: >
+  MCP-Server (Model Context Protocol, stdio) für WerkkernERP — dünne
+  Adapterschicht über der Server-REST-API (Roadmap C8). Handelt mit
+  einem Agent-Token, also genau mit den Rechten des Nutzers;
+  irreversible Aktionen werden nur als Freigabe-Anfrage gestellt.
+publish_to: none
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  werkkern_client:
+    path: ../werkkern_client
+
+dev_dependencies:
+  test: ^1.26.2
