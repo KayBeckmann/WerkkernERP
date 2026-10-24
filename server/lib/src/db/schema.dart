@@ -72,4 +72,14 @@ Future<void> ensureSchema(Connection db) async {
       expires_at TIMESTAMPTZ NOT NULL
     );
   ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS invitations (
+      token_hash TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+      invited_by_user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
 }

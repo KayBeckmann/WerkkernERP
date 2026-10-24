@@ -115,3 +115,29 @@ class CompanySession {
 
   bool isExpired(DateTime now) => now.isAfter(expiresAt);
 }
+
+/// Einladung eines (noch nicht oder bereits registrierten) Nutzers in
+/// eine Firma — schließt die in B1 zurückgestellte Onboarding-Lücke
+/// ("`POST /memberships` setzt eine bereits registrierte E-Mail
+/// voraus"). Einmal verwendbar, nur als Hash gespeichert (gleiches
+/// Prinzip wie Sitzungen, siehe `Tokens`). Gruppe wird schon beim
+/// Einladen festgelegt — "pro Firma genau eine Gruppe" (B1 Punkt 1)
+/// gilt damit ab der ersten Sekunde der Mitgliedschaft.
+class Invitation {
+  const Invitation({
+    required this.tokenHash,
+    required this.companyId,
+    required this.email,
+    required this.groupId,
+    required this.invitedByUserId,
+    required this.expiresAt,
+  });
+  final String tokenHash;
+  final String companyId;
+  final String email;
+  final String groupId;
+  final String invitedByUserId;
+  final DateTime expiresAt;
+
+  bool isExpired(DateTime now) => now.isAfter(expiresAt);
+}

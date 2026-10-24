@@ -5,6 +5,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models.dart';
+import 'permission_catalog.dart';
 import 'permission_resolver.dart';
 import 'repository.dart';
 import 'util/passwords.dart';
@@ -21,13 +22,36 @@ const _starterGroupNames = ['Projektleiter', 'Monteur', 'Buchhaltung'];
 /// Gruppen statt Zeichner) — "Negativtests mit erratenen IDs, direkten
 /// URLs ... Cross-Tenant-Tests".
 class PhaseBRouter {
-  PhaseBRouter({required this.repository, this.sessionTtl = const Duration(hours: 8)});
+  PhaseBRouter({
+    required this.repository,
+    this.sessionTtl = const Duration(hours: 8),
+    this.invitationTtl = const Duration(days: 7),
+  });
 
   final PhaseBRepository repository;
   final Duration sessionTtl;
+  final Duration invitationTtl;
   static const _uuid = Uuid();
 
-  Router get handler {
+  /// Fehlerhaftes JSON bzw. falsche Feldtypen im Request-Body sind ein
+  /// Client-Fehler (400), kein Serverabsturz (500) — fängt
+  /// [FormatException] aus `jsonDecode` und [TypeError] aus den
+  /// `as String?`-Casts zentral ab, statt jeden Endpunkt einzeln
+  /// abzusichern.
+  Handler get handler {
+    final router = _buildRouter();
+    return (Request request) async {
+      try {
+        return await router.call(request);
+      } on FormatException {
+        return jsonError('Ungültiger JSON-Body.');
+      } on TypeError {
+        return jsonError('Ungültiger Feldtyp im JSON-Body.');
+      }
+    };
+  }
+
+  Router _buildRouter() {
     final router = Router();
     router.get('/health', (Request request) => healthResponse());
 
@@ -35,9 +59,12 @@ class PhaseBRouter {
     router.post('/auth/login', _login);
     router.post('/auth/select-company', _selectCompany);
     router.post('/auth/logout', _logout);
+    router.post('/auth/accept-invitation', _acceptInvitation);
     router.get('/me', _me);
 
     router.post('/companies', _createCompany);
+    router.get('/company/modules', _getModules);
+    router.put('/company/modules', _setModules);
 
     router.get('/groups', _listGroups);
     router.post('/groups', _createGroup);
@@ -50,7 +77,13 @@ class PhaseBRouter {
     router.put('/memberships/<id>/overrides/<permission>', _setOverride);
     router.delete('/memberships/<id>/overrides/<permission>', _removeOverride);
 
+    router.post('/invitations', _createInvitation);
+    router.get('/invitations', _listInvitations);
+    router.delete('/invitations/<id>', _revokeInvitation);
+
+    router.get('/permissions/catalog', _permissionCatalog);
     router.get('/permissions/effective', _effectivePermission);
+    router.get('/permissions/mine', _myPermissions);
 
     return router;
   }
@@ -58,7 +91,9 @@ class PhaseBRouter {
   Future<Map<String, Object?>> _bodyJson(Request request) async {
     final raw = await request.readAsString();
     if (raw.isEmpty) return const {};
-    return jsonDecode(raw) as Map<String, Object?>;
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map<String, Object?>) throw const FormatException('JSON-Objekt erwartet');
+    return decoded;
   }
 
   // ---- Auth ----------------------------------------------------------------
@@ -245,6 +280,7 @@ class PhaseBRouter {
     if (group == null || group.companyId != auth.session.companyId) {
       return jsonError('Gruppe nicht gefunden.', status: 404);
     }
+    if (!isKnownPermission(permission)) return jsonError('Unbekannte Berechtigung: $permission');
     final body = await _bodyJson(request);
     final granted = body['granted'] as bool?;
     if (granted == null) return jsonError('granted (bool) ist Pflicht.');
@@ -353,6 +389,7 @@ class PhaseBRouter {
     if (target == null || target.companyId != auth.session.companyId) {
       return jsonError('Mitgliedschaft nicht gefunden.', status: 404);
     }
+    if (!isKnownPermission(permission)) return jsonError('Unbekannte Berechtigung: $permission');
     final body = await _bodyJson(request);
     final allowed = body['allowed'] as bool?;
     if (allowed == null) return jsonError('allowed (bool) ist Pflicht.');
@@ -378,22 +415,205 @@ class PhaseBRouter {
     if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
     final permission = request.url.queryParameters['permission'];
     if (permission == null) return jsonError('permission ist Pflicht.');
-    final requiredModule = request.url.queryParameters['module'];
+    // Ein explizit übergebenes Modul bleibt möglich (Abwärtskompatibilität
+    // zum B1-Grundgerüst), sonst gilt die Zuordnung aus dem Katalog.
+    final requiredModule = request.url.queryParameters['module'] ?? requiredModuleFor(permission);
+    final granted = await _isGranted(auth, permission, requiredModule: requiredModule);
+    return jsonOk({'permission': permission, 'granted': granted});
+  }
 
+  /// Alle für die eigene Sitzung wirksamen Rechte — damit ein Client
+  /// Aktionen ausblenden kann, ohne jede einzeln abzufragen. Rein zur
+  /// Anzeige: jeder Fach-Endpunkt prüft serverseitig trotzdem selbst.
+  Future<Response> _myPermissions(Request request) async {
+    final auth = await _requireSession(request);
+    if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
+    final granted = <String>[];
+    for (final permission in permissionCatalog.keys) {
+      if (await _isGranted(auth, permission)) granted.add(permission);
+    }
+    return jsonOk({'isAdmin': auth.membership.isAdmin, 'permissions': granted});
+  }
+
+  Future<Response> _permissionCatalog(Request request) async {
+    final auth = await _requireSession(request);
+    if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
+    return jsonOk({
+      'permissions': [
+        for (final entry in permissionCatalog.entries) {'key': entry.key, 'module': entry.value},
+      ],
+      'modules': knownModules.toList()..sort(),
+    });
+  }
+
+  Future<bool> _isGranted(
+    ({CompanySession session, Membership membership}) auth,
+    String permission, {
+    String? requiredModule,
+  }) async {
     final company = await repository.findCompanyById(auth.session.companyId);
-    if (company == null) return jsonError('Firma nicht gefunden.', status: 404);
-    final groupPermissions = await repository.listGroupPermissions(auth.membership.groupId);
-    final overrides = await repository.listMembershipOverrides(auth.membership.id);
-
-    final granted = PermissionResolver.hasPermission(
+    if (company == null) return false;
+    return PermissionResolver.hasPermission(
       membership: auth.membership,
       company: company,
       permission: permission,
-      groupPermissions: groupPermissions,
-      overrides: overrides,
-      requiredModule: requiredModule,
+      groupPermissions: await repository.listGroupPermissions(auth.membership.groupId),
+      overrides: await repository.listMembershipOverrides(auth.membership.id),
+      requiredModule: requiredModule ?? requiredModuleFor(permission),
     );
-    return jsonOk({'permission': permission, 'granted': granted});
+  }
+
+  // ---- Firmenmodule ----------------------------------------------------------
+
+  Future<Response> _getModules(Request request) async {
+    final auth = await _requireSession(request);
+    if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
+    final company = await repository.findCompanyById(auth.session.companyId);
+    return jsonOk({'modules': (company?.enabledModules.toList() ?? <String>[])..sort()});
+  }
+
+  /// Nur Firmenadmin — Modul-Schalter sind wie Gruppen/Ausnahmen eine
+  /// strukturelle Firmeneinstellung, keine delegierbare Einzelberechtigung.
+  Future<Response> _setModules(Request request) async {
+    final auth = await _requireAdmin(request);
+    if (auth == null) return jsonError('Nicht angemeldet oder keine Admin-Rechte.', status: 403);
+    final body = await _bodyJson(request);
+    final rawModules = body['modules'];
+    if (rawModules is! List) return jsonError('modules (Liste) ist Pflicht.');
+    final modules = rawModules.cast<String>().toSet();
+    final unknown = modules.difference(knownModules);
+    if (unknown.isNotEmpty) return jsonError('Unbekannte Module: ${unknown.join(', ')}');
+    // Gleiche Abhängigkeit wie in der Offline-App
+    // (`CompanyRepository.setModules()`): Bestellwesen braucht Lagerbestand.
+    if (modules.contains('bestellwesen') && !modules.contains('lagerbestand')) {
+      return jsonError('Modul "bestellwesen" setzt "lagerbestand" voraus.');
+    }
+    await repository.setCompanyModules(companyId: auth.session.companyId, enabledModules: modules);
+    return jsonOk({'modules': modules.toList()..sort()});
+  }
+
+  // ---- Einladungen -------------------------------------------------------------
+
+  Future<Response> _createInvitation(Request request) async {
+    final auth = await _requireAdmin(request);
+    if (auth == null) return jsonError('Nicht angemeldet oder keine Admin-Rechte.', status: 403);
+    final body = await _bodyJson(request);
+    final email = (body['email'] as String?)?.trim();
+    final groupId = body['groupId'] as String?;
+    if (email == null || email.isEmpty || groupId == null) return jsonError('email und groupId sind Pflicht.');
+    final group = await repository.findGroupById(groupId);
+    if (group == null || group.companyId != auth.session.companyId) {
+      return jsonError('Gruppe nicht gefunden.', status: 404);
+    }
+    final existingUser = await repository.findUserByEmail(email);
+    if (existingUser != null &&
+        await repository.findMembership(userId: existingUser.id, companyId: auth.session.companyId) != null) {
+      return jsonError('Nutzer ist bereits Mitglied dieser Firma.', status: 409);
+    }
+
+    final rawToken = Tokens.generate();
+    final expiresAt = DateTime.now().toUtc().add(invitationTtl);
+    await repository.saveInvitation(
+      Invitation(
+        tokenHash: Tokens.hashOf(rawToken),
+        companyId: auth.session.companyId,
+        email: email,
+        groupId: groupId,
+        invitedByUserId: auth.session.userId,
+        expiresAt: expiresAt,
+      ),
+    );
+    // Der Server versendet bewusst selbst keine E-Mail (kein SMTP im
+    // Server-Dienst) — der Admin gibt das Token/den Link selbst weiter.
+    // Es wird genau einmal im Klartext ausgeliefert, danach nur noch
+    // als Hash gespeichert.
+    return jsonOk({
+      'invitationToken': rawToken,
+      'email': email,
+      'groupId': groupId,
+      'expiresAt': expiresAt.toIso8601String(),
+    }, status: 201);
+  }
+
+  Future<Response> _listInvitations(Request request) async {
+    final auth = await _requireAdmin(request);
+    if (auth == null) return jsonError('Nicht angemeldet oder keine Admin-Rechte.', status: 403);
+    final invitations = await repository.listInvitationsForCompany(auth.session.companyId);
+    final now = DateTime.now().toUtc();
+    return jsonOk({
+      'invitations': [
+        for (final i in invitations)
+          {
+            // Der Hash taugt nicht zum Einlösen (nur das Klartext-Token)
+            // und dient daher gefahrlos als ID zum Widerrufen.
+            'id': i.tokenHash,
+            'email': i.email,
+            'groupId': i.groupId,
+            'expiresAt': i.expiresAt.toIso8601String(),
+            'expired': i.isExpired(now),
+          },
+      ],
+    });
+  }
+
+  Future<Response> _revokeInvitation(Request request, String id) async {
+    final auth = await _requireAdmin(request);
+    if (auth == null) return jsonError('Nicht angemeldet oder keine Admin-Rechte.', status: 403);
+    final invitations = await repository.listInvitationsForCompany(auth.session.companyId);
+    if (!invitations.any((i) => i.tokenHash == id)) {
+      return jsonError('Einladung nicht gefunden.', status: 404);
+    }
+    await repository.consumeInvitation(id, DateTime.now().toUtc());
+    return Response(204);
+  }
+
+  /// Löst eine Einladung ein. Neue E-Mail -> Nutzer wird mit dem
+  /// angegebenen Passwort angelegt. Bereits registrierte E-Mail -> das
+  /// Passwort muss zum bestehenden Konto passen (Nachweis, dass die
+  /// einlösende Person das Konto besitzt — sonst könnte jeder mit dem
+  /// Token ein fremdes Konto in die Firma ziehen).
+  Future<Response> _acceptInvitation(Request request) async {
+    final body = await _bodyJson(request);
+    final token = body['invitationToken'] as String?;
+    final password = body['password'] as String?;
+    if (token == null || password == null) return jsonError('invitationToken und password sind Pflicht.');
+
+    final invitation = await repository.consumeInvitation(Tokens.hashOf(token), DateTime.now().toUtc());
+    if (invitation == null) return jsonError('Einladung ungültig, abgelaufen oder bereits verwendet.', status: 404);
+
+    var user = await repository.findUserByEmail(invitation.email);
+    if (user == null) {
+      if (password.length < 8) {
+        // Einladung bleibt gültig — ein zu kurzes Passwort ist ein
+        // Eingabefehler, kein Grund, das Token zu verbrennen.
+        await repository.saveInvitation(invitation);
+        return jsonError('password muss mind. 8 Zeichen haben.');
+      }
+      user = await repository.createUser(
+        id: _uuid.v4(),
+        email: invitation.email,
+        passwordHash: Passwords.hash(password),
+      );
+    } else if (!Passwords.verify(password, user.passwordHash)) {
+      await repository.saveInvitation(invitation);
+      return jsonError('Passwort passt nicht zum bestehenden Konto dieser E-Mail.', status: 401);
+    }
+
+    if (await repository.findMembership(userId: user.id, companyId: invitation.companyId) != null) {
+      return jsonError('Bereits Mitglied dieser Firma.', status: 409);
+    }
+    final group = await repository.findGroupById(invitation.groupId);
+    if (group == null || group.companyId != invitation.companyId) {
+      return jsonError('Die eingeladene Gruppe existiert nicht mehr.', status: 409);
+    }
+    final membership = await repository.createMembership(
+      id: _uuid.v4(),
+      userId: user.id,
+      companyId: invitation.companyId,
+      groupId: invitation.groupId,
+      isAdmin: false,
+    );
+    return jsonOk({'membershipId': membership.id, 'companyId': invitation.companyId}, status: 201);
   }
 
   // ---- Auth-Helfer --------------------------------------------------------------

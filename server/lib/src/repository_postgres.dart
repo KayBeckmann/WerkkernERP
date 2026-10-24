@@ -285,6 +285,61 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   }
 
   @override
+  Future<void> saveInvitation(Invitation invitation) async {
+    await _db.execute(
+      Sql.named('''
+        INSERT INTO invitations (token_hash, company_id, email, group_id, invited_by_user_id, expires_at)
+        VALUES (@tokenHash, @companyId, @email, @groupId, @invitedBy, @expiresAt)
+      '''),
+      parameters: {
+        'tokenHash': invitation.tokenHash,
+        'companyId': invitation.companyId,
+        'email': invitation.email,
+        'groupId': invitation.groupId,
+        'invitedBy': invitation.invitedByUserId,
+        'expiresAt': invitation.expiresAt,
+      },
+    );
+  }
+
+  @override
+  Future<Invitation?> consumeInvitation(String tokenHash, DateTime now) async {
+    // DELETE ... RETURNING: Lesen und Entwerten in einer Anweisung —
+    // zwei gleichzeitige Einlöseversuche können nicht beide gewinnen.
+    final result = await _db.execute(
+      Sql.named(
+        'DELETE FROM invitations WHERE token_hash = @tokenHash '
+        'RETURNING token_hash, company_id, email, group_id, invited_by_user_id, expires_at',
+      ),
+      parameters: {'tokenHash': tokenHash},
+    );
+    if (result.isEmpty) return null;
+    final invitation = _toInvitation(result.first);
+    return invitation.isExpired(now) ? null : invitation;
+  }
+
+  @override
+  Future<List<Invitation>> listInvitationsForCompany(String companyId) async {
+    final result = await _db.execute(
+      Sql.named(
+        'SELECT token_hash, company_id, email, group_id, invited_by_user_id, expires_at FROM invitations '
+        'WHERE company_id = @companyId ORDER BY expires_at',
+      ),
+      parameters: {'companyId': companyId},
+    );
+    return [for (final row in result) _toInvitation(row)];
+  }
+
+  Invitation _toInvitation(ResultRow row) => Invitation(
+        tokenHash: row[0] as String,
+        companyId: row[1] as String,
+        email: row[2] as String,
+        groupId: row[3] as String,
+        invitedByUserId: row[4] as String,
+        expiresAt: row[5] as DateTime,
+      );
+
+  @override
   Future<void> saveSession(CompanySession session) async {
     await _db.execute(
       Sql.named('''

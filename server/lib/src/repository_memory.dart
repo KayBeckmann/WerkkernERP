@@ -10,6 +10,7 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
   final List<MembershipPermissionOverride> _overrides = [];
   final List<({String tokenHash, String userId, DateTime expiresAt})> _pendingLogins = [];
   final List<CompanySession> _sessions = [];
+  final List<Invitation> _invitations = [];
 
   @override
   Future<AppUser> createUser({required String id, required String email, required String passwordHash}) async {
@@ -159,6 +160,21 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
     if (now.isAfter(pending.expiresAt)) return null;
     return pending.userId;
   }
+
+  @override
+  Future<void> saveInvitation(Invitation invitation) async => _invitations.add(invitation);
+
+  @override
+  Future<Invitation?> consumeInvitation(String tokenHash, DateTime now) async {
+    final index = _invitations.indexWhere((i) => i.tokenHash == tokenHash);
+    if (index == -1) return null;
+    final invitation = _invitations.removeAt(index);
+    return invitation.isExpired(now) ? null : invitation;
+  }
+
+  @override
+  Future<List<Invitation>> listInvitationsForCompany(String companyId) async =>
+      _invitations.where((i) => i.companyId == companyId).toList();
 
   @override
   Future<void> saveSession(CompanySession session) async {

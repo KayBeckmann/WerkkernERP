@@ -210,33 +210,33 @@ void main() {
 
       // Ohne Gruppenrecht und ohne Override: verweigert.
       final before = await http.get(
-        baseUrl.resolve('/permissions/effective?permission=projects.read'),
+        baseUrl.resolve('/permissions/effective?permission=customers.read'),
         headers: {'authorization': 'Bearer $drafterToken'},
       );
       expect((jsonDecode(before.body) as Map<String, Object?>)['granted'], isFalse);
 
       // Admin gewährt eine individuelle Ausnahme.
       final overrideResponse = await http.put(
-        baseUrl.resolve('/memberships/$drafterMembershipId/overrides/projects.read'),
+        baseUrl.resolve('/memberships/$drafterMembershipId/overrides/customers.read'),
         headers: {'authorization': 'Bearer ${company.token}'},
         body: jsonEncode({'allowed': true}),
       );
       expect(overrideResponse.statusCode, 200);
 
       final after = await http.get(
-        baseUrl.resolve('/permissions/effective?permission=projects.read'),
+        baseUrl.resolve('/permissions/effective?permission=customers.read'),
         headers: {'authorization': 'Bearer $drafterToken'},
       );
       expect((jsonDecode(after.body) as Map<String, Object?>)['granted'], isTrue);
 
       // Override wieder entfernen -> zurück auf Gruppenvorgabe (weiterhin verweigert).
       final removeResponse = await http.delete(
-        baseUrl.resolve('/memberships/$drafterMembershipId/overrides/projects.read'),
+        baseUrl.resolve('/memberships/$drafterMembershipId/overrides/customers.read'),
         headers: {'authorization': 'Bearer ${company.token}'},
       );
       expect(removeResponse.statusCode, 204);
       final afterRemoval = await http.get(
-        baseUrl.resolve('/permissions/effective?permission=projects.read'),
+        baseUrl.resolve('/permissions/effective?permission=customers.read'),
         headers: {'authorization': 'Bearer $drafterToken'},
       );
       expect((jsonDecode(afterRemoval.body) as Map<String, Object?>)['granted'], isFalse);
@@ -335,4 +335,207 @@ void main() {
       expect(selfDemote.statusCode, 409);
     },
   );
+
+  Future<String> firstGroupId(String token) async {
+    final response = await http.get(baseUrl.resolve('/groups'), headers: {'authorization': 'Bearer $token'});
+    return ((jsonDecode(response.body) as Map<String, Object?>)['groups'] as List).first['id'] as String;
+  }
+
+  test('Fehlerhaftes JSON liefert 400 statt eines Serverfehlers', () async {
+    final invalid = await http.post(baseUrl.resolve('/auth/register'), body: '{kein json');
+    expect(invalid.statusCode, 400);
+    final wrongType = await http.post(
+      baseUrl.resolve('/auth/register'),
+      body: jsonEncode({'email': 42, 'password': 'passwort-12345'}),
+    );
+    expect(wrongType.statusCode, 400);
+    final notAnObject = await http.post(baseUrl.resolve('/auth/register'), body: '[1,2]');
+    expect(notAnObject.statusCode, 400);
+  });
+
+  test('Unbekannte Berechtigungs-Schlüssel werden beim Vergeben abgewiesen (Tippfehler-Schutz)', () async {
+    final company = await setUpCompanyWithAdmin('admin@example.com', 'Firma A');
+    final groupId = await firstGroupId(company.token);
+    final typo = await http.put(
+      baseUrl.resolve('/groups/$groupId/permissions/invoice.read'),
+      headers: {'authorization': 'Bearer ${company.token}'},
+      body: jsonEncode({'granted': true}),
+    );
+    expect(typo.statusCode, 400);
+    final known = await http.put(
+      baseUrl.resolve('/groups/$groupId/permissions/invoices.read'),
+      headers: {'authorization': 'Bearer ${company.token}'},
+      body: jsonEncode({'granted': true}),
+    );
+    expect(known.statusCode, 200);
+  });
+
+  test('Modul-Schalter: nur Admin, nur bekannte Module, Bestellwesen setzt Lagerbestand voraus; '
+      'Modulrecht greift erst nach Aktivierung', () async {
+    final company = await setUpCompanyWithAdmin('admin@example.com', 'Firma A');
+    final auth = {'authorization': 'Bearer ${company.token}'};
+    final groupId = await firstGroupId(company.token);
+    await http.put(
+      baseUrl.resolve('/groups/$groupId/permissions/projects.read'),
+      headers: auth,
+      body: jsonEncode({'granted': true}),
+    );
+
+    Future<bool> projectsGranted() async {
+      final r = await http.get(baseUrl.resolve('/permissions/mine'), headers: auth);
+      return ((jsonDecode(r.body) as Map<String, Object?>)['permissions'] as List).contains('projects.read');
+    }
+
+    expect(await projectsGranted(), isFalse, reason: 'Modul projects noch nicht aktiviert');
+
+    final unknown = await http.put(baseUrl.resolve('/company/modules'), headers: auth, body: jsonEncode({
+      'modules': ['projekte'],
+    }));
+    expect(unknown.statusCode, 400);
+    final missingDependency = await http.put(baseUrl.resolve('/company/modules'), headers: auth, body: jsonEncode({
+      'modules': ['bestellwesen'],
+    }));
+    expect(missingDependency.statusCode, 400);
+    final ok = await http.put(baseUrl.resolve('/company/modules'), headers: auth, body: jsonEncode({
+      'modules': ['projects', 'lagerbestand', 'bestellwesen'],
+    }));
+    expect(ok.statusCode, 200);
+    expect(await projectsGranted(), isTrue);
+
+    // Nicht-Admin darf Module nicht umschalten.
+    await register('monteur@example.com', 'passwort-12345');
+    await http.post(baseUrl.resolve('/memberships'), headers: auth, body: jsonEncode({
+      'email': 'monteur@example.com',
+      'groupId': groupId,
+    }));
+    final monteurToken = await selectCompany(await loginIdentity('monteur@example.com', 'passwort-12345'), company.companyId);
+    final asMonteur = await http.put(
+      baseUrl.resolve('/company/modules'),
+      headers: {'authorization': 'Bearer $monteurToken'},
+      body: jsonEncode({'modules': <String>[]}),
+    );
+    expect(asMonteur.statusCode, 403);
+  });
+
+  test('Einladung eines neuen Nutzers: einmal einlösbar, legt Konto + Mitgliedschaft in der '
+      'eingeladenen Gruppe an', () async {
+    final company = await setUpCompanyWithAdmin('admin@example.com', 'Firma A');
+    final auth = {'authorization': 'Bearer ${company.token}'};
+    final groupId = await firstGroupId(company.token);
+
+    final invite = await http.post(baseUrl.resolve('/invitations'), headers: auth, body: jsonEncode({
+      'email': 'neu@example.com',
+      'groupId': groupId,
+    }));
+    expect(invite.statusCode, 201);
+    final invitationToken = (jsonDecode(invite.body) as Map<String, Object?>)['invitationToken'] as String;
+
+    final listed = await http.get(baseUrl.resolve('/invitations'), headers: auth);
+    expect((jsonDecode(listed.body) as Map<String, Object?>)['invitations'] as List, hasLength(1));
+
+    // Zu kurzes Passwort verbrennt die Einladung nicht.
+    final tooShort = await http.post(baseUrl.resolve('/auth/accept-invitation'), body: jsonEncode({
+      'invitationToken': invitationToken,
+      'password': 'kurz',
+    }));
+    expect(tooShort.statusCode, 400);
+
+    final accept = await http.post(baseUrl.resolve('/auth/accept-invitation'), body: jsonEncode({
+      'invitationToken': invitationToken,
+      'password': 'passwort-12345',
+    }));
+    expect(accept.statusCode, 201);
+
+    final again = await http.post(baseUrl.resolve('/auth/accept-invitation'), body: jsonEncode({
+      'invitationToken': invitationToken,
+      'password': 'passwort-12345',
+    }));
+    expect(again.statusCode, 404, reason: 'Einladung ist nur einmal einlösbar');
+
+    final token = await selectCompany(await loginIdentity('neu@example.com', 'passwort-12345'), company.companyId);
+    final me = jsonDecode((await http.get(baseUrl.resolve('/me'), headers: {'authorization': 'Bearer $token'})).body)
+        as Map<String, Object?>;
+    expect(me['isAdmin'], isFalse);
+    expect(me['companyName'], 'Firma A');
+  });
+
+  test('Einladung einer bereits registrierten E-Mail verlangt deren echtes Passwort', () async {
+    final companyA = await setUpCompanyWithAdmin('admin-a@example.com', 'Firma A');
+    await setUpCompanyWithAdmin('admin-b@example.com', 'Firma B');
+    final groupId = await firstGroupId(companyA.token);
+    final invite = await http.post(
+      baseUrl.resolve('/invitations'),
+      headers: {'authorization': 'Bearer ${companyA.token}'},
+      body: jsonEncode({'email': 'admin-b@example.com', 'groupId': groupId}),
+    );
+    final invitationToken = (jsonDecode(invite.body) as Map<String, Object?>)['invitationToken'] as String;
+
+    final wrongPassword = await http.post(baseUrl.resolve('/auth/accept-invitation'), body: jsonEncode({
+      'invitationToken': invitationToken,
+      'password': 'falsches-passwort',
+    }));
+    expect(wrongPassword.statusCode, 401);
+
+    final accept = await http.post(baseUrl.resolve('/auth/accept-invitation'), body: jsonEncode({
+      'invitationToken': invitationToken,
+      'password': 'passwort-12345',
+    }));
+    expect(accept.statusCode, 201);
+
+    final login = await http.post(
+      baseUrl.resolve('/auth/login'),
+      body: jsonEncode({'email': 'admin-b@example.com', 'password': 'passwort-12345'}),
+    );
+    final memberships = (jsonDecode(login.body) as Map<String, Object?>)['memberships'] as List;
+    expect(memberships.map((m) => (m as Map<String, Object?>)['companyName']), unorderedEquals(['Firma A', 'Firma B']));
+  });
+
+  test('Einladungen: fremde Gruppe 404, Widerruf nur in der eigenen Firma, Nicht-Admin 403', () async {
+    final companyA = await setUpCompanyWithAdmin('admin-a@example.com', 'Firma A');
+    final companyB = await setUpCompanyWithAdmin('admin-b@example.com', 'Firma B');
+    final groupB = await firstGroupId(companyB.token);
+
+    final foreignGroup = await http.post(
+      baseUrl.resolve('/invitations'),
+      headers: {'authorization': 'Bearer ${companyA.token}'},
+      body: jsonEncode({'email': 'x@example.com', 'groupId': groupB}),
+    );
+    expect(foreignGroup.statusCode, 404);
+
+    await http.post(
+      baseUrl.resolve('/invitations'),
+      headers: {'authorization': 'Bearer ${companyB.token}'},
+      body: jsonEncode({'email': 'y@example.com', 'groupId': groupB}),
+    );
+    final listB = await http.get(baseUrl.resolve('/invitations'), headers: {'authorization': 'Bearer ${companyB.token}'});
+    final idB = ((jsonDecode(listB.body) as Map<String, Object?>)['invitations'] as List).single['id'] as String;
+
+    final crossRevoke = await http.delete(
+      baseUrl.resolve('/invitations/$idB'),
+      headers: {'authorization': 'Bearer ${companyA.token}'},
+    );
+    expect(crossRevoke.statusCode, 404);
+
+    final ownRevoke = await http.delete(
+      baseUrl.resolve('/invitations/$idB'),
+      headers: {'authorization': 'Bearer ${companyB.token}'},
+    );
+    expect(ownRevoke.statusCode, 204);
+  });
+
+  test('Deaktivierte Mitgliedschaft: bestehende Sitzung verliert sofort jeden Zugriff', () async {
+    final company = await setUpCompanyWithAdmin('admin@example.com', 'Firma A');
+    final auth = {'authorization': 'Bearer ${company.token}'};
+    await register('monteur@example.com', 'passwort-12345');
+    final add = await http.post(baseUrl.resolve('/memberships'), headers: auth, body: jsonEncode({
+      'email': 'monteur@example.com',
+      'groupId': await firstGroupId(company.token),
+    }));
+    final membershipId = (jsonDecode(add.body) as Map<String, Object?>)['id'] as String;
+    final monteurToken = await selectCompany(await loginIdentity('monteur@example.com', 'passwort-12345'), company.companyId);
+    expect((await http.get(baseUrl.resolve('/me'), headers: {'authorization': 'Bearer $monteurToken'})).statusCode, 200);
+
+    await http.patch(baseUrl.resolve('/memberships/$membershipId'), headers: auth, body: jsonEncode({'active': false}));
+    expect((await http.get(baseUrl.resolve('/me'), headers: {'authorization': 'Bearer $monteurToken'})).statusCode, 401);
+  });
 }

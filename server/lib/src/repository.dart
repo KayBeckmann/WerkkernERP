@@ -70,6 +70,18 @@ abstract class PhaseBRepository {
   Future<void> savePendingLogin({required String tokenHash, required String userId, required DateTime expiresAt});
   Future<String?> consumePendingLogin(String tokenHash, DateTime now);
 
+  // ---- Einladungen -----------------------------------------------------------
+  Future<void> saveInvitation(Invitation invitation);
+
+  /// Liefert die Einladung und entfernt sie im selben Schritt — eine
+  /// Einladung ist genau einmal einlösbar, auch wenn sie abgelaufen ist
+  /// (abgelaufene werden dabei mit aufgeräumt, Rückgabe dann `null`).
+  Future<Invitation?> consumeInvitation(String tokenHash, DateTime now);
+
+  /// Offene (noch nicht eingelöste) Einladungen einer Firma, inklusive
+  /// abgelaufener — die UI zeigt den Ablauf an, statt sie zu verstecken.
+  Future<List<Invitation>> listInvitationsForCompany(String companyId);
+
   Future<void> saveSession(CompanySession session);
   Future<CompanySession?> findSession(String tokenHash);
   Future<void> deleteSession(String tokenHash);
