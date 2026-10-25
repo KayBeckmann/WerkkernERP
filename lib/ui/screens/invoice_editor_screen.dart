@@ -264,7 +264,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
     _advancePaymentInvoicesEnabled = company.advancePaymentInvoicesEnabled;
     _dunningEnabled = company.dunningEnabled;
-    _dunningConfig = DunningConfig.fromCompany(company);
+    _dunningConfig = dunningConfigFromCompany(company);
     _smtpEnabled = company.smtpEnabled;
     _smtpConfig = SmtpConfig.fromCompany(company);
     _creditNotesEnabled = company.creditNotesEnabled;

@@ -30,7 +30,7 @@ Future<Uint8List> buildDunningLetterPdf({
   required DunningLevel level,
   required DunningConfig config,
   required Money invoiceGross,
-}) async {
+}) {
   if (invoice.status != InvoiceStatus.finalized || invoice.invoiceNumber == null) {
     throw StateError('Mahnschreiben kann nur für eine finalisierte Rechnung erzeugt werden.');
   }
@@ -38,16 +38,80 @@ Future<Uint8List> buildDunningLetterPdf({
   if (dueDate == null || level == DunningLevel.none) {
     throw StateError('Mahnschreiben kann nur für eine überfällige Rechnung erzeugt werden.');
   }
-
   final now = DateTime.now();
   final overdueDays = now.difference(dueDate).inDays;
-  final fee = config.feeFor(level);
-  final interest = dunningInterestFor(
-    principal: invoiceGross,
+  return buildDunningLetterPdfFromData(DunningLetterPdfData(
+    level: level,
+    date: now,
+    companyName: invoice.companySnapshotName ?? '',
+    companyAddress: invoice.companySnapshotAddress,
+    customerName: invoice.customerSnapshotName ?? '',
+    customerAddress: invoice.customerSnapshotAddress,
+    invoiceNumber: invoice.invoiceNumber!,
+    invoiceDate: invoice.issueDate,
+    dueDate: dueDate,
+    invoiceGross: invoiceGross,
+    fee: config.feeFor(level),
+    interest: dunningInterestFor(principal: invoiceGross, overdueDays: overdueDays, ratePercent: config.interestRatePercent),
     overdueDays: overdueDays,
-    ratePercent: config.interestRatePercent,
-  );
-  final totalDue = invoiceGross + fee + interest;
+    interestRatePercent: config.interestRatePercent,
+    introText: company.pdfIntroTextDunning,
+    closingText: company.pdfClosingTextDunning,
+    footerText: company.pdfFooterText,
+  ));
+}
+
+/// Neutrales Datenmodell des Mahnschreibens — Offline-App und Online-
+/// Modus erzeugen damit dasselbe Layout; Beträge sind bereits berechnet.
+class DunningLetterPdfData {
+  const DunningLetterPdfData({
+    required this.level,
+    required this.date,
+    required this.companyName,
+    this.companyAddress,
+    required this.customerName,
+    this.customerAddress,
+    required this.invoiceNumber,
+    required this.invoiceDate,
+    required this.dueDate,
+    required this.invoiceGross,
+    required this.fee,
+    required this.interest,
+    required this.overdueDays,
+    required this.interestRatePercent,
+    this.introText,
+    this.closingText,
+    this.footerText,
+  });
+  final DunningLevel level;
+  final DateTime date;
+  final String companyName;
+  final String? companyAddress;
+  final String customerName;
+  final String? customerAddress;
+  final String invoiceNumber;
+  final DateTime invoiceDate;
+  final DateTime dueDate;
+  final Money invoiceGross;
+  final Money fee;
+  final Money interest;
+  final int overdueDays;
+  final double interestRatePercent;
+  final String? introText;
+  final String? closingText;
+  final String? footerText;
+
+  Money get totalDue => invoiceGross + fee + interest;
+}
+
+Future<Uint8List> buildDunningLetterPdfFromData(DunningLetterPdfData data) async {
+  final invoiceGross = data.invoiceGross;
+  final fee = data.fee;
+  final interest = data.interest;
+  final totalDue = data.totalDue;
+  final overdueDays = data.overdueDays;
+  final now = data.date;
+  final dueDate = data.dueDate;
 
   final regularFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans.ttf'));
   final boldFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'));
@@ -60,10 +124,10 @@ Future<Uint8List> buildDunningLetterPdf({
       footer: (context) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
-          if (company.pdfFooterText != null) ...[
+          if (data.footerText != null) ...[
             pw.Divider(color: PdfColors.grey400),
             pw.Text(
-              company.pdfFooterText!,
+              data.footerText!,
               textAlign: pw.TextAlign.center,
               style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
             ),
@@ -83,28 +147,28 @@ Future<Uint8List> buildDunningLetterPdf({
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             pw.Text(
-              invoice.companySnapshotName ?? '',
+              data.companyName,
               style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
             ),
-            if (invoice.companySnapshotAddress != null) pw.Text(invoice.companySnapshotAddress!),
+            if (data.companyAddress != null) pw.Text(data.companyAddress!),
             pw.SizedBox(height: 16),
-            pw.Text(invoice.customerSnapshotName ?? ''),
-            if (invoice.customerSnapshotAddress != null) pw.Text(invoice.customerSnapshotAddress!),
+            pw.Text(data.customerName),
+            if (data.customerAddress != null) pw.Text(data.customerAddress!),
             pw.SizedBox(height: 24),
             pw.Text(
-              dunningLetterTitle(level),
+              dunningLetterTitle(data.level),
               style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
             ),
             pw.Text('Datum: ${_formatDate(now)}'),
             pw.SizedBox(height: 16),
           ],
         ),
-        if (company.pdfIntroTextDunning != null) ...[
-          pw.Text(company.pdfIntroTextDunning!, style: const pw.TextStyle(fontSize: 10)),
+        if (data.introText != null) ...[
+          pw.Text(data.introText!, style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 12),
         ],
         pw.Text(
-          'Die Rechnung ${invoice.invoiceNumber} vom ${_formatDate(invoice.issueDate)} über '
+          'Die Rechnung ${data.invoiceNumber} vom ${_formatDate(data.invoiceDate)} über '
           '$invoiceGross war fällig am ${_formatDate(dueDate)}. Trotz Fälligkeit liegt uns '
           'bisher kein Zahlungseingang vor.',
           style: const pw.TextStyle(fontSize: 10),
@@ -120,7 +184,7 @@ Future<Uint8List> buildDunningLetterPdf({
                 _amountRow('Offener Rechnungsbetrag', invoiceGross),
                 if (fee.cents > 0) _amountRow('Mahngebühr', fee),
                 if (interest.cents > 0)
-                  _amountRow('Verzugszinsen ($overdueDays Tage, ${config.interestRatePercent} %)', interest),
+                  _amountRow('Verzugszinsen ($overdueDays Tage, ${data.interestRatePercent.toString().replaceAll('.', ',')} %)', interest),
                 pw.Divider(),
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -133,10 +197,10 @@ Future<Uint8List> buildDunningLetterPdf({
             ),
           ),
         ),
-        if (company.pdfClosingTextDunning != null) ...[
+        if (data.closingText != null) ...[
           pw.SizedBox(height: 16),
           pw.Text(
-            company.pdfClosingTextDunning!,
+            data.closingText!,
             style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
           ),
         ],

@@ -96,7 +96,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return computeDashboardSummary(
       finalizedInvoices: withGross,
       now: now,
-      dunningConfig: DunningConfig.fromCompany(company),
+      dunningConfig: dunningConfigFromCompany(company),
       vehiclesDueSoonCount: vehiclesDueSoonCount,
       activeProjectsCount: activeProjectsCount,
       activeRecurringTemplatesCount: activeRecurringTemplatesCount,
