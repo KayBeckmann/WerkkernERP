@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -12,13 +10,6 @@ import '../../data/repositories/time_sheet_repository.dart';
 import '../../domain/services/active_company_service.dart';
 import '../widgets/signature_pad.dart';
 
-/// Fester Hinweistext (C3-Rest, Nachtrag 2026-10-21, Kay-Entscheidung
-/// auf Rückfrage: "Fester Hinweistext: keine qualifizierte
-/// elektronische Signatur") — überall anzuzeigen, wo eine Unterschrift
-/// erfasst oder dargestellt wird.
-const signatureDisclaimer =
-    'Hinweis: Diese Unterschrift ist eine einfache Touch-Zeichnung, keine '
-    'qualifizierte elektronische Signatur im Sinne der eIDAS-Verordnung.';
 
 String _formatDate(DateTime date) =>
     '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
@@ -331,64 +322,7 @@ class _TimeSheetDetailScreenState extends State<TimeSheetDetailScreen> {
   }
 
   Future<void> _sign() async {
-    final controller = SignaturePadController();
-    // Das PNG MUSS exportiert werden, während die `SignaturePad`
-    // (und damit ihr `RepaintBoundary`) noch im Baum steckt — danach,
-    // also erst nach `Navigator.pop()`, liefert `exportPng()` nur noch
-    // `null`, weil der zugehörige BuildContext schon weg ist.
-    final signatureBytes = await showDialog<Uint8List>(
-      context: context,
-      // `ListenableBuilder` statt eines einfachen Closure-Builders: der
-      // "Unterschreiben"-Button hängt von `controller.isEmpty` ab, das
-      // sich erst durch das Zeichnen selbst ändert — ohne diesen
-      // Listener bliebe der Button auf dem Stand beim ersten Aufbau des
-      // Dialogs "eingefroren" (deaktiviert), egal was gezeichnet wird.
-      builder: (dialogContext) => ListenableBuilder(
-        listenable: controller,
-        builder: (context, _) => AlertDialog(
-          title: const Text('Unterschrift des Kunden'),
-          content: SizedBox(
-            width: 420,
-            height: 280,
-            child: Column(
-              children: [
-                Expanded(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
-                    child: SignaturePad(controller: controller),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  signatureDisclaimer,
-                  style: TextStyle(fontSize: 11),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => controller.clear(),
-              child: const Text('Löschen'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Abbrechen'),
-            ),
-            FilledButton(
-              onPressed: controller.isEmpty
-                  ? null
-                  : () async {
-                      final bytes = await controller.exportPng();
-                      if (dialogContext.mounted) Navigator.pop(dialogContext, bytes);
-                    },
-              child: const Text('Unterschreiben'),
-            ),
-          ],
-        ),
-      ),
-    );
+    final signatureBytes = await showSignatureDialog(context);
     if (signatureBytes == null || !mounted) return;
 
     setState(() => _busy = true);

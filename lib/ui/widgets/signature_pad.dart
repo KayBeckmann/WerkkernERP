@@ -124,3 +124,59 @@ class _SignaturePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _SignaturePainter oldDelegate) => true;
 }
+
+/// Fester Hinweistext (C3-Rest, Nachtrag 2026-10-21, Kay-Entscheidung
+/// auf Rückfrage: "Fester Hinweistext: keine qualifizierte
+/// elektronische Signatur") — überall anzuzeigen, wo eine Unterschrift
+/// erfasst oder dargestellt wird.
+const signatureDisclaimer =
+    'Hinweis: Diese Unterschrift ist eine einfache Touch-Zeichnung, keine '
+    'qualifizierte elektronische Signatur im Sinne der eIDAS-Verordnung.';
+
+/// Unterschrift des Kunden erfassen — Dialog mit Zeichenfläche und festem
+/// Hinweis, liefert das PNG oder `null` bei Abbruch. Das PNG wird
+/// exportiert, solange die Zeichenfläche (und ihr `RepaintBoundary`)
+/// noch im Baum steckt; nach `Navigator.pop()` lieferte `exportPng()`
+/// nur noch `null`. `ListenableBuilder`, damit „Unterschreiben“ beim
+/// Zeichnen freigeschaltet wird.
+Future<Uint8List?> showSignatureDialog(BuildContext context) {
+  final controller = SignaturePadController();
+  return showDialog<Uint8List>(
+    context: context,
+    builder: (dialogContext) => ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) => AlertDialog(
+        title: const Text('Unterschrift des Kunden'),
+        content: SizedBox(
+          width: 420,
+          height: 280,
+          child: Column(
+            children: [
+              Expanded(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+                  child: SignaturePad(controller: controller),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(signatureDisclaimer, style: TextStyle(fontSize: 11), textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => controller.clear(), child: const Text('Löschen')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Abbrechen')),
+          FilledButton(
+            onPressed: controller.isEmpty
+                ? null
+                : () async {
+                    final bytes = await controller.exportPng();
+                    if (dialogContext.mounted) Navigator.pop(dialogContext, bytes);
+                  },
+            child: const Text('Unterschreiben'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
