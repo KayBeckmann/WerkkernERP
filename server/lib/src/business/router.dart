@@ -15,6 +15,7 @@ import 'repository.dart';
 import 'request_util.dart';
 import 'stock.dart';
 import 'stock_routes.dart';
+import 'accounting_routes.dart';
 import 'fleet_routes.dart';
 import 'suppliers_routes.dart';
 
@@ -35,6 +36,7 @@ class BusinessRoutes {
     _suppliers.mount(router);
     FleetRoutes(business: business, auth: auth).mount(router);
     StockRoutes(repository: repository, business: business, auth: auth).mount(router);
+    AccountingRoutes(repository: repository, business: business, auth: auth).mount(router);
 
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);
@@ -1129,7 +1131,8 @@ class BusinessRoutes {
         final items = await business.itemsFor(companyId, d.id);
         final gross = _totals(items).totalGross.cents;
         documents.add({...d.toJson(), 'totalGrossCents': gross});
-        if (d.kind == 'invoice' && !d.isDraft) invoiceGross = invoiceGross! + gross;
+        // Rechnungen erhöhen, Gutschriften mindern die Erlöse (wie offline).
+        if (!d.isDraft) invoiceGross = invoiceGross! + gross * revenueSignForKind(d.kind);
         if (d.kind == 'quote' || d.kind == 'order') {
           for (final i in items.where((i) => i.kind == 'hours')) {
             plannedHours = plannedHours! + Decimal.parse(i.quantity);
@@ -1138,9 +1141,12 @@ class BusinessRoutes {
       }
     }
 
+    // Ohne Zeiterfassungsmodul gibt es keine Stundenkosten (0); mit Modul,
+    // aber ohne Leserecht sind sie unbekannt (null) — wie bei Belegen.
+    final withTimeTracking = modules.contains('timeTracking');
     Decimal? bookedHours;
-    int? hoursCost;
-    if (await auth.isGranted(ctx, 'timeTracking.read')) {
+    int? hoursCost = withTimeTracking ? null : 0;
+    if (withTimeTracking && await auth.isGranted(ctx, 'timeTracking.read')) {
       bookedHours = Decimal.zero;
       hoursCost = 0;
       for (final t in await business.listTimeEntries(companyId, projectId: id)) {
@@ -1151,6 +1157,15 @@ class BusinessRoutes {
         }
       }
     }
+    // Zugeordnete Belege (Buchhaltung) sind Projektkosten — Fuhrpark
+    // bewusst nicht (Gemeinkosten). Ohne aktives Modul zählen sie nicht,
+    // ohne Leserecht ist das Ergebnis unbekannt statt geschönt.
+    final withExpenses = modules.contains('buchhaltung');
+    int? expenseCost;
+    if (withExpenses && await auth.isGranted(ctx, 'accounting.read')) {
+      expenseCost = (await business.listExpenses(companyId, projectId: id)).fold<int>(0, (sum, e) => sum + e.amountGrossCents);
+    }
+    final costsKnown = hoursCost != null && (!withExpenses || expenseCost != null);
     return jsonOk({
       ...project.toJson(),
       'documents': documents,
@@ -1159,7 +1174,8 @@ class BusinessRoutes {
         'plannedHours': plannedHours?.toString(),
         'bookedHours': bookedHours?.toString(),
         'hoursCostCents': hoursCost,
-        'resultCents': (invoiceGross != null && hoursCost != null) ? invoiceGross - hoursCost : null,
+        'expenseCostCents': expenseCost,
+        'resultCents': (invoiceGross != null && costsKnown) ? invoiceGross - hoursCost - (expenseCost ?? 0) : null,
       },
     });
   }

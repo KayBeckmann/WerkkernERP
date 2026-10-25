@@ -7,11 +7,11 @@ import 'package:werkkernerp/domain/services/euer_service.dart';
 
 /// C14.3 EÜR-Übersicht (Kay-Priorisierungsentscheidung 2026-10-18).
 void main() {
-  Invoice invoiceWith({required DateTime issueDate}) => Invoice(
-        id: 'inv-${issueDate.toIso8601String()}',
+  Invoice invoiceWith({required DateTime issueDate, DocumentKind kind = DocumentKind.invoice}) => Invoice(
+        id: 'inv-${issueDate.toIso8601String()}-${kind.name}',
         companyId: 'company-1',
         customerId: 'customer-1',
-        kind: DocumentKind.invoice,
+        kind: kind,
         status: InvoiceStatus.finalized,
         invoiceNumber: 'R-26001',
         numberYear: issueDate.year,
@@ -189,5 +189,24 @@ void main() {
     );
 
     expect(summary.surplus, Money.fromCents(-4000));
+  });
+
+  test('Einnahmen: nur Rechnungen zählen, Gutschriften mindern, Angebot/Auftrag/Lieferschein/Proforma nie', () {
+    final date = DateTime(2026, 10, 15);
+    final summary = computeEuerSummary(
+      allFinalizedInvoices: [
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date), gross: Money.fromCents(10000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date, kind: DocumentKind.order), gross: Money.fromCents(10000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date, kind: DocumentKind.quote), gross: Money.fromCents(5000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date, kind: DocumentKind.deliveryNote), gross: Money.fromCents(10000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date, kind: DocumentKind.proforma), gross: Money.fromCents(7000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date, kind: DocumentKind.creditNote), gross: Money.fromCents(2500)),
+      ],
+      allExpenses: const [],
+      categoryById: const {},
+      periodStart: DateTime(2026, 10, 1),
+      periodEnd: DateTime(2026, 10, 31),
+    );
+    expect(summary.totalIncome.cents, 7500, reason: '100 € Rechnung − 25 € Gutschrift; Auftrag zählt nicht doppelt');
   });
 }

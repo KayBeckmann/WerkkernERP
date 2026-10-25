@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
-import '../../data/database/tables.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../domain/services/active_company_service.dart';
@@ -42,8 +41,7 @@ class _OpenItemsScreenState extends State<OpenItemsScreen> {
 
     final openItems = <OpenItem>[];
     for (final invoice in allInvoices) {
-      if (invoice.status != InvoiceStatus.finalized) continue;
-      if (invoice.paymentStatus != PaymentStatus.open) continue;
+      if (!isOpenItem(invoice)) continue;
       final totals = await invoiceRepo.totalsFor(invoice.id);
       openItems.add(
         OpenItem(

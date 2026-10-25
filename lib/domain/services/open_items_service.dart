@@ -1,4 +1,7 @@
+import 'package:werkkern_core/werkkern_core.dart' show hasPaymentStatusKind;
+
 import '../../data/database/database.dart';
+import '../../data/database/tables.dart';
 import '../models/money.dart';
 
 /// C14.1 Offene-Posten-Übersicht (Kay-Priorisierungsentscheidung
@@ -6,6 +9,14 @@ import '../models/money.dart';
 /// Aggregationslogik ohne Datenbankzugriff, testbar ohne DB — gleiches
 /// Trennungsprinzip wie `dashboard_service.dart`/
 /// `invoice_totals_service.dart`.
+/// Ob ein Dokument ein offener Posten ist: finalisierte, unbezahlte
+/// **Rechnung** — Angebote/Aufträge/Lieferscheine/Proforma/Gutschriften
+/// haben keinen Zahlungsstatus (`hasPaymentStatusKind`).
+bool isOpenItem(Invoice invoice) =>
+    invoice.status == InvoiceStatus.finalized &&
+    invoice.paymentStatus == PaymentStatus.open &&
+    hasPaymentStatusKind(invoice.kind.name);
+
 class OpenItem {
   const OpenItem({required this.invoice, required this.gross, required this.customerName});
   final Invoice invoice;

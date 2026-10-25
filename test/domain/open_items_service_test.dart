@@ -7,12 +7,19 @@ import 'package:werkkernerp/domain/services/open_items_service.dart';
 /// C14.1 Offene-Posten-Übersicht (Kay-Priorisierungsentscheidung
 /// 2026-10-18).
 void main() {
-  Invoice invoiceWith({required String customerId, required String id}) => Invoice(
+  Invoice invoiceWith({
+    required String customerId,
+    required String id,
+    DocumentKind kind = DocumentKind.invoice,
+    PaymentStatus paymentStatus = PaymentStatus.open,
+    InvoiceStatus status = InvoiceStatus.finalized,
+  }) =>
+      Invoice(
         id: id,
         companyId: 'company-1',
         customerId: customerId,
-        kind: DocumentKind.invoice,
-        status: InvoiceStatus.finalized,
+        kind: kind,
+        status: status,
         invoiceNumber: 'R-26001',
         numberYear: 2026,
         issueDate: DateTime(2026, 10, 1),
@@ -35,7 +42,7 @@ void main() {
         isFixedPrice: false,
         stockBooked: false,
         dueDate: null,
-        paymentStatus: PaymentStatus.open,
+        paymentStatus: paymentStatus,
         paidAt: null,
       );
 
@@ -107,5 +114,14 @@ void main() {
   test('Leere Liste ergibt leere Gruppierung und Summe 0', () {
     expect(groupOpenItemsByCustomer([]), isEmpty);
     expect(totalOpenAmount([]), Money.zero());
+  });
+
+  test('isOpenItem: nur finalisierte, unbezahlte Rechnungen', () {
+    expect(isOpenItem(invoiceWith(customerId: 'c', id: '1')), isTrue);
+    expect(isOpenItem(invoiceWith(customerId: 'c', id: '2', paymentStatus: PaymentStatus.paid)), isFalse);
+    expect(isOpenItem(invoiceWith(customerId: 'c', id: '3', status: InvoiceStatus.draft)), isFalse);
+    for (final kind in [DocumentKind.quote, DocumentKind.order, DocumentKind.deliveryNote, DocumentKind.proforma, DocumentKind.creditNote]) {
+      expect(isOpenItem(invoiceWith(customerId: 'c', id: kind.name, kind: kind)), isFalse, reason: kind.name);
+    }
   });
 }

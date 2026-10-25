@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:file_picker/file_picker.dart';
@@ -656,12 +656,9 @@ class _DatevExportDialogState extends State<_DatevExportDialog> {
         generatedAt: DateTime.now(),
       );
 
-      // DATEV EXTF erwartet traditionell Windows-1252/ANSI statt UTF-8
-      // — Latin-1 deckt die in Buchungstexten üblichen deutschen
-      // Zeichen (Umlaute, ß) identisch ab, ist aber keine vollständige
-      // cp1252-Implementierung (z. B. Euro-Zeichen € unterscheidet
-      // sich) - für die hier erzeugten Texte in der Praxis ausreichend.
-      final bytes = latin1.encode(result.csvContent);
+      // DATEV EXTF erwartet ANSI statt UTF-8 — `encodeDatevAnsi` statt
+      // `latin1.encode`, das bei „€“/„–“ im Buchungstext abstürzte.
+      final bytes = Uint8List.fromList(encodeDatevAnsi(result.csvContent));
       final timestamp =
           '${_periodStart.year}${_periodStart.month.toString().padLeft(2, '0')}';
       final savedUri = await FilePicker.saveFile(

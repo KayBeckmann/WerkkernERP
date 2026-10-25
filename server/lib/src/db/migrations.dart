@@ -26,6 +26,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step11SuppliersArticleGroups,
   _step12Fleet,
   _step13Stock,
+  _step14Accounting,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -317,6 +318,59 @@ Future<void> _step13Stock(Session db) async {
       counted_quantity TEXT,
       counted_at TIMESTAMPTZ,
       UNIQUE (inventory_count_id, article_id)
+    );
+  ''');
+}
+
+/// C14 online: Beleg-Kategorien, Belege, Bankumsätze und Firmen-
+/// Einstellungen (DATEV, CSV-Spaltenzuordnung) je Bereich als JSON.
+Future<void> _step14Accounting(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS expense_categories (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      skr03_account TEXT,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS expenses (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      expense_date DATE NOT NULL,
+      description TEXT NOT NULL,
+      amount_gross_cents BIGINT NOT NULL,
+      vat_rate_percent DOUBLE PRECISION NOT NULL,
+      category_id TEXT REFERENCES expense_categories(id) ON DELETE SET NULL,
+      supplier_reference TEXT,
+      project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      purchase_order_id TEXT,
+      created_by_user_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS expenses_company_idx ON expenses (company_id, expense_date)');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS bank_transactions (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      transaction_date DATE NOT NULL,
+      amount_cents BIGINT NOT NULL,
+      purpose TEXT, counterparty TEXT,
+      matched_document_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
+      import_hash TEXT NOT NULL,
+      imported_at TIMESTAMPTZ NOT NULL,
+      UNIQUE (company_id, import_hash)
+    );
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS company_settings (
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      section TEXT NOT NULL,
+      settings TEXT NOT NULL,
+      PRIMARY KEY (company_id, section)
     );
   ''');
 }
