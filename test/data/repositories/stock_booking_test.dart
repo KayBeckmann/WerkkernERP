@@ -391,4 +391,55 @@ void main() {
       expect(reloaded!.stockQuantity, 7, reason: '10 - 5 (Rechnung) + 2 (Teil-Gutschrift) = 7');
     },
   );
+
+  test(
+    'Bearbeiteter, bereits gebuchter Auftrag bucht die Mengendifferenz nach (wie online)',
+    () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      await companies.update(company.copyWith(lagerbestandEnabled: true, ordersEnabled: true));
+      final customer = await customers.create(companyId: company.id, name: 'Testkunde');
+      final article = await articles.create(companyId: company.id, name: 'Steckdose');
+      await articles.setStock(companyId: company.id, id: article.id, newQuantity: 10);
+
+      final draft = await draftWithArticle(
+        companyId: company.id,
+        customerId: customer.id,
+        articleId: article.id,
+        quantity: '3',
+      );
+      final order = (await invoices.finalize(companyId: company.id, id: draft.id))!;
+      expect(order.stockBooked, isTrue);
+      expect((await articles.findById(companyId: company.id, id: article.id))!.stockQuantity, 7);
+
+      InvoiceItemInput line(String quantity) => InvoiceItemInput(
+            kind: InvoiceItemKind.article,
+            articleId: article.id,
+            description: 'Testartikel',
+            quantity: Decimal.parse(quantity),
+            unitPriceCents: 1000,
+            vatRatePercent: 19,
+          );
+      await invoices.update(companyId: company.id, id: order.id, items: [line('5')]);
+      expect((await articles.findById(companyId: company.id, id: article.id))!.stockQuantity, 5);
+      await invoices.update(companyId: company.id, id: order.id, items: [line('1.5')]);
+      expect((await articles.findById(companyId: company.id, id: article.id))!.stockQuantity, 8.5);
+
+      final movements = await (db.select(db.stockMovements)..where((m) => m.articleId.equals(article.id))).get();
+      expect(movements.where((m) => m.note == 'Korrektur nach Bearbeitung'), hasLength(2));
+
+      // Ein nicht buchendes Angebot bucht auch beim Bearbeiten nichts.
+      await companies.update(company.copyWith(lagerbestandEnabled: true, ordersEnabled: true, quotesEnabled: true));
+      final quoteDraft = await draftWithArticle(
+        companyId: company.id,
+        customerId: customer.id,
+        articleId: article.id,
+        quantity: '2',
+        kind: DocumentKind.quote,
+      );
+      final quote = (await invoices.finalize(companyId: company.id, id: quoteDraft.id))!;
+      expect(quote.stockBooked, isFalse);
+      await invoices.update(companyId: company.id, id: quote.id, items: [line('9')]);
+      expect((await articles.findById(companyId: company.id, id: article.id))!.stockQuantity, 8.5);
+    },
+  );
 }

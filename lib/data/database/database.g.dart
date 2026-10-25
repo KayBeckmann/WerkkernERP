@@ -7956,6 +7956,21 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _stockBookedMeta = const VerificationMeta(
+    'stockBooked',
+  );
+  @override
+  late final GeneratedColumn<bool> stockBooked = GeneratedColumn<bool>(
+    'stock_booked',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("stock_booked" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _dueDateMeta = const VerificationMeta(
     'dueDate',
   );
@@ -8017,6 +8032,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     projectId,
     isAdvancePayment,
     isFixedPrice,
+    stockBooked,
     dueDate,
     paymentStatus,
     paidAt,
@@ -8260,6 +8276,15 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         ),
       );
     }
+    if (data.containsKey('stock_booked')) {
+      context.handle(
+        _stockBookedMeta,
+        stockBooked.isAcceptableOrUnknown(
+          data['stock_booked']!,
+          _stockBookedMeta,
+        ),
+      );
+    }
     if (data.containsKey('due_date')) {
       context.handle(
         _dueDateMeta,
@@ -8401,6 +8426,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_fixed_price'],
       )!,
+      stockBooked: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}stock_booked'],
+      )!,
       dueDate: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}due_date'],
@@ -8535,6 +8564,12 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   /// den Wert unverändert weiter wie `projectId`.
   final bool isFixedPrice;
 
+  /// C5.1: dieses Dokument hat beim Finalisieren Bestand abgebucht. Eine
+  /// spätere Bearbeitung (finalisierter Auftrag bis zur Umwandlung, siehe
+  /// `InvoiceRepository.isEditable`) bucht dann die Mengendifferenz nach —
+  /// sonst stünde der Bestand nach einer Korrektur falsch (wie online).
+  final bool stockBooked;
+
   /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales
   /// Fälligkeitsdatum, vom Nutzer im Entwurf gesetzt. `null` = keine
   /// Fälligkeitsüberwachung für dieses Dokument. Nur bei `kind ==
@@ -8580,6 +8615,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.projectId,
     required this.isAdvancePayment,
     required this.isFixedPrice,
+    required this.stockBooked,
     this.dueDate,
     required this.paymentStatus,
     this.paidAt,
@@ -8666,6 +8702,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     }
     map['is_advance_payment'] = Variable<bool>(isAdvancePayment);
     map['is_fixed_price'] = Variable<bool>(isFixedPrice);
+    map['stock_booked'] = Variable<bool>(stockBooked);
     if (!nullToAbsent || dueDate != null) {
       map['due_date'] = Variable<DateTime>(dueDate);
     }
@@ -8747,6 +8784,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           : Value(projectId),
       isAdvancePayment: Value(isAdvancePayment),
       isFixedPrice: Value(isFixedPrice),
+      stockBooked: Value(stockBooked),
       dueDate: dueDate == null && nullToAbsent
           ? const Value.absent()
           : Value(dueDate),
@@ -8818,6 +8856,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       projectId: serializer.fromJson<String?>(json['projectId']),
       isAdvancePayment: serializer.fromJson<bool>(json['isAdvancePayment']),
       isFixedPrice: serializer.fromJson<bool>(json['isFixedPrice']),
+      stockBooked: serializer.fromJson<bool>(json['stockBooked']),
       dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
       paymentStatus: $InvoicesTable.$converterpaymentStatus.fromJson(
         serializer.fromJson<String>(json['paymentStatus']),
@@ -8874,6 +8913,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'projectId': serializer.toJson<String?>(projectId),
       'isAdvancePayment': serializer.toJson<bool>(isAdvancePayment),
       'isFixedPrice': serializer.toJson<bool>(isFixedPrice),
+      'stockBooked': serializer.toJson<bool>(stockBooked),
       'dueDate': serializer.toJson<DateTime?>(dueDate),
       'paymentStatus': serializer.toJson<String>(
         $InvoicesTable.$converterpaymentStatus.toJson(paymentStatus),
@@ -8912,6 +8952,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<String?> projectId = const Value.absent(),
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    bool? stockBooked,
     Value<DateTime?> dueDate = const Value.absent(),
     PaymentStatus? paymentStatus,
     Value<DateTime?> paidAt = const Value.absent(),
@@ -8971,6 +9012,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     projectId: projectId.present ? projectId.value : this.projectId,
     isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
     isFixedPrice: isFixedPrice ?? this.isFixedPrice,
+    stockBooked: stockBooked ?? this.stockBooked,
     dueDate: dueDate.present ? dueDate.value : this.dueDate,
     paymentStatus: paymentStatus ?? this.paymentStatus,
     paidAt: paidAt.present ? paidAt.value : this.paidAt,
@@ -9046,6 +9088,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       isFixedPrice: data.isFixedPrice.present
           ? data.isFixedPrice.value
           : this.isFixedPrice,
+      stockBooked: data.stockBooked.present
+          ? data.stockBooked.value
+          : this.stockBooked,
       dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
       paymentStatus: data.paymentStatus.present
           ? data.paymentStatus.value
@@ -9086,6 +9131,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('projectId: $projectId, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
+          ..write('stockBooked: $stockBooked, ')
           ..write('dueDate: $dueDate, ')
           ..write('paymentStatus: $paymentStatus, ')
           ..write('paidAt: $paidAt')
@@ -9124,6 +9170,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     projectId,
     isAdvancePayment,
     isFixedPrice,
+    stockBooked,
     dueDate,
     paymentStatus,
     paidAt,
@@ -9161,6 +9208,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.projectId == this.projectId &&
           other.isAdvancePayment == this.isAdvancePayment &&
           other.isFixedPrice == this.isFixedPrice &&
+          other.stockBooked == this.stockBooked &&
           other.dueDate == this.dueDate &&
           other.paymentStatus == this.paymentStatus &&
           other.paidAt == this.paidAt);
@@ -9196,6 +9244,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String?> projectId;
   final Value<bool> isAdvancePayment;
   final Value<bool> isFixedPrice;
+  final Value<bool> stockBooked;
   final Value<DateTime?> dueDate;
   final Value<PaymentStatus> paymentStatus;
   final Value<DateTime?> paidAt;
@@ -9230,6 +9279,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.projectId = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
+    this.stockBooked = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.paymentStatus = const Value.absent(),
     this.paidAt = const Value.absent(),
@@ -9265,6 +9315,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.projectId = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
+    this.stockBooked = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.paymentStatus = const Value.absent(),
     this.paidAt = const Value.absent(),
@@ -9307,6 +9358,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? projectId,
     Expression<bool>? isAdvancePayment,
     Expression<bool>? isFixedPrice,
+    Expression<bool>? stockBooked,
     Expression<DateTime>? dueDate,
     Expression<String>? paymentStatus,
     Expression<DateTime>? paidAt,
@@ -9353,6 +9405,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (projectId != null) 'project_id': projectId,
       if (isAdvancePayment != null) 'is_advance_payment': isAdvancePayment,
       if (isFixedPrice != null) 'is_fixed_price': isFixedPrice,
+      if (stockBooked != null) 'stock_booked': stockBooked,
       if (dueDate != null) 'due_date': dueDate,
       if (paymentStatus != null) 'payment_status': paymentStatus,
       if (paidAt != null) 'paid_at': paidAt,
@@ -9390,6 +9443,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String?>? projectId,
     Value<bool>? isAdvancePayment,
     Value<bool>? isFixedPrice,
+    Value<bool>? stockBooked,
     Value<DateTime?>? dueDate,
     Value<PaymentStatus>? paymentStatus,
     Value<DateTime?>? paidAt,
@@ -9431,6 +9485,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       projectId: projectId ?? this.projectId,
       isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
       isFixedPrice: isFixedPrice ?? this.isFixedPrice,
+      stockBooked: stockBooked ?? this.stockBooked,
       dueDate: dueDate ?? this.dueDate,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       paidAt: paidAt ?? this.paidAt,
@@ -9554,6 +9609,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (isFixedPrice.present) {
       map['is_fixed_price'] = Variable<bool>(isFixedPrice.value);
     }
+    if (stockBooked.present) {
+      map['stock_booked'] = Variable<bool>(stockBooked.value);
+    }
     if (dueDate.present) {
       map['due_date'] = Variable<DateTime>(dueDate.value);
     }
@@ -9603,6 +9661,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('projectId: $projectId, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
+          ..write('stockBooked: $stockBooked, ')
           ..write('dueDate: $dueDate, ')
           ..write('paymentStatus: $paymentStatus, ')
           ..write('paidAt: $paidAt, ')
@@ -28168,6 +28227,7 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       Value<String?> projectId,
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
+      Value<bool> stockBooked,
       Value<DateTime?> dueDate,
       Value<PaymentStatus> paymentStatus,
       Value<DateTime?> paidAt,
@@ -28204,6 +28264,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<String?> projectId,
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
+      Value<bool> stockBooked,
       Value<DateTime?> dueDate,
       Value<PaymentStatus> paymentStatus,
       Value<DateTime?> paidAt,
@@ -28508,6 +28569,11 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<bool> get isFixedPrice => $composableBuilder(
     column: $table.isFixedPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get stockBooked => $composableBuilder(
+    column: $table.stockBooked,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -28879,6 +28945,11 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get stockBooked => $composableBuilder(
+    column: $table.stockBooked,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get dueDate => $composableBuilder(
     column: $table.dueDate,
     builder: (column) => ColumnOrderings(column),
@@ -29104,6 +29175,11 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<bool> get isFixedPrice => $composableBuilder(
     column: $table.isFixedPrice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get stockBooked => $composableBuilder(
+    column: $table.stockBooked,
     builder: (column) => column,
   );
 
@@ -29404,6 +29480,7 @@ class $$InvoicesTableTableManager
                 Value<String?> projectId = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
+                Value<bool> stockBooked = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<PaymentStatus> paymentStatus = const Value.absent(),
                 Value<DateTime?> paidAt = const Value.absent(),
@@ -29438,6 +29515,7 @@ class $$InvoicesTableTableManager
                 projectId: projectId,
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
+                stockBooked: stockBooked,
                 dueDate: dueDate,
                 paymentStatus: paymentStatus,
                 paidAt: paidAt,
@@ -29474,6 +29552,7 @@ class $$InvoicesTableTableManager
                 Value<String?> projectId = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
+                Value<bool> stockBooked = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<PaymentStatus> paymentStatus = const Value.absent(),
                 Value<DateTime?> paidAt = const Value.absent(),
@@ -29508,6 +29587,7 @@ class $$InvoicesTableTableManager
                 projectId: projectId,
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
+                stockBooked: stockBooked,
                 dueDate: dueDate,
                 paymentStatus: paymentStatus,
                 paidAt: paidAt,

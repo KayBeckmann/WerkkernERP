@@ -38,7 +38,8 @@ import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 /// Tilgungs-/Zinsanteil bei Fahrzeug-Finanzierungskosten,
 /// Nachtrag 2026-10-21; v29→v30: C2-Nachtrag Projektnummer-
 /// Nummernkreise, Nachtrag 2026-10-21; v30→v31: C3-Rest
-/// Kunden-Stundenzettel/Unterschrift, Nachtrag 2026-10-21).
+/// Kunden-Stundenzettel/Unterschrift, Nachtrag 2026-10-21; v31→v32:
+/// C5.1-Fix Merker stock_booked).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -278,6 +279,8 @@ void main() {
       // v31 nie) und `time_entries.time_sheet_id` wird beim Rückbau von
       // v26→v27 oben bereits mit der ganzen Tabelle gedroppt (siehe den
       // `from >= 27`-Guard in database.dart).
+      // v31 -> v32 (C5.1-Fix: Merker stock_booked am Dokument).
+      raw.execute('ALTER TABLE invoices DROP COLUMN stock_booked;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -357,6 +360,7 @@ void main() {
         expect(migratedInvoice.customerId, customer.id, reason: 'Bestandsdaten dürfen nicht verändert werden');
         expect(migratedInvoice.customerSnapshotVatId, isNull);
         expect(migratedInvoice.convertedFromId, isNull);
+        expect(migratedInvoice.stockBooked, isFalse, reason: 'v32: Altdokumente gelten als nicht gebucht');
         expect(migratedInvoice.projectId, isNull);
         expect(migratedInvoice.pdfIntroTextSnapshot, isNull);
         expect(migratedInvoice.pdfClosingTextSnapshot, isNull);

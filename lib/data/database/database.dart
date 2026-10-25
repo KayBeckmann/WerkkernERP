@@ -48,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 32;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -340,6 +340,13 @@ class AppDatabase extends _$AppDatabase {
             if (from >= 27) {
               await migrator.addColumn(timeEntries, timeEntries.timeSheetId);
             }
+          }
+          if (from < 32) {
+            // C5.1-Fix: Merker, ob ein Dokument Bestand gebucht hat. Bereits
+            // gebuchte Altdokumente bleiben `false` (Nachbuchung erst für
+            // ab jetzt finalisierte) — eine rückwirkende Erkennung über die
+            // Bewegungen wäre nur geraten.
+            await migrator.addColumn(invoices, invoices.stockBooked);
           }
         },
       );

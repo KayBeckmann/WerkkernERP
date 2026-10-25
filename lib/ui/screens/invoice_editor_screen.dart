@@ -1000,6 +1000,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       isAdvancePayment: _isAdvancePayment,
       dueDate: _dueDate,
       isFixedPrice: _isFixedPrice,
+      stockBooked: false,
       paymentStatus: PaymentStatus.open,
       paidAt: null,
     );
