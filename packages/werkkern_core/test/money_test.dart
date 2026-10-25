@@ -42,4 +42,11 @@ void main() {
     expect(Money.fromEuroString('0,30').cents, 30);
     expect(Money.fromEuroString('19').cents, 1900);
   });
+
+  test('Negative Beträge behalten ihr Vorzeichen, auch unter 1 €', () {
+    expect(const Money.fromCents(-50).formatEuro(), '-0,50');
+    expect(const Money.fromCents(-150).formatEuro(), '-1,50');
+    expect(const Money.fromCents(-5).toString(), '-0,05 €');
+    expect(const Money.fromCents(0).formatEuro(), '0,00');
+  });
 }

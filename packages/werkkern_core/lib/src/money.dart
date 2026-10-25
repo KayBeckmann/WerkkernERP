@@ -63,9 +63,10 @@ class Money {
   double toEuro() => cents / 100;
 
   String formatEuro() {
-    final euros = cents ~/ 100;
-    final remCents = (cents % 100).abs().toString().padLeft(2, '0');
-    return '$euros,$remCents';
+    // Vorzeichen getrennt: sonst wird aus -50 Cent "0,50" (−0 € hat kein Minus).
+    final sign = cents < 0 ? '-' : '';
+    final abs = cents.abs();
+    return '$sign${abs ~/ 100},${(abs % 100).toString().padLeft(2, '0')}';
   }
 
   @override
