@@ -28,6 +28,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step13Stock,
   _step14Accounting,
   _step15Purchasing,
+  _step16Dunning,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -416,4 +417,24 @@ Future<void> _step15Purchasing(Session db) async {
     'ALTER TABLE expenses ADD CONSTRAINT expenses_purchase_order_fk FOREIGN KEY (purchase_order_id) '
     'REFERENCES purchase_orders(id) ON DELETE SET NULL',
   );
+}
+
+/// C12 online: Protokoll erstellter (und ggf. versendeter) Mahnungen.
+Future<void> _step16Dunning(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS dunning_notices (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+      level INTEGER NOT NULL,
+      invoice_gross_cents BIGINT NOT NULL,
+      fee_cents BIGINT NOT NULL,
+      interest_cents BIGINT NOT NULL,
+      overdue_days INTEGER NOT NULL,
+      created_by_user_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      sent_at TIMESTAMPTZ
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS dunning_notices_document_idx ON dunning_notices (company_id, document_id)');
 }

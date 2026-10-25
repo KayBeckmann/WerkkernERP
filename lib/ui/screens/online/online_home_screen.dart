@@ -7,6 +7,7 @@ import 'online_agent_screen.dart';
 import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
 import 'online_documents_screen.dart';
+import 'online_dunning_screen.dart';
 import 'online_fleet_screen.dart';
 import 'online_password_dialog.dart';
 import 'online_projects_screen.dart';
@@ -123,6 +124,8 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             (label: 'Artikel', icon: Icons.inventory_2_outlined, body: OnlineArticlesScreen(session: session)),
           if (session.modules.contains('buchhaltung') && session.can('accounting.read') && !session.offlineOnly)
             (label: 'Buchhaltung', icon: Icons.account_balance_outlined, body: OnlineAccountingScreen(session: session)),
+          if (session.modules.contains('dunning') && session.can('dunning.read') && !session.offlineOnly)
+            (label: 'Mahnwesen', icon: Icons.notification_important_outlined, body: OnlineDunningScreen(session: session)),
           if (session.modules.contains('lagerbestand') && session.can('stock.read') && !session.offlineOnly)
             (label: 'Lager', icon: Icons.warehouse_outlined, body: OnlineStockScreen(session: session)),
           if (session.modules.contains('bestellwesen') && session.can('purchaseOrders.read') && !session.offlineOnly)
