@@ -41,6 +41,7 @@ void main() {
     expect(find.text('Elektro Kay'), findsOneWidget);
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Dokumente');
     expect(find.text('Elektro Kay · online'), findsOneWidget);
     expect(find.textContaining('keine lokale Kopie'), findsOneWidget);
 
@@ -110,6 +111,7 @@ void main() {
     await login(tester, server);
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Dokumente');
     await tester.tap(find.text('Rechnung (Entwurf)'));
     await tester.pumpAndSettle();
 
@@ -189,6 +191,7 @@ void main() {
     await login(tester, server);
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Dokumente');
 
     await tester.tap(find.text('An-${year}001'));
     await tester.pumpAndSettle();
@@ -224,6 +227,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Dokumente');
 
     await tester.tap(find.byTooltip('Weitere Aktionen'));
     await tester.pumpAndSettle();

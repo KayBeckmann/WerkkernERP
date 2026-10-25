@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart' show NavigationDestination;
+import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shelf/shelf.dart' as shelf;
@@ -76,4 +78,13 @@ class OnlineTestServer {
 
   Future<Map<String, Object?>> post(String path, Object body, String token) => _call('POST', path, body, token);
   Future<Map<String, Object?>> put(String path, Object body, String token) => _call('PUT', path, body, token);
+}
+
+/// Wechselt in den Bereich [label] der unteren Leiste — die Übersicht ist
+/// der Einstieg, Tests für einen Fachbereich gehen ausdrücklich dorthin.
+Future<void> openTab(WidgetTester tester, String label) async {
+  final destination = find.widgetWithText(NavigationDestination, label);
+  if (destination.evaluate().isEmpty) return;
+  await tester.tap(destination);
+  await tester.pumpAndSettle();
 }
