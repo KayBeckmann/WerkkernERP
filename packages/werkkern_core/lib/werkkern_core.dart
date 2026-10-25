@@ -8,3 +8,4 @@ export 'src/pricing.dart';
 export 'src/stock_rules.dart';
 export 'src/accounting_rules.dart';
 export 'src/datev.dart';
+export 'src/dunning.dart';

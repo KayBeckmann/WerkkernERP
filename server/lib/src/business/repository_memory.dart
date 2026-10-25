@@ -6,6 +6,7 @@ import 'models.dart';
 import 'repository.dart';
 import 'suppliers.dart';
 import 'accounting.dart';
+import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
 import 'stock.dart';
@@ -15,8 +16,9 @@ part 'memory/fleet.dart';
 part 'memory/stock.dart';
 part 'memory/accounting.dart';
 part 'memory/purchasing.dart';
+part 'memory/dunning.dart';
 
-class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing implements BusinessRepository {
+class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning implements BusinessRepository {
   final List<Customer> _customers = [];
   @override
   final List<Article> _articles = [];

@@ -265,7 +265,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     }
     // C12 Mahnwesen — Nachbesserung (Kay-Feedback 2026-10-17): Fristen
     // kommen jetzt aus den Firmen-Einstellungen statt fester Konstanten.
-    final dunningConfig = DunningConfig.fromCompany(context.read<ActiveCompanyService>().active!);
+    final dunningConfig = dunningConfigFromCompany(context.read<ActiveCompanyService>().active!);
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
       itemCount: data.invoices.length,

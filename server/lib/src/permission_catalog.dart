@@ -67,6 +67,10 @@ const permissionCatalog = <String, String?>{
   'stock.write': 'lagerbestand',
   'purchaseOrders.read': 'bestellwesen',
   'purchaseOrders.write': 'bestellwesen',
+  // Mahnwesen: überfällige Rechnungen einsehen bzw. Mahnungen erstellen
+  // und Mahn-Einstellungen pflegen.
+  'dunning.read': 'dunning',
+  'dunning.write': 'dunning',
 };
 
 bool isKnownPermission(String permission) => permissionCatalog.containsKey(permission);
@@ -90,6 +94,7 @@ const starterGroupPermissions = <String, Set<String>>{
     'fleet.read', 'fleet.write',
     'stock.read', 'stock.write',
     'purchaseOrders.read', 'purchaseOrders.write',
+    'dunning.read',
   },
   // Monteur erstellt Entwürfe und bucht Zeiten/Lager, finalisiert aber
   // nicht und sieht keine Finanzen. Kein `timeTracking.read`: das hieße
@@ -112,5 +117,6 @@ const starterGroupPermissions = <String, Set<String>>{
     'fleet.read', 'fleet.write',
     'accounting.read', 'accounting.write',
     'purchaseOrders.read',
+    'dunning.read', 'dunning.write',
   },
 };
