@@ -4,6 +4,7 @@ import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
 import 'online_form.dart';
+import '../ecad_material_screen.dart';
 
 /// Artikelbereich der Online-Firma: Artikel, Lieferanten, Artikelgruppen
 /// (wie offline A1). Lesen mit `articles.read`, Pflege mit `articles.write`.
@@ -17,6 +18,27 @@ class OnlineArticlesScreen extends StatelessWidget {
       length: 3,
       child: Column(
         children: [
+          if (session.can('articles.read'))
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: const Icon(Icons.electrical_services),
+                label: const Text('LibreECAD-Materialvorschau'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EcadMaterialScreen(
+                      companyId: session.companyId,
+                      companyName: session.companyName,
+                      loadArticles: () async => [
+                        for (final a in await session.client.articles())
+                          {'id': a.id, 'name': a.name, 'unit': a.unit},
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           const TabBar(tabs: [Tab(text: 'Artikel'), Tab(text: 'Lieferanten'), Tab(text: 'Gruppen')]),
           Expanded(
             child: TabBarView(

@@ -1,0 +1,70 @@
+{
+  "schema": "libre-ecad.material.v1",
+  "source": "http://test.invalid",
+  "projectId": "test-m7",
+  "projectName": "TEST M7 Installation",
+  "projectVersion": 1,
+  "drawingSha256": "7672d4280db98c972522b7cbff8c2f5d2d179e5ff714063fb111d8512b4090b9",
+  "status": "planned-unapproved",
+  "items": [
+    {
+      "id": "21bf8e693b643c7467d599cb7e2c5bee8aba1c04eb1dfd6e5db8c67e2e5d77ef",
+      "articleId": "synthetic-plc",
+      "articleVersion": 1,
+      "articleNumber": "TEST-plc",
+      "name": "TEST plc",
+      "manufacturer": "",
+      "variant": "",
+      "unit": "piece",
+      "quantity": 1,
+      "origin": "Eigener synthetischer Test",
+      "license": "CC0-1.0",
+      "deviceIds": [
+        "835fa634bbbce38a70154b4450a4b8cb"
+      ],
+      "bmks": [
+        "1-A7"
+      ]
+    },
+    {
+      "id": "d0644c2a4616c17ed93071315c23103eb78eb5dab0af53799e6009a74803340f",
+      "articleId": "synthetic-switch",
+      "articleVersion": 1,
+      "articleNumber": "TEST-switch",
+      "name": "TEST switch",
+      "manufacturer": "",
+      "variant": "",
+      "unit": "piece",
+      "quantity": 1,
+      "origin": "Eigener synthetischer Test",
+      "license": "CC0-1.0",
+      "deviceIds": [
+        "16b53a7bf6f15264e61e69dffd05c965"
+      ],
+      "bmks": [
+        "1-S5"
+      ]
+    },
+    {
+      "id": "e61881f7e2637fe8c5bf85c2fe4d19e90308a401d7d45e47272ca4c251ac12f5",
+      "articleId": "synthetic-terminal",
+      "articleVersion": 1,
+      "articleNumber": "TEST-terminal",
+      "name": "TEST terminal",
+      "manufacturer": "",
+      "variant": "",
+      "unit": "piece",
+      "quantity": 1,
+      "origin": "Eigener synthetischer Test",
+      "license": "CC0-1.0",
+      "deviceIds": [
+        "d9d98f906566cf170ccc67d48bc7b60f"
+      ],
+      "bmks": [
+        "1-X2"
+      ]
+    }
+  ],
+  "unassigned": [],
+  "packetId": "1c505742837ac2cbc3405fffa40fa3ddb014dee4bcc644f72995d0145e24fb90"
+}

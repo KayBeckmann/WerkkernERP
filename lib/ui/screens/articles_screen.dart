@@ -10,6 +10,7 @@ import '../../domain/services/active_company_service.dart';
 import '../../domain/services/stock_change_notifier.dart';
 import 'article_detail_screen.dart';
 import 'article_groups_screen.dart';
+import 'ecad_material_screen.dart';
 
 /// Artikelliste der aktiven Firma (A1). Tippen auf einen Artikel öffnet
 /// die Lieferantenpreis-Verwaltung ([ArticleDetailScreen]).
@@ -123,6 +124,27 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       appBar: AppBar(
         title: const Text('Artikel'),
         actions: [
+          IconButton(
+            tooltip: 'LibreECAD-Materialvorschau',
+            icon: const Icon(Icons.electrical_services),
+            onPressed: () {
+              final company = context.read<ActiveCompanyService>().active!;
+              final repo = context.read<ArticleRepository>();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EcadMaterialScreen(
+                    companyId: company.id,
+                    companyName: company.name,
+                    loadArticles: () async => [
+                      for (final a in await repo.listForCompany(company.id))
+                        {'id': a.id, 'name': a.name, 'unit': a.unit},
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.category_outlined),
             tooltip: 'Artikelgruppen',
