@@ -29,6 +29,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step14Accounting,
   _step15Purchasing,
   _step16Dunning,
+  _step17Recurring,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -437,4 +438,40 @@ Future<void> _step16Dunning(Session db) async {
     );
   ''');
   await db.execute('CREATE INDEX IF NOT EXISTS dunning_notices_document_idx ON dunning_notices (company_id, document_id)');
+}
+
+/// C11 online: Vorlagen wiederkehrender Rechnungen mit Positionen.
+Future<void> _step17Recurring(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS recurring_templates (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE RESTRICT,
+      label TEXT NOT NULL,
+      recurrence_interval TEXT NOT NULL,
+      next_due_date DATE NOT NULL,
+      payment_terms TEXT, notes TEXT,
+      project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      active BOOLEAN NOT NULL DEFAULT true,
+      created_by_user_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS recurring_templates_due_idx ON recurring_templates (active, next_due_date)');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS recurring_template_items (
+      id TEXT PRIMARY KEY,
+      template_id TEXT NOT NULL REFERENCES recurring_templates(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      article_id TEXT REFERENCES articles(id) ON DELETE SET NULL,
+      description TEXT NOT NULL,
+      quantity TEXT NOT NULL,
+      unit_price_cents BIGINT NOT NULL,
+      vat_rate_percent DOUBLE PRECISION NOT NULL,
+      unit TEXT,
+      discount_percent DOUBLE PRECISION NOT NULL DEFAULT 0,
+      group_label TEXT,
+      sort_order INTEGER NOT NULL
+    );
+  ''');
 }

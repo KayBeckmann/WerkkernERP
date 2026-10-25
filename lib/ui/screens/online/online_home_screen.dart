@@ -12,6 +12,7 @@ import 'online_fleet_screen.dart';
 import 'online_password_dialog.dart';
 import 'online_projects_screen.dart';
 import 'online_purchasing_screen.dart';
+import 'online_recurring_screen.dart';
 import 'online_stock_screen.dart';
 import 'online_time_screen.dart';
 
@@ -124,6 +125,8 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             (label: 'Artikel', icon: Icons.inventory_2_outlined, body: OnlineArticlesScreen(session: session)),
           if (session.modules.contains('buchhaltung') && session.can('accounting.read') && !session.offlineOnly)
             (label: 'Buchhaltung', icon: Icons.account_balance_outlined, body: OnlineAccountingScreen(session: session)),
+          if (session.modules.contains('recurringInvoices') && session.can('invoices.read') && !session.offlineOnly)
+            (label: 'Wiederkehrend', icon: Icons.autorenew, body: OnlineRecurringScreen(session: session)),
           if (session.modules.contains('dunning') && session.can('dunning.read') && !session.offlineOnly)
             (label: 'Mahnwesen', icon: Icons.notification_important_outlined, body: OnlineDunningScreen(session: session)),
           if (session.modules.contains('lagerbestand') && session.can('stock.read') && !session.offlineOnly)

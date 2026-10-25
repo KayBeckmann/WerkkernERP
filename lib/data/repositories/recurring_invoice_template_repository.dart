@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:werkkern_core/werkkern_core.dart' show nextRecurrenceDate;
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -119,11 +120,7 @@ class RecurringInvoiceTemplateRepository {
   /// einem kürzeren Zielmonat rutscht dadurch in den übernächsten Monat
   /// vor, statt auf den Monatsletzten zu fallen — bekannte, dokumentierte
   /// Einschränkung, keine stillschweigende Annahme.
-  static DateTime _advance(DateTime date, RecurrenceInterval interval) => switch (interval) {
-        RecurrenceInterval.monthly => DateTime(date.year, date.month + 1, date.day),
-        RecurrenceInterval.quarterly => DateTime(date.year, date.month + 3, date.day),
-        RecurrenceInterval.yearly => DateTime(date.year + 1, date.month, date.day),
-      };
+  static DateTime _advance(DateTime date, RecurrenceInterval interval) => nextRecurrenceDate(date, interval.name);
 
   /// Erzeugt für jede aktive, fällige Vorlage **einen Entwurf je
   /// überfälliger Periode** — nicht nur die aktuell fällige. Ohne

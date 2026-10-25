@@ -19,6 +19,7 @@ import 'accounting_routes.dart';
 import 'dunning_routes.dart';
 import 'fleet_routes.dart';
 import 'purchasing_routes.dart';
+import 'recurring_routes.dart';
 import 'suppliers_routes.dart';
 
 /// Fach-Endpunkte (B1 Punkt 3). Jeder Endpunkt prüft serverseitig
@@ -41,6 +42,7 @@ class BusinessRoutes {
     AccountingRoutes(repository: repository, business: business, auth: auth).mount(router);
     PurchasingRoutes(business: business, auth: auth).mount(router);
     DunningRoutes(business: business, auth: auth).mount(router);
+    RecurringRoutes(repository: repository, business: business, auth: auth, parseItems: _parseItems).mount(router);
 
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);
