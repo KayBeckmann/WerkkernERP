@@ -30,6 +30,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step15Purchasing,
   _step16Dunning,
   _step17Recurring,
+  _step18TimeSheets,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -472,6 +473,35 @@ Future<void> _step17Recurring(Session db) async {
       discount_percent DOUBLE PRECISION NOT NULL DEFAULT 0,
       group_label TEXT,
       sort_order INTEGER NOT NULL
+    );
+  ''');
+}
+
+/// C3-Rest online: Kunden-Stundenzettel mit Unterschrift (PNG), Zuordnung
+/// Buchung → Zettel (je Buchung höchstens einer).
+Future<void> _step18TimeSheets(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS time_sheets (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      sheet_date DATE NOT NULL,
+      document_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
+      project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      status TEXT NOT NULL,
+      signature_png BYTEA,
+      signer_name TEXT,
+      signed_at TIMESTAMPTZ,
+      supersedes_id TEXT REFERENCES time_sheets(id) ON DELETE SET NULL,
+      created_by_user_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS time_sheets_company_idx ON time_sheets (company_id, sheet_date)');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS time_sheet_entries (
+      sheet_id TEXT NOT NULL REFERENCES time_sheets(id) ON DELETE CASCADE,
+      entry_id TEXT NOT NULL UNIQUE REFERENCES time_entries(id) ON DELETE CASCADE,
+      PRIMARY KEY (sheet_id, entry_id)
     );
   ''');
 }

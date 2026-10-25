@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 
 import '../../../domain/services/online_session.dart';
+import 'online_time_sheets_screen.dart';
 
 /// Zeiterfassung online (C3, Nachtrag 20.10.: "Der Monteur muss seine
 /// Zeiten buchen können"). Jeder bucht eigene Zeiten auf Auftrag oder
@@ -110,6 +111,20 @@ class _OnlineTimeScreenState extends State<OnlineTimeScreen> {
                     subtitle: Text(data.companyScope ? 'Buchungen aller Mitarbeiter' : 'Deine Buchungen'),
                   ),
                 ),
+                if (canBook)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<void>(builder: (_) => OnlineTimeSheetsScreen(session: widget.session)),
+                        );
+                        _reload();
+                      },
+                      icon: const Icon(Icons.draw_outlined),
+                      label: const Text('Stundenzettel'),
+                    ),
+                  ),
                 if (data.entries.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Noch keine Zeiten gebucht.')),
                 for (final e in data.entries)
                   Card(

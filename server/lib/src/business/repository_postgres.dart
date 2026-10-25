@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:postgres/postgres.dart';
 import 'package:decimal/decimal.dart';
@@ -13,6 +14,7 @@ import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
 import 'recurring.dart';
+import 'timesheets.dart';
 import 'stock.dart';
 
 part 'postgres/suppliers.dart';
@@ -22,11 +24,12 @@ part 'postgres/accounting.dart';
 part 'postgres/purchasing.dart';
 part 'postgres/dunning.dart';
 part 'postgres/recurring.dart';
+part 'postgres/timesheets.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   @override
   final SessionExecutor _db;

@@ -20,6 +20,7 @@ import 'dunning_routes.dart';
 import 'fleet_routes.dart';
 import 'purchasing_routes.dart';
 import 'recurring_routes.dart';
+import 'timesheets_routes.dart';
 import 'suppliers_routes.dart';
 
 /// Fach-Endpunkte (B1 Punkt 3). Jeder Endpunkt prüft serverseitig
@@ -43,6 +44,7 @@ class BusinessRoutes {
     PurchasingRoutes(business: business, auth: auth).mount(router);
     DunningRoutes(business: business, auth: auth).mount(router);
     RecurringRoutes(repository: repository, business: business, auth: auth, parseItems: _parseItems).mount(router);
+    TimeSheetRoutes(business: business, auth: auth).mount(router);
 
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);
@@ -994,6 +996,14 @@ class BusinessRoutes {
         error: seesAll
             ? jsonError('Nur eigene Buchungen können geändert werden.', status: 403)
             : jsonError('Buchung nicht gefunden.', status: 404),
+      );
+    }
+    // Unterschriebener Stundenzettel sperrt seine Buchungen (wie offline).
+    if ((await business.timeSheetForEntry(ctx.session.companyId, id))?.isSigned ?? false) {
+      return (
+        auth: null,
+        entry: null,
+        error: jsonError('Buchung liegt auf einem unterschriebenen Stundenzettel — Korrektur nur per Nachtrag.', status: 409),
       );
     }
     return (auth: ctx, entry: entry, error: null);

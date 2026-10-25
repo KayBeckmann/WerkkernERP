@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:decimal/decimal.dart';
 import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart';
@@ -10,6 +12,7 @@ import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
 import 'recurring.dart';
+import 'timesheets.dart';
 import 'stock.dart';
 
 part 'memory/suppliers.dart';
@@ -19,8 +22,9 @@ part 'memory/accounting.dart';
 part 'memory/purchasing.dart';
 part 'memory/dunning.dart';
 part 'memory/recurring.dart';
+part 'memory/timesheets.dart';
 
-class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring implements BusinessRepository {
+class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring, _InMemoryTimeSheets implements BusinessRepository {
   final List<Customer> _customers = [];
   @override
   final List<Article> _articles = [];
