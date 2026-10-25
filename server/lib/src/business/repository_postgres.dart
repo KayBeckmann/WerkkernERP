@@ -12,6 +12,7 @@ import 'accounting.dart';
 import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
+import 'recurring.dart';
 import 'stock.dart';
 
 part 'postgres/suppliers.dart';
@@ -20,11 +21,12 @@ part 'postgres/stock.dart';
 part 'postgres/accounting.dart';
 part 'postgres/purchasing.dart';
 part 'postgres/dunning.dart';
+part 'postgres/recurring.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   @override
   final SessionExecutor _db;
@@ -334,36 +336,43 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           throw const BusinessConflict('Quelle wurde zwischenzeitlich geändert — bitte neu laden.');
         }
       }
-      await s.execute(
-        Sql.named(
-          'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
-          'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id, '
-          'is_advance_payment, is_fixed_price) VALUES (@id, @companyId, @customerId, @kind, @status, @issueDate, '
-          '@serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version, @convertedFromId, '
-          '@projectId, @advance, @fixed)',
-        ),
-        parameters: {
-          'id': d.id,
-          'companyId': d.companyId,
-          'customerId': d.customerId,
-          'kind': d.kind,
-          'status': d.status,
-          'issueDate': TypedValue(Type.date, d.issueDate),
-          'serviceDate': TypedValue(Type.date, d.serviceDate),
-          'paymentTerms': d.paymentTerms,
-          'notes': d.notes,
-          'createdBy': d.createdByUserId,
-          'createdAt': d.createdAt,
-          'updatedAt': d.updatedAt,
-          'version': d.version,
-          'convertedFromId': d.convertedFromId,
-          'projectId': d.projectId,
-          'advance': d.isAdvancePayment,
-          'fixed': d.isFixedPrice,
-        },
-      );
-      await _insertItems(s, items);
+      await _insertDocumentTx(s, d, items);
     });
+  }
+
+  /// Fügt Dokument + Positionen in eine laufende Transaktion ein (auch
+  /// für den Tagesjob wiederkehrender Rechnungen).
+  @override
+  Future<void> _insertDocumentTx(TxSession s, Document d, List<DocumentItem> items) async {
+    await s.execute(
+      Sql.named(
+        'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
+        'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id, '
+        'is_advance_payment, is_fixed_price) VALUES (@id, @companyId, @customerId, @kind, @status, @issueDate, '
+        '@serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version, @convertedFromId, '
+        '@projectId, @advance, @fixed)',
+      ),
+      parameters: {
+        'id': d.id,
+        'companyId': d.companyId,
+        'customerId': d.customerId,
+        'kind': d.kind,
+        'status': d.status,
+        'issueDate': TypedValue(Type.date, d.issueDate),
+        'serviceDate': TypedValue(Type.date, d.serviceDate),
+        'paymentTerms': d.paymentTerms,
+        'notes': d.notes,
+        'createdBy': d.createdByUserId,
+        'createdAt': d.createdAt,
+        'updatedAt': d.updatedAt,
+        'version': d.version,
+        'convertedFromId': d.convertedFromId,
+        'projectId': d.projectId,
+        'advance': d.isAdvancePayment,
+        'fixed': d.isFixedPrice,
+      },
+    );
+    await _insertItems(s, items);
   }
 
   /// Sperrt die Dokumentzeile bis Transaktionsende (`FOR UPDATE`) und

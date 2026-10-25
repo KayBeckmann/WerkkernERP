@@ -9,6 +9,7 @@ import 'accounting.dart';
 import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
+import 'recurring.dart';
 import 'stock.dart';
 
 part 'memory/suppliers.dart';
@@ -17,12 +18,15 @@ part 'memory/stock.dart';
 part 'memory/accounting.dart';
 part 'memory/purchasing.dart';
 part 'memory/dunning.dart';
+part 'memory/recurring.dart';
 
-class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning implements BusinessRepository {
+class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring implements BusinessRepository {
   final List<Customer> _customers = [];
   @override
   final List<Article> _articles = [];
+  @override
   final List<Document> _documents = [];
+  @override
   final List<DocumentItem> _items = [];
   @override
   final Map<String, int> _sequences = {};
