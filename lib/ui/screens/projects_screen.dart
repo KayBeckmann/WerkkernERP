@@ -1,5 +1,6 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:werkkern_core/werkkern_core.dart' show revenueSignForKind;
 import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
@@ -282,8 +283,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen> {
     Money invoiceSum = Money.zero();
     Decimal plannedHours = Decimal.zero;
     for (final doc in documents) {
-      if (doc.kind == DocumentKind.invoice && doc.status == InvoiceStatus.finalized) {
-        invoiceSum = invoiceSum + (await invoiceRepo.totalsFor(doc.id)).totalGross;
+      // Rechnungen erhöhen, Gutschriften mindern die Erlöse
+      // (`revenueSignForKind`, gemeinsam mit dem Server).
+      final sign = revenueSignForKind(doc.kind.name);
+      if (sign != 0 && doc.status == InvoiceStatus.finalized) {
+        invoiceSum = invoiceSum + Money.fromCents((await invoiceRepo.totalsFor(doc.id)).totalGross.cents * sign);
       }
       // C3.3: "kalkuliert" sind die Angebots-/Auftragsmengen (keine
       // separate Projektkalkulation) — Rechnung/Lieferschein/Proforma/
