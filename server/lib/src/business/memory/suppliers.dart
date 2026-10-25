@@ -2,6 +2,7 @@ part of '../repository_memory.dart';
 
 mixin _InMemorySuppliers implements SupplierStore {
   List<Article> get _articles;
+  List<PurchaseOrder> get _purchaseOrders;
   final List<Supplier> _suppliers = [];
   final List<ArticleGroup> _articleGroups = [];
   final Map<String, ({String companyId, ArticleSupplierPrice price})> _prices = {};
@@ -47,6 +48,10 @@ mixin _InMemorySuppliers implements SupplierStore {
 
   @override
   Future<bool> deleteSupplier(String companyId, String id) async {
+    // Wie Postgres `ON DELETE RESTRICT` auf Bestellungen.
+    if (_purchaseOrders.any((o) => o.companyId == companyId && o.supplierId == id)) {
+      throw const BusinessConflict('Lieferant hat Bestellungen und kann nicht gelöscht werden.');
+    }
     final before = _suppliers.length;
     _suppliers.removeWhere((s) => s.companyId == companyId && s.id == id);
     if (_suppliers.length == before) return false;

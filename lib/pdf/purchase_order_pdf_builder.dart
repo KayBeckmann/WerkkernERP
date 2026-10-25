@@ -22,21 +22,66 @@ Future<Uint8List> buildPurchaseOrderPdf({
   required PurchaseOrder order,
   required List<PurchaseOrderItem> items,
   required Company company,
-}) async {
+}) {
   if (order.status == PurchaseOrderStatus.draft || order.orderNumber == null) {
     throw StateError('PDF kann nur für eine finalisierte Bestellung erzeugt werden.');
   }
+  return buildPurchaseOrderPdfFromData(PurchaseOrderPdfData(
+    number: order.orderNumber!,
+    issueDate: order.issueDate,
+    notes: order.notes,
+    supplierName: order.supplierSnapshotName ?? '',
+    supplierAddress: order.supplierSnapshotAddress,
+    companyName: company.name,
+    companyAddress: company.address,
+    companyEmail: company.email,
+    companyPhone: company.phone,
+    items: [
+      for (final i in items)
+        (description: i.description, quantity: Decimal.parse(i.quantity.toString()), purchasePriceCents: i.purchasePriceCents),
+    ],
+  ));
+}
+
+/// Neutrales Datenmodell des Bestellungs-PDFs — Offline-App und
+/// Online-Modus erzeugen damit dasselbe Layout (wie `PdfDocumentData`).
+class PurchaseOrderPdfData {
+  const PurchaseOrderPdfData({
+    required this.number,
+    required this.issueDate,
+    this.notes,
+    required this.supplierName,
+    this.supplierAddress,
+    required this.companyName,
+    this.companyAddress,
+    this.companyEmail,
+    this.companyPhone,
+    required this.items,
+  });
+  final String number;
+  final DateTime issueDate;
+  final String? notes;
+  final String supplierName;
+  final String? supplierAddress;
+  final String companyName;
+  final String? companyAddress;
+  final String? companyEmail;
+  final String? companyPhone;
+  final List<({String description, Decimal quantity, int? purchasePriceCents})> items;
+}
+
+Future<Uint8List> buildPurchaseOrderPdfFromData(PurchaseOrderPdfData data) async {
 
   final regularFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans.ttf'));
   final boldFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'));
 
+  final items = data.items;
   final total = items.fold(
     Money.zero(),
     (sum, item) => sum +
         (item.purchasePriceCents == null
             ? Money.zero()
-            : Money.fromCents(item.purchasePriceCents!)
-                .multiplyByQuantity(Decimal.parse(item.quantity.toString()))),
+            : Money.fromCents(item.purchasePriceCents!).multiplyByQuantity(item.quantity)),
   );
 
   final doc = pw.Document(theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont));
@@ -58,29 +103,28 @@ Future<Uint8List> buildPurchaseOrderPdf({
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(company.name, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                if (company.address != null) pw.Text(company.address!),
-                if (company.email != null) pw.Text(company.email!),
-                if (company.phone != null) pw.Text(company.phone!),
+                pw.Text(data.companyName, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                if (data.companyAddress != null) pw.Text(data.companyAddress!),
+                if (data.companyEmail != null) pw.Text(data.companyEmail!),
+                if (data.companyPhone != null) pw.Text(data.companyPhone!),
               ],
             ),
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.end,
               children: [
                 pw.Text(
-                  'Bestellung ${order.orderNumber}',
+                  'Bestellung ${data.number}',
                   style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
                 ),
-                pw.Text('Bestelldatum: ${_formatDate(order.issueDate)}'),
+                pw.Text('Bestelldatum: ${_formatDate(data.issueDate)}'),
               ],
             ),
           ],
         ),
         pw.SizedBox(height: 16),
         pw.Text('An:', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-        pw.Text(order.supplierSnapshotName ?? '', style: const pw.TextStyle(fontSize: 11)),
-        if (order.supplierSnapshotAddress != null)
-          pw.Text(order.supplierSnapshotAddress!, style: const pw.TextStyle(fontSize: 11)),
+        pw.Text(data.supplierName, style: const pw.TextStyle(fontSize: 11)),
+        if (data.supplierAddress != null) pw.Text(data.supplierAddress!, style: const pw.TextStyle(fontSize: 11)),
         pw.Divider(),
         pw.SizedBox(height: 16),
         pw.Table(
@@ -115,9 +159,7 @@ Future<Uint8List> buildPurchaseOrderPdf({
                   _cell(
                     item.purchasePriceCents == null
                         ? '–'
-                        : Money.fromCents(item.purchasePriceCents!)
-                            .multiplyByQuantity(Decimal.parse(item.quantity.toString()))
-                            .toString(),
+                        : Money.fromCents(item.purchasePriceCents!).multiplyByQuantity(item.quantity).toString(),
                     alignRight: true,
                   ),
                 ],
@@ -132,9 +174,9 @@ Future<Uint8List> buildPurchaseOrderPdf({
             style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
           ),
         ),
-        if (order.notes != null) ...[
+        if (data.notes != null) ...[
           pw.SizedBox(height: 16),
-          pw.Text(order.notes!, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+          pw.Text(data.notes!, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
         ],
       ],
     ),
@@ -143,8 +185,7 @@ Future<Uint8List> buildPurchaseOrderPdf({
   return doc.save();
 }
 
-String _formatQuantity(double value) =>
-    value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
+String _formatQuantity(Decimal value) => value.toString().replaceAll('.', ',');
 
 pw.Widget _cell(String text, {bool bold = false, bool alignRight = false}) => pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 4),

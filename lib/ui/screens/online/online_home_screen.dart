@@ -10,6 +10,7 @@ import 'online_documents_screen.dart';
 import 'online_fleet_screen.dart';
 import 'online_password_dialog.dart';
 import 'online_projects_screen.dart';
+import 'online_purchasing_screen.dart';
 import 'online_stock_screen.dart';
 import 'online_time_screen.dart';
 
@@ -124,6 +125,8 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             (label: 'Buchhaltung', icon: Icons.account_balance_outlined, body: OnlineAccountingScreen(session: session)),
           if (session.modules.contains('lagerbestand') && session.can('stock.read') && !session.offlineOnly)
             (label: 'Lager', icon: Icons.warehouse_outlined, body: OnlineStockScreen(session: session)),
+          if (session.modules.contains('bestellwesen') && session.can('purchaseOrders.read') && !session.offlineOnly)
+            (label: 'Bestellungen', icon: Icons.shopping_cart_outlined, body: OnlinePurchasingScreen(session: session)),
           if (session.modules.contains('fleet') && session.can('fleet.read') && !session.offlineOnly)
             (label: 'Fuhrpark', icon: Icons.local_shipping_outlined, body: OnlineFleetScreen(session: session)),
         ];

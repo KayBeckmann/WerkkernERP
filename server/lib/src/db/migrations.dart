@@ -27,6 +27,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step12Fleet,
   _step13Stock,
   _step14Accounting,
+  _step15Purchasing,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -373,4 +374,46 @@ Future<void> _step14Accounting(Session db) async {
       PRIMARY KEY (company_id, section)
     );
   ''');
+}
+
+/// C5.2 online: Bestellungen und Positionen; Lieferanten mit Bestellungen
+/// sind nicht löschbar (RESTRICT wie offline).
+Future<void> _step15Purchasing(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      supplier_id TEXT NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
+      status TEXT NOT NULL,
+      number TEXT, number_year INTEGER,
+      issue_date DATE NOT NULL,
+      notes TEXT,
+      supplier_snapshot_name TEXT, supplier_snapshot_address TEXT,
+      finalized_at TIMESTAMPTZ,
+      source_order_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
+      project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      expense_category_id TEXT REFERENCES expense_categories(id) ON DELETE SET NULL,
+      created_by_user_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL,
+      version INTEGER NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS purchase_orders_company_idx ON purchase_orders (company_id, created_at)');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+      id TEXT PRIMARY KEY,
+      purchase_order_id TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+      article_id TEXT REFERENCES articles(id) ON DELETE SET NULL,
+      description TEXT NOT NULL,
+      quantity TEXT NOT NULL,
+      purchase_price_cents BIGINT,
+      received_quantity TEXT NOT NULL DEFAULT '0',
+      sort_order INTEGER NOT NULL
+    );
+  ''');
+  await db.execute(
+    'ALTER TABLE expenses ADD CONSTRAINT expenses_purchase_order_fk FOREIGN KEY (purchase_order_id) '
+    'REFERENCES purchase_orders(id) ON DELETE SET NULL',
+  );
 }
