@@ -65,19 +65,55 @@ class OnlineCustomer {
 }
 
 class OnlineArticle {
-  const OnlineArticle({required this.id, required this.name, this.unit, this.salePriceCents, required this.active});
+  const OnlineArticle({
+    required this.id,
+    required this.name,
+    this.unit,
+    this.salePriceCents,
+    required this.active,
+    this.articleGroupId,
+    this.articleGroupName,
+    this.defaultSupplierId,
+    this.calculatedSalePriceCents,
+    int? effectiveSalePriceCents,
+  }) : effectiveSalePriceCents = effectiveSalePriceCents ?? salePriceCents;
   factory OnlineArticle.fromJson(Map<String, Object?> j) => OnlineArticle(
         id: j['id'] as String,
         name: j['name'] as String,
         unit: j['unit'] as String?,
         salePriceCents: j['salePriceCents'] as int?,
         active: j['active'] as bool,
+        articleGroupId: j['articleGroupId'] as String?,
+        articleGroupName: j['articleGroupName'] as String?,
+        defaultSupplierId: j['defaultSupplierId'] as String?,
+        calculatedSalePriceCents: j['calculatedSalePriceCents'] as int?,
+        effectiveSalePriceCents: j['effectiveSalePriceCents'] as int?,
       );
   final String id;
   final String name;
   final String? unit;
+
+  /// Manueller Netto-Verkaufspreis (überschreibt die Kalkulation).
   final int? salePriceCents;
   final bool active;
+  final String? articleGroupId;
+  final String? articleGroupName;
+  final String? defaultSupplierId;
+
+  /// EK des Standardlieferanten × Gruppenaufschlag (`null` ohne EK).
+  final int? calculatedSalePriceCents;
+
+  /// Was in eine Position übernommen wird: manuell, sonst kalkuliert.
+  final int? effectiveSalePriceCents;
+
+  Map<String, Object?> toWriteJson() => {
+        'name': name,
+        'unit': unit,
+        'salePriceCents': salePriceCents,
+        'active': active,
+        'articleGroupId': articleGroupId,
+        'defaultSupplierId': defaultSupplierId,
+      };
 }
 
 /// Positionsart wie offline (`InvoiceItemKind`).

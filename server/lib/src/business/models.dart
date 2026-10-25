@@ -41,10 +41,10 @@ class Customer {
       };
 }
 
-/// Vereinfachte Server-Fassung des Artikels: ein manueller Netto-
-/// Verkaufspreis statt der Offline-Kalkulation aus Standardlieferant +
-/// Artikelgruppen-Aufschlag (die kommt mit Lieferanten/Gruppen im
-/// Server nach). Artikel werden wie offline deaktiviert, nie gelöscht.
+/// Artikel wie offline: [salePriceCents] ist der **manuelle** Netto-
+/// Verkaufspreis; ohne ihn kalkuliert der Server aus Standardlieferant +
+/// Artikelgruppen-Aufschlag (siehe `suppliers.dart`). Artikel werden wie
+/// offline deaktiviert, nie gelöscht.
 class Article {
   const Article({
     required this.id,
@@ -54,6 +54,8 @@ class Article {
     this.salePriceCents,
     required this.active,
     required this.createdAt,
+    this.articleGroupId,
+    this.defaultSupplierId,
   });
   final String id;
   final String companyId;
@@ -62,6 +64,20 @@ class Article {
   final int? salePriceCents;
   final bool active;
   final DateTime createdAt;
+  final String? articleGroupId;
+  final String? defaultSupplierId;
+
+  Article withReferences({required String? articleGroupId, required String? defaultSupplierId}) => Article(
+        id: id,
+        companyId: companyId,
+        name: name,
+        unit: unit,
+        salePriceCents: salePriceCents,
+        active: active,
+        createdAt: createdAt,
+        articleGroupId: articleGroupId,
+        defaultSupplierId: defaultSupplierId,
+      );
 
   Map<String, Object?> toJson() => {
         'id': id,
@@ -70,6 +86,8 @@ class Article {
         'salePriceCents': salePriceCents,
         'active': active,
         'createdAt': createdAt.toIso8601String(),
+        'articleGroupId': articleGroupId,
+        'defaultSupplierId': defaultSupplierId,
       };
 }
 

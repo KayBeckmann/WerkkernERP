@@ -12,6 +12,7 @@ import '../repository.dart';
 import '../util/responses.dart';
 import 'models.dart';
 import 'repository.dart';
+import 'suppliers_routes.dart';
 
 /// Fach-Endpunkte (B1 Punkt 3). Jeder Endpunkt prüft serverseitig
 /// Sitzung → Recht → Modul, bevor er die (ausnahmslos firmengebundene)
@@ -24,8 +25,11 @@ class BusinessRoutes {
   final BusinessRepository business;
   final SessionAuthenticator auth;
   static const _uuid = Uuid();
+  late final SupplierRoutes _suppliers = SupplierRoutes(business: business, auth: auth);
 
   void mount(Router router) {
+    _suppliers.mount(router);
+
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);
     router.get('/customers/<id>', _getCustomer);
@@ -163,7 +167,7 @@ class BusinessRoutes {
       query: request.url.queryParameters['q'],
       includeInactive: request.url.queryParameters['includeInactive'] == 'true',
     );
-    return jsonOk({'articles': [for (final a in articles) a.toJson()]});
+    return jsonOk({'articles': await _suppliers.articlesJson(check.auth!.session.companyId, articles)});
   }
 
   Future<Response> _getArticle(Request request, String id) async {
@@ -171,7 +175,7 @@ class BusinessRoutes {
     if (check.error != null) return check.error!;
     final article = await business.findArticle(check.auth!.session.companyId, id);
     if (article == null) return jsonError('Artikel nicht gefunden.', status: 404);
-    return jsonOk(article.toJson());
+    return jsonOk((await _suppliers.articlesJson(check.auth!.session.companyId, [article])).single);
   }
 
   Article? _articleFromBody(Map<String, Object?> body, {required String id, required String companyId, required DateTime createdAt, required bool defaultActive}) {
@@ -187,6 +191,8 @@ class BusinessRoutes {
       salePriceCents: price,
       active: body['active'] as bool? ?? defaultActive,
       createdAt: createdAt,
+      articleGroupId: _trimmed(body['articleGroupId']),
+      defaultSupplierId: _trimmed(body['defaultSupplierId']),
     );
   }
 
@@ -201,9 +207,15 @@ class BusinessRoutes {
       defaultActive: true,
     );
     if (article == null) return jsonError('name ist Pflicht, salePriceCents (falls gesetzt) >= 0.');
+    final invalid = await _suppliers.validateArticleReferences(
+      article.companyId,
+      articleGroupId: article.articleGroupId,
+      defaultSupplierId: article.defaultSupplierId,
+    );
+    if (invalid != null) return invalid;
     await business.createArticle(article);
     await auth.audit(check.auth!, 'article.create', 'article', article.id);
-    return jsonOk(article.toJson(), status: 201);
+    return jsonOk((await _suppliers.articlesJson(article.companyId, [article])).single, status: 201);
   }
 
   Future<Response> _updateArticle(Request request, String id) async {
@@ -220,9 +232,15 @@ class BusinessRoutes {
       defaultActive: existing.active,
     );
     if (article == null) return jsonError('name ist Pflicht, salePriceCents (falls gesetzt) >= 0.');
+    final invalid = await _suppliers.validateArticleReferences(
+      companyId,
+      articleGroupId: article.articleGroupId,
+      defaultSupplierId: article.defaultSupplierId,
+    );
+    if (invalid != null) return invalid;
     await business.updateArticle(article);
     await auth.audit(check.auth!, 'article.update', 'article', id);
-    return jsonOk(article.toJson());
+    return jsonOk((await _suppliers.articlesJson(companyId, [article])).single);
   }
 
   // ---- Dokumente --------------------------------------------------------------

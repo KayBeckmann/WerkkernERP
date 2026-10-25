@@ -23,6 +23,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step8Projects,
   _step9AdvanceFixedPrice,
   _step10DocumentTextsSmallBusiness,
+  _step11SuppliersArticleGroups,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -193,5 +194,47 @@ Future<void> _step10DocumentTextsSmallBusiness(Session db) async {
   }
   await db.execute(
     'ALTER TABLE documents ADD COLUMN IF NOT EXISTS small_business_exempt_snapshot BOOLEAN NOT NULL DEFAULT false',
+  );
+}
+
+/// A1 online: Lieferanten, Artikelgruppen, Einkaufspreise je Lieferant;
+/// am Artikel Gruppe und Standardlieferant (beide wie offline `setNull`).
+Future<void> _step11SuppliersArticleGroups(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS suppliers (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      address TEXT, email TEXT, phone TEXT, vat_id TEXT, contact_person TEXT, notes TEXT,
+      minimum_order_quantity TEXT, delivery_terms TEXT,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS suppliers_company_idx ON suppliers (company_id)');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS article_groups (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      markup_percent DOUBLE PRECISION NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS article_groups_company_idx ON article_groups (company_id)');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS article_supplier_prices (
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      supplier_id TEXT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+      purchase_price_cents BIGINT NOT NULL,
+      PRIMARY KEY (article_id, supplier_id)
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS article_prices_company_idx ON article_supplier_prices (company_id)');
+  await db.execute(
+    'ALTER TABLE articles ADD COLUMN IF NOT EXISTS article_group_id TEXT REFERENCES article_groups(id) ON DELETE SET NULL',
+  );
+  await db.execute(
+    'ALTER TABLE articles ADD COLUMN IF NOT EXISTS default_supplier_id TEXT REFERENCES suppliers(id) ON DELETE SET NULL',
   );
 }
