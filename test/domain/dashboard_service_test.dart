@@ -48,6 +48,7 @@ void main() {
         convertedFromId: null,
         isAdvancePayment: false,
         isFixedPrice: false,
+        stockBooked: false,
         dueDate: dueDate,
         paymentStatus: paymentStatus,
         paidAt: null,

@@ -76,6 +76,8 @@ class OnlineArticle {
     this.defaultSupplierId,
     this.calculatedSalePriceCents,
     int? effectiveSalePriceCents,
+    this.stockQuantity = '0',
+    this.minimumStock,
   }) : effectiveSalePriceCents = effectiveSalePriceCents ?? salePriceCents;
   factory OnlineArticle.fromJson(Map<String, Object?> j) => OnlineArticle(
         id: j['id'] as String,
@@ -88,6 +90,8 @@ class OnlineArticle {
         defaultSupplierId: j['defaultSupplierId'] as String?,
         calculatedSalePriceCents: j['calculatedSalePriceCents'] as int?,
         effectiveSalePriceCents: j['effectiveSalePriceCents'] as int?,
+        stockQuantity: j['stockQuantity'] as String? ?? '0',
+        minimumStock: j['minimumStock'] as String?,
       );
   final String id;
   final String name;
@@ -106,6 +110,10 @@ class OnlineArticle {
   /// Was in eine Position übernommen wird: manuell, sonst kalkuliert.
   final int? effectiveSalePriceCents;
 
+  /// Lagerbestand (Dezimaltext, ändert sich nur über Bewegungen).
+  final String stockQuantity;
+  final String? minimumStock;
+
   Map<String, Object?> toWriteJson() => {
         'name': name,
         'unit': unit,
@@ -113,6 +121,7 @@ class OnlineArticle {
         'active': active,
         'articleGroupId': articleGroupId,
         'defaultSupplierId': defaultSupplierId,
+        'minimumStock': minimumStock,
       };
 }
 

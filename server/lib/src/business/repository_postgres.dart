@@ -1,19 +1,24 @@
 import 'package:postgres/postgres.dart';
+import 'package:decimal/decimal.dart';
+import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import 'models.dart';
 import 'repository.dart';
 import 'suppliers.dart';
 import 'fleet.dart';
+import 'stock.dart';
 
 part 'postgres/suppliers.dart';
 part 'postgres/fleet.dart';
+part 'postgres/stock.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock implements BusinessRepository {
   PostgresBusinessRepository(this._db);
+  @override
   final SessionExecutor _db;
 
   @override
@@ -111,8 +116,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
 
   // ---- Artikel --------------------------------------------------------------
 
-  static const _articleColumns =
-      'id, company_id, name, unit, sale_price_cents, active, created_at, article_group_id, default_supplier_id';
+  static const _articleColumns = 'id, company_id, name, unit, sale_price_cents, active, created_at, article_group_id, '
+      'default_supplier_id, stock_quantity, minimum_stock';
 
   Article _toArticle(ResultRow r) => Article(
         id: r[0] as String,
@@ -124,6 +129,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
         createdAt: r[6] as DateTime,
         articleGroupId: r[7] as String?,
         defaultSupplierId: r[8] as String?,
+        stockQuantity: r[9] as String,
+        minimumStock: r[10] as String?,
       );
 
   @override
@@ -155,12 +162,15 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
         'createdAt': a.createdAt,
         'groupId': a.articleGroupId,
         'supplierId': a.defaultSupplierId,
+        'stock': a.stockQuantity,
+        'minimumStock': a.minimumStock,
       };
 
   @override
   Future<void> createArticle(Article article) async {
     await _q(
-      'INSERT INTO articles ($_articleColumns) VALUES (@id, @companyId, @name, @unit, @price, @active, @createdAt, @groupId, @supplierId)',
+      'INSERT INTO articles ($_articleColumns) VALUES (@id, @companyId, @name, @unit, @price, @active, @createdAt, @groupId, @supplierId, '
+      '@stock, @minimumStock)',
       _articleParams(article),
     );
   }
@@ -169,8 +179,11 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
   Future<bool> updateArticle(Article article) async {
     final result = await _q(
       'UPDATE articles SET name = @name, unit = @unit, sale_price_cents = @price, active = @active, '
-      'article_group_id = @groupId, default_supplier_id = @supplierId WHERE company_id = @companyId AND id = @id',
-      _articleParams(article)..remove('createdAt'),
+      'article_group_id = @groupId, default_supplier_id = @supplierId, minimum_stock = @minimumStock '
+      'WHERE company_id = @companyId AND id = @id',
+      _articleParams(article)
+        ..remove('createdAt')
+        ..remove('stock'),
     );
     return result.affectedRows > 0;
   }
@@ -183,7 +196,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
       'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version, '
       'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban, '
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
-      'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot';
+      'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -221,6 +234,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
         closingTextSnapshot: r[32] as String?,
         footerTextSnapshot: r[33] as String?,
         smallBusinessExemptSnapshot: r[34] as bool,
+        stockBooked: r[35] as bool,
       );
 
   @override
@@ -398,9 +412,40 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
     required DateTime now,
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    String? userId,
   }) async {
     final updated = await _db.runTx((s) async {
       if (!await _lockEditable(s, companyId, id, expectedVersion)) return false;
+      final booked = await s.execute(
+        Sql.named('SELECT stock_booked, number, created_by_user_id FROM documents WHERE id = @id'),
+        parameters: {'id': id},
+      );
+      if (booked.first[0] as bool) {
+        final before = articleQuantities([
+          for (final r in await s.execute(
+            Sql.named('SELECT article_id, quantity FROM document_items WHERE document_id = @id'),
+            parameters: {'id': id},
+          ))
+            (articleId: r[0] as String?, quantity: r[1] as String),
+        ]);
+        final after = articleQuantities(items.map((i) => (articleId: i.articleId, quantity: i.quantity)));
+        await _bookStockTx(
+          s,
+          companyId,
+          [
+            for (final articleId in {...before.keys, ...after.keys})
+              StockDelta(articleId, (before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero)),
+          ],
+          StockBookingContext(
+            type: 'documentBooking',
+            userId: userId ?? booked.first[2] as String,
+            now: now,
+            referenceLabel: booked.first[1] as String?,
+            note: 'Korrektur nach Bearbeitung',
+            documentId: id,
+          ),
+        );
+      }
       await s.execute(
         Sql.named(
           'UPDATE documents SET customer_id = @customerId, issue_date = @issueDate, service_date = @serviceDate, '
@@ -453,6 +498,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
     required int expectedVersion,
     required CompanySnapshot company,
     required DateTime now,
+    ({StockBookingMode mode, String userId})? stockBooking,
   }) async {
     final finalized = await _db.runTx((s) async {
       final row = await _lockDraft(s, companyId, id, expectedVersion);
@@ -510,6 +556,32 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet impleme
           'id': id,
         },
       );
+      if (stockBooking != null) {
+        final issue = stockBooking.mode == StockBookingMode.issue;
+        final sign = issue ? Decimal.fromInt(-1) : Decimal.one;
+        final quantities = articleQuantities([
+          for (final r in await s.execute(
+            Sql.named('SELECT article_id, quantity FROM document_items WHERE document_id = @id'),
+            parameters: {'id': id},
+          ))
+            (articleId: r[0] as String?, quantity: r[1] as String),
+        ]);
+        await _bookStockTx(
+          s,
+          companyId,
+          [for (final e in quantities.entries) StockDelta(e.key, e.value * sign)],
+          StockBookingContext(
+            type: issue ? 'documentBooking' : 'creditNoteReturn',
+            userId: stockBooking.userId,
+            now: now,
+            referenceLabel: number,
+            documentId: id,
+          ),
+        );
+        if (issue) {
+          await s.execute(Sql.named('UPDATE documents SET stock_booked = true WHERE id = @id'), parameters: {'id': id});
+        }
+      }
       return true;
     });
     return finalized ? findDocument(companyId, id) : null;

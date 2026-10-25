@@ -1,5 +1,6 @@
 import 'models.dart';
 import 'fleet.dart';
+import 'stock.dart';
 import 'suppliers.dart';
 
 /// Fachdaten-Repository. **Jede** Methode ist zwingend firmengebunden
@@ -7,7 +8,7 @@ import 'suppliers.dart';
 /// Abfrage, auch keine "nach ID global" (ADR-0001 B0.5). Eine fremde
 /// ID liefert dadurch exakt dasselbe Ergebnis wie eine nicht
 /// existierende (`null`/`false`), kein Oracle.
-abstract class BusinessRepository implements SupplierStore, FleetStore {
+abstract class BusinessRepository implements SupplierStore, FleetStore, StockStore {
   // ---- Kunden -----------------------------------------------------------
   Future<List<Customer>> listCustomers(String companyId, {String? query});
   Future<Customer?> findCustomer(String companyId, String id);
@@ -39,7 +40,9 @@ abstract class BusinessRepository implements SupplierStore, FleetStore {
   /// (Entwurf, oder finalisiertes Angebot/Auftrag/Proforma ohne
   /// Umwandlung — siehe `isDocumentEditable`). Wirft [BusinessConflict]
   /// bei nicht mehr bearbeitbarem Dokument oder wenn [expectedVersion]
-  /// nicht mehr aktuell ist. Liefert die neue
+  /// nicht mehr aktuell ist. Hat das Dokument schon Bestand gebucht
+  /// ([Document.stockBooked]), wird die Mengendifferenz der Artikel in
+  /// derselben Transaktion nachgebucht (Bewegung durch [userId]). Liefert die neue
   /// Fassung, `null` wenn nicht gefunden.
   Future<Document?> updateDraft({
     required String companyId,
@@ -54,6 +57,7 @@ abstract class BusinessRepository implements SupplierStore, FleetStore {
     required DateTime now,
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    String? userId,
   });
 
   Future<bool> deleteDraft(String companyId, String id);
@@ -62,12 +66,16 @@ abstract class BusinessRepository implements SupplierStore, FleetStore {
   /// einfrieren, Status setzen (F3). Wirft [BusinessConflict], wenn das
   /// Dokument nicht (mehr) Entwurf ist oder [expectedVersion] veraltet
   /// ist — zwei gleichzeitige Aufrufe ergeben nie zwei Nummern.
+  /// [stockBooking]: in derselben Transaktion den Bestand der
+  /// Artikelpositionen bewegen (Abgang bzw. Gutschrift-Rückbuchung); die
+  /// Entscheidung trifft der Aufrufer nach `shouldBookStockOnFinalizeKind`.
   Future<Document?> finalize({
     required String companyId,
     required String id,
     required int expectedVersion,
     required CompanySnapshot company,
     required DateTime now,
+    ({StockBookingMode mode, String userId})? stockBooking,
   });
 
   /// Dokumente, die per Umwandlung aus [sourceId] entstanden sind.

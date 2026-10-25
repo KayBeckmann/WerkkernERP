@@ -9,6 +9,7 @@ import 'online_documents_screen.dart';
 import 'online_fleet_screen.dart';
 import 'online_password_dialog.dart';
 import 'online_projects_screen.dart';
+import 'online_stock_screen.dart';
 import 'online_time_screen.dart';
 
 /// Hauptansicht im Online-Modus. Tabs erscheinen nur bei wirksamem
@@ -24,6 +25,11 @@ class OnlineHomeScreen extends StatefulWidget {
 class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
   int _index = 0;
   bool _syncing = false;
+
+  /// Zählt Wechsel je Ziel — ein neuer Schlüssel lädt den Bereich beim
+  /// Hinwechseln frisch, statt den Stand vom ersten Aufbau zu zeigen
+  /// (z. B. Lager nach einer Bestandskorrektur im Artikelbereich).
+  final _visits = <String, int>{};
 
   @override
   void initState() {
@@ -113,6 +119,8 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             (label: 'Zeiten', icon: Icons.timer_outlined, body: OnlineTimeScreen(session: session)),
           if (session.can('articles.read') && !session.offlineOnly)
             (label: 'Artikel', icon: Icons.inventory_2_outlined, body: OnlineArticlesScreen(session: session)),
+          if (session.modules.contains('lagerbestand') && session.can('stock.read') && !session.offlineOnly)
+            (label: 'Lager', icon: Icons.warehouse_outlined, body: OnlineStockScreen(session: session)),
           if (session.modules.contains('fleet') && session.can('fleet.read') && !session.offlineOnly)
             (label: 'Fuhrpark', icon: Icons.local_shipping_outlined, body: OnlineFleetScreen(session: session)),
         ];
@@ -230,7 +238,13 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
                           ),
                         ),
                       )
-                    : IndexedStack(index: index, children: [for (final t in destinations) t.body]),
+                    : IndexedStack(
+                        index: index,
+                        children: [
+                          for (final t in destinations)
+                            KeyedSubtree(key: ValueKey('${t.label}-${_visits[t.label] ?? 0}'), child: t.body),
+                        ],
+                      ),
               ),
             ],
           ),
@@ -238,7 +252,10 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
               ? null
               : NavigationBar(
                   selectedIndex: index,
-                  onDestinationSelected: (i) => setState(() => _index = i),
+                  onDestinationSelected: (i) => setState(() {
+                    if (i != index) _visits.update(destinations[i].label, (v) => v + 1, ifAbsent: () => 1);
+                    _index = i;
+                  }),
                   destinations: [for (final t in destinations) NavigationDestination(icon: Icon(t.icon), label: t.label)],
                 ),
         );

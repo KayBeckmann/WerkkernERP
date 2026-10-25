@@ -33,6 +33,7 @@ void main() {
         convertedFromId: null,
         isAdvancePayment: false,
         isFixedPrice: false,
+        stockBooked: false,
         dueDate: null,
         paymentStatus: PaymentStatus.open,
         paidAt: null,

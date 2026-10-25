@@ -267,10 +267,52 @@ class InvoiceRepository {
         ),
       );
       if (items != null) {
+        if (existing.stockBooked) {
+          await _rebookStockAfterEdit(companyId: companyId, invoice: existing, newItems: items);
+        }
         await _replaceItems(id, items);
       }
       return findById(companyId: companyId, id: id);
     });
+  }
+
+  /// Ein bereits gebuchtes Dokument wurde bearbeitet: die Differenz der
+  /// Artikelmengen (alt − neu) nachbuchen, je Artikel eine Bewegung mit
+  /// Hinweis — gleiche Regel wie der Server.
+  Future<void> _rebookStockAfterEdit({
+    required String companyId,
+    required Invoice invoice,
+    required List<InvoiceItemInput> newItems,
+  }) async {
+    final before = _aggregateArticleQuantities(await itemsFor(invoice.id));
+    final after = <String, Decimal>{};
+    for (final item in newItems) {
+      if (item.kind == InvoiceItemKind.article && item.articleId != null) {
+        after[item.articleId!] = (after[item.articleId!] ?? Decimal.zero) + item.quantity;
+      }
+    }
+    for (final articleId in {...before.keys, ...after.keys}) {
+      final delta = ((before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero)).toDouble();
+      if (delta == 0) continue;
+      final article = await (_db.select(_db.articles)..where((a) => a.id.equals(articleId))).getSingleOrNull();
+      if (article == null) continue;
+      final newStock = article.stockQuantity + delta;
+      await (_db.update(_db.articles)..where((a) => a.id.equals(articleId)))
+          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
+      await _db.into(_db.stockMovements).insert(
+            StockMovementsCompanion.insert(
+              id: _uuid.v4(),
+              companyId: companyId,
+              articleId: articleId,
+              type: StockMovementType.documentBooking,
+              quantityDelta: delta,
+              resultingQuantity: newStock,
+              referenceLabel: Value(invoice.invoiceNumber),
+              note: const Value('Korrektur nach Bearbeitung'),
+              createdAt: DateTime.now(),
+            ),
+          );
+    }
   }
 
   /// Finalisiert einen Entwurf: vergibt die nächste Nummer im Firmen-/
@@ -427,6 +469,8 @@ class InvoiceRepository {
     if (!shouldBookStockOnFinalize(kind: invoice.kind, predecessorKind: predecessorKind)) {
       return;
     }
+    await (_db.update(_db.invoices)..where((i) => i.id.equals(invoice.id)))
+        .write(const InvoicesCompanion(stockBooked: Value(true)));
 
     for (final entry in _aggregateArticleQuantities(items).entries) {
       final article =

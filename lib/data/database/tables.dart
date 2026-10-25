@@ -520,6 +520,12 @@ class Invoices extends Table {
   /// den Wert unverändert weiter wie `projectId`.
   BoolColumn get isFixedPrice => boolean().withDefault(const Constant(false))();
 
+  /// C5.1: dieses Dokument hat beim Finalisieren Bestand abgebucht. Eine
+  /// spätere Bearbeitung (finalisierter Auftrag bis zur Umwandlung, siehe
+  /// `InvoiceRepository.isEditable`) bucht dann die Mengendifferenz nach —
+  /// sonst stünde der Bestand nach einer Korrektur falsch (wie online).
+  BoolColumn get stockBooked => boolean().withDefault(const Constant(false))();
+
   /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales
   /// Fälligkeitsdatum, vom Nutzer im Entwurf gesetzt. `null` = keine
   /// Fälligkeitsüberwachung für dieses Dokument. Nur bei `kind ==

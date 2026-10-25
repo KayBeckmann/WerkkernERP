@@ -43,6 +43,7 @@ void main() {
         convertedFromId: null,
         isAdvancePayment: isAdvancePayment,
         isFixedPrice: false,
+        stockBooked: false,
         paymentStatus: PaymentStatus.open,
       );
 
