@@ -828,7 +828,7 @@ class _ItemDialogState extends State<_ItemDialog> {
       if (article != null) {
         _description.text = article.name;
         _unit.text = article.unit ?? '';
-        if (article.salePriceCents != null) _price.text = Money.fromCents(article.salePriceCents!).formatEuro();
+        if (article.effectiveSalePriceCents != null) _price.text = Money.fromCents(article.effectiveSalePriceCents!).formatEuro();
       }
     });
   }

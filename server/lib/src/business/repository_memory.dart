@@ -2,9 +2,13 @@ import 'package:werkkern_core/werkkern_core.dart';
 
 import 'models.dart';
 import 'repository.dart';
+import 'suppliers.dart';
 
-class InMemoryBusinessRepository implements BusinessRepository {
+part 'memory/suppliers.dart';
+
+class InMemoryBusinessRepository with _InMemorySuppliers implements BusinessRepository {
   final List<Customer> _customers = [];
+  @override
   final List<Article> _articles = [];
   final List<Document> _documents = [];
   final List<DocumentItem> _items = [];

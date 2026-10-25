@@ -3,14 +3,18 @@ import 'package:werkkern_core/werkkern_core.dart';
 
 import 'models.dart';
 import 'repository.dart';
+import 'suppliers.dart';
+
+part 'postgres/suppliers.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   final SessionExecutor _db;
 
+  @override
   Future<Result> _q(String sql, [Map<String, Object?> parameters = const {}]) =>
       _db.run((s) => s.execute(Sql.named(sql), parameters: parameters));
 
@@ -105,7 +109,8 @@ class PostgresBusinessRepository implements BusinessRepository {
 
   // ---- Artikel --------------------------------------------------------------
 
-  static const _articleColumns = 'id, company_id, name, unit, sale_price_cents, active, created_at';
+  static const _articleColumns =
+      'id, company_id, name, unit, sale_price_cents, active, created_at, article_group_id, default_supplier_id';
 
   Article _toArticle(ResultRow r) => Article(
         id: r[0] as String,
@@ -115,6 +120,8 @@ class PostgresBusinessRepository implements BusinessRepository {
         salePriceCents: r[4] as int?,
         active: r[5] as bool,
         createdAt: r[6] as DateTime,
+        articleGroupId: r[7] as String?,
+        defaultSupplierId: r[8] as String?,
       );
 
   @override
@@ -144,12 +151,14 @@ class PostgresBusinessRepository implements BusinessRepository {
         'price': a.salePriceCents,
         'active': a.active,
         'createdAt': a.createdAt,
+        'groupId': a.articleGroupId,
+        'supplierId': a.defaultSupplierId,
       };
 
   @override
   Future<void> createArticle(Article article) async {
     await _q(
-      'INSERT INTO articles ($_articleColumns) VALUES (@id, @companyId, @name, @unit, @price, @active, @createdAt)',
+      'INSERT INTO articles ($_articleColumns) VALUES (@id, @companyId, @name, @unit, @price, @active, @createdAt, @groupId, @supplierId)',
       _articleParams(article),
     );
   }
@@ -157,8 +166,8 @@ class PostgresBusinessRepository implements BusinessRepository {
   @override
   Future<bool> updateArticle(Article article) async {
     final result = await _q(
-      'UPDATE articles SET name = @name, unit = @unit, sale_price_cents = @price, active = @active '
-      'WHERE company_id = @companyId AND id = @id',
+      'UPDATE articles SET name = @name, unit = @unit, sale_price_cents = @price, active = @active, '
+      'article_group_id = @groupId, default_supplier_id = @supplierId WHERE company_id = @companyId AND id = @id',
       _articleParams(article)..remove('createdAt'),
     );
     return result.affectedRows > 0;
