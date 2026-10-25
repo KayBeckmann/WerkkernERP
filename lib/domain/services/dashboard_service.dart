@@ -1,3 +1,5 @@
+import 'package:werkkern_core/werkkern_core.dart' show hasPaymentStatusKind, revenueSignForKind;
+
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../models/money.dart';
@@ -71,13 +73,14 @@ DashboardSummary computeDashboardSummary({
 
   for (final entry in finalizedInvoices) {
     final invoice = entry.invoice;
+    final signed = Money.fromCents(entry.gross.cents * revenueSignForKind(invoice.kind.name));
     if (invoice.issueDate.year == now.year) {
-      revenueYear += entry.gross;
+      revenueYear += signed;
       if (invoice.issueDate.month == now.month) {
-        revenueMonth += entry.gross;
+        revenueMonth += signed;
       }
     }
-    if (invoice.paymentStatus == PaymentStatus.open) {
+    if (hasPaymentStatusKind(invoice.kind.name) && invoice.paymentStatus == PaymentStatus.open) {
       openCount++;
       openSum += entry.gross;
       if (dunningLevelFor(invoice, now, dunningConfig) != DunningLevel.none) {

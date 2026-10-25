@@ -1,3 +1,5 @@
+import 'package:werkkern_core/werkkern_core.dart' show revenueSignForKind;
+
 import '../../data/database/database.dart';
 import '../models/money.dart';
 import 'dashboard_service.dart' show InvoiceWithGross;
@@ -71,10 +73,13 @@ EuerSummary computeEuerSummary({
   required DateTime periodEnd,
   List<VehicleCostEntry> allVehicleCostEntries = const [],
 }) {
+  // Nur Rechnungen sind Einnahmen, Gutschriften mindern sie (siehe
+  // `revenueSignForKind`) — Angebote/Aufträge/Lieferscheine/Proforma nie.
   var totalIncome = Money.zero();
   for (final entry in allFinalizedInvoices) {
-    if (_withinPeriod(entry.invoice.issueDate, periodStart, periodEnd)) {
-      totalIncome += entry.gross;
+    final sign = revenueSignForKind(entry.invoice.kind.name);
+    if (sign != 0 && _withinPeriod(entry.invoice.issueDate, periodStart, periodEnd)) {
+      totalIncome += Money.fromCents(entry.gross.cents * sign);
     }
   }
 

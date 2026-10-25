@@ -21,12 +21,13 @@ void main() {
     required DateTime issueDate,
     PaymentStatus paymentStatus = PaymentStatus.open,
     DateTime? dueDate,
+    DocumentKind kind = DocumentKind.invoice,
   }) =>
       Invoice(
-        id: 'inv-${issueDate.toIso8601String()}-$paymentStatus',
+        id: 'inv-${issueDate.toIso8601String()}-$paymentStatus-${kind.name}',
         companyId: 'company-1',
         customerId: 'customer-1',
-        kind: DocumentKind.invoice,
+        kind: kind,
         status: InvoiceStatus.finalized,
         invoiceNumber: 'R-26001',
         numberYear: issueDate.year,
@@ -145,5 +146,24 @@ void main() {
     expect(summary.nextRecurringDueDate, nextDue);
     expect(summary.revenueThisMonth, Money.zero());
     expect(summary.openInvoicesCount, 0);
+  });
+
+  test('Umsatz und offene Posten zählen nur Rechnungen; Gutschrift mindert den Umsatz', () {
+    final now = DateTime(2026, 10, 20);
+    final date = DateTime(2026, 10, 5);
+    final summary = computeDashboardSummary(
+      finalizedInvoices: [
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date), gross: Money.fromCents(10000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date, kind: DocumentKind.order), gross: Money.fromCents(10000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date, kind: DocumentKind.quote), gross: Money.fromCents(3000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: date, kind: DocumentKind.creditNote), gross: Money.fromCents(1000)),
+      ],
+      now: now,
+      dunningConfig: defaultConfig,
+    );
+    expect(summary.revenueThisMonth.cents, 9000);
+    expect(summary.revenueThisYear.cents, 9000);
+    expect(summary.openInvoicesCount, 1, reason: 'Auftrag/Angebot/Gutschrift sind keine offenen Posten');
+    expect(summary.openInvoicesSum.cents, 10000);
   });
 }

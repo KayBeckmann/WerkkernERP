@@ -6,3 +6,4 @@ export 'src/money.dart';
 export 'src/document_number.dart';
 export 'src/pricing.dart';
 export 'src/stock_rules.dart';
+export 'src/accounting_rules.dart';
