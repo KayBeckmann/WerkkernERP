@@ -6,6 +6,7 @@ import 'online_admin_screen.dart';
 import 'online_agent_screen.dart';
 import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
+import 'online_dashboard_screen.dart';
 import 'online_documents_screen.dart';
 import 'online_dunning_screen.dart';
 import 'online_fleet_screen.dart';
@@ -111,6 +112,10 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
       listenable: session,
       builder: (context, _) {
         final tabs = <({String label, IconData icon, Widget body})>[
+          // Einstieg wie offline; der Server liefert nur Kacheln, für die
+          // Rechte und Module passen (ohne Verbindung keine Übersicht).
+          if (!session.offlineOnly && session.permissions.isNotEmpty)
+            (label: 'Übersicht', icon: Icons.dashboard_outlined, body: OnlineDashboardScreen(session: session)),
           if (session.can('invoices.read'))
             (label: 'Dokumente', icon: Icons.receipt_long_outlined, body: OnlineDocumentsScreen(session: session)),
           if (session.can('customers.read') && !session.offlineOnly)

@@ -45,6 +45,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
+    await openTab(tester, 'Dokumente');
 
     await tester.tap(find.text('A-${yy}001'));
     await tester.pumpAndSettle();

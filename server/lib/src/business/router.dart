@@ -16,6 +16,7 @@ import 'request_util.dart';
 import 'stock.dart';
 import 'stock_routes.dart';
 import 'accounting_routes.dart';
+import 'dashboard_routes.dart';
 import 'dunning_routes.dart';
 import 'fleet_routes.dart';
 import 'purchasing_routes.dart';
@@ -42,7 +43,8 @@ class BusinessRoutes {
     StockRoutes(repository: repository, business: business, auth: auth).mount(router);
     AccountingRoutes(repository: repository, business: business, auth: auth).mount(router);
     PurchasingRoutes(business: business, auth: auth).mount(router);
-    DunningRoutes(business: business, auth: auth).mount(router);
+    final dunning = DunningRoutes(business: business, auth: auth)..mount(router);
+    DashboardRoutes(repository: repository, business: business, auth: auth, dunning: dunning).mount(router);
     RecurringRoutes(repository: repository, business: business, auth: auth, parseItems: _parseItems).mount(router);
     TimeSheetRoutes(business: business, auth: auth).mount(router);
 
