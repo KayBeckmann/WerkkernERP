@@ -4,13 +4,15 @@ import 'package:werkkern_core/werkkern_core.dart';
 import 'models.dart';
 import 'repository.dart';
 import 'suppliers.dart';
+import 'fleet.dart';
 
 part 'postgres/suppliers.dart';
+part 'postgres/fleet.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   final SessionExecutor _db;
 

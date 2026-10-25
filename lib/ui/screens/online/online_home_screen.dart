@@ -6,6 +6,7 @@ import 'online_agent_screen.dart';
 import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
 import 'online_documents_screen.dart';
+import 'online_fleet_screen.dart';
 import 'online_password_dialog.dart';
 import 'online_projects_screen.dart';
 import 'online_time_screen.dart';
@@ -112,8 +113,18 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             (label: 'Zeiten', icon: Icons.timer_outlined, body: OnlineTimeScreen(session: session)),
           if (session.can('articles.read') && !session.offlineOnly)
             (label: 'Artikel', icon: Icons.inventory_2_outlined, body: OnlineArticlesScreen(session: session)),
+          if (session.modules.contains('fleet') && session.can('fleet.read') && !session.offlineOnly)
+            (label: 'Fuhrpark', icon: Icons.local_shipping_outlined, body: OnlineFleetScreen(session: session)),
         ];
-        final index = _index.clamp(0, tabs.isEmpty ? 0 : tabs.length - 1);
+        // Höchstens fünf Ziele in der Leiste — der Rest liegt unter „Mehr“.
+        const maxDestinations = 5;
+        final primary = tabs.length <= maxDestinations ? tabs : tabs.sublist(0, maxDestinations - 1);
+        final more = tabs.length <= maxDestinations ? const <({String label, IconData icon, Widget body})>[] : tabs.sublist(maxDestinations - 1);
+        final destinations = [
+          ...primary,
+          if (more.isNotEmpty) (label: 'Mehr', icon: Icons.more_horiz, body: _MoreScreen(entries: more)),
+        ];
+        final index = _index.clamp(0, destinations.isEmpty ? 0 : destinations.length - 1);
         return Scaffold(
           appBar: AppBar(
             title: Text('${session.companyName} · ${session.offlineOnly ? 'offline' : 'online'}'),
@@ -219,19 +230,48 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
                           ),
                         ),
                       )
-                    : IndexedStack(index: index, children: [for (final t in tabs) t.body]),
+                    : IndexedStack(index: index, children: [for (final t in destinations) t.body]),
               ),
             ],
           ),
-          bottomNavigationBar: tabs.length < 2
+          bottomNavigationBar: destinations.length < 2
               ? null
               : NavigationBar(
                   selectedIndex: index,
                   onDestinationSelected: (i) => setState(() => _index = i),
-                  destinations: [for (final t in tabs) NavigationDestination(icon: Icon(t.icon), label: t.label)],
+                  destinations: [for (final t in destinations) NavigationDestination(icon: Icon(t.icon), label: t.label)],
                 ),
         );
       },
+    );
+  }
+}
+
+/// Weitere Bereiche, die nicht mehr in die untere Leiste passen — jeder
+/// öffnet sich als eigene Seite.
+class _MoreScreen extends StatelessWidget {
+  const _MoreScreen({required this.entries});
+  final List<({String label, IconData icon, Widget body})> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        for (final e in entries)
+          Card(
+            child: ListTile(
+              leading: Icon(e.icon),
+              title: Text(e.label),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => Scaffold(appBar: AppBar(title: Text(e.label)), body: e.body),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

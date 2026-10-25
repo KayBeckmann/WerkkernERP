@@ -12,6 +12,7 @@ import '../repository.dart';
 import '../util/responses.dart';
 import 'models.dart';
 import 'repository.dart';
+import 'fleet_routes.dart';
 import 'suppliers_routes.dart';
 
 /// Fach-Endpunkte (B1 Punkt 3). Jeder Endpunkt prüft serverseitig
@@ -29,6 +30,7 @@ class BusinessRoutes {
 
   void mount(Router router) {
     _suppliers.mount(router);
+    FleetRoutes(business: business, auth: auth).mount(router);
 
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);

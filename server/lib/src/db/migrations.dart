@@ -24,6 +24,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step9AdvanceFixedPrice,
   _step10DocumentTextsSmallBusiness,
   _step11SuppliersArticleGroups,
+  _step12Fleet,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -237,4 +238,38 @@ Future<void> _step11SuppliersArticleGroups(Session db) async {
   await db.execute(
     'ALTER TABLE articles ADD COLUMN IF NOT EXISTS default_supplier_id TEXT REFERENCES suppliers(id) ON DELETE SET NULL',
   );
+}
+
+/// C6 online: Fahrzeuge und Kostenbuchungen (Gemeinkosten; projectId nur
+/// Markierung).
+Future<void> _step12Fleet(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS vehicles (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      license_plate TEXT, notes TEXT,
+      next_inspection_date DATE,
+      active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS vehicles_company_idx ON vehicles (company_id)');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS vehicle_costs (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      vehicle_id TEXT NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+      cost_date DATE NOT NULL,
+      amount_cents BIGINT NOT NULL,
+      category TEXT NOT NULL,
+      description TEXT,
+      principal_amount_cents BIGINT,
+      interest_amount_cents BIGINT,
+      project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      created_by_user_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS vehicle_costs_company_idx ON vehicle_costs (company_id, cost_date)');
 }
