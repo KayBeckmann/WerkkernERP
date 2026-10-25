@@ -4,6 +4,7 @@ import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
 import 'recurring.dart';
+import 'timesheets.dart';
 import 'stock.dart';
 import 'suppliers.dart';
 
@@ -12,7 +13,7 @@ import 'suppliers.dart';
 /// Abfrage, auch keine "nach ID global" (ADR-0001 B0.5). Eine fremde
 /// ID liefert dadurch exakt dasselbe Ergebnis wie eine nicht
 /// existierende (`null`/`false`), kein Oracle.
-abstract class BusinessRepository implements SupplierStore, FleetStore, StockStore, AccountingStore, PurchasingStore, DunningStore, RecurringStore {
+abstract class BusinessRepository implements SupplierStore, FleetStore, StockStore, AccountingStore, PurchasingStore, DunningStore, RecurringStore, TimeSheetStore {
   // ---- Kunden -----------------------------------------------------------
   Future<List<Customer>> listCustomers(String companyId, {String? query});
   Future<Customer?> findCustomer(String companyId, String id);
