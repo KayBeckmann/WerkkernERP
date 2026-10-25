@@ -5,6 +5,7 @@ import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart' show Money;
 
 import '../../../domain/services/online_session.dart';
+import 'online_form.dart';
 import 'online_text_prompt.dart';
 
 /// Firmenverwaltung im Online-Modus — nur für Firmen-Admins (B1: "Nur
@@ -17,7 +18,7 @@ class OnlineAdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 6,
+      length: 7,
       child: Scaffold(
         appBar: AppBar(
           title: Text('Verwaltung · ${session.companyName}'),
@@ -29,6 +30,7 @@ class OnlineAdminScreen extends StatelessWidget {
               Tab(text: 'Einladungen'),
               Tab(text: 'Module'),
               Tab(text: 'Firmendaten'),
+              Tab(text: 'E-Mail'),
               Tab(text: 'Protokoll'),
             ],
           ),
@@ -40,6 +42,7 @@ class OnlineAdminScreen extends StatelessWidget {
             _InvitationsTab(session: session),
             _ModulesTab(session: session),
             _ProfileTab(session: session),
+            _MailTab(session: session),
             _AuditTab(session: session),
           ],
         ),
@@ -429,13 +432,15 @@ class _InvitationsTabState extends State<_InvitationsTab> {
       });
 
   Future<void> _invite(List<OnlineGroup> groups) async {
-    final result = await showDialog<({String email, String groupId})>(
+    final result = await showDialog<({String email, String groupId, bool sendEmail})>(
       context: context,
-      builder: (_) => _InviteDialog(groups: groups),
+      builder: (_) => _InviteDialog(groups: groups, canSendEmail: widget.session.modules.contains('smtp')),
     );
     if (result == null || !mounted) return;
     try {
-      final token = await widget.session.client.createInvitation(result.email, result.groupId);
+      final invitation =
+          await widget.session.client.createInvitationWithMail(result.email, result.groupId, sendEmail: result.sendEmail);
+      final token = invitation.token;
       if (!mounted) return;
       await showDialog<void>(
         context: context,
@@ -446,9 +451,16 @@ class _InvitationsTabState extends State<_InvitationsTab> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Gib diesen Einladungscode an ${result.email} weiter (7 Tage gültig, einmal einlösbar). '
-                'Er wird nur jetzt angezeigt — der Server speichert ihn nicht im Klartext.',
+                invitation.emailSent
+                    ? 'Der Code wurde per E-Mail an ${result.email} geschickt (7 Tage gültig, einmal einlösbar).'
+                    : 'Gib diesen Einladungscode an ${result.email} weiter (7 Tage gültig, einmal einlösbar). '
+                        'Er wird nur jetzt angezeigt — der Server speichert ihn nicht im Klartext.',
               ),
+              if (invitation.emailError != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text('E-Mail nicht versendet: ${invitation.emailError}', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ),
               const SizedBox(height: 12),
               SelectableText(token, key: const Key('online-invitation-token')),
             ],
@@ -518,8 +530,9 @@ class _InvitationsTabState extends State<_InvitationsTab> {
 }
 
 class _InviteDialog extends StatefulWidget {
-  const _InviteDialog({required this.groups});
+  const _InviteDialog({required this.groups, required this.canSendEmail});
   final List<OnlineGroup> groups;
+  final bool canSendEmail;
 
   @override
   State<_InviteDialog> createState() => _InviteDialogState();
@@ -528,6 +541,7 @@ class _InviteDialog extends StatefulWidget {
 class _InviteDialogState extends State<_InviteDialog> {
   final _email = TextEditingController();
   late String? _groupId = widget.groups.isEmpty ? null : widget.groups.first.id;
+  bool _sendEmail = false;
 
   @override
   void dispose() {
@@ -554,6 +568,13 @@ class _InviteDialogState extends State<_InviteDialog> {
             items: [for (final g in widget.groups) DropdownMenuItem(value: g.id, child: Text(g.name))],
             onChanged: (v) => setState(() => _groupId = v),
           ),
+          if (widget.canSendEmail)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Code per E-Mail senden'),
+              value: _sendEmail,
+              onChanged: (v) => setState(() => _sendEmail = v ?? false),
+            ),
         ],
       ),
       actions: [
@@ -561,9 +582,164 @@ class _InviteDialogState extends State<_InviteDialog> {
         FilledButton(
           onPressed: () {
             if (_email.text.trim().isEmpty || _groupId == null) return;
-            Navigator.pop(context, (email: _email.text.trim(), groupId: _groupId!));
+            Navigator.pop(context, (email: _email.text.trim(), groupId: _groupId!, sendEmail: _sendEmail));
           },
           child: const Text('Einladung erstellen'),
+        ),
+      ],
+    );
+  }
+}
+
+// ---- E-Mail -----------------------------------------------------------------------
+
+/// SMTP-Zugang der Firma (Versand über den Server). Das Passwort wird
+/// verschlüsselt gespeichert und nie wieder angezeigt.
+class _MailTab extends StatefulWidget {
+  const _MailTab({required this.session});
+  final OnlineSession session;
+
+  @override
+  State<_MailTab> createState() => _MailTabState();
+}
+
+class _MailTabState extends State<_MailTab> {
+  static const _templateLabels = {
+    'documentSubject': 'Dokument: Betreff',
+    'documentBody': 'Dokument: Text',
+    'dunningSubject': 'Mahnung: Betreff',
+    'dunningBody': 'Mahnung: Text',
+    'purchaseOrderSubject': 'Bestellung: Betreff',
+    'purchaseOrderBody': 'Bestellung: Text',
+    'invitationSubject': 'Einladung: Betreff',
+    'invitationBody': 'Einladung: Text',
+  };
+  OnlineMailSettings? _settings;
+  final _host = TextEditingController();
+  final _port = TextEditingController();
+  final _username = TextEditingController();
+  final _password = TextEditingController();
+  final _from = TextEditingController();
+  final _fromName = TextEditingController();
+  final _templates = <String, TextEditingController>{};
+  bool _useTls = true;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_host, _port, _username, _password, _from, _fromName, ..._templates.values]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final s = await widget.session.client.mailSettings();
+      _host.text = s.host ?? '';
+      _port.text = '${s.port}';
+      _username.text = s.username ?? '';
+      _from.text = s.fromAddress ?? '';
+      _fromName.text = s.fromName ?? '';
+      _useTls = s.useTls;
+      for (final key in _templateLabels.keys) {
+        (_templates[key] ??= TextEditingController()).text = s.templates[key] ?? '';
+      }
+      if (mounted) setState(() => _settings = s);
+    } on Exception catch (e) {
+      if (mounted) setState(() => _error = e);
+    }
+  }
+
+  String? _value(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
+
+  Future<void> _save() async {
+    final port = int.tryParse(_port.text.trim());
+    if (port == null) {
+      _showError(context, const FormatException('Port ist keine Zahl.'));
+      return;
+    }
+    await runOnline(context, () async {
+      final saved = await widget.session.client.saveMailSettings(
+        host: _value(_host),
+        port: port,
+        username: _value(_username),
+        fromAddress: _value(_from),
+        fromName: _value(_fromName),
+        useTls: _useTls,
+        password: _password.text.isEmpty ? null : _password.text,
+        templates: {for (final e in _templates.entries) e.key: e.value.text},
+      );
+      _password.clear();
+      if (mounted) setState(() => _settings = saved);
+    }, success: 'E-Mail-Einstellungen gespeichert.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = _settings;
+    if (_error != null) return Center(child: Text(describeOnlineError(_error!)));
+    if (s == null) return const Center(child: CircularProgressIndicator());
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        if (!s.available)
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: const ListTile(
+              leading: Icon(Icons.warning_amber_outlined),
+              title: Text('Mailversand auf diesem Server nicht eingerichtet'),
+              subtitle: Text('Der Betreiber muss WERKKERN_SECRET_KEY setzen — sonst kann kein SMTP-Passwort gespeichert werden.'),
+            ),
+          ),
+        if (!widget.session.modules.contains('smtp'))
+          const Card(child: ListTile(leading: Icon(Icons.info_outline), title: Text('Modul „E-Mail-Versand“ unter „Module“ aktivieren, um zu versenden.'))),
+        TextField(key: const Key('online-mail-host'), controller: _host, decoration: const InputDecoration(labelText: 'SMTP-Server')),
+        TextField(controller: _port, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Port (587 STARTTLS, 465 SSL)')),
+        SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('TLS verwenden'), value: _useTls, onChanged: (v) => setState(() => _useTls = v)),
+        TextField(controller: _username, decoration: const InputDecoration(labelText: 'Benutzername')),
+        TextField(
+          key: const Key('online-mail-password'),
+          controller: _password,
+          obscureText: true,
+          decoration: InputDecoration(labelText: 'Passwort', helperText: s.hasPassword ? 'gespeichert — leer lassen, um es zu behalten' : 'nicht gesetzt'),
+        ),
+        TextField(key: const Key('online-mail-from'), controller: _from, decoration: const InputDecoration(labelText: 'Absenderadresse')),
+        TextField(controller: _fromName, decoration: const InputDecoration(labelText: 'Absendername')),
+        const SizedBox(height: 12),
+        Text('Vorlagen — Platzhalter {{kunde}}, {{nummer}}, {{firma}}, bei Einladungen {{code}}',
+            style: Theme.of(context).textTheme.titleSmall),
+        for (final e in _templateLabels.entries)
+          TextField(
+            controller: _templates[e.key],
+            maxLines: e.key.endsWith('Body') ? 4 : 1,
+            decoration: InputDecoration(labelText: e.value),
+          ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          children: [
+            FilledButton(onPressed: _save, child: const Text('E-Mail-Einstellungen speichern')),
+            OutlinedButton(
+              onPressed: () async {
+                final values = await showOnlineForm(
+                  context,
+                  title: 'Testnachricht',
+                  submitLabel: 'Senden',
+                  fields: const [OnlineField('to', 'Empfänger', required: true)],
+                );
+                if (values == null || !context.mounted) return;
+                await runOnline(context, () => widget.session.client.sendTestMail(values['to'] as String), success: 'Testnachricht versendet.');
+              },
+              child: const Text('Testnachricht senden'),
+            ),
+          ],
         ),
       ],
     );

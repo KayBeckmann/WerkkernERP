@@ -7,6 +7,7 @@ import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
 import '../../../pdf/online_document_pdf.dart';
+import 'online_mail.dart';
 import 'online_purchasing_screen.dart' show createPurchaseOrdersFromDocument;
 
 /// Detail/Bearbeitung eines Online-Dokuments. Lokale Änderungen werden
@@ -616,6 +617,23 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                 tooltip: _pinned ? 'Nicht mehr offline verfügbar' : 'Offline verfügbar machen',
                 icon: Icon(_pinned ? Icons.offline_pin : Icons.download_for_offline_outlined),
                 onPressed: _busy ? null : _togglePinned,
+              ),
+            if (document != null && !document.isDraft && !_dirty && canSendMail(widget.session) && _serverActionsAllowed)
+              IconButton(
+                tooltip: 'Per E-Mail senden',
+                icon: const Icon(Icons.send_outlined),
+                onPressed: _busy
+                    ? null
+                    : () => sendPdfByMail(
+                          context,
+                          session: widget.session,
+                          title: '${onlineDocumentKindLabels[document.kind] ?? 'Dokument'} ${document.number} senden',
+                          defaultRecipientHint: 'Leer = E-Mail des Kunden',
+                          customText: true,
+                          buildPdf: () => buildOnlineDocumentPdf(document),
+                          send: (pdf, {to, subject, body}) =>
+                              _client.sendDocumentMail(document.id, pdf, to: to, subject: subject, body: body),
+                        ),
               ),
             if (document != null && !_dirty)
               IconButton(

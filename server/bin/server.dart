@@ -8,6 +8,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:werkkernerp_server/src/business/recurring_job.dart';
 import 'package:werkkernerp_server/src/business/repository_postgres.dart';
 import 'package:werkkernerp_server/src/db/migrations.dart';
+import 'package:werkkernerp_server/src/mail.dart';
 import 'package:werkkernerp_server/src/repository_postgres.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
@@ -46,6 +47,12 @@ Future<void> main() async {
     business: business,
     corsAllowedOrigins: corsOrigins,
     trustForwardedFor: Platform.environment['TRUST_PROXY'] == 'true',
+    // Ohne WERKKERN_SECRET_KEY bleibt der Mailversand abgeschaltet (kein
+    // SMTP-Passwort im Klartext).
+    mail: MailService(
+      transport: const SmtpMailTransport(),
+      secrets: SecretSealer.fromBase64(Platform.environment['WERKKERN_SECRET_KEY']),
+    ),
   );
 
   // Abgelaufenes regelmäßig aufräumen (Sitzungen, Login-Token,

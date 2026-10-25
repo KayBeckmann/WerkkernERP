@@ -7,6 +7,7 @@ import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkernerp_server/src/business/repository.dart';
 import 'package:werkkernerp_server/src/business/repository_memory.dart';
 import 'package:werkkernerp_server/src/business/repository_postgres.dart';
+import 'package:werkkernerp_server/src/mail.dart';
 import 'package:werkkernerp_server/src/repository.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/repository_postgres.dart';
@@ -43,8 +44,11 @@ void runOnPostgres(String name, void Function(RepositoryFactory create) suite) {
 
 /// Laufender Server + Firma mit genau den angegebenen Rechten/Modulen.
 class ModuleHarness {
-  ModuleHarness(this.create);
+  ModuleHarness(this.create, {this.mail});
   final RepositoryFactory create;
+
+  /// Optionaler Mailversand (Tests mit `RecordingMailTransport`).
+  final MailService? mail;
 
   late HttpServer server;
   late Uri base;
@@ -57,7 +61,7 @@ class ModuleHarness {
       repository = r;
       business = b;
       server = await shelf_io.serve(
-        PhaseBRouter(repository: repository, business: business).handler.call,
+        PhaseBRouter(repository: repository, business: business, mail: mail).handler.call,
         InternetAddress.loopbackIPv4,
         0,
       );

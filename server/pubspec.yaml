@@ -16,6 +16,10 @@ dependencies:
   crypto: ^3.0.6
   uuid: ^4.6.0
   decimal: ^3.2.6
+  # Mailversand über den Server (SMTP je Firma) und AES-GCM für das
+  # gespeicherte SMTP-Passwort — dieselben Pakete wie die Offline-App.
+  mailer: ^7.2.0
+  cryptography: ^2.9.0
   # Gemeinsamer Rechenkern mit der Offline-App (Money, Summen, Nummernformat).
   werkkern_core:
     path: ../packages/werkkern_core

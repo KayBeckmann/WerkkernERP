@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
@@ -8,6 +10,7 @@ import '../../../domain/services/online_session.dart';
 import '../../../pdf/purchase_order_pdf_builder.dart';
 import 'online_articles_screen.dart' show formatQuantity;
 import 'online_form.dart';
+import 'online_mail.dart';
 
 const purchaseOrderStatusLabels = {
   'draft': 'Entwurf',
@@ -335,19 +338,8 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
     }, success: 'Wareneingang gebucht.');
   }
 
-  Future<void> _pdf() async {
-    final order = _order!;
-    final company = await _client.companyProfile();
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: Text(order.number!)),
-          body: PdfPreview(
-            canChangeOrientation: false,
-            canChangePageFormat: false,
-            pdfFileName: '${order.number}.pdf',
-            build: (_) => buildPurchaseOrderPdfFromData(PurchaseOrderPdfData(
+  Future<Uint8List> _buildPdf(OnlinePurchaseOrder order, OnlineCompanyProfile company) =>
+      buildPurchaseOrderPdfFromData(PurchaseOrderPdfData(
               number: order.number!,
               issueDate: order.issueDate,
               notes: order.notes,
@@ -361,7 +353,21 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
                 for (final i in order.items)
                   (description: i.description, quantity: Decimal.parse(i.quantity), purchasePriceCents: i.purchasePriceCents),
               ],
-            )),
+            ));
+
+  Future<void> _pdf() async {
+    final order = _order!;
+    final company = await _client.companyProfile();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: Text(order.number!)),
+          body: PdfPreview(
+            canChangeOrientation: false,
+            canChangePageFormat: false,
+            pdfFileName: '${order.number}.pdf',
+            build: (_) => _buildPdf(order, company),
           ),
         ),
       ),
@@ -377,6 +383,19 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
         title: Text(order == null ? 'Bestellung' : (order.number ?? 'Bestellentwurf')),
         actions: [
           if (order != null && !order.isDraft) IconButton(tooltip: 'PDF', icon: const Icon(Icons.picture_as_pdf_outlined), onPressed: _pdf),
+          if (order != null && !order.isDraft && _canWrite && canSendMail(widget.session))
+            IconButton(
+              tooltip: 'Per E-Mail senden',
+              icon: const Icon(Icons.send_outlined),
+              onPressed: () => sendPdfByMail(
+                context,
+                session: widget.session,
+                title: 'Bestellung ${order.number} senden',
+                defaultRecipientHint: 'Leer = E-Mail des Lieferanten',
+                buildPdf: () async => _buildPdf(order, await _client.companyProfile()),
+                send: (pdf, {to, subject, body}) => _client.sendPurchaseOrderMail(order.id, pdf, to: to),
+              ),
+            ),
           if (editable) IconButton(tooltip: 'Bestellung bearbeiten', icon: const Icon(Icons.edit_outlined), onPressed: _editHeader),
           if (editable)
             IconButton(

@@ -12,3 +12,4 @@ export 'src/purchasing.dart';
 export 'src/dunning.dart';
 export 'src/recurring.dart';
 export 'src/timesheets.dart';
+export 'src/mail.dart';
