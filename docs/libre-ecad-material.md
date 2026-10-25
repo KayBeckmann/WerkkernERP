@@ -25,6 +25,6 @@ parallel laufende Einkaufs-/Datenbankarbeiten im Hauptarbeitsverzeichnis
 unverändert bleiben. Sie ist nicht automatisch in die laufende ERP-Instanz
 ausgerollt.
 
-Validierung: `flutter analyze lib test`, `flutter test` (318 Tests).
+Validierung: `flutter analyze lib test`, `flutter test` (318 Tests plus gezielter Widgettest zum sichtbaren Zurücksetzen der Zuordnung).
 `test/fixtures/libre_ecad_material.json` stammt aus dem synthetischen
 LibreECAD-Generator `backend/ecad_core/bin/planning_sample.dart`.

@@ -12,9 +12,11 @@ class EcadMaterialScreen extends StatefulWidget {
     required this.companyId,
     required this.companyName,
     required this.loadArticles,
+    this.readFile,
   });
   final String companyId, companyName;
   final Future<List<EcadJson>> Function() loadArticles;
+  final Future<String?> Function()? readFile;
   @override
   State<EcadMaterialScreen> createState() => _EcadMaterialScreenState();
 }
@@ -25,23 +27,28 @@ class _EcadMaterialScreenState extends State<EcadMaterialScreen> {
   final matches = <String, String>{};
   String? error;
   bool busy = false;
+  int loadGeneration = 0;
+  Future<String?> readLocalFile() async {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    return file == null ? null : utf8.decode(await file.readAsBytes());
+  }
+
   Future<void> load() async {
     setState(() => busy = true);
     try {
-      final file = await FilePicker.pickFile(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-      if (file == null) return;
-      final next = await EcadMaterialPreview.parse(
-        utf8.decode(await file.readAsBytes()),
-      );
+      final input = await (widget.readFile ?? readLocalFile)();
+      if (input == null) return;
+      final next = await EcadMaterialPreview.parse(input);
       final existing = await widget.loadArticles();
       if (mounted) {
         setState(() {
           preview = next;
           articles = existing;
           matches.clear();
+          loadGeneration++;
           error = null;
         });
       }
@@ -146,7 +153,9 @@ class _EcadMaterialScreenState extends State<EcadMaterialScreen> {
                       '${preview!.candidates(r, articles).length} Namens-/Einheitenvorschläge',
                     ),
                     DropdownButtonFormField<String>(
-                      key: ValueKey('${preview!.packetId}/${r['id']}'),
+                      key: ValueKey(
+                        '$loadGeneration/${preview!.packetId}/${r['id']}',
+                      ),
                       initialValue: matches[r['id']] ?? '',
                       isExpanded: true,
                       decoration: const InputDecoration(
