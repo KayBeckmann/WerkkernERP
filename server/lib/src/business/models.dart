@@ -56,6 +56,8 @@ class Article {
     required this.createdAt,
     this.articleGroupId,
     this.defaultSupplierId,
+    this.stockQuantity = '0',
+    this.minimumStock,
   });
   final String id;
   final String companyId;
@@ -67,6 +69,11 @@ class Article {
   final String? articleGroupId;
   final String? defaultSupplierId;
 
+  /// C5.1 Lagerbestand als Dezimaltext — ändert sich ausschließlich über
+  /// Bestandsbewegungen (nie über die Artikelpflege).
+  final String stockQuantity;
+  final String? minimumStock;
+
   Article withReferences({required String? articleGroupId, required String? defaultSupplierId}) => Article(
         id: id,
         companyId: companyId,
@@ -77,6 +84,22 @@ class Article {
         createdAt: createdAt,
         articleGroupId: articleGroupId,
         defaultSupplierId: defaultSupplierId,
+        stockQuantity: stockQuantity,
+        minimumStock: minimumStock,
+      );
+
+  Article withStock(String quantity) => Article(
+        id: id,
+        companyId: companyId,
+        name: name,
+        unit: unit,
+        salePriceCents: salePriceCents,
+        active: active,
+        createdAt: createdAt,
+        articleGroupId: articleGroupId,
+        defaultSupplierId: defaultSupplierId,
+        stockQuantity: quantity,
+        minimumStock: minimumStock,
       );
 
   Map<String, Object?> toJson() => {
@@ -88,6 +111,8 @@ class Article {
         'createdAt': createdAt.toIso8601String(),
         'articleGroupId': articleGroupId,
         'defaultSupplierId': defaultSupplierId,
+        'stockQuantity': stockQuantity,
+        'minimumStock': minimumStock,
       };
 }
 
@@ -146,6 +171,7 @@ class Document {
     this.closingTextSnapshot,
     this.footerTextSnapshot,
     this.smallBusinessExemptSnapshot = false,
+    this.stockBooked = false,
   });
   final String id;
   final String companyId;
@@ -198,6 +224,11 @@ class Document {
   final String? footerTextSnapshot;
   final bool smallBusinessExemptSnapshot;
 
+  /// C5.1: dieses Dokument hat beim Finalisieren Bestand gebucht —
+  /// spätere Bearbeitungen (Auftrag bis zur Umwandlung) buchen die
+  /// Mengendifferenz nach.
+  final bool stockBooked;
+
   bool get isDraft => status == 'draft';
 
   /// Kopie mit geänderten Feldern — verhindert, dass beim Aktualisieren
@@ -224,6 +255,7 @@ class Document {
     String? Function()? projectId,
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    bool? stockBooked,
   }) =>
       Document(
         id: id,
@@ -261,6 +293,7 @@ class Document {
         closingTextSnapshot: company != null ? company.closingText : closingTextSnapshot,
         footerTextSnapshot: company != null ? company.footerText : footerTextSnapshot,
         smallBusinessExemptSnapshot: company != null ? company.smallBusinessExempt : smallBusinessExemptSnapshot,
+        stockBooked: stockBooked ?? this.stockBooked,
       );
 
   Map<String, Object?> toJson() => {
@@ -297,6 +330,7 @@ class Document {
         'projectId': projectId,
         'isAdvancePayment': isAdvancePayment,
         'isFixedPrice': isFixedPrice,
+        'stockBooked': stockBooked,
         'textSnapshot': isDraft
             ? null
             : {

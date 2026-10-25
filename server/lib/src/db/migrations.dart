@@ -25,6 +25,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step10DocumentTextsSmallBusiness,
   _step11SuppliersArticleGroups,
   _step12Fleet,
+  _step13Stock,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -272,4 +273,50 @@ Future<void> _step12Fleet(Session db) async {
     );
   ''');
   await db.execute('CREATE INDEX IF NOT EXISTS vehicle_costs_company_idx ON vehicle_costs (company_id, cost_date)');
+}
+
+/// C5.1/C5.3 online: Lagerbestand am Artikel (Dezimaltext wie Mengen),
+/// unveränderliche Bewegungen, Inventurläufe; Dokument merkt sich, ob es
+/// gebucht hat.
+Future<void> _step13Stock(Session db) async {
+  await db.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS stock_quantity TEXT NOT NULL DEFAULT '0'");
+  await db.execute('ALTER TABLE articles ADD COLUMN IF NOT EXISTS minimum_stock TEXT');
+  await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS stock_booked BOOLEAN NOT NULL DEFAULT false');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS stock_movements (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE RESTRICT,
+      type TEXT NOT NULL,
+      quantity_delta TEXT NOT NULL,
+      resulting_quantity TEXT NOT NULL,
+      reference_label TEXT, note TEXT,
+      document_id TEXT REFERENCES documents(id) ON DELETE SET NULL,
+      created_by_user_id TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS stock_movements_article_idx ON stock_movements (company_id, article_id, created_at)');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS inventory_counts (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      count_date DATE NOT NULL,
+      status TEXT NOT NULL,
+      completed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS inventory_count_items (
+      id TEXT PRIMARY KEY,
+      inventory_count_id TEXT NOT NULL REFERENCES inventory_counts(id) ON DELETE CASCADE,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE RESTRICT,
+      expected_quantity TEXT NOT NULL,
+      counted_quantity TEXT,
+      counted_at TIMESTAMPTZ,
+      UNIQUE (inventory_count_id, article_id)
+    );
+  ''');
 }

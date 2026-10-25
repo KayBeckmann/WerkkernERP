@@ -6,3 +6,4 @@ export 'src/models.dart';
 export 'src/offline.dart';
 export 'src/catalog.dart';
 export 'src/fleet.dart';
+export 'src/stock.dart';

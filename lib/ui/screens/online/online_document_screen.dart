@@ -287,13 +287,38 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
 
   Future<void> _finalize() async {
     final label = onlineDocumentKindLabels[_document!.kind] ?? 'Dokument';
+    // C5.1: nicht blockierender Hinweis auf zu geringen Bestand.
+    var warnings = const <OnlineStockWarning>[];
+    if (widget.session.modules.contains('lagerbestand')) {
+      try {
+        warnings = (await _client.stockCheck(widget.documentId)).warnings;
+      } on Exception {
+        // Hinweis ist optional — Finalisieren bleibt möglich.
+      }
+    }
+    if (!mounted) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('$label finalisieren?'),
-        content: const Text(
-          'Vergibt die nächste Nummer und macht das Dokument unveränderlich. Kunden- und Firmendaten werden '
-          'zum jetzigen Stand eingefroren.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Vergibt die nächste Nummer und macht das Dokument unveränderlich. Kunden- und Firmendaten werden '
+              'zum jetzigen Stand eingefroren.',
+            ),
+            for (final w in warnings)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Bestand zu gering: ${w.articleName} — benötigt ${w.requested.replaceAll('.', ',')}, '
+                  'vorhanden ${w.available.replaceAll('.', ',')}.',
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Abbrechen')),

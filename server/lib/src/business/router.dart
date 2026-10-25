@@ -12,6 +12,9 @@ import '../repository.dart';
 import '../util/responses.dart';
 import 'models.dart';
 import 'repository.dart';
+import 'request_util.dart';
+import 'stock.dart';
+import 'stock_routes.dart';
 import 'fleet_routes.dart';
 import 'suppliers_routes.dart';
 
@@ -31,6 +34,7 @@ class BusinessRoutes {
   void mount(Router router) {
     _suppliers.mount(router);
     FleetRoutes(business: business, auth: auth).mount(router);
+    StockRoutes(repository: repository, business: business, auth: auth).mount(router);
 
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);
@@ -195,6 +199,7 @@ class BusinessRoutes {
       createdAt: createdAt,
       articleGroupId: _trimmed(body['articleGroupId']),
       defaultSupplierId: _trimmed(body['defaultSupplierId']),
+      minimumStock: decimalOrNull(body['minimumStock']),
     );
   }
 
@@ -543,6 +548,7 @@ class BusinessRoutes {
         now: DateTime.now().toUtc(),
         isAdvancePayment: isAdvancePayment,
         isFixedPrice: isFixedPrice,
+        userId: session.session.userId,
       );
       if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
       await auth.audit(check.auth!, 'document.update', existing.kind, id);
@@ -658,8 +664,21 @@ class BusinessRoutes {
         status: 409,
       );
     }
+    // C5.1: genau eine Buchung pro Dokumentenkette, Gutschrift bucht zurück
+    // — nur bei aktivem Lagermodul (wie offline).
+    StockBookingMode? stockMode;
+    if ((await _enabledModules(check.auth!)).contains('lagerbestand')) {
+      final predecessor =
+          existing.convertedFromId == null ? null : await business.findDocument(companyId, existing.convertedFromId!);
+      if (shouldBookStockReturnKind(existing.kind)) {
+        stockMode = StockBookingMode.creditNoteReturn;
+      } else if (shouldBookStockOnFinalizeKind(kind: existing.kind, predecessorKind: predecessor?.kind)) {
+        stockMode = StockBookingMode.issue;
+      }
+    }
     try {
       final finalized = await business.finalize(
+        stockBooking: stockMode == null ? null : (mode: stockMode, userId: check.auth!.session.userId),
         companyId: companyId,
         id: id,
         expectedVersion: version,
@@ -688,12 +707,8 @@ class BusinessRoutes {
   /// Rechnung) nach derselben Tabelle wie offline (`werkkern_core`).
   /// Erzeugt einen neuen **Entwurf** mit kopierten Positionen — nie
   /// automatisch finalisiert. Lieferscheine übernehmen keine Stunden.
-  ///
-  /// **Bewusste Abweichung von offline:** dort bleibt ein finalisiertes
-  /// Angebot/Auftrag bis zur ersten Umwandlung editierbar (F3-
-  /// Verfeinerung). Online ist jedes finalisierte Dokument sofort
-  /// unveränderlich — bei mehreren Bearbeitern wäre ein nachträglich
-  /// geändertes, bereits verschicktes Angebot nicht nachvollziehbar.
+  /// Ab der ersten Umwandlung ist die Quelle nicht mehr bearbeitbar
+  /// (`isDocumentEditable`, wie offline).
   Future<Response> _convertDocument(Request request, String id) async {
     final session = await auth.requireSession(request);
     if (session == null) return jsonError('Nicht angemeldet.', status: 401);

@@ -1,14 +1,18 @@
+import 'package:decimal/decimal.dart';
+import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import 'models.dart';
 import 'repository.dart';
 import 'suppliers.dart';
 import 'fleet.dart';
+import 'stock.dart';
 
 part 'memory/suppliers.dart';
 part 'memory/fleet.dart';
+part 'memory/stock.dart';
 
-class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet implements BusinessRepository {
+class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock implements BusinessRepository {
   final List<Customer> _customers = [];
   @override
   final List<Article> _articles = [];
@@ -191,7 +195,8 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet impleme
   Future<bool> updateArticle(Article article) async {
     final index = _articles.indexWhere((a) => a.companyId == article.companyId && a.id == article.id);
     if (index == -1) return false;
-    _articles[index] = article;
+    // Bestand ändert sich nur über Bewegungen (wie Postgres).
+    _articles[index] = article.withStock(_articles[index].stockQuantity);
     return true;
   }
 
@@ -246,6 +251,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet impleme
     required DateTime now,
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    String? userId,
   }) async {
     // Bewusst ohne await zwischen Prüfung und Schreiben — damit ist der
     // Abschnitt in Dart (single-threaded) atomar, wie die
@@ -266,6 +272,27 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet impleme
       isFixedPrice: isFixedPrice,
     );
     _documents[index] = updated;
+    if (existing.stockBooked) {
+      Map<String, Decimal> quantities(Iterable<DocumentItem> list) =>
+          articleQuantities(list.map((i) => (articleId: i.articleId, quantity: i.quantity)));
+      final before = quantities(_items.where((i) => i.documentId == id));
+      final after = quantities(items);
+      _bookStockSync(
+        companyId,
+        [
+          for (final articleId in {...before.keys, ...after.keys})
+            StockDelta(articleId, (before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero)),
+        ],
+        StockBookingContext(
+          type: 'documentBooking',
+          userId: userId ?? existing.createdByUserId,
+          now: now,
+          referenceLabel: existing.number,
+          note: 'Korrektur nach Bearbeitung',
+          documentId: id,
+        ),
+      );
+    }
     _items.removeWhere((i) => i.documentId == id);
     _items.addAll(items);
     return updated;
@@ -291,6 +318,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet impleme
     required int expectedVersion,
     required CompanySnapshot company,
     required DateTime now,
+    ({StockBookingMode mode, String userId})? stockBooking,
   }) async {
     final index = _documents.indexWhere((d) => d.companyId == companyId && d.id == id);
     if (index == -1) return null;
@@ -324,8 +352,26 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet impleme
       updatedAt: now,
       finalizedAt: now,
       version: existing.version + 1,
+      stockBooked: stockBooking?.mode == StockBookingMode.issue,
     );
     _documents[index] = finalized;
+    if (stockBooking != null) {
+      final sign = stockBooking.mode == StockBookingMode.issue ? Decimal.fromInt(-1) : Decimal.one;
+      final quantities = articleQuantities(
+        _items.where((i) => i.documentId == id).map((i) => (articleId: i.articleId, quantity: i.quantity)),
+      );
+      _bookStockSync(
+        companyId,
+        [for (final e in quantities.entries) StockDelta(e.key, e.value * sign)],
+        StockBookingContext(
+          type: stockBooking.mode == StockBookingMode.issue ? 'documentBooking' : 'creditNoteReturn',
+          userId: stockBooking.userId,
+          now: now,
+          referenceLabel: finalized.number,
+          documentId: id,
+        ),
+      );
+    }
     return finalized;
   }
 

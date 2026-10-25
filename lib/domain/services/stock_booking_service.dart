@@ -1,3 +1,5 @@
+import 'package:werkkern_core/werkkern_core.dart' as core;
+
 import '../../data/database/tables.dart';
 
 /// C5.1 Lagerbestand (Nachtrag 2026-10-19, Kay-Entscheidung auf
@@ -17,44 +19,15 @@ const stockRelevantDocumentKinds = {
 };
 
 /// Ob die Finalisierung eines Dokuments der Art [kind] jetzt eine
-/// Bestandsbuchung auslösen soll.
-///
-/// Kays Vorgabe ("Erst wenn ein Angebot zum Auftrag/Rechnung gewandelt
-/// wird, dürfen die Lagerbestände ... gebucht werden" + "Artikel in
-/// einem Auftrag dürfen NICHT doppelt gebucht werden, wenn eine
-/// Rechnung erstellt wird") wird hier generisch für JEDE Dokumenten-
-/// kette umgesetzt, nicht nur Auftrag→Rechnung: **genau eine Buchung
-/// pro Kette**, ausgelöst durch das erste bestandsrelevante Dokument.
-/// Da Rechnung/Lieferschein nie selbst Quelle einer Umwandlung sind
-/// (siehe `allowedConversionTargets`), reicht ein Blick auf das
-/// unmittelbare Vorgängerdokument (`convertedFromId`) — ist dieses
-/// bereits bestandsrelevant gewesen, hat es beim eigenen Finalisieren
-/// schon gebucht, und das aktuelle Dokument darf nicht erneut buchen.
-///
-/// [predecessorKind] ist `null`, wenn das Dokument keine Umwandlung
-/// ist (`convertedFromId == null`) — dann zählt es als "erstes"
-/// Dokument seiner eigenen (einelementigen) Kette.
+/// Bestandsbuchung auslösen soll — Regel in `werkkern_core`
+/// (`shouldBookStockOnFinalizeKind`), gemeinsam mit dem Server.
 bool shouldBookStockOnFinalize({
   required DocumentKind kind,
   required DocumentKind? predecessorKind,
-}) {
-  if (!stockRelevantDocumentKinds.contains(kind)) return false;
-  if (predecessorKind != null && stockRelevantDocumentKinds.contains(predecessorKind)) {
-    return false;
-  }
-  return true;
-}
+}) =>
+    core.shouldBookStockOnFinalizeKind(kind: kind.name, predecessorKind: predecessorKind?.name);
 
-/// C5-Nachtrag (Kay-Entscheidung 2026-10-21 auf die Frage "was ist noch
-/// offen im ERP?": "Automatisch beim Finalisieren der Gutschrift") —
-/// eine Gutschrift bucht beim eigenen Finalisieren immer eine
-/// Rückbuchung der betroffenen Artikel-Positionen, unabhängig vom
-/// Vorgängerdokument und unabhängig davon, ob dieses je gebucht hat.
-/// Das ist bewusst keine "Gegenbuchung" im Sinne einer exakten
-/// Umkehrung der ursprünglichen Buchung (eine Gutschrift kann eine
-/// Teilmenge der Original-Positionen sein, siehe
-/// `InvoiceRepository.createCreditNoteDraft`) — sie bucht einfach die
-/// Mengen zurück, die sie selbst als Positionen enthält.
-bool shouldBookStockReturnOnCreditNoteFinalize({required DocumentKind kind}) {
-  return kind == DocumentKind.creditNote;
-}
+/// Eine Gutschrift bucht beim eigenen Finalisieren immer eine
+/// Rückbuchung ihrer Artikelmengen — siehe `werkkern_core`.
+bool shouldBookStockReturnOnCreditNoteFinalize({required DocumentKind kind}) =>
+    core.shouldBookStockReturnKind(kind.name);

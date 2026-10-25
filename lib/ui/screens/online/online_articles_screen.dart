@@ -35,6 +35,16 @@ class OnlineArticlesScreen extends StatelessWidget {
 
 String _price(int? cents) => cents == null ? 'kein Preis' : '${Money.fromCents(cents)} netto';
 
+/// Dezimaltext ("2.5") in deutscher Schreibweise.
+String formatQuantity(String value) => value.replaceAll('.', ',');
+
+const stockMovementTypeLabels = {
+  'documentBooking': 'Dokument',
+  'purchaseOrderReceipt': 'Wareneingang',
+  'inventoryCorrection': 'Inventur/Korrektur',
+  'creditNoteReturn': 'Gutschrift-Rückbuchung',
+};
+
 Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession session, [OnlineArticle? existing]) async {
   final client = session.client;
   final groups = await client.articleGroups();
@@ -68,6 +78,8 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
         initial: existing?.salePriceCents,
         helper: 'Leer lassen, um zu kalkulieren.',
       ),
+      if (session.modules.contains('lagerbestand'))
+        OnlineField('minimumStock', 'Mindestbestand', type: OnlineFieldType.decimal, initial: existing?.minimumStock),
       OnlineField('active', 'Aktiv', type: OnlineFieldType.toggle, initial: existing?.active ?? true),
     ],
   );
@@ -82,6 +94,8 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
       active: values['active'] as bool,
       articleGroupId: values['articleGroupId'] as String?,
       defaultSupplierId: values['defaultSupplierId'] as String?,
+      // Ohne Lagermodul bleibt ein gesetzter Mindestbestand erhalten.
+      minimumStock: values.containsKey('minimumStock') ? values['minimumStock'] as String? : existing?.minimumStock,
     ));
   });
   return saved;
@@ -106,6 +120,7 @@ class _ArticleList extends StatelessWidget {
             a.unit == null ? _price(a.effectiveSalePriceCents) : '${_price(a.effectiveSalePriceCents)} / ${a.unit}',
             if (a.salePriceCents != null) 'manuell',
             if (a.articleGroupName != null) a.articleGroupName!,
+            if (session.modules.contains('lagerbestand')) 'Bestand ${formatQuantity(a.stockQuantity)}',
           ].join(' · ')),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
@@ -145,6 +160,8 @@ class OnlineArticleDetailScreen extends StatefulWidget {
 class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
   late Future<(OnlineArticle, List<OnlineArticlePrice>, List<OnlineSupplier>)> _future = _load();
 
+  bool get _showStock => widget.session.modules.contains('lagerbestand') && widget.session.can('stock.read');
+
   Future<(OnlineArticle, List<OnlineArticlePrice>, List<OnlineSupplier>)> _load() async {
     final client = widget.session.client;
     return (
@@ -157,6 +174,30 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
   void _reload() => setState(() {
         _future = _load();
       });
+
+  Future<void> _correctStock(OnlineArticle article) async {
+    final values = await showOnlineForm(
+      context,
+      title: 'Bestand korrigieren',
+      submitLabel: 'Buchen',
+      fields: [
+        OnlineField('counted', 'Gezählter Bestand', type: OnlineFieldType.decimal, required: true, initial: article.stockQuantity),
+        const OnlineField('reason', 'Grund', required: true, helper: 'Wird als Inventur dokumentiert.'),
+      ],
+    );
+    if (values == null || !mounted) return;
+    if (await runOnline(
+      context,
+      () => widget.session.client.correctStock(
+        article.id,
+        countedQuantity: values['counted'] as String,
+        reason: values['reason'] as String,
+      ),
+      success: 'Bestand gebucht.',
+    )) {
+      _reload();
+    }
+  }
 
   Future<void> _editPrice(List<OnlineSupplier> suppliers, [OnlineArticlePrice? existing]) async {
     final values = await showOnlineForm(
@@ -242,6 +283,54 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
             ],
           ),
         ),
+        if (_showStock) ...[
+          const SizedBox(height: 12),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('Lagerbestand'),
+                  subtitle: article.minimumStock == null ? null : Text('Mindestbestand ${formatQuantity(article.minimumStock!)}'),
+                  trailing: Text(
+                    '${formatQuantity(article.stockQuantity)}${article.unit == null ? '' : ' ${article.unit}'}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (widget.session.can('stock.write'))
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _correctStock(article),
+                      icon: const Icon(Icons.edit_note),
+                      label: const Text('Bestand korrigieren'),
+                    ),
+                  ),
+                FutureBuilder<List<OnlineStockMovement>>(
+                  future: widget.session.client.stockMovements(articleId: article.id),
+                  builder: (context, snapshot) {
+                    final movements = snapshot.data ?? const <OnlineStockMovement>[];
+                    return Column(
+                      children: [
+                        for (final m in movements.take(20))
+                          ListTile(
+                            dense: true,
+                            title: Text('${m.quantityDelta.startsWith('-') ? '' : '+'}${formatQuantity(m.quantityDelta)} → '
+                                '${formatQuantity(m.resultingQuantity)}'),
+                            subtitle: Text([
+                              stockMovementTypeLabels[m.type] ?? m.type,
+                              if (m.referenceLabel != null) m.referenceLabel!,
+                              if (m.note != null) m.note!,
+                              formatOnlineDate(m.createdAt.toLocal()),
+                            ].join(' · ')),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         Text('Einkaufspreise', style: Theme.of(context).textTheme.titleMedium),
         if (prices.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Noch keine Einkaufspreise.')),
