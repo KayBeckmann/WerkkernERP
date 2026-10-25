@@ -38,7 +38,7 @@ curl http://localhost:8190/health
 ## Tests
 
 ```bash
-dart test                      # In-Memory, kein Postgres nötig
+dart test -x postgres -j 6     # In-Memory, kein Postgres nötig, parallel
 ```
 
 Dieselbe Router-Suite läuft zusätzlich gegen echtes Postgres, sobald
@@ -47,8 +47,11 @@ Dieselbe Router-Suite läuft zusätzlich gegen echtes Postgres, sobald
 ```bash
 docker run -d --rm --name werkkern-test-pg -e POSTGRES_PASSWORD=test \
   -e POSTGRES_USER=test -e POSTGRES_DB=test -p 127.0.0.1:55432:5432 postgres:16-alpine
-WERKKERN_TEST_DB=localhost:55432:test:test:test dart test
+WERKKERN_TEST_DB=localhost:55432:test:test:test dart test -t postgres
 ```
+
+Die Postgres-Suiten setzen das gemeinsame Schema vor jedem Test zurück
+und laufen deshalb nacheinander (`dart_test.yaml`: `concurrency: 1`).
 
 ## Kernablauf (B1)
 
@@ -103,6 +106,42 @@ Ausnahme → Gruppenrecht.
   „Projektleiter“; Admins brauchen Fachrechte weiterhin über ihre Gruppe
   und ändern sie über `PUT /groups/:id/permissions/:key`. Bestehende
   Firmen behalten ihre bisherigen Gruppenrechte.
+
+## Fachmodule (online wie offline)
+
+Alle Endpunkte prüfen Sitzung → Recht → Modul; fremde IDs verhalten sich
+wie nicht existierende. Neue Module liegen je als eigenes Modell/Store
+(`lib/src/business/<modul>.dart`), Implementierung als Part-Mixin
+(`memory/`, `postgres/`) und Routen (`<modul>_routes.dart`).
+
+| Bereich | Endpunkte | Recht (Modul) |
+|---|---|---|
+| Lieferanten, Artikelgruppen, Einkaufspreise | `/suppliers`, `/article-groups`, `/articles/:id/prices/:supplierId` | `articles.*` |
+| Fuhrpark | `/vehicles`, `/vehicle-costs` (Summen je Kategorie) | `fleet.*` (`fleet`) |
+| Lager, Inventur | `/stock/movements`, `/stock/low`, `/articles/:id/stock-correction`, `/inventory-counts`, `/documents/:id/stock-check` | `stock.*` (`lagerbestand`) |
+| Bestellwesen | `/purchase-orders` (+ `/finalize`, `/receive`, `/suggestions`, `/from-suggestion`), `/documents/:id/purchase-orders` | `purchaseOrders.*` (`bestellwesen`) |
+| Buchhaltung | `/expense-categories`, `/expenses`, `/accounting/open-items`, `/accounting/euer`, `/accounting/settings`, `/accounting/datev`, `/bank-transactions` (+ `/import`, `/:id/match`) | `accounting.*` (`buchhaltung`) |
+| Mahnwesen | `/dunning/settings`, `/dunning/overdue`, `/documents/:id/dunning-notices` | `dunning.*` (`dunning`) |
+| Wiederkehrende Rechnungen | `/recurring-templates` (+ `/generate`) | `invoices.*` (`recurringInvoices`) |
+| Stundenzettel | `/time-sheets` (+ `/entries`, `/sign`, `/correction`) | `timeTracking.write` (`timeTracking`) |
+| Mailversand | `/mail/settings`, `/mail/test` (Admin), `/documents/:id/send`, `/dunning-notices/:id/send`, `/purchase-orders/:id/send` | Fachrecht (`smtp`) |
+| Übersicht | `/dashboard`, `/dashboard/preferences` | Kacheln nach Rechten |
+
+- **Bestand** ändert sich nur über unveränderliche Bewegungen. Finalisieren
+  bucht in derselben Transaktion (Regel aus `werkkern_core`: genau eine
+  Buchung pro Kette, Gutschrift bucht zurück), ein später bearbeiteter
+  Auftrag bucht die Differenz nach.
+- **Wiederkehrende Rechnungen:** `bin/server.dart` prüft stündlich und
+  legt je fälliger Periode einen Entwurf an; jede Periode wird in
+  derselben Transaktion beansprucht, mehrere Instanzen sind unkritisch.
+- **Mailversand:** SMTP-Passwort AES-256-GCM-verschlüsselt mit
+  `WERKKERN_SECRET_KEY` (32 Byte Base64, z. B. `openssl rand -base64 32`);
+  ohne Schlüssel ist der Versand aus. Das PDF rendert die App, der
+  Server prüft Recht, Modul, Status und PDF-Signatur; nie über
+  Agent-Token, jeder Versand im Audit-Protokoll.
+- Die Kalkulationen (Verkaufspreis, Mahnstufe/Zins, Intervall, DATEV,
+  Umsatzregeln) kommen aus `packages/werkkern_core` — identisch zur
+  Offline-App.
 
 ## Offline-Arbeit und Abgleich (B2)
 
@@ -180,13 +219,9 @@ Kein API-Endpunkt — nur mit direktem DB-Zugriff:
 docker compose exec server /app/recover_admin <email> <companyId>
 ```
 
-## Bewusst noch nicht Teil von B1
+## Noch offen
 
-- Konkrete **Standardrechte je Startgruppe** — laut Roadmap
-  ausdrücklich "nicht entschieden, muss vor Rollout fachlich festgelegt
-  werden". Der Katalog definiert nur, welche Schlüssel es gibt.
-- Mailversand von Einladungen durch den Server.
-- Flutter-Client-Integration (Online-Verbindungsmodus).
-- Server-seitig noch fehlende Fachteile: Lieferanten/Artikelgruppen-
-  Kalkulation, Umwandlung Angebot→Auftrag→Rechnung, Projekte,
-  Zahlungsstatus, PDF-Erzeugung, Firmen-Stammdaten (Adresse/Steuernr.).
+- MCP-Werkzeuge für die neuen Module (die REST-API ist mit dem
+  Agent-Token nutzbar, die MCP-Schicht deckt bisher Kunden/Dokumente ab).
+- Offline-Anlage neuer Dokumente/Kunden im Online-Modus.
+- Offsite-Kopie/Cron und Monitoring der Backups sind Betreiberaufgabe.
