@@ -7,6 +7,7 @@ import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
 import '../../../pdf/online_document_pdf.dart';
+import 'online_purchasing_screen.dart' show createPurchaseOrdersFromDocument;
 
 /// Detail/Bearbeitung eines Online-Dokuments. Lokale Änderungen werden
 /// erst mit "Speichern" übertragen — immer mit der zuletzt gelesenen
@@ -525,6 +526,15 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
               onPressed: _busy ? null : _createCreditNote,
               icon: const Icon(Icons.undo),
               label: const Text('Gutschrift erstellen'),
+            ),
+          ),
+        if (document.kind == 'order' && session.modules.contains('bestellwesen') && session.can('purchaseOrders.write'))
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : () => createPurchaseOrdersFromDocument(context, session, document.id),
+              icon: const Icon(Icons.shopping_cart_outlined),
+              label: const Text('Bestellungen erzeugen'),
             ),
           ),
         if (canConvert)

@@ -10,17 +10,19 @@ import 'repository.dart';
 import 'suppliers.dart';
 import 'accounting.dart';
 import 'fleet.dart';
+import 'purchasing.dart';
 import 'stock.dart';
 
 part 'postgres/suppliers.dart';
 part 'postgres/fleet.dart';
 part 'postgres/stock.dart';
 part 'postgres/accounting.dart';
+part 'postgres/purchasing.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   @override
   final SessionExecutor _db;

@@ -77,11 +77,17 @@ mixin _PostgresSuppliers implements SupplierStore {
 
   @override
   Future<bool> deleteSupplier(String companyId, String id) async {
-    final result = await _q('DELETE FROM suppliers WHERE company_id = @companyId AND id = @id', {
-      'companyId': companyId,
-      'id': id,
-    });
-    return result.affectedRows > 0;
+    try {
+      final result = await _q('DELETE FROM suppliers WHERE company_id = @companyId AND id = @id', {
+        'companyId': companyId,
+        'id': id,
+      });
+      return result.affectedRows > 0;
+    } on ServerException catch (e) {
+      // 23503: Fremdschlüssel (Bestellungen verweisen per RESTRICT).
+      if (e.code == '23503') throw const BusinessConflict('Lieferant hat Bestellungen und kann nicht gelöscht werden.');
+      rethrow;
+    }
   }
 
   ArticleGroup _toGroup(ResultRow r) => ArticleGroup(
