@@ -25,6 +25,13 @@ parallel laufende Einkaufs-/Datenbankarbeiten im Hauptarbeitsverzeichnis
 unverändert bleiben. Sie ist nicht automatisch in die laufende ERP-Instanz
 ausgerollt.
 
-Validierung: `flutter analyze lib test`, `flutter test` (318 Tests plus gezielter Widgettest zum sichtbaren Zurücksetzen der Zuordnung).
+Validierung: `flutter analyze lib test`, `flutter test` (321 Tests, einschließlich sichtbarem Zurücksetzen der Zuordnung).
 `test/fixtures/libre_ecad_material.json` stammt aus dem synthetischen
 LibreECAD-Generator `backend/ecad_core/bin/planning_sample.dart`.
+
+Zusätzlich erfolgreich: Web-Release und Chromium-Rundlauf mit der im
+LibreECAD-Browser heruntergeladenen Datei, expliziter Artikelwahl, erneutem
+Laden und Download des Zuordnungsentwurfs. Reproduzierbar mit
+`python3 tool/browser_ecad_preview.py <material.json>` gegen einen lokalen
+Server für `build/web` (Standard: Port 8297). Der Test erzeugt ausschließlich
+eine TEST-Firma im isolierten Browserprofil.
