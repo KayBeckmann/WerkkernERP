@@ -28,10 +28,11 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   und stehen noch aus: ein Navigations-/Formulardurchlauf auf einem
   kleinen Bildschirm, sowie ein Backup/Restore-Test über Neustart,
   App-Update und eine frische Installation hinweg.
-- Die **Online-Betriebsart** ist funktionsfähig und getestet, umfasst
-  serverseitig aber bisher nur den Kern (Kunden, Artikel, Dokumente inkl.
-  Umwandlung, Zahlungsstatus, PDF). Weitere Module laufen vorerst nur
-  offline — siehe unten.
+- Die **Online-Betriebsart** deckt inzwischen dieselben Fachmodule ab
+  wie offline (siehe unten) und ist ebenfalls durchgängig automatisiert
+  getestet (In-Memory und echtes PostgreSQL). Ein Betrieb mit echten
+  Mitarbeitern, Mailversand über einen echten SMTP-Server und ein
+  Lasttest stehen noch aus.
 
 ## Umfang (umgesetzt)
 
@@ -116,9 +117,20 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Audit-Protokoll, Login-Drosselung, verschlüsseltes Backup/Restore.
 - Jede Abfrage firmengebunden, fremde IDs verhalten sich wie nicht
   existierende; optimistische Versionierung statt „last write wins“.
-- In der App: „Online anmelden“ (Wolken-Symbol) mit Dokumenten, Kunden,
-  Artikeln, Verwaltung für Admins, PDF mit demselben Generator wie
-  offline.
+- In der App: „Online anmelden“ (Wolken-Symbol) mit Übersicht nach
+  Rechten, Dokumenten, Kunden, Artikeln, Verwaltung für Admins, PDF mit
+  demselben Generator wie offline.
+- **Fachmodule online** (je Firma schaltbar, Rechte je Gruppe;
+  Standardrechte für Projektleiter/Monteur/Buchhaltung): Projekte mit
+  Ergebnisrechnung, Zeiterfassung je Benutzer, Kunden-Stundenzettel mit
+  Unterschrift, Lieferanten/Artikelgruppen mit Mehrlieferanten-
+  Kalkulation, Lager mit Inventur, Bestellwesen mit Wareneingang,
+  Buchhaltung (Belege, offene Posten, EÜR, Bankabgleich per CSV,
+  DATEV-Export), Mahnwesen, wiederkehrende Rechnungen (der Server legt
+  fällige Entwürfe täglich selbst an), Fuhrpark.
+- **Mailversand über den Server** (SMTP je Firma, Passwort verschlüsselt
+  mit `WERKKERN_SECRET_KEY`): Dokumente, Mahnungen, Bestellungen,
+  Einladungen — auch aus der Web-Version.
 - **Selektiver Offline-Bestand:** ausdrücklich markierte Dokumente
   liegen AES-256-GCM-verschlüsselt auf dem Gerät, Entwürfe sind offline
   bearbeitbar (Outbox, idempotenter Abgleich, Konflikte sichtbar).
@@ -136,14 +148,18 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - Konfigurierbare Steuersätze, Nummernmuster und PDF-Layouts mit
   Migration vorhandener Dokumente.
 - Personal-/Einsatzplanung (Disposition, Urlaub, Überstunden).
-- **Online-Betriebsart:** Projekte, Zeiterfassung, Lager/Bestellwesen,
-  Buchhaltung, Fuhrpark, Mahnwesen, Abschläge/Gutschriften und
-  E-Mail-Versand laufen bisher nur offline; Offline-Anlage neuer
-  Dokumente im Online-Modus ist nicht vorgesehen.
+- **Online-Betriebsart:** Offline-Anlage neuer Dokumente/Kunden im
+  Online-Modus ist nicht vorgesehen (offline nur Bearbeiten markierter
+  Entwürfe); die MCP-Werkzeuge für KI-Agenten decken Kunden und
+  Dokumente ab — die übrigen Module sind über die REST-API mit dem
+  Agent-Token erreichbar, aber noch ohne eigene MCP-Werkzeuge.
 - Import von Materiallisten aus LibreECAD (Format noch offen).
 - Lokaler KI-Adapter für die reine Offline-App (ohne Server).
 
 ## E-Mail-Versand: Android vs. Web
+
+Im **Online-Modus** verschickt der Server (siehe oben) — das geht auch
+aus der Web-Version. Für die **Offline-App** gilt:
 
 Ein echter SMTP-Versand braucht einen rohen Netzwerk-Socket. Das ist im
 Browser aus Sicherheitsgründen grundsätzlich nicht möglich — ohne einen
@@ -176,7 +192,7 @@ Tests und statische Analyse:
 ```bash
 flutter analyze
 flutter test
-(cd server && dart analyze && dart test)      # + echtes Postgres: siehe server/README.md
+(cd server && dart analyze && dart test -x postgres -j 6)   # + echtes Postgres: siehe server/README.md
 (cd packages/werkkern_core && dart test)
 (cd packages/werkkern_client && dart test)
 ```
