@@ -5,13 +5,21 @@ import 'package:http/testing.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkernerp_server/src/business/repository_memory.dart';
+import 'package:werkkernerp_server/src/mail.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
 
 /// Echter Server-Router (In-Memory) hinter einem MockClient — keine
 /// Sockets, daher in `testWidgets` (FakeAsync) zuverlässig.
 class OnlineTestServer {
-  final handler = PhaseBRouter(repository: InMemoryPhaseBRepository(), business: InMemoryBusinessRepository()).handler;
+  /// Versendete Mails (statt SMTP) — für Versand-Tests.
+  final mailTransport = RecordingMailTransport();
+
+  late final handler = PhaseBRouter(
+    repository: InMemoryPhaseBRepository(),
+    business: InMemoryBusinessRepository(),
+    mail: MailService(transport: mailTransport, secrets: SecretSealer(List<int>.filled(32, 7))),
+  ).handler;
 
   /// Funkloch simulieren: jede Anfrage scheitert wie ohne Netz.
   bool offline = false;

@@ -7,6 +7,7 @@ import '../../../domain/services/online_session.dart';
 import '../../../pdf/dunning_letter_pdf_builder.dart';
 import 'online_document_screen.dart';
 import 'online_form.dart';
+import 'online_mail.dart';
 
 /// Mahnwesen der Online-Firma (C12): überfällige Rechnungen mit Stufe,
 /// Gebühr und Zins nach den eigenen Einstellungen, Mahnung erstellen
@@ -60,7 +61,7 @@ class OnlineDunningScreen extends StatelessWidget {
       company = await session.client.companyProfile();
     });
     if (!ok || !context.mounted) return;
-    await showDunningLetter(context, document: document!, notice: notice!, company: company!);
+    await showDunningLetter(context, session: session, document: document!, notice: notice!, company: company!);
   }
 
   @override
@@ -131,6 +132,7 @@ class OnlineDunningScreen extends StatelessWidget {
 /// Mahnschreiben aus Rechnungs-Schnappschuss und protokollierter Mahnung.
 Future<void> showDunningLetter(
   BuildContext context, {
+  required OnlineSession session,
   required OnlineDocument document,
   required OnlineDunningNotice notice,
   required OnlineCompanyProfile company,
@@ -158,7 +160,26 @@ Future<void> showDunningLetter(
   return Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => Scaffold(
-        appBar: AppBar(title: Text('${dunningLetterTitle(level)} ${document.number ?? ''}')),
+        appBar: AppBar(
+          title: Text('${dunningLetterTitle(level)} ${document.number ?? ''}'),
+          actions: [
+            if (canSendMail(session) && session.can('dunning.write'))
+              Builder(
+                builder: (context) => IconButton(
+                  tooltip: 'Per E-Mail senden',
+                  icon: const Icon(Icons.send_outlined),
+                  onPressed: () => sendPdfByMail(
+                    context,
+                    session: session,
+                    title: '${dunningLetterTitle(level)} senden',
+                    defaultRecipientHint: 'Leer = E-Mail des Kunden',
+                    buildPdf: () => buildDunningLetterPdfFromData(data),
+                    send: (pdf, {to, subject, body}) => session.client.sendDunningMail(notice.id, pdf, to: to),
+                  ),
+                ),
+              ),
+          ],
+        ),
         body: PdfPreview(
           canChangeOrientation: false,
           canChangePageFormat: false,

@@ -10,8 +10,10 @@ import 'models.dart';
 import 'auth.dart';
 import 'business/repository.dart';
 import 'business/models.dart' show documentKindModules;
+import 'business/mail_routes.dart';
 import 'business/router.dart';
 import 'login_throttle.dart';
+import 'mail.dart';
 import 'permission_catalog.dart';
 import 'repository.dart';
 import 'util/passwords.dart';
@@ -36,7 +38,12 @@ class PhaseBRouter {
     this.corsAllowedOrigins = const {},
     LoginThrottle? loginThrottle,
     this.trustForwardedFor = false,
+    this.mail,
   }) : loginThrottle = loginThrottle ?? LoginThrottle();
+
+  /// Mailversand über den Server (optional — ohne ihn keine Mail-Routen).
+  final MailService? mail;
+  MailRoutes? _mailRoutes;
 
   /// Schutz gegen Passwort-Durchprobieren (Login, Einladung mit
   /// bestehendem Konto, Passwortänderung).
@@ -218,6 +225,9 @@ class PhaseBRouter {
 
     if (business != null) {
       BusinessRoutes(repository: repository, business: business!, auth: _auth).mount(router);
+      if (mail != null) {
+        _mailRoutes = MailRoutes(repository: repository, business: business!, auth: _auth, mail: mail!)..mount(router);
+      }
     }
 
     return router;
@@ -932,15 +942,25 @@ class PhaseBRouter {
       ),
     );
     await _auth.audit(auth, 'invitation.create', 'invitation');
-    // Der Server versendet bewusst selbst keine E-Mail (kein SMTP im
-    // Server-Dienst) — der Admin gibt das Token/den Link selbst weiter.
-    // Es wird genau einmal im Klartext ausgeliefert, danach nur noch
-    // als Hash gespeichert.
+    // Das Token wird genau einmal im Klartext ausgeliefert, danach nur
+    // noch als Hash gespeichert. Mit `sendEmail: true` verschickt der
+    // Server es zusätzlich per Mail (SMTP der Firma); scheitert das,
+    // bleibt die Einladung gültig und der Admin gibt den Code selbst weiter.
+    String? emailError;
+    var emailSent = false;
+    if (body['sendEmail'] == true) {
+      emailError = _mailRoutes == null
+          ? 'Mailversand ist auf diesem Server nicht eingerichtet.'
+          : await _mailRoutes!.sendInvitation(auth, to: email, code: rawToken);
+      emailSent = emailError == null;
+    }
     return jsonOk({
       'invitationToken': rawToken,
       'email': email,
       'groupId': groupId,
       'expiresAt': expiresAt.toIso8601String(),
+      'emailSent': emailSent,
+      'emailError': ?emailError,
     }, status: 201);
   }
 

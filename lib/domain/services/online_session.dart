@@ -146,9 +146,11 @@ const onlinePermissionLabels = <String, String>{
   'invoices.read': 'Dokumente ansehen',
   'invoices.write': 'Dokumente bearbeiten',
   'invoices.finalize': 'Dokumente finalisieren',
+  'invoices.payment': 'Zahlungseingänge erfassen',
   'projects.read': 'Projekte ansehen',
   'projects.write': 'Projekte bearbeiten',
-  'timeTracking.read': 'Zeiten ansehen',
+  // Ohne dieses Recht sieht jeder nur die eigenen Buchungen.
+  'timeTracking.read': 'Zeiten aller ansehen',
   'timeTracking.write': 'Zeiten buchen',
   'fleet.read': 'Fuhrpark ansehen',
   'fleet.write': 'Fuhrpark bearbeiten',
@@ -158,4 +160,6 @@ const onlinePermissionLabels = <String, String>{
   'stock.write': 'Lager buchen',
   'purchaseOrders.read': 'Bestellungen ansehen',
   'purchaseOrders.write': 'Bestellungen bearbeiten',
+  'dunning.read': 'Mahnwesen ansehen',
+  'dunning.write': 'Mahnungen erstellen',
 };
