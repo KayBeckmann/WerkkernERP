@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../domain/services/online_session.dart';
+import 'online_accounting_screen.dart';
 import 'online_admin_screen.dart';
 import 'online_agent_screen.dart';
 import 'online_articles_screen.dart';
@@ -119,6 +120,8 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             (label: 'Zeiten', icon: Icons.timer_outlined, body: OnlineTimeScreen(session: session)),
           if (session.can('articles.read') && !session.offlineOnly)
             (label: 'Artikel', icon: Icons.inventory_2_outlined, body: OnlineArticlesScreen(session: session)),
+          if (session.modules.contains('buchhaltung') && session.can('accounting.read') && !session.offlineOnly)
+            (label: 'Buchhaltung', icon: Icons.account_balance_outlined, body: OnlineAccountingScreen(session: session)),
           if (session.modules.contains('lagerbestand') && session.can('stock.read') && !session.offlineOnly)
             (label: 'Lager', icon: Icons.warehouse_outlined, body: OnlineStockScreen(session: session)),
           if (session.modules.contains('fleet') && session.can('fleet.read') && !session.offlineOnly)
