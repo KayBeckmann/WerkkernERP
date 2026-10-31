@@ -87,6 +87,26 @@ void main() {
     expect(summary.surplus, Money.fromCents(7000));
   });
 
+  test('Start- und Endtag zählen ganztägig mit, unabhängig von der Uhrzeit', () {
+    final summary = computeEuerSummary(
+      allFinalizedInvoices: [
+        InvoiceWithGross(invoice: invoiceWith(issueDate: DateTime(2026, 10, 31, 14, 30)), gross: Money.fromCents(10000)),
+        InvoiceWithGross(invoice: invoiceWith(issueDate: DateTime(2026, 11, 1, 0, 0, 1)), gross: Money.fromCents(99999)),
+      ],
+      allExpenses: [
+        expenseWith(date: DateTime(2026, 10, 1, 0, 0), cents: 3000),
+        expenseWith(date: DateTime(2026, 10, 31, 23, 59), cents: 2000),
+      ],
+      categoryById: const {},
+      // So bildet die EÜR-Ansicht "dieser Monat": Ende = letzter Tag 00:00.
+      periodStart: DateTime(2026, 10, 1),
+      periodEnd: DateTime(2026, 11, 1).subtract(const Duration(days: 1)),
+    );
+
+    expect(summary.totalIncome, Money.fromCents(10000));
+    expect(summary.totalExpenses, Money.fromCents(5000));
+  });
+
   test('Ausgaben werden nach Kategorie gruppiert, größte Kategorie zuerst', () {
     final categoryById = {
       'material': categoryWith(id: 'material', label: 'Material', skr03Account: '4200'),

@@ -50,8 +50,17 @@ class EuerSummary {
   final Money surplus;
 }
 
-bool _withinPeriod(DateTime date, DateTime start, DateTime end) =>
-    !date.isBefore(start) && !date.isAfter(end);
+/// Vergleicht nach **Kalendertag**: Start- und Endtag zählen ganztägig
+/// mit, egal welche Uhrzeit in [date] steckt. Ein reiner Zeitpunktvergleich
+/// würde am letzten Tag des Zeitraums alles nach 00:00 Uhr ausschließen
+/// (z. B. eine am 31.10. um 14 Uhr finalisierte Rechnung im Oktober).
+bool isWithinDatePeriod(DateTime date, DateTime start, DateTime end) {
+  final day = DateTime(date.year, date.month, date.day);
+  return !day.isBefore(DateTime(start.year, start.month, start.day)) &&
+      !day.isAfter(DateTime(end.year, end.month, end.day));
+}
+
+bool _withinPeriod(DateTime date, DateTime start, DateTime end) => isWithinDatePeriod(date, start, end);
 
 /// Filtert UND aggregiert in einem Schritt — bewusst die vollen Listen
 /// übergeben (nicht vorgefiltert), damit die UI den Zeitraum wechseln
