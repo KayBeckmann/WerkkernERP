@@ -36,18 +36,29 @@ class PurchasingRoutes {
   Future<Response> _response(String companyId, PurchaseOrder order, {int status = 200}) async {
     final items = await business.purchaseOrderItems(companyId, order.id);
     final supplier = await business.findSupplier(companyId, order.supplierId);
+    return jsonOk({
+      ...order.toJson(),
+      'supplierName': supplier?.name,
+      'items': [for (final i in items) i.toJson()],
+      'totalNetCents': _totalNetCents(items),
+    }, status: status);
+  }
+
+  int _totalNetCents(List<PurchaseOrderItem> items) {
     var total = 0;
     for (final i in items) {
       if (i.purchasePriceCents != null) {
         total += Money.fromCents(i.purchasePriceCents!).multiplyByQuantity(Decimal.parse(i.quantity)).cents;
       }
     }
-    return jsonOk({
-      ...order.toJson(),
-      'supplierName': supplier?.name,
-      'items': [for (final i in items) i.toJson()],
-      'totalNetCents': total,
-    }, status: status);
+    return total;
+  }
+
+  /// Text für den Bestätigungsdialog einer Agent-Freigabe (C8).
+  Future<String> _summary(String companyId, PurchaseOrder order) async {
+    final supplier = await business.findSupplier(companyId, order.supplierId);
+    final total = Money.fromCents(_totalNetCents(await business.purchaseOrderItems(companyId, order.id)));
+    return 'Bestellung ${order.number ?? '(Entwurf)'} bei ${supplier?.name ?? 'unbekanntem Lieferanten'} über $total netto';
   }
 
   /// Positionen aus dem Body; Artikel müssen zur Firma gehören.
@@ -199,6 +210,18 @@ class PurchasingRoutes {
   Future<Response> _delete(Request request, String id) async {
     final check = await auth.requirePermission(request, 'purchaseOrders.write');
     if (check.error != null) return check.error!;
+    if (check.auth!.session.isAgent) {
+      final order = await business.findPurchaseOrder(check.auth!.session.companyId, id);
+      if (order == null) return jsonError('Bestellung nicht gefunden.', status: 404);
+      if (!order.isDraft) return jsonError('Nur Entwürfe können gelöscht werden.', status: 409);
+      return auth.requestApproval(
+        check.auth!,
+        method: 'DELETE',
+        path: '/purchase-orders/$id',
+        body: const {},
+        summary: '${await _summary(check.auth!.session.companyId, order)} löschen',
+      );
+    }
     try {
       if (!await business.deletePurchaseOrderDraft(check.auth!.session.companyId, id)) {
         return jsonError('Bestellung nicht gefunden.', status: 404);
@@ -214,8 +237,21 @@ class PurchasingRoutes {
     final check = await auth.requirePermission(request, 'purchaseOrders.write');
     if (check.error != null) return check.error!;
     final companyId = check.auth!.session.companyId;
-    final version = (await readJsonBody(request))['version'];
+    final body = await readJsonBody(request);
+    final version = body['version'];
     if (version is! int) return jsonError('version (Ganzzahl) ist Pflicht.');
+    if (check.auth!.session.isAgent) {
+      final order = await business.findPurchaseOrder(companyId, id);
+      if (order == null) return jsonError('Bestellung nicht gefunden.', status: 404);
+      if (!order.isDraft) return jsonError('Bestellung ist bereits finalisiert.', status: 409);
+      return auth.requestApproval(
+        check.auth!,
+        method: 'POST',
+        path: '/purchase-orders/$id/finalize',
+        body: body,
+        summary: '${await _summary(companyId, order)} finalisieren (Version $version)',
+      );
+    }
     try {
       final order = await business.finalizePurchaseOrder(companyId, id, expectedVersion: version, now: DateTime.now().toUtc());
       if (order == null) return jsonError('Bestellung nicht gefunden.', status: 404);
@@ -231,13 +267,26 @@ class PurchasingRoutes {
     final check = await auth.requirePermission(request, 'purchaseOrders.write');
     if (check.error != null) return check.error!;
     final companyId = check.auth!.session.companyId;
-    final raw = (await readJsonBody(request))['receipts'];
+    final body = await readJsonBody(request);
+    final raw = body['receipts'];
     if (raw is! Map || raw.isEmpty) return jsonError('receipts (Position → Menge) ist Pflicht.');
     final receipts = <String, Decimal>{};
     for (final entry in raw.entries) {
       final quantity = decimalOrNull(entry.value);
       if (quantity == null || Decimal.parse(quantity) < Decimal.zero) return jsonError('Mengen müssen >= 0 sein.');
       receipts[entry.key as String] = Decimal.parse(quantity);
+    }
+    // Wareneingang bucht Lagerbewegungen — für Agenten nur per Freigabe.
+    if (check.auth!.session.isAgent) {
+      final order = await business.findPurchaseOrder(companyId, id);
+      if (order == null) return jsonError('Bestellung nicht gefunden.', status: 404);
+      return auth.requestApproval(
+        check.auth!,
+        method: 'POST',
+        path: '/purchase-orders/$id/receive',
+        body: body,
+        summary: 'Wareneingang zu ${await _summary(companyId, order)} buchen (${receipts.length} Position(en))',
+      );
     }
     try {
       final order = await business.receivePurchaseOrder(

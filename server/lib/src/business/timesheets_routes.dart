@@ -146,6 +146,16 @@ class TimeSheetRoutes {
   Future<Response> _delete(Request request, String id) async {
     final v = await _visible(request, id, 'timeTracking.write');
     if (v.error != null) return v.error!;
+    if (v.ctx!.session.isAgent) {
+      if (v.sheet!.isSigned) return jsonError('Unterschriebene Stundenzettel sind unveränderlich.', status: 409);
+      return auth.requestApproval(
+        v.ctx!,
+        method: 'DELETE',
+        path: '/time-sheets/$id',
+        body: const {},
+        summary: 'Stundenzettel vom ${dateJson(v.sheet!.date)} (Entwurf) löschen',
+      );
+    }
     try {
       await business.deleteTimeSheetDraft(v.ctx!.session.companyId, id);
     } on BusinessConflict catch (e) {
@@ -187,6 +197,10 @@ class TimeSheetRoutes {
   Future<Response> _sign(Request request, String id) async {
     final v = await _visible(request, id, 'timeTracking.write');
     if (v.error != null) return v.error!;
+    // Die Unterschrift leistet der Kunde selbst auf dem Gerät — nie ein Agent.
+    if (v.ctx!.session.isAgent) {
+      return jsonError('Unterschreiben nur in der App, nicht über ein Agent-Token.', status: 403);
+    }
     final body = await readJsonBody(request);
     final raw = body['signaturePng'];
     if (raw is! String) return jsonError('signaturePng (Base64) ist Pflicht.');
