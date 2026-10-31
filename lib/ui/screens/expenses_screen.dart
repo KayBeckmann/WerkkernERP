@@ -14,6 +14,7 @@ import '../../data/repositories/project_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/datev_export_service.dart';
+import '../../domain/services/euer_service.dart' show isWithinDatePeriod;
 
 /// C14.2 Belege/Ausgaben (Kay-Priorisierungsentscheidung 2026-10-18,
 /// voller Umfang der Buchhaltung). Erfasst Ausgaben als Bruttobetrag +
@@ -639,7 +640,7 @@ class _DatevExportDialogState extends State<_DatevExportDialog> {
       await service.refreshActive();
 
       final expensesInPeriod = widget.expenses
-          .where((e) => !e.date.isBefore(_periodStart) && !e.date.isAfter(_periodEnd))
+          .where((e) => isWithinDatePeriod(e.date, _periodStart, _periodEnd))
           .toList();
       final result = buildDatevBuchungsstapel(
         expenses: expensesInPeriod,
