@@ -163,7 +163,11 @@ wie nicht existierende. Neue Module liegen je als eigenes Modell/Store
   (`wka_…`) erzeugt jeder Nutzer selbst: `POST /agent-tokens` (nur aus
   einer App-Sitzung). Der Agent hat exakt die Rechte dieses Nutzers,
   nie Admin-Funktionen; Protokolleinträge tragen `[agent]`.
-- Finalisieren/Entwurf löschen per Agent -> `202` + Freigabe-Anfrage.
+- Irreversibles per Agent -> `202` + Freigabe-Anfrage: Dokument
+  finalisieren/Entwurf löschen, Bestellung finalisieren/Wareneingang/
+  Entwurf löschen, Bestandskorrektur, Inventur abschließen, Mahnung
+  erstellen, Stundenzettel-Entwurf oder Beleg löschen. Stundenzettel
+  unterschreiben und Mailversand gehen über ein Agent-Token nie (`403`).
   `GET /approvals`, `POST /approvals/:id/confirm|reject` (nur der
   Nutzer selbst, nicht das Token). Bestätigen führt mit der Sitzung des
   Nutzers aus und prüft dabei alles neu; höchstens einmal.
@@ -221,7 +225,5 @@ docker compose exec server /app/recover_admin <email> <companyId>
 
 ## Noch offen
 
-- MCP-Werkzeuge für die neuen Module (die REST-API ist mit dem
-  Agent-Token nutzbar, die MCP-Schicht deckt bisher Kunden/Dokumente ab).
 - Offline-Anlage neuer Dokumente/Kunden im Online-Modus.
 - Offsite-Kopie/Cron und Monitoring der Backups sind Betreiberaufgabe.

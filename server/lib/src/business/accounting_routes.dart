@@ -230,6 +230,18 @@ class AccountingRoutes {
   Future<Response> _deleteExpense(Request request, String id) async {
     final check = await auth.requirePermission(request, 'accounting.write');
     if (check.error != null) return check.error!;
+    if (check.auth!.session.isAgent) {
+      final expense = await business.findExpense(check.auth!.session.companyId, id);
+      if (expense == null) return jsonError('Beleg nicht gefunden.', status: 404);
+      return auth.requestApproval(
+        check.auth!,
+        method: 'DELETE',
+        path: '/expenses/$id',
+        body: const {},
+        summary: 'Beleg "${expense.description}" vom ${dateJson(expense.date)} über '
+            '${Money.fromCents(expense.amountGrossCents)} löschen',
+      );
+    }
     if (!await business.deleteExpense(check.auth!.session.companyId, id)) {
       return jsonError('Beleg nicht gefunden.', status: 404);
     }

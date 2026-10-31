@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:shelf/shelf.dart';
+import 'package:uuid/uuid.dart';
 
 import 'models.dart';
 import 'permission_catalog.dart';
@@ -133,4 +136,38 @@ class SessionAuthenticator {
         entityId: entityId,
         at: DateTime.now().toUtc(),
       ));
+
+  /// C8: irreversible Aktion eines Agenten -> nur Freigabe-Anfrage
+  /// (202). Ausgeführt wird erst, wenn der Nutzer sie in der App
+  /// bestätigt — dann mit SEINER Sitzung und erneuter Rechteprüfung
+  /// (dieselbe Anfrage [method]/[path]/[body] wird erneut ausgeführt).
+  Future<Response> requestApproval(
+    AuthContext ctx, {
+    required String method,
+    required String path,
+    required Map<String, Object?> body,
+    required String summary,
+  }) async {
+    final agent = await repository.findAgentTokenByHash(ctx.session.tokenHash);
+    final approval = PendingApproval(
+      id: const Uuid().v4(),
+      companyId: ctx.session.companyId,
+      userId: ctx.session.userId,
+      agentTokenId: agent?.id ?? '',
+      method: method,
+      path: path,
+      body: jsonEncode(body),
+      summary: summary,
+      status: 'pending',
+      createdAt: DateTime.now().toUtc(),
+    );
+    await repository.createApproval(approval);
+    await audit(ctx, 'approval.request', 'approval', approval.id);
+    return jsonOk({
+      'approvalId': approval.id,
+      'status': 'pending',
+      'summary': summary,
+      'message': 'Irreversible Aktion: wartet auf Bestätigung durch den Nutzer in der App.',
+    }, status: 202);
+  }
 }

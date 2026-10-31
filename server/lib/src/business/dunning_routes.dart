@@ -165,6 +165,19 @@ class DunningRoutes {
     if (a.level == DunningLevel.none) {
       return jsonError('Rechnung ist nicht überfällig (bezahlt, ohne Fälligkeit oder noch nicht fällig).', status: 409);
     }
+    // Eine Mahnung wird protokolliert und berechnet Gebühren/Zinsen —
+    // für Agenten nur per Freigabe.
+    if (check.auth!.session.isAgent) {
+      final customer = await business.findCustomer(companyId, document.customerId);
+      return auth.requestApproval(
+        check.auth!,
+        method: 'POST',
+        path: '/documents/$id/dunning-notices',
+        body: const {},
+        summary: '${dunningLetterTitle(a.level)} zu Rechnung ${document.number ?? ''} für '
+            '${customer?.name ?? 'unbekannten Kunden'} erstellen (Gebühr ${Money.fromCents(a.feeCents)})',
+      );
+    }
     final notice = DunningNotice(
       id: _uuid.v4(),
       companyId: companyId,

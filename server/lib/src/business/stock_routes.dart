@@ -82,6 +82,16 @@ class StockRoutes {
     final counted = decimalOrNull(body['countedQuantity']);
     final reason = trimmedOrNull(body['reason']);
     if (counted == null || reason == null) return jsonError('countedQuantity und reason sind Pflicht.');
+    // Bucht sofort eine Lagerbewegung — für Agenten nur per Freigabe.
+    if (check.auth!.session.isAgent) {
+      return auth.requestApproval(
+        check.auth!,
+        method: 'POST',
+        path: '/articles/$id/stock-correction',
+        body: body,
+        summary: 'Bestand von "${article.name}" auf $counted korrigieren ($reason)',
+      );
+    }
     final now = DateTime.now().toUtc();
     final count = InventoryCount(
       id: _uuid.v4(),
@@ -256,6 +266,17 @@ class StockRoutes {
     final check = await auth.requirePermission(request, 'stock.write');
     if (check.error != null) return check.error!;
     final companyId = check.auth!.session.companyId;
+    if (check.auth!.session.isAgent) {
+      final count = await business.findInventoryCount(companyId, id);
+      if (count == null || count.status != 'draft') return _draftCountOr404(companyId, id);
+      return auth.requestApproval(
+        check.auth!,
+        method: 'POST',
+        path: '/inventory-counts/$id/complete',
+        body: const {},
+        summary: 'Inventur "${count.label}" abschließen und Differenzen buchen',
+      );
+    }
     final movements = await business.completeInventoryCount(
       companyId,
       id,

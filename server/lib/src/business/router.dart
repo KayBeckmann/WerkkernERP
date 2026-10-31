@@ -7,7 +7,6 @@ import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../auth.dart';
-import '../models.dart' show PendingApproval;
 import '../repository.dart';
 import '../util/responses.dart';
 import 'models.dart';
@@ -578,7 +577,7 @@ class BusinessRoutes {
     final check = await _requireDocumentPermission(request, 'invoices.write', existing.kind);
     if (check.error != null) return check.error!;
     if (check.auth!.session.isAgent) {
-      return _requestApproval(
+      return auth.requestApproval(
         check.auth!,
         method: 'DELETE',
         path: '/documents/$id',
@@ -604,39 +603,6 @@ class BusinessRoutes {
     'creditNote': 'Gutschrift',
   };
 
-  /// C8: irreversible Aktion eines Agenten -> nur Freigabe-Anfrage
-  /// (202). Ausgeführt wird erst, wenn der Nutzer sie in der App
-  /// bestätigt — dann mit SEINER Sitzung und erneuter Rechteprüfung.
-  Future<Response> _requestApproval(
-    AuthContext ctx, {
-    required String method,
-    required String path,
-    required Map<String, Object?> body,
-    required String summary,
-  }) async {
-    final agent = await repository.findAgentTokenByHash(ctx.session.tokenHash);
-    final approval = PendingApproval(
-      id: _uuid.v4(),
-      companyId: ctx.session.companyId,
-      userId: ctx.session.userId,
-      agentTokenId: agent?.id ?? '',
-      method: method,
-      path: path,
-      body: jsonEncode(body),
-      summary: summary,
-      status: 'pending',
-      createdAt: DateTime.now().toUtc(),
-    );
-    await repository.createApproval(approval);
-    await auth.audit(ctx, 'approval.request', 'approval', approval.id);
-    return jsonOk({
-      'approvalId': approval.id,
-      'status': 'pending',
-      'summary': summary,
-      'message': 'Irreversible Aktion: wartet auf Bestätigung durch den Nutzer in der App.',
-    }, status: 202);
-  }
-
   Future<String> _documentSummary(String companyId, Document d) async {
     final customer = await business.findCustomer(companyId, d.customerId);
     final gross = _totals(await business.itemsFor(companyId, d.id)).totalGross;
@@ -660,7 +626,7 @@ class BusinessRoutes {
     }
     if (!existing.isDraft) return jsonError('Dokument ist finalisiert und unveränderlich.', status: 409);
     if (check.auth!.session.isAgent) {
-      return _requestApproval(
+      return auth.requestApproval(
         check.auth!,
         method: 'POST',
         path: '/documents/$id/finalize',
