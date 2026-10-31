@@ -150,9 +150,7 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - Personal-/Einsatzplanung (Disposition, Urlaub, Überstunden).
 - **Online-Betriebsart:** Offline-Anlage neuer Dokumente/Kunden im
   Online-Modus ist nicht vorgesehen (offline nur Bearbeiten markierter
-  Entwürfe); die MCP-Werkzeuge für KI-Agenten decken Kunden und
-  Dokumente ab — die übrigen Module sind über die REST-API mit dem
-  Agent-Token erreichbar, aber noch ohne eigene MCP-Werkzeuge.
+  Entwürfe).
 - Import von Materiallisten aus LibreECAD (Format noch offen).
 - Lokaler KI-Adapter für die reine Offline-App (ohne Server).
 
