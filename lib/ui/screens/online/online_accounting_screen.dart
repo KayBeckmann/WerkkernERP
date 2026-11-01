@@ -82,58 +82,94 @@ class _OnlineOpenItemsScreenState extends State<OnlineOpenItemsScreen> {
         _future = widget.session.client.openItems();
       });
 
+  Future<void> _markPaid(String documentId) async {
+    if (await runOnline(
+      context,
+      () => widget.session.client.setPaid(documentId, paid: true),
+      success: 'Als bezahlt markiert.',
+    )) {
+      _reload();
+    }
+  }
+
+  /// Aufbau wie offline (`open_items_screen.dart`): Gesamtsumme oben, je
+  /// Kunde eine aufklappbare Gruppe mit „Bezahlt“ je Rechnung.
   @override
   Widget build(BuildContext context) {
+    final canPay = widget.session.can('invoices.payment');
     return FutureBuilder<({int totalCents, List<OnlineOpenItemGroup> customers})>(
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.hasError) return Center(child: Text(describeOnlineError(snapshot.error!)));
         final data = snapshot.data;
         if (data == null) return const Center(child: CircularProgressIndicator());
+        if (data.customers.isEmpty) {
+          return RefreshIndicator(
+            onRefresh: () async => _reload(),
+            child: ListView(children: const [
+              SizedBox(height: 120),
+              Center(child: Text('Keine offenen Posten.')),
+            ]),
+          );
+        }
         final today = DateTime.now();
-        return RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              Card(
-                child: ListTile(
-                  title: const Text('Offen gesamt'),
-                  trailing: Text(_euro(data.totalCents), style: const TextStyle(fontWeight: FontWeight.bold)),
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Gesamt offen', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(_euro(data.totalCents), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async => _reload(),
+                child: ListView(
+                  children: [
+                    for (final g in data.customers)
+                      ExpansionTile(
+                        title: Text(g.customerName),
+                        subtitle: Text('${g.items.length} offene Rechnung(en)'),
+                        trailing: Text(_euro(g.totalCents), style: const TextStyle(fontWeight: FontWeight.bold)),
+                        children: [
+                          for (final i in g.items)
+                            ListTile(
+                              title: Text(i.number ?? 'Rechnung'),
+                              subtitle: Text(
+                                i.dueDate == null
+                                    ? 'Ohne Fälligkeitsdatum'
+                                    : '${i.dueDate!.isBefore(today) ? 'Überfällig seit' : 'Fällig am'} ${formatOnlineDate(i.dueDate!)}',
+                              ),
+                              trailing: Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                children: [
+                                  Text(_euro(i.grossCents)),
+                                  if (canPay) TextButton(onPressed: () => _markPaid(i.documentId), child: const Text('Bezahlt')),
+                                ],
+                              ),
+                              // Nur online: Rechnung direkt öffnen.
+                              onTap: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: i.documentId),
+                                  ),
+                                );
+                                _reload();
+                              },
+                            ),
+                        ],
+                      ),
+                  ],
                 ),
               ),
-              if (data.customers.isEmpty)
-                const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Keine offenen Rechnungen.'))),
-              for (final g in data.customers)
-                Card(
-                  child: ExpansionTile(
-                    title: Text(g.customerName),
-                    trailing: Text(_euro(g.totalCents)),
-                    children: [
-                      for (final i in g.items)
-                        ListTile(
-                          dense: true,
-                          title: Text(i.number ?? 'Rechnung'),
-                          subtitle: Text([
-                            'vom ${formatOnlineDate(i.issueDate)}',
-                            if (i.dueDate != null)
-                              '${i.dueDate!.isBefore(today) ? 'überfällig seit' : 'fällig'} ${formatOnlineDate(i.dueDate!)}',
-                          ].join(' · ')),
-                          trailing: Text(_euro(i.grossCents)),
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: i.documentId),
-                              ),
-                            );
-                            _reload();
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -157,9 +193,20 @@ class _OnlineExpensesScreenState extends State<OnlineExpensesScreen> {
   WerkkernApiClient get _client => widget.session.client;
   bool get _canWrite => widget.session.can('accounting.write');
 
+  /// Projektnamen für die Listenzeile (wie offline).
+  Map<String, String> _projectNames = const {};
+
   Future<(List<OnlineExpense>, int, List<OnlineExpenseCategory>)> _load() async {
     final categories = await _client.expenseCategories();
     final result = await _client.expenses(from: _period.from, to: _period.to);
+    final session = widget.session;
+    if (session.modules.contains('projects') && session.can('projects.read')) {
+      try {
+        _projectNames = {for (final p in await _client.projects(includeArchived: true)) p.id: p.name};
+      } on Exception {
+        // Ohne Projektliste eben ohne Projektnamen.
+      }
+    }
     return (result.expenses, result.totalGrossCents, categories);
   }
 
@@ -232,9 +279,12 @@ class _OnlineExpensesScreenState extends State<OnlineExpensesScreen> {
     final datev = settings['datev']!;
     final values = await showOnlineForm(
       context,
-      title: 'DATEV-Export ${_period.label}',
+      title: 'DATEV-Export',
       submitLabel: 'Exportieren',
       fields: [
+        // Wie offline frei wählbarer Zeitraum (vorbelegt mit dem angezeigten).
+        OnlineField('from', 'Von', type: OnlineFieldType.date, required: true, initial: _period.from),
+        OnlineField('to', 'Bis', type: OnlineFieldType.date, required: true, initial: _period.to),
         OnlineField('beraterNummer', 'Beraternummer', required: true, initial: datev['beraterNummer'] as String?),
         OnlineField('mandantNummer', 'Mandantennummer', required: true, initial: datev['mandantNummer'] as String?),
         OnlineField('bankGegenkonto', 'Bank-Gegenkonto (SKR03)', required: true, initial: datev['bankGegenkonto'] as String?),
@@ -252,7 +302,7 @@ class _OnlineExpensesScreenState extends State<OnlineExpensesScreen> {
           'sachkontenlaenge': int.parse(values['sachkontenlaenge'] as String),
         },
       });
-      final export = await _client.datevExport(from: _period.from, to: _period.to);
+      final export = await _client.datevExport(from: values['from'] as DateTime, to: values['to'] as DateTime);
       final saved = await FilePicker.saveFile(
         fileName: export.fileName,
         bytes: Uint8List.fromList(encodeDatevAnsi(export.csv)),
@@ -275,89 +325,97 @@ class _OnlineExpensesScreenState extends State<OnlineExpensesScreen> {
     _reload();
   }
 
+  /// Aufbau wie offline (`expenses_screen.dart`): Kategorien, DATEV und
+  /// Aktualisieren in der Titelleiste; Zeitraum und Summe nur online.
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      floatingActionButton: _canWrite
-          ? FutureBuilder<(List<OnlineExpense>, int, List<OnlineExpenseCategory>)>(
-              future: _future,
-              builder: (context, snapshot) => FloatingActionButton.extended(
-                heroTag: 'online-expense-fab',
-                onPressed: snapshot.data == null ? null : () => _edit(snapshot.data!.$3),
-                icon: const Icon(Icons.add),
-                label: const Text('Beleg erfassen'),
-              ),
-            )
-          : null,
-      body: FutureBuilder<(List<OnlineExpense>, int, List<OnlineExpenseCategory>)>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) return Center(child: Text(describeOnlineError(snapshot.error!)));
-          final data = snapshot.data;
-          if (data == null) return const Center(child: CircularProgressIndicator());
-          final categories = {for (final c in data.$3) c.id: c};
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
-            children: [
-              _PeriodBar(
-                period: _period,
-                onChanged: (p) {
-                  _period = p;
-                  _reload();
-                },
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton.icon(onPressed: _datev, icon: const Icon(Icons.file_download_outlined), label: const Text('DATEV-Export')),
-                  if (_canWrite)
-                    OutlinedButton.icon(
-                      onPressed: () => _manageCategories(data.$3),
-                      icon: const Icon(Icons.category_outlined),
-                      label: const Text('Kategorien'),
-                    ),
-                ],
-              ),
-              Card(
-                child: ListTile(
-                  title: Text('Summe ${_period.label}'),
-                  trailing: Text(_euro(data.$2), style: const TextStyle(fontWeight: FontWeight.bold)),
+    return FutureBuilder<(List<OnlineExpense>, int, List<OnlineExpenseCategory>)>(
+      future: _future,
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        return Scaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            title: const Text('Belege/Ausgaben'),
+            actions: [
+              if (_canWrite)
+                IconButton(
+                  icon: const Icon(Icons.category_outlined),
+                  tooltip: 'Kategorien verwalten',
+                  onPressed: data == null ? null : () => _manageCategories(data.$3),
                 ),
-              ),
-              if (data.$1.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Keine Belege im Zeitraum.'))),
-              for (final e in data.$1)
-                Card(
-                  child: ListTile(
-                    leading: Icon(e.purchaseOrderId == null ? Icons.receipt_outlined : Icons.local_shipping_outlined),
-                    title: Text(e.description),
-                    subtitle: Text([
-                      formatOnlineDate(e.date),
-                      categories[e.categoryId]?.label ?? 'ohne Kategorie',
-                      '${e.vatRatePercent.toStringAsFixed(0)} %',
-                      if (e.supplierReference != null) e.supplierReference!,
-                    ].join(' · ')),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_euro(e.amountGrossCents)),
-                        if (_canWrite)
-                          IconButton(
-                            tooltip: 'Beleg löschen',
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () async {
-                              if (!await confirmOnline(context, 'Beleg löschen?', e.description)) return;
-                              if (context.mounted && await runOnline(context, () => _client.deleteExpense(e.id))) _reload();
-                            },
-                          ),
-                      ],
-                    ),
-                    onTap: _canWrite ? () => _edit(data.$3, e) : null,
-                  ),
-                ),
+              IconButton(icon: const Icon(Icons.description_outlined), tooltip: 'DATEV-Export', onPressed: _datev),
+              IconButton(icon: const Icon(Icons.refresh_outlined), tooltip: 'Aktualisieren', onPressed: _reload),
             ],
-          );
-        },
-      ),
+          ),
+          floatingActionButton: _canWrite
+              ? FloatingActionButton.extended(
+                  heroTag: 'online-expense-fab',
+                  onPressed: data == null ? null : () => _edit(data.$3),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Beleg erfassen'),
+                )
+              : null,
+          body: snapshot.hasError
+              ? Center(child: Text(describeOnlineError(snapshot.error!)))
+              : data == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : _buildList(data),
+        );
+      },
+    );
+  }
+
+  Widget _buildList((List<OnlineExpense>, int, List<OnlineExpenseCategory>) data) {
+    final categories = {for (final c in data.$3) c.id: c};
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 88),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: _PeriodBar(
+            period: _period,
+            onChanged: (p) {
+              _period = p;
+              _reload();
+            },
+          ),
+        ),
+        ListTile(
+          title: Text('Summe ${_period.label}'),
+          trailing: Text(_euro(data.$2), style: const TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        const Divider(height: 1),
+        if (data.$1.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Keine Belege im Zeitraum.'))),
+        for (final e in data.$1)
+          ListTile(
+            leading: e.purchaseOrderId == null ? null : const Icon(Icons.local_shipping_outlined),
+            title: Text(e.description),
+            subtitle: Text(
+              '${formatOnlineDate(e.date)}'
+              '${e.categoryId != null ? ' — ${categories[e.categoryId]?.label ?? 'Kategorie gelöscht'}' : ''}'
+              '${e.projectId != null ? ' — ${_projectNames[e.projectId] ?? 'Projekt'}' : ''}',
+            ),
+            trailing: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              children: [
+                Text(_euro(e.amountGrossCents)),
+                if (_canWrite) ...[
+                  IconButton(tooltip: 'Bearbeiten', icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(data.$3, e)),
+                  IconButton(
+                    tooltip: 'Löschen',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () async {
+                      if (!await confirmOnline(context, 'Beleg löschen?', e.description)) return;
+                      if (mounted && await runOnline(context, () => _client.deleteExpense(e.id))) _reload();
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -441,10 +499,13 @@ class _OnlineEuerScreenState extends State<OnlineEuerScreen> {
 
   Future<OnlineEuer> _load() => widget.session.client.euer(from: _period.from, to: _period.to);
 
-  Widget _row(String label, int cents, {bool bold = false}) {
-    final style = bold ? const TextStyle(fontWeight: FontWeight.bold) : null;
+  Widget _row(String label, int cents, {bool bold = false, bool negative = false}) {
+    final style = TextStyle(
+      fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+      color: negative ? Theme.of(context).colorScheme.error : null,
+    );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(children: [Expanded(child: Text(label, style: style)), Text(_euro(cents), style: style)]),
     );
   }
@@ -467,26 +528,44 @@ class _OnlineEuerScreenState extends State<OnlineEuerScreen> {
             if (snapshot.hasError) return Text(describeOnlineError(snapshot.error!));
             final euer = snapshot.data;
             if (euer == null) return const Center(child: CircularProgressIndicator());
-            return Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    _row('Einnahmen (Rechnungen − Gutschriften)', euer.incomeCents),
-                    const Divider(),
-                    for (final l in euer.expensesByCategory)
-                      _row(l.skr03Account == null ? l.label : '${l.label} (${l.skr03Account})', l.totalCents),
-                    _row('Ausgaben gesamt', euer.expensesCents),
-                    const Divider(),
-                    _row('Überschuss', euer.surplusCents, bold: true),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Interne Übersicht nach Rechnungs-/Belegdatum — keine steuerliche EÜR nach § 4 Abs. 3 EStG.',
-                      style: Theme.of(context).textTheme.bodySmall,
+            final theme = Theme.of(context);
+            // Aufbau wie offline (`euer_screen.dart`).
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Keine steuerliche Einnahmen-Überschuss-Rechnung — nur eine interne '
+                          'Übersicht aus bereits erfassten Rechnungen/Belegen (z. B. ohne '
+                          'Abschreibungen). Keine Rechtsprüfung.',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 12),
+                        _row('Einnahmen', euer.incomeCents),
+                        _row('Ausgaben', euer.expensesCents),
+                        const Divider(),
+                        _row('Überschuss', euer.surplusCents, bold: true, negative: euer.surplusCents < 0),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 16),
+                if (euer.expensesByCategory.isNotEmpty) ...[
+                  Text('Ausgaben nach Kategorie', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  for (final l in euer.expensesByCategory)
+                    ListTile(
+                      title: Text(l.label),
+                      subtitle: l.skr03Account == null ? null : Text('SKR03-Konto ${l.skr03Account}'),
+                      trailing: Text(_euro(l.totalCents)),
+                    ),
+                ],
+              ],
             );
           },
         ),
@@ -631,17 +710,32 @@ class _OnlineBankScreenState extends State<OnlineBankScreen> {
     }
   }
 
+  Future<void> _editMappingAndSave() async {
+    final current = (await _client.accountingSettings())['bankCsv']!;
+    if (!mounted) return;
+    final edited = await _editMapping(current);
+    if (edited != null && mounted) {
+      await runOnline(context, () => _client.saveAccountingSettings({'bankCsv': edited}), success: 'Zuordnung gespeichert.');
+    }
+  }
+
+  /// Aufbau wie offline (`bank_reconciliation_screen.dart`): Aktionen in
+  /// der Titelleiste, je Umsatz Richtung, Gegenpartei, Betrag und
+  /// „Zuordnen“/„Zuordnung lösen“.
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: _canWrite
-          ? FloatingActionButton.extended(
-              heroTag: 'online-bank-fab',
-              onPressed: _import,
-              icon: const Icon(Icons.upload_file_outlined),
-              label: const Text('CSV importieren'),
-            )
-          : null,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Bankabgleich'),
+        actions: [
+          if (_canWrite) ...[
+            IconButton(icon: const Icon(Icons.settings_outlined), tooltip: 'CSV-Spaltenzuordnung', onPressed: _editMappingAndSave),
+            IconButton(icon: const Icon(Icons.upload_file_outlined), tooltip: 'CSV importieren', onPressed: _import),
+          ],
+          IconButton(icon: const Icon(Icons.refresh_outlined), tooltip: 'Aktualisieren', onPressed: _reload),
+        ],
+      ),
       body: FutureBuilder<List<OnlineBankTransaction>>(
         future: _future,
         builder: (context, snapshot) {
@@ -649,8 +743,9 @@ class _OnlineBankScreenState extends State<OnlineBankScreen> {
           final transactions = snapshot.data;
           if (transactions == null) return const Center(child: CircularProgressIndicator());
           return ListView(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
+            padding: const EdgeInsets.only(bottom: 24),
             children: [
+              // Nur online: Filter auf noch nicht zugeordnete Umsätze.
               SwitchListTile(
                 title: const Text('Nur nicht zugeordnete'),
                 value: _onlyUnmatched,
@@ -659,41 +754,36 @@ class _OnlineBankScreenState extends State<OnlineBankScreen> {
                   _reload();
                 },
               ),
-              if (_canWrite)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () async {
-                      final current = (await _client.accountingSettings())['bankCsv']!;
-                      if (!context.mounted) return;
-                      final edited = await _editMapping(current);
-                      if (edited != null && context.mounted) {
-                        await runOnline(context, () => _client.saveAccountingSettings({'bankCsv': edited}), success: 'Zuordnung gespeichert.');
-                      }
-                    },
-                    icon: const Icon(Icons.tune),
-                    label: const Text('CSV-Spaltenzuordnung'),
+              if (transactions.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Center(
+                    child: Text(_onlyUnmatched ? 'Keine Bankumsätze.' : 'Noch keine Bank-Transaktionen importiert.'),
                   ),
                 ),
-              if (transactions.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Keine Bankumsätze.'))),
               for (final t in transactions)
-                Card(
-                  child: ListTile(
-                    leading: Icon(t.matchedDocumentId == null ? Icons.link_off : Icons.link),
-                    title: Text('${_euro(t.amountCents)} · ${formatOnlineDate(t.date)}'),
-                    subtitle: Text([if (t.counterparty != null) t.counterparty!, if (t.purpose != null) t.purpose!].join(' · ')),
-                    trailing: !_canWrite
-                        ? null
-                        : t.matchedDocumentId == null
-                            ? (t.amountCents > 0
-                                ? TextButton(onPressed: () => _match(t), child: const Text('Zuordnen'))
-                                : null)
-                            : TextButton(
-                                onPressed: () async {
-                                  if (await runOnline(context, () => _client.matchBankTransaction(t.id, documentId: null))) _reload();
-                                },
-                                child: const Text('Lösen'),
-                              ),
+                ListTile(
+                  leading: Icon(
+                    t.amountCents >= 0 ? Icons.arrow_downward : Icons.arrow_upward,
+                    color: t.amountCents >= 0 ? Colors.green : null,
+                  ),
+                  title: Text(t.counterparty ?? t.purpose ?? 'Ohne Angabe'),
+                  subtitle: Text('${formatOnlineDate(t.date)}${t.purpose != null ? ' — ${t.purpose}' : ''}'),
+                  trailing: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    children: [
+                      Text(_euro(t.amountCents)),
+                      if (_canWrite && t.matchedDocumentId == null && t.amountCents > 0)
+                        TextButton(onPressed: () => _match(t), child: const Text('Zuordnen')),
+                      if (_canWrite && t.matchedDocumentId != null)
+                        TextButton(
+                          onPressed: () async {
+                            if (await runOnline(context, () => _client.matchBankTransaction(t.id, documentId: null))) _reload();
+                          },
+                          child: const Text('Zuordnung lösen'),
+                        ),
+                    ],
                   ),
                 ),
             ],

@@ -57,6 +57,13 @@ class OnlineSettingsScreen extends StatelessWidget {
           ),
         if (admin && modules.contains('smtp'))
           adminTile(OnlineAdminSection.mail, Icons.outgoing_mail, 'Server, Zugangsdaten, E-Mail-Vorlagen'),
+        if (admin && modules.contains('timeTracking'))
+          _MenuTile(
+            icon: Icons.badge_outlined,
+            title: 'Rollen & Stundensätze',
+            subtitle: 'Monteur, Meister, Projektleiter …',
+            onTap: () => _push(context, OnlineStaffRolesScreen(session: session)),
+          ),
         if (admin) ...[
           const Divider(),
           const _SectionHeader('Benutzer & Zugriff'),
@@ -334,6 +341,180 @@ class _OnlineDunningSettingsScreenState extends State<OnlineDunningSettingsScree
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// Rollen & Stundensätze wie offline (`settings_staff_roles_screen.dart`).
+/// Online gilt zusätzlich der Stundensatz je Mitglied, wenn eine Buchung
+/// keine Rolle trägt.
+class OnlineStaffRolesScreen extends StatefulWidget {
+  const OnlineStaffRolesScreen({super.key, required this.session});
+  final OnlineSession session;
+
+  @override
+  State<OnlineStaffRolesScreen> createState() => _OnlineStaffRolesScreenState();
+}
+
+class _OnlineStaffRolesScreenState extends State<OnlineStaffRolesScreen> {
+  late Future<List<OnlineStaffRole>> _future = widget.session.client.staffRoles();
+
+  void _reload() => setState(() {
+        _future = widget.session.client.staffRoles();
+      });
+
+  Future<void> _edit([OnlineStaffRole? existing]) async {
+    final result = await showDialog<({String name, int cents})>(
+      context: context,
+      builder: (_) => _StaffRoleFormDialog(existing: existing),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await widget.session.client.saveStaffRole(id: existing?.id, name: result.name, hourlyCostCents: result.cents);
+      _reload();
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+    }
+  }
+
+  Future<void> _delete(OnlineStaffRole role) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rolle löschen?'),
+        content: Text(
+          '"${role.name}" löschen? Bereits gebuchte Zeiten mit dieser Rolle behalten ihren '
+          'eingefrorenen Stundensatz, verlieren aber den Rollenbezug.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Löschen')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.session.client.deleteStaffRole(role.id);
+      _reload();
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Rollen & Stundensätze')),
+      body: FutureBuilder<List<OnlineStaffRole>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return Center(child: Text(describeOnlineError(snapshot.error!)));
+          if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+          final roles = snapshot.data!;
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Text(
+                  'Rollen sind Stundensatz-Kategorien — eine Zeitbuchung kann optional eine Rolle wählen, deren '
+                  'Stundenkostensatz in die Projekt-Ergebnisrechnung einfließt. Ohne Rolle gilt der Stundensatz '
+                  'des Mitglieds (Einstellungen › Mitglieder).',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              for (final role in roles)
+                Card(
+                  child: ListTile(
+                    title: Text(role.name),
+                    subtitle: Text('${Money.fromCents(role.hourlyCostCents)} / Std.'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(tooltip: 'Bearbeiten', icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(role)),
+                        IconButton(tooltip: 'Löschen', icon: const Icon(Icons.delete_outline), onPressed: () => _delete(role)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'online-staff-roles-fab',
+        onPressed: _edit,
+        icon: const Icon(Icons.add),
+        label: const Text('Rolle anlegen'),
+      ),
+    );
+  }
+}
+
+class _StaffRoleFormDialog extends StatefulWidget {
+  const _StaffRoleFormDialog({this.existing});
+  final OnlineStaffRole? existing;
+
+  @override
+  State<_StaffRoleFormDialog> createState() => _StaffRoleFormDialogState();
+}
+
+class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
+  late final _nameCtrl = TextEditingController(text: widget.existing?.name);
+  late final _rateCtrl = TextEditingController(
+    text: widget.existing == null ? null : Money.fromCents(widget.existing!.hourlyCostCents).formatEuro(),
+  );
+  String? _error;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _rateCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_isEdit ? 'Rolle bearbeiten' : 'Neue Rolle'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            key: const Key('online-role-name'),
+            controller: _nameCtrl,
+            autofocus: !_isEdit,
+            decoration: const InputDecoration(labelText: 'Name *'),
+          ),
+          TextField(
+            key: const Key('online-role-rate'),
+            controller: _rateCtrl,
+            decoration: InputDecoration(labelText: 'Stundenkostensatz (€)', errorText: _error),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: () {
+            final name = _nameCtrl.text.trim();
+            if (name.isEmpty) return;
+            final rateText = _rateCtrl.text.trim();
+            final int cents;
+            try {
+              cents = rateText.isEmpty ? 0 : Money.fromEuroString(rateText).cents;
+            } on FormatException {
+              setState(() => _error = 'Bitte einen Betrag eingeben.');
+              return;
+            }
+            Navigator.pop(context, (name: name, cents: cents));
+          },
+          child: Text(_isEdit ? 'Speichern' : 'Anlegen'),
+        ),
+      ],
     );
   }
 }
