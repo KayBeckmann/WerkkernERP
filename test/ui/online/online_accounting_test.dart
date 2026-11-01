@@ -48,15 +48,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Buchhaltung');
+    await openTab(tester, 'Offene Posten');
 
     // Offene Posten
     expect(find.text('1190,00 €'), findsWidgets);
     expect(find.text('Meyer'), findsOneWidget);
 
     // Beleg erfassen
-    await tester.tap(find.text('Belege'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Belege');
     await tester.tap(find.text('Beleg erfassen'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-form-description')), 'Kabel Großhandel');
@@ -71,21 +70,18 @@ void main() {
     expect(find.text('238,00 €'), findsWidgets);
 
     // EÜR
-    await tester.tap(find.text('EÜR'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'EÜR-Übersicht');
     expect(find.text('952,00 €'), findsOneWidget, reason: '1190 € Einnahmen − 238 € Ausgaben');
 
     // Bank: zuordnen und bezahlt markieren
-    await tester.tap(find.text('Bank'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Bankabgleich');
     await tester.tap(find.text('Zuordnen'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Zuordnen').last);
     await tester.pumpAndSettle();
     expect(find.text('Keine Bankumsätze.'), findsOneWidget, reason: 'nur nicht zugeordnete sichtbar');
 
-    await tester.tap(find.text('Offene Posten'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Offene Posten');
     await tester.drag(find.text('Offen gesamt'), const Offset(0, 300));
     await tester.pumpAndSettle();
     expect(find.text('Keine offenen Rechnungen.'), findsOneWidget);

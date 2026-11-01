@@ -7,11 +7,12 @@ import '../../../domain/services/online_session.dart';
 import 'online_document_screen.dart';
 
 /// Dokumente der Online-Firma — Liste mit Suche und Status, neuer
-/// Entwurf mit `invoices.write`. Dokumentarten erscheinen nur bei
-/// aktivem Modul (wie offline).
+/// Entwurf mit `invoices.write`. Wie offline ein Tab je Dokumentart
+/// ([kind]); ohne [kind] alle Arten (z. B. im Offline-Bestand).
 class OnlineDocumentsScreen extends StatefulWidget {
-  const OnlineDocumentsScreen({super.key, required this.session});
+  const OnlineDocumentsScreen({super.key, required this.session, this.kind});
   final OnlineSession session;
+  final String? kind;
 
   @override
   State<OnlineDocumentsScreen> createState() => _OnlineDocumentsScreenState();
@@ -34,7 +35,7 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
     final offline = widget.session.offline;
     if (widget.session.offlineOnly && offline != null) return _offlineDocuments(offline);
     try {
-      final documents = await widget.session.client.documents(query: _query);
+      final documents = await widget.session.client.documents(kind: widget.kind, query: _query);
       _showingOffline = false;
       return documents;
     } on ApiUnreachable {
@@ -48,7 +49,8 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
     final q = _query.toLowerCase();
     return [
       for (final d in offline.documents)
-        if (q.isEmpty || (d.number ?? '').toLowerCase().contains(q) || (d.displayCustomerName ?? '').toLowerCase().contains(q))
+        if ((widget.kind == null || d.kind == widget.kind) &&
+            (q.isEmpty || (d.number ?? '').toLowerCase().contains(q) || (d.displayCustomerName ?? '').toLowerCase().contains(q)))
           d,
     ];
   }
@@ -74,7 +76,7 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
       return;
     }
     if (!mounted) return;
-    final kinds = [
+    final kinds = widget.kind != null ? [widget.kind!] : [
       for (final entry in onlineDocumentKindModules.entries)
         // Gutschriften entstehen offline nur aus einer Rechnung — hier
         // ebenso wenig "aus dem Nichts" anbieten.
@@ -134,7 +136,17 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
                 final offline = widget.session.offline;
                 if (documents.isEmpty) {
                   return Center(
-                    child: Text(_showingOffline ? 'Keine offline verfügbaren Dokumente.' : 'Keine Dokumente gefunden.'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        _showingOffline
+                            ? 'Keine offline verfügbaren Dokumente.'
+                            : _query.isNotEmpty
+                            ? 'Keine Dokumente gefunden.'
+                            : onlineDocumentEmptyText(widget.kind),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   );
                 }
                 final list = RefreshIndicator(
@@ -184,19 +196,44 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
           ),
         ],
       ),
+      // Gutschriften entstehen nur aus einer Rechnung (wie offline).
       floatingActionButton: !widget.session.offlineOnly &&
+              widget.kind != 'creditNote' &&
               widget.session.can('invoices.write') &&
               widget.session.can('customers.read')
           ? FloatingActionButton.extended(
-              heroTag: 'online-documents-fab',
+              heroTag: 'online-documents-fab-${widget.kind}',
               onPressed: _create,
               icon: const Icon(Icons.add),
-              label: const Text('Neues Dokument'),
+              label: Text(onlineNewDocumentLabel(widget.kind)),
             )
           : null,
     );
   }
 }
+
+/// Wie offline `DocumentLabels.newFabLabel`.
+String onlineNewDocumentLabel(String? kind) => switch (kind) {
+      'invoice' => 'Neue Rechnung',
+      'quote' => 'Neues Angebot',
+      'order' => 'Neuer Auftrag',
+      'deliveryNote' => 'Neuer Lieferschein',
+      'proforma' => 'Neue Proforma-Rechnung',
+      'creditNote' => 'Neue Gutschrift',
+      _ => 'Neues Dokument',
+    };
+
+/// Wie offline `DocumentLabels.emptyListText`.
+String onlineDocumentEmptyText(String? kind) => switch (kind) {
+      'invoice' => 'Noch keine Rechnungsentwürfe.',
+      'quote' => 'Noch keine Angebotsentwürfe.',
+      'order' => 'Noch keine Auftragsentwürfe.',
+      'deliveryNote' => 'Noch keine Lieferschein-Entwürfe.',
+      'proforma' => 'Noch keine Proforma-Entwürfe.',
+      'creditNote' => 'Noch keine Gutschriften. Eine Gutschrift wird aus der betreffenden Rechnung heraus '
+          'erstellt (Rechnung öffnen → „Gutschrift erstellen").',
+      _ => 'Keine Dokumente gefunden.',
+    };
 
 class _NewDocumentDialog extends StatefulWidget {
   const _NewDocumentDialog({required this.customers, required this.kinds, this.projects = const []});
@@ -216,12 +253,13 @@ class _NewDocumentDialogState extends State<_NewDocumentDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Neues Dokument'),
+      title: Text(widget.kinds.length == 1 ? onlineNewDocumentLabel(widget.kinds.single) : 'Neues Dokument'),
       content: widget.customers.isEmpty
           ? const Text('Bitte zuerst einen Kunden anlegen.')
           : Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (widget.kinds.length > 1)
                 DropdownButtonFormField<String>(
                   initialValue: _kind,
                   decoration: const InputDecoration(labelText: 'Dokumentart'),

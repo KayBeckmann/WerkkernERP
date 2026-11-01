@@ -11,38 +11,10 @@ import '../../../domain/services/online_session.dart';
 import 'online_document_screen.dart';
 import 'online_form.dart';
 
-/// Buchhaltung der Online-Firma (C14): offene Posten, Belege mit
-/// DATEV-Export, EÜR-Übersicht, Bankabgleich per CSV. Wie offline eine
-/// interne Übersicht, **keine Steuerberatung**.
-class OnlineAccountingScreen extends StatelessWidget {
-  const OnlineAccountingScreen({super.key, required this.session});
-  final OnlineSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Column(
-        children: [
-          const TabBar(
-            isScrollable: true,
-            tabs: [Tab(text: 'Offene Posten'), Tab(text: 'Belege'), Tab(text: 'EÜR'), Tab(text: 'Bank')],
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _OpenItemsTab(session: session),
-                _ExpensesTab(session: session),
-                _EuerTab(session: session),
-                _BankTab(session: session),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// Buchhaltung der Online-Firma (C14): offene Posten, Belege mit
+// DATEV-Export, EÜR-Übersicht, Bankabgleich per CSV — wie offline je ein
+// eigener Bereich in der Navigation. Interne Übersicht, **keine
+// Steuerberatung**.
 
 String _euro(int cents) => Money.fromCents(cents).toString();
 
@@ -95,15 +67,15 @@ class _PeriodBar extends StatelessWidget {
 
 // ---- Offene Posten -------------------------------------------------------------
 
-class _OpenItemsTab extends StatefulWidget {
-  const _OpenItemsTab({required this.session});
+class OnlineOpenItemsScreen extends StatefulWidget {
+  const OnlineOpenItemsScreen({super.key, required this.session});
   final OnlineSession session;
 
   @override
-  State<_OpenItemsTab> createState() => _OpenItemsTabState();
+  State<OnlineOpenItemsScreen> createState() => _OnlineOpenItemsScreenState();
 }
 
-class _OpenItemsTabState extends State<_OpenItemsTab> {
+class _OnlineOpenItemsScreenState extends State<OnlineOpenItemsScreen> {
   late Future<({int totalCents, List<OnlineOpenItemGroup> customers})> _future = widget.session.client.openItems();
 
   void _reload() => setState(() {
@@ -170,15 +142,15 @@ class _OpenItemsTabState extends State<_OpenItemsTab> {
 
 // ---- Belege ----------------------------------------------------------------------
 
-class _ExpensesTab extends StatefulWidget {
-  const _ExpensesTab({required this.session});
+class OnlineExpensesScreen extends StatefulWidget {
+  const OnlineExpensesScreen({super.key, required this.session});
   final OnlineSession session;
 
   @override
-  State<_ExpensesTab> createState() => _ExpensesTabState();
+  State<OnlineExpensesScreen> createState() => _OnlineExpensesScreenState();
 }
 
-class _ExpensesTabState extends State<_ExpensesTab> {
+class _OnlineExpensesScreenState extends State<OnlineExpensesScreen> {
   _Period _period = _Period(DateTime.now().year, DateTime.now().month);
   late Future<(List<OnlineExpense>, int, List<OnlineExpenseCategory>)> _future = _load();
 
@@ -455,15 +427,15 @@ class _CategoriesScreen extends StatelessWidget {
 
 // ---- EÜR ---------------------------------------------------------------------------
 
-class _EuerTab extends StatefulWidget {
-  const _EuerTab({required this.session});
+class OnlineEuerScreen extends StatefulWidget {
+  const OnlineEuerScreen({super.key, required this.session});
   final OnlineSession session;
 
   @override
-  State<_EuerTab> createState() => _EuerTabState();
+  State<OnlineEuerScreen> createState() => _OnlineEuerScreenState();
 }
 
-class _EuerTabState extends State<_EuerTab> {
+class _OnlineEuerScreenState extends State<OnlineEuerScreen> {
   _Period _period = _Period(DateTime.now().year);
   late Future<OnlineEuer> _future = _load();
 
@@ -525,15 +497,15 @@ class _EuerTabState extends State<_EuerTab> {
 
 // ---- Bank ----------------------------------------------------------------------------
 
-class _BankTab extends StatefulWidget {
-  const _BankTab({required this.session});
+class OnlineBankScreen extends StatefulWidget {
+  const OnlineBankScreen({super.key, required this.session});
   final OnlineSession session;
 
   @override
-  State<_BankTab> createState() => _BankTabState();
+  State<OnlineBankScreen> createState() => _OnlineBankScreenState();
 }
 
-class _BankTabState extends State<_BankTab> {
+class _OnlineBankScreenState extends State<OnlineBankScreen> {
   bool _onlyUnmatched = true;
   late Future<List<OnlineBankTransaction>> _future = _load();
 

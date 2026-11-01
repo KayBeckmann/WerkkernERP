@@ -8,6 +8,7 @@ import '../../../pdf/dunning_letter_pdf_builder.dart';
 import 'online_document_screen.dart';
 import 'online_form.dart';
 import 'online_mail.dart';
+import 'online_settings_screen.dart';
 
 /// Mahnwesen der Online-Firma (C12): überfällige Rechnungen mit Stufe,
 /// Gebühr und Zins nach den eigenen Einstellungen, Mahnung erstellen
@@ -15,40 +16,6 @@ import 'online_mail.dart';
 class OnlineDunningScreen extends StatelessWidget {
   const OnlineDunningScreen({super.key, required this.session});
   final OnlineSession session;
-
-  Future<void> _settings(BuildContext context) async {
-    final s = await session.client.dunningSettings();
-    if (!context.mounted) return;
-    final values = await showOnlineForm(
-      context,
-      title: 'Mahn-Einstellungen',
-      fields: [
-        OnlineField('reminder2AfterDays', '2. Stufe ab Tag (nach Fälligkeit)', type: OnlineFieldType.decimal, required: true, initial: '${s['reminder2AfterDays']}'),
-        OnlineField('reminder3AfterDays', '3. Stufe ab Tag', type: OnlineFieldType.decimal, required: true, initial: '${s['reminder3AfterDays']}'),
-        OnlineField('feeLevel1Cents', 'Gebühr 1. Mahnung', type: OnlineFieldType.money, initial: s['feeLevel1Cents'] as int?),
-        OnlineField('feeLevel2Cents', 'Gebühr 2. Mahnung', type: OnlineFieldType.money, initial: s['feeLevel2Cents'] as int?),
-        OnlineField('feeLevel3Cents', 'Gebühr 3. Mahnung', type: OnlineFieldType.money, initial: s['feeLevel3Cents'] as int?),
-        OnlineField('interestRatePercent', 'Verzugszins % p. a. (0 = aus)', type: OnlineFieldType.decimal, initial: '${s['interestRatePercent']}'),
-        OnlineField('introText', 'Einleitungstext', type: OnlineFieldType.multiline, initial: s['introText'] as String?),
-        OnlineField('closingText', 'Schlusstext', type: OnlineFieldType.multiline, initial: s['closingText'] as String?),
-      ],
-    );
-    if (values == null || !context.mounted) return;
-    await runOnline(
-      context,
-      () => session.client.saveDunningSettings({
-        'reminder2AfterDays': double.parse(values['reminder2AfterDays'] as String).round(),
-        'reminder3AfterDays': double.parse(values['reminder3AfterDays'] as String).round(),
-        'feeLevel1Cents': values['feeLevel1Cents'] as int? ?? 0,
-        'feeLevel2Cents': values['feeLevel2Cents'] as int? ?? 0,
-        'feeLevel3Cents': values['feeLevel3Cents'] as int? ?? 0,
-        'interestRatePercent': double.parse(values['interestRatePercent'] as String? ?? '0'),
-        'introText': values['introText'],
-        'closingText': values['closingText'],
-      }),
-      success: 'Einstellungen gespeichert.',
-    );
-  }
 
   /// Mahnung zur heutigen Stufe erstellen und als PDF zeigen.
   Future<void> _createNotice(BuildContext context, OnlineOverdueInvoice item) async {
@@ -74,7 +41,13 @@ class OnlineDunningScreen extends StatelessWidget {
         spacing: 8,
         children: [
           if (canWrite)
-            OutlinedButton.icon(onPressed: () => _settings(context), icon: const Icon(Icons.tune), label: const Text('Einstellungen')),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => OnlineDunningSettingsScreen(session: session)),
+              ),
+              icon: const Icon(Icons.tune),
+              label: const Text('Einstellungen'),
+            ),
           if (items.isNotEmpty)
             Chip(label: Text('Offen inkl. Gebühren/Zinsen: ${Money.fromCents(items.fold(0, (s, i) => s + i.totalDueCents))}')),
         ],

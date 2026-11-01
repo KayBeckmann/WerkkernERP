@@ -47,11 +47,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Zeiten');
-    await tester.tap(find.text('Stundenzettel'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Stundenzettel');
 
-    await tester.tap(find.text('Stundenzettel anlegen'));
+    await tester.tap(find.text('Stundenzettel erstellen'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-form-documentId')));
     await tester.pumpAndSettle();

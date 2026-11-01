@@ -5,32 +5,38 @@ import 'package:werkkern_core/werkkern_core.dart';
 import '../../../domain/services/online_session.dart';
 import 'online_form.dart';
 
-/// Artikelbereich der Online-Firma: Artikel, Lieferanten, Artikelgruppen
-/// (wie offline A1). Lesen mit `articles.read`, Pflege mit `articles.write`.
+/// Artikel der Online-Firma (wie offline A1): Liste mit Knopf
+/// „Artikelgruppen“; Lieferanten haben wie offline einen eigenen Bereich
+/// ([OnlineSuppliersScreen]). Lesen mit `articles.read`, Pflege mit
+/// `articles.write`.
 class OnlineArticlesScreen extends StatelessWidget {
   const OnlineArticlesScreen({super.key, required this.session});
   final OnlineSession session;
 
   @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Column(
-        children: [
-          const TabBar(tabs: [Tab(text: 'Artikel'), Tab(text: 'Lieferanten'), Tab(text: 'Gruppen')]),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _ArticleList(session: session),
-                _SupplierList(session: session),
-                _GroupList(session: session),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => _ArticleList(session: session);
+}
+
+/// Lieferanten der Online-Firma — eigener Bereich wie offline.
+class OnlineSuppliersScreen extends StatelessWidget {
+  const OnlineSuppliersScreen({super.key, required this.session});
+  final OnlineSession session;
+
+  @override
+  Widget build(BuildContext context) => _SupplierList(session: session);
+}
+
+/// Artikelgruppen mit Aufschlag — wie offline eine Unterseite des
+/// Artikelbereichs.
+class OnlineArticleGroupsScreen extends StatelessWidget {
+  const OnlineArticleGroupsScreen({super.key, required this.session});
+  final OnlineSession session;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Artikelgruppen')),
+        body: _GroupList(session: session),
+      );
 }
 
 String _price(int? cents) => cents == null ? 'kein Preis' : '${Money.fromCents(cents)} netto';
@@ -111,6 +117,22 @@ class _ArticleList extends StatelessWidget {
     return OnlineListView<OnlineArticle>(
       load: (q) => session.client.articles(query: q),
       emptyText: 'Keine Artikel vorhanden.',
+      appBar: (context, reload) => AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Artikel'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.category_outlined),
+            tooltip: 'Artikelgruppen',
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => OnlineArticleGroupsScreen(session: session)),
+              );
+              reload();
+            },
+          ),
+        ],
+      ),
       searchHint: 'Artikel suchen',
       itemBuilder: (context, a, reload) => Card(
         child: ListTile(

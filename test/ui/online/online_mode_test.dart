@@ -41,8 +41,8 @@ void main() {
     expect(find.text('Elektro Kay'), findsOneWidget);
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Dokumente');
-    expect(find.text('Elektro Kay — Dokumente'), findsOneWidget);
+    await openTab(tester, 'Rechnungen');
+    expect(find.text('Elektro Kay — Rechnungen'), findsOneWidget);
     expect(find.textContaining('keine lokale Kopie'), findsOneWidget);
 
     // Kunde anlegen
@@ -56,9 +56,9 @@ void main() {
     expect(find.text('Müller GmbH'), findsOneWidget);
 
     // Dokument anlegen
-    await tester.tap(find.text('Dokumente'));
+    await tester.tap(find.text('Rechnungen'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Neues Dokument'));
+    await tester.tap(find.text('Neue Rechnung'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-new-document-customer')));
     await tester.pumpAndSettle();
@@ -111,7 +111,7 @@ void main() {
     await login(tester, server);
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Dokumente');
+    await openTab(tester, 'Rechnungen');
     await tester.tap(find.text('Rechnung (Entwurf)'));
     await tester.pumpAndSettle();
 
@@ -142,8 +142,10 @@ void main() {
     await login(tester, server, email: 'monteur@example.com');
     await tester.tap(find.text('Firma ohne Rechte'));
     await tester.pumpAndSettle();
+    // Der Ersteller ist Admin: nur „Einstellungen“ (Rechte vergeben), keine Fachbereiche.
     expect(find.textContaining('noch keine Rechte zugewiesen'), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+    expect(find.textContaining('Rechnungen'), findsNothing);
 
     await tester.pumpWidget(MaterialApp(key: UniqueKey(), home: OnlineLoginScreen(clientFactory: (_) => server.client(), offlineStoreFactory: () => null)));
     await tester.enterText(find.byKey(const Key('online-server')), 'erp.example.org');
@@ -191,7 +193,7 @@ void main() {
     await login(tester, server);
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Dokumente');
+    await openTab(tester, 'Angebote');
 
     await tester.tap(find.text('An-${year}001'));
     await tester.pumpAndSettle();
@@ -201,6 +203,7 @@ void main() {
     expect(find.text('Leistung'), findsOneWidget, reason: 'Positionen übernommen');
     await tester.pageBack();
     await tester.pumpAndSettle();
+    await openTab(tester, 'Rechnungen');
 
     await tester.tap(find.text('R-${year}001'));
     await tester.pumpAndSettle();
@@ -227,7 +230,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Dokumente');
+    await openTab(tester, 'Rechnungen');
 
     await tester.tap(find.byTooltip('Weitere Aktionen'));
     await tester.pumpAndSettle();

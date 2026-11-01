@@ -133,18 +133,19 @@ String describeOnlineError(Object error) => switch (error) {
 
 /// Anzeigenamen der Firmenmodule (Schlüssel wie offline `*Enabled`).
 const onlineModuleLabels = <String, String>{
+  // Reihenfolge und Namen wie offline (`settings_modules_screen.dart`).
   'quotes': 'Angebote',
   'orders': 'Aufträge',
   'deliveryNotes': 'Lieferscheine',
   'proforma': 'Proforma-Rechnungen',
-  'creditNotes': 'Gutschriften',
-  'advancePaymentInvoices': 'Abschlagsrechnungen',
   'projects': 'Projekte',
   'fleet': 'Fuhrpark',
   'recurringInvoices': 'Wiederkehrende Rechnungen',
+  'advancePaymentInvoices': 'Abschlagsrechnungen',
   'dunning': 'Mahnwesen',
-  'smtp': 'E-Mail-Versand',
+  'smtp': 'Versand (SMTP)',
   'buchhaltung': 'Buchhaltung',
+  'creditNotes': 'Gutschriften',
   'lagerbestand': 'Lagerbestand',
   'bestellwesen': 'Bestellwesen',
   'timeTracking': 'Zeiterfassung',

@@ -61,12 +61,14 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // Lager: Unterbestand + Inventur
-    await openTab(tester, 'Lager');
-    expect(find.textContaining('fehlen 10'), findsOneWidget);
-    await tester.tap(find.text('Inventur'));
+    // Inventur-Bereich wie offline; Unterbestand als Unterseite
+    await openTab(tester, 'Inventur');
+    await tester.tap(find.byTooltip('Unterbestand'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Inventur starten'));
+    expect(find.textContaining('fehlen 10'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Neue Inventur'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
@@ -86,12 +88,14 @@ void main() {
     expect(find.text('Inventur abschließen'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Bewegungen'));
+    await tester.tap(find.byTooltip('Bestandsbewegungen'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Kabel: +15,5 → 55,5'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
 
     // Dokument mit 60 m: Warnung beim Finalisieren, aber nicht blockierend.
-    await openTab(tester, 'Dokumente');
+    await openTab(tester, 'Rechnungen');
     await tester.tap(find.textContaining('Meyer').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Finalisieren'));

@@ -8,45 +8,45 @@ import '../../../domain/services/online_session.dart';
 import 'online_form.dart';
 import 'online_text_prompt.dart';
 
-/// Firmenverwaltung im Online-Modus — nur für Firmen-Admins (B1: "Nur
-/// Firmenadmin der betreffenden Firma verwaltet Gruppen, Zuordnung und
-/// Ausnahmen"). Jede Änderung prüft der Server erneut.
-class OnlineAdminScreen extends StatelessWidget {
-  const OnlineAdminScreen({super.key, required this.session});
+/// Bereiche der Firmenverwaltung im Online-Modus — je eine Unterseite im
+/// Einstellungsmenü (`online_settings_screen.dart`), nur für Firmen-Admins
+/// (B1: "Nur Firmenadmin der betreffenden Firma verwaltet Gruppen,
+/// Zuordnung und Ausnahmen"). Jede Änderung prüft der Server erneut.
+enum OnlineAdminSection {
+  modules('Module'),
+  company('Firmendaten'),
+  tax('Umsatzsteuer'),
+  documentTexts('Dokumenttexte'),
+  mail('Versand (SMTP)'),
+  members('Mitglieder'),
+  groups('Gruppen & Rechte'),
+  invitations('Einladungen'),
+  audit('Protokoll');
+
+  const OnlineAdminSection(this.title);
+  final String title;
+}
+
+class OnlineAdminPage extends StatelessWidget {
+  const OnlineAdminPage({super.key, required this.session, required this.section});
   final OnlineSession session;
+  final OnlineAdminSection section;
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 7,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('Verwaltung · ${session.companyName}'),
-          bottom: const TabBar(
-            isScrollable: true,
-            tabs: [
-              Tab(text: 'Mitglieder'),
-              Tab(text: 'Gruppen & Rechte'),
-              Tab(text: 'Einladungen'),
-              Tab(text: 'Module'),
-              Tab(text: 'Firmendaten'),
-              Tab(text: 'E-Mail'),
-              Tab(text: 'Protokoll'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _MembersTab(session: session),
-            _GroupsTab(session: session),
-            _InvitationsTab(session: session),
-            _ModulesTab(session: session),
-            _ProfileTab(session: session),
-            _MailTab(session: session),
-            _AuditTab(session: session),
-          ],
-        ),
-      ),
+    return Scaffold(
+      appBar: AppBar(title: Text(section.title)),
+      body: switch (section) {
+        OnlineAdminSection.modules => _ModulesTab(session: session),
+        OnlineAdminSection.company => _ProfileTab(session: session, section: section),
+        OnlineAdminSection.tax => _ProfileTab(session: session, section: section),
+        OnlineAdminSection.documentTexts => _ProfileTab(session: session, section: section),
+        OnlineAdminSection.mail => _MailTab(session: session),
+        OnlineAdminSection.members => _MembersTab(session: session),
+        OnlineAdminSection.groups => _GroupsTab(session: session),
+        OnlineAdminSection.invitations => _InvitationsTab(session: session),
+        OnlineAdminSection.audit => _AuditTab(session: session),
+      },
     );
   }
 }
@@ -699,7 +699,7 @@ class _MailTabState extends State<_MailTab> {
             ),
           ),
         if (!widget.session.modules.contains('smtp'))
-          const Card(child: ListTile(leading: Icon(Icons.info_outline), title: Text('Modul „E-Mail-Versand“ unter „Module“ aktivieren, um zu versenden.'))),
+          const Card(child: ListTile(leading: Icon(Icons.info_outline), title: Text('Modul „Versand (SMTP)“ unter „Module“ aktivieren, um zu versenden.'))),
         TextField(key: const Key('online-mail-host'), controller: _host, decoration: const InputDecoration(labelText: 'SMTP-Server')),
         TextField(controller: _port, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Port (587 STARTTLS, 465 SSL)')),
         SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('TLS verwenden'), value: _useTls, onChanged: (v) => setState(() => _useTls = v)),
@@ -760,14 +760,29 @@ class _ModulesTabState extends State<_ModulesTab> {
   late final Set<String> _modules = {...widget.session.modules};
   bool _busy = false;
 
-  Future<void> _save() async {
-    setState(() => _busy = true);
+  /// Wie offline: jeder Schalter wirkt sofort.
+  Future<void> _toggle(String key, bool on) async {
+    final previous = {..._modules};
+    setState(() {
+      _busy = true;
+      if (on) {
+        _modules.add(key);
+        if (key == 'bestellwesen') _modules.add('lagerbestand');
+      } else {
+        _modules.remove(key);
+        if (key == 'lagerbestand') _modules.remove('bestellwesen');
+      }
+    });
     try {
       await widget.session.client.setModules(_modules);
       await widget.session.refreshPermissions();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Module gespeichert.')));
     } on Exception catch (e) {
-      if (mounted) _showError(context, e);
+      if (mounted) {
+        setState(() => _modules
+          ..clear()
+          ..addAll(previous));
+        _showError(context, e);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -776,28 +791,30 @@ class _ModulesTabState extends State<_ModulesTab> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       children: [
-        const Text(
-          'Deaktivierte Module blenden Funktionen und Rechte aus; vorhandene Daten bleiben gespeichert.',
-        ),
-        for (final entry in onlineModuleLabels.entries)
-          SwitchListTile(
-            title: Text(entry.value),
-            subtitle: entry.key == 'bestellwesen' ? const Text('setzt Lagerbestand voraus') : null,
-            value: _modules.contains(entry.key),
-            onChanged: (v) => setState(() {
-              if (v) {
-                _modules.add(entry.key);
-                if (entry.key == 'bestellwesen') _modules.add('lagerbestand');
-              } else {
-                _modules.remove(entry.key);
-                if (entry.key == 'lagerbestand') _modules.remove('bestellwesen');
-              }
-            }),
+        Card(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Deaktivierte Module blenden Funktionen und Rechte aus; vorhandene Daten bleiben gespeichert.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              for (final entry in onlineModuleLabels.entries)
+                SwitchListTile(
+                  title: Text(entry.value),
+                  subtitle: entry.key == 'bestellwesen' && !_modules.contains('lagerbestand')
+                      ? const Text('Setzt Lagerbestand voraus')
+                      : null,
+                  value: _modules.contains(entry.key),
+                  onChanged: _busy ? null : (v) => _toggle(entry.key, v),
+                ),
+            ],
           ),
-        const SizedBox(height: 12),
-        FilledButton(onPressed: _busy ? null : _save, child: const Text('Module speichern')),
+        ),
       ],
     );
   }
@@ -805,9 +822,13 @@ class _ModulesTabState extends State<_ModulesTab> {
 
 // ---- Firmendaten ----------------------------------------------------------------
 
+/// Firmendaten, Umsatzsteuer und Dokumenttexte sind wie offline eigene
+/// Seiten, teilen sich aber ein Firmenprofil: jede Seite lädt es ganz und
+/// schickt die übrigen Felder unverändert zurück.
 class _ProfileTab extends StatefulWidget {
-  const _ProfileTab({required this.session});
+  const _ProfileTab({required this.session, required this.section});
   final OnlineSession session;
+  final OnlineAdminSection section;
 
   @override
   State<_ProfileTab> createState() => _ProfileTabState();
@@ -894,7 +915,7 @@ class _ProfileTabState extends State<_ProfileTab> {
         },
         smallBusinessExempt: _smallBusiness,
       ));
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Firmendaten gespeichert.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.section.title} gespeichert.')));
     } on Exception catch (e) {
       if (mounted) _showError(context, e);
     } finally {
@@ -905,46 +926,62 @@ class _ProfileTabState extends State<_ProfileTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
+    final section = widget.section;
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       children: [
-        const Text('Wird beim Finalisieren unveränderlich in jedes Dokument übernommen.'),
-        TextField(controller: _address, maxLines: 3, decoration: const InputDecoration(labelText: 'Anschrift')),
-        TextField(controller: _taxNumber, decoration: const InputDecoration(labelText: 'Steuernummer')),
-        TextField(controller: _vatId, decoration: const InputDecoration(labelText: 'USt-IdNr.')),
-        TextField(controller: _iban, decoration: const InputDecoration(labelText: 'IBAN')),
-        TextField(controller: _email, decoration: const InputDecoration(labelText: 'E-Mail')),
-        TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Telefon')),
-        SwitchListTile(
-          key: const Key('online-profile-small-business'),
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Kleinunternehmerregelung (§ 19 UStG)'),
-          subtitle: const Text('Alle Positionen 0 % USt, fester Hinweis im PDF. Bitte mit dem Steuerberater klären.'),
-          value: _smallBusiness,
-          onChanged: (v) => setState(() => _smallBusiness = v),
-        ),
-        TextField(controller: _footer, maxLines: 2, decoration: const InputDecoration(labelText: 'PDF-Fußzeile')),
-        const SizedBox(height: 12),
-        Text('Texte je Dokumentart', style: Theme.of(context).textTheme.titleSmall),
-        for (final kind in _kinds)
-          ExpansionTile(
-            title: Text(onlineDocumentKindLabels[kind] ?? kind),
-            children: [
-              TextField(
-                key: Key('online-profile-intro-$kind'),
-                controller: _texts[kind]!.intro,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Einleitungstext'),
-              ),
-              TextField(
-                controller: _texts[kind]!.closing,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Schlusstext'),
-              ),
-            ],
+        if (section == OnlineAdminSection.company) ...[
+          const Text('Wird beim Finalisieren unveränderlich in jedes Dokument übernommen.'),
+          TextField(controller: _address, maxLines: 3, decoration: const InputDecoration(labelText: 'Anschrift')),
+          TextField(controller: _taxNumber, decoration: const InputDecoration(labelText: 'Steuernummer')),
+          TextField(controller: _vatId, decoration: const InputDecoration(labelText: 'USt-IdNr.')),
+          TextField(controller: _iban, decoration: const InputDecoration(labelText: 'IBAN')),
+          TextField(controller: _email, decoration: const InputDecoration(labelText: 'E-Mail')),
+          TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Telefon')),
+        ],
+        if (section == OnlineAdminSection.tax)
+          Card(
+            child: SwitchListTile(
+              key: const Key('online-profile-small-business'),
+              title: const Text('Kleinunternehmerregelung (§ 19 UStG)'),
+              subtitle: const Text('Alle Positionen 0 % USt, fester Hinweis im PDF. Bitte mit dem Steuerberater klären.'),
+              value: _smallBusiness,
+              onChanged: (v) => setState(() => _smallBusiness = v),
+            ),
           ),
+        if (section == OnlineAdminSection.documentTexts) ...[
+          Text(
+            'Einleitungs- und Schlusstext je Dokumentart; werden beim Finalisieren in das Dokument übernommen.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          for (final kind in _kinds)
+            ExpansionTile(
+              title: Text(onlineDocumentKindLabels[kind] ?? kind),
+              children: [
+                TextField(
+                  key: Key('online-profile-intro-$kind'),
+                  controller: _texts[kind]!.intro,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Einleitungstext'),
+                ),
+                TextField(
+                  controller: _texts[kind]!.closing,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Schlusstext'),
+                ),
+              ],
+            ),
+          const SizedBox(height: 12),
+          TextField(controller: _footer, maxLines: 2, decoration: const InputDecoration(labelText: 'PDF-Fußzeile')),
+        ],
         const SizedBox(height: 12),
-        FilledButton(onPressed: _busy ? null : _save, child: const Text('Firmendaten speichern')),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton(
+            onPressed: _busy ? null : _save,
+            child: Text(section == OnlineAdminSection.company ? 'Firmendaten speichern' : 'Speichern'),
+          ),
+        ),
       ],
     );
   }

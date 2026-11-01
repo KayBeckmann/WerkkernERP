@@ -41,13 +41,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Dokumente');
+    await openTab(tester, 'Rechnungen');
 
-    // Verwaltung → E-Mail
-    await tester.tap(find.byTooltip('Verwaltung'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('E-Mail'));
-    await tester.tap(find.text('E-Mail'));
+    // Einstellungen → Versand (SMTP)
+    await openTab(tester, 'Einstellungen');
+    await tester.tap(find.text('Versand (SMTP)'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-mail-host')), 'smtp.example.org');
     await tester.enterText(find.byKey(const Key('online-mail-password')), 'geheim-123');
@@ -58,6 +56,7 @@ void main() {
     tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
     await tester.pageBack();
     await tester.pumpAndSettle();
+    await openTab(tester, 'Rechnungen');
 
     // Dokument senden
     await tester.tap(find.textContaining('Meyer').first);
