@@ -46,7 +46,7 @@ void main() {
     await fill('markup', '30');
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
-    expect(find.text('Aufschlag 30,0 %'), findsOneWidget);
+    expect(find.text('+30,0 %'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -75,12 +75,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('kein Preis'), findsOneWidget, reason: 'ohne EK kein Preis');
+    expect(find.text('–'), findsOneWidget, reason: 'ohne EK kein Preis (wie offline „–“)');
 
     // Einkaufspreis im Detail
     await tester.tap(find.text('NYM 3x1,5'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Einkaufspreis hinzufügen'));
+    expect(find.textContaining('Verkaufspreis: unbekannt'), findsOneWidget);
+    await tester.tap(find.text('Einkaufspreis setzen'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-form-supplierId')));
     await tester.pumpAndSettle();
@@ -90,10 +91,10 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
     expect(find.text('Standardlieferant'), findsOneWidget);
-    expect(find.text('130,00 € netto'), findsWidgets);
+    expect(find.text('Kalkulierter Netto-Verkaufspreis: 130,00 €'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.textContaining('130,00 € netto / m'), findsOneWidget);
+    expect(find.text('130,00 €'), findsOneWidget, reason: 'Preis rechts in der Zeile wie offline');
 
     // Neue Rechnung: Artikel-Position übernimmt den kalkulierten Preis.
     await openTab(tester, 'Rechnungen');

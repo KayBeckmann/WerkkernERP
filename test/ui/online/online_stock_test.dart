@@ -55,9 +55,14 @@ void main() {
     await tester.enterText(find.byKey(const Key('online-form-reason')), 'Anfangsbestand');
     await tester.tap(find.text('Buchen'));
     await tester.pumpAndSettle();
-    expect(find.text('40 m'), findsOneWidget);
-    expect(find.textContaining('Inventur/Korrektur · Anfangsbestand'), findsOneWidget);
+    expect(find.textContaining('Lagerbestand: 40 m'), findsOneWidget);
     tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
+    // Bewegungen wie offline als Dialog.
+    await tester.tap(find.text('Bewegungen'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Inventur/Korrektur · Anfangsbestand'), findsOneWidget);
+    await tester.tap(find.text('Schließen'));
+    await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -72,18 +77,17 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Soll 40 m'), findsOneWidget);
-    await tester.tap(find.text('Kabel'));
+    expect(find.text('Soll: 40 m'), findsOneWidget);
+    // Ist-Menge wie offline direkt in der Zeile.
+    await tester.enterText(find.byKey(const Key('online-inventory-counted-Kabel')), '55,5');
+    await tester.pump(const Duration(milliseconds: 700));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('online-form-counted')), '55,5');
-    await tester.tap(find.text('Übernehmen'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('gezählt 55,5'), findsOneWidget);
     await tester.tap(find.text('Inventur abschließen'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Abschließen'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('abgeschlossen'), findsWidgets);
+    expect(find.textContaining('Abgeschlossen'), findsWidgets);
+    expect(find.text('Ist: 55,5'), findsOneWidget);
     tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
     expect(find.text('Inventur abschließen'), findsNothing);
     await tester.pageBack();

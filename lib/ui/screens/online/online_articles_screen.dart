@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart';
@@ -40,6 +41,10 @@ class OnlineArticleGroupsScreen extends StatelessWidget {
 }
 
 String _price(int? cents) => cents == null ? 'kein Preis' : '${Money.fromCents(cents)} netto';
+
+/// Bestand unter dem Mindestbestand (Mengen als Dezimaltext).
+bool isBelowMinimum(OnlineArticle a) =>
+    a.minimumStock != null && Decimal.parse(a.stockQuantity) < Decimal.parse(a.minimumStock!);
 
 /// Dezimaltext ("2.5") in deutscher Schreibweise.
 String formatQuantity(String value) => value.replaceAll('.', ',');
@@ -114,9 +119,10 @@ class _ArticleList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canWrite = session.can('articles.write');
+    final showStock = session.modules.contains('lagerbestand');
     return OnlineListView<OnlineArticle>(
       load: (q) => session.client.articles(query: q),
-      emptyText: 'Keine Artikel vorhanden.',
+      emptyText: 'Noch keine Artikel angelegt.',
       appBar: (context, reload) => AppBar(
         automaticallyImplyLeading: false,
         title: const Text('Artikel'),
@@ -134,25 +140,32 @@ class _ArticleList extends StatelessWidget {
         ],
       ),
       searchHint: 'Artikel suchen',
-      itemBuilder: (context, a, reload) => Card(
-        child: ListTile(
-          leading: const Icon(Icons.inventory_2_outlined),
-          title: Text(a.name),
-          subtitle: Text([
-            a.unit == null ? _price(a.effectiveSalePriceCents) : '${_price(a.effectiveSalePriceCents)} / ${a.unit}',
-            if (a.salePriceCents != null) 'manuell',
-            if (a.articleGroupName != null) a.articleGroupName!,
-            if (session.modules.contains('lagerbestand')) 'Bestand ${formatQuantity(a.stockQuantity)}',
-          ].join(' · ')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => OnlineArticleDetailScreen(session: session, articleId: a.id)),
-            );
-            reload();
-          },
-        ),
-      ),
+      itemBuilder: (context, a, reload) {
+        // Wie offline: Artikel unter Mindestbestand rot markieren.
+        final lowStock = showStock && isBelowMinimum(a);
+        final error = Theme.of(context).colorScheme.error;
+        return Card(
+          child: ListTile(
+            leading: Icon(Icons.inventory_2_outlined, color: lowStock ? error : null),
+            title: Text(a.name),
+            subtitle: Text(
+              [
+                ?a.unit,
+                if (a.articleGroupName != null) a.articleGroupName!,
+                if (showStock) 'Bestand: ${formatQuantity(a.stockQuantity)}${lowStock ? ' (unter Mindestbestand!)' : ''}',
+              ].join(' · '),
+              style: lowStock ? TextStyle(color: error) : null,
+            ),
+            trailing: Text(a.effectiveSalePriceCents == null ? '–' : Money.fromCents(a.effectiveSalePriceCents!).toString()),
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => OnlineArticleDetailScreen(session: session, articleId: a.id)),
+              );
+              reload();
+            },
+          ),
+        );
+      },
       floatingActionButton: canWrite
           ? (reload) => Builder(
                 builder: (context) => FloatingActionButton.extended(
@@ -224,7 +237,7 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
   Future<void> _editPrice(List<OnlineSupplier> suppliers, [OnlineArticlePrice? existing]) async {
     final values = await showOnlineForm(
       context,
-      title: existing == null ? 'Einkaufspreis hinzufügen' : 'Einkaufspreis ändern',
+      title: 'Einkaufspreis setzen',
       fields: [
         OnlineField(
           'supplierId',
@@ -252,6 +265,62 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
     }
   }
 
+  Future<void> _toggleActive(OnlineArticle a) async {
+    if (await runOnline(
+      context,
+      () => widget.session.client.saveArticle(OnlineArticle(
+        id: a.id,
+        name: a.name,
+        unit: a.unit,
+        salePriceCents: a.salePriceCents,
+        active: !a.active,
+        articleGroupId: a.articleGroupId,
+        defaultSupplierId: a.defaultSupplierId,
+        minimumStock: a.minimumStock,
+      )),
+    )) {
+      _reload();
+    }
+  }
+
+  /// Bestandsbewegungen als Dialog wie offline (Knopf „Bewegungen“).
+  Future<void> _showMovements(OnlineArticle article) async {
+    List<OnlineStockMovement>? movements;
+    if (!await runOnline(context, () async => movements = await widget.session.client.stockMovements(articleId: article.id))) {
+      return;
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Bewegungen: ${article.name}'),
+        content: SizedBox(
+          width: 420,
+          child: movements!.isEmpty
+              ? const Text('Noch keine Bestandsbewegungen.')
+              : ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final m in movements!)
+                      ListTile(
+                        dense: true,
+                        title: Text('${m.quantityDelta.startsWith('-') ? '' : '+'}${formatQuantity(m.quantityDelta)} → '
+                            '${formatQuantity(m.resultingQuantity)}'),
+                        subtitle: Text([
+                          stockMovementTypeLabels[m.type] ?? m.type,
+                          if (m.referenceLabel != null) m.referenceLabel!,
+                          if (m.note != null) m.note!,
+                          formatOnlineDate(m.createdAt.toLocal()),
+                        ].join(' · ')),
+                      ),
+                  ],
+                ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Schließen'))],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final canWrite = widget.session.can('articles.write');
@@ -259,18 +328,25 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
       future: _future,
       builder: (context, snapshot) {
         final data = snapshot.data;
+        final article = data?.$1;
         return Scaffold(
           appBar: AppBar(
-            title: Text(data?.$1.name ?? 'Artikel'),
+            title: Text(article == null ? 'Artikel' : article.active ? article.name : '${article.name} (deaktiviert)'),
             actions: [
-              if (canWrite && data != null)
+              if (canWrite && article != null) ...[
                 IconButton(
                   tooltip: 'Bearbeiten',
                   icon: const Icon(Icons.edit_outlined),
                   onPressed: () async {
-                    if (await editOnlineArticle(context, widget.session, data.$1) != null) _reload();
+                    if (await editOnlineArticle(context, widget.session, article) != null) _reload();
                   },
                 ),
+                IconButton(
+                  icon: Icon(article.active ? Icons.block_outlined : Icons.check_circle_outline),
+                  tooltip: article.active ? 'Deaktivieren' : 'Aktivieren',
+                  onPressed: () => _toggleActive(article),
+                ),
+              ],
             ],
           ),
           body: snapshot.hasError
@@ -278,121 +354,107 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
               : data == null
                   ? const Center(child: CircularProgressIndicator())
                   : _body(data.$1, data.$2, data.$3, canWrite),
+          floatingActionButton: canWrite && data != null && data.$3.isNotEmpty
+              ? FloatingActionButton.extended(
+                  heroTag: 'online-article-detail-fab',
+                  onPressed: () => _editPrice(data.$3),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Einkaufspreis setzen'),
+                )
+              : null,
         );
       },
     );
   }
 
+  /// Aufbau wie offline (`article_detail_screen.dart`): Verkaufspreis,
+  /// Lagerbestand mit „Bewegungen“/„Bestand korrigieren“, darunter die
+  /// Einkaufspreise je Lieferant (Stern = Standardlieferant).
   Widget _body(OnlineArticle article, List<OnlineArticlePrice> prices, List<OnlineSupplier> suppliers, bool canWrite) {
+    final theme = Theme.of(context);
+    final low = isBelowMinimum(article);
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 88),
       children: [
-        Card(
+        Padding(
+          padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ListTile(
-                title: const Text('Verkaufspreis (wirksam)'),
-                trailing: Text(_price(article.effectiveSalePriceCents), style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                article.effectiveSalePriceCents == null
+                    ? 'Verkaufspreis: unbekannt (kein Standardlieferant/Einkaufspreis)'
+                    : article.salePriceCents != null
+                        ? 'Netto-Verkaufspreis (manuell): ${Money.fromCents(article.salePriceCents!)}'
+                        : 'Kalkulierter Netto-Verkaufspreis: ${Money.fromCents(article.effectiveSalePriceCents!)}',
+                style: theme.textTheme.titleMedium,
               ),
-              ListTile(
-                dense: true,
-                title: const Text('Kalkuliert'),
-                subtitle: Text(article.articleGroupName == null ? 'ohne Gruppe: 0 % Aufschlag' : 'Gruppe ${article.articleGroupName}'),
-                trailing: Text(_price(article.calculatedSalePriceCents)),
-              ),
+              // Nur online: manueller Preis überschreibt die Kalkulation.
               if (article.salePriceCents != null)
-                ListTile(dense: true, title: const Text('Manuell (vorrangig)'), trailing: Text(_price(article.salePriceCents))),
+                Text(
+                  'Kalkuliert: ${_price(article.calculatedSalePriceCents)}'
+                  '${article.articleGroupName == null ? '' : ' (Gruppe ${article.articleGroupName})'}',
+                  style: theme.textTheme.bodySmall,
+                ),
+              if (_showStock) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Lagerbestand: ${formatQuantity(article.stockQuantity)}'
+                      '${article.unit == null ? '' : ' ${article.unit}'}'
+                      '${article.minimumStock == null ? '' : ' (Mindestbestand: ${formatQuantity(article.minimumStock!)})'}',
+                      style: TextStyle(color: low ? theme.colorScheme.error : null, fontWeight: FontWeight.w600),
+                    ),
+                    TextButton(onPressed: () => _showMovements(article), child: const Text('Bewegungen')),
+                    if (widget.session.can('stock.write'))
+                      TextButton(onPressed: () => _correctStock(article), child: const Text('Bestand korrigieren')),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
-        if (_showStock) ...[
-          const SizedBox(height: 12),
-          Card(
-            child: Column(
-              children: [
-                ListTile(
-                  title: const Text('Lagerbestand'),
-                  subtitle: article.minimumStock == null ? null : Text('Mindestbestand ${formatQuantity(article.minimumStock!)}'),
-                  trailing: Text(
-                    '${formatQuantity(article.stockQuantity)}${article.unit == null ? '' : ' ${article.unit}'}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                if (widget.session.can('stock.write'))
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => _correctStock(article),
-                      icon: const Icon(Icons.edit_note),
-                      label: const Text('Bestand korrigieren'),
-                    ),
-                  ),
-                FutureBuilder<List<OnlineStockMovement>>(
-                  future: widget.session.client.stockMovements(articleId: article.id),
-                  builder: (context, snapshot) {
-                    final movements = snapshot.data ?? const <OnlineStockMovement>[];
-                    return Column(
-                      children: [
-                        for (final m in movements.take(20))
-                          ListTile(
-                            dense: true,
-                            title: Text('${m.quantityDelta.startsWith('-') ? '' : '+'}${formatQuantity(m.quantityDelta)} → '
-                                '${formatQuantity(m.resultingQuantity)}'),
-                            subtitle: Text([
-                              stockMovementTypeLabels[m.type] ?? m.type,
-                              if (m.referenceLabel != null) m.referenceLabel!,
-                              if (m.note != null) m.note!,
-                              formatOnlineDate(m.createdAt.toLocal()),
-                            ].join(' · ')),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: 12),
-        Text('Einkaufspreise', style: Theme.of(context).textTheme.titleMedium),
-        if (prices.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Noch keine Einkaufspreise.')),
+        const Divider(height: 1),
+        if (prices.isEmpty)
+          const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Noch keine Lieferantenpreise hinterlegt.'))),
         for (final p in prices)
-          Card(
-            child: ListTile(
-              leading: Icon(p.supplierId == article.defaultSupplierId ? Icons.star : Icons.local_shipping_outlined),
-              title: Text(p.supplierName ?? 'Lieferant'),
-              subtitle: p.supplierId == article.defaultSupplierId ? const Text('Standardlieferant') : null,
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(Money.fromCents(p.purchasePriceCents).toString()),
-                  if (canWrite)
-                    IconButton(
-                      tooltip: 'Preis entfernen',
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () async {
-                        if (await runOnline(
-                          context,
-                          () => widget.session.client.removeArticlePrice(article.id, p.supplierId),
-                        )) {
-                          _reload();
-                        }
-                      },
-                    ),
-                ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Card(
+              child: ListTile(
+                leading: Icon(
+                  p.supplierId == article.defaultSupplierId ? Icons.star : Icons.local_shipping_outlined,
+                  color: p.supplierId == article.defaultSupplierId ? Colors.amber[700] : null,
+                ),
+                title: Text(p.supplierName ?? '(unbekannt)'),
+                subtitle: p.supplierId == article.defaultSupplierId ? const Text('Standardlieferant') : null,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(Money.fromCents(p.purchasePriceCents).toString()),
+                    if (canWrite)
+                      IconButton(
+                        tooltip: 'Preis entfernen',
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () async {
+                          if (await runOnline(
+                            context,
+                            () => widget.session.client.removeArticlePrice(article.id, p.supplierId),
+                          )) {
+                            _reload();
+                          }
+                        },
+                      ),
+                  ],
+                ),
+                onTap: canWrite ? () => _editPrice(suppliers, p) : null,
               ),
-              onTap: canWrite ? () => _editPrice(suppliers, p) : null,
             ),
           ),
-        if (canWrite)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: suppliers.isEmpty ? null : () => _editPrice(suppliers),
-              icon: const Icon(Icons.add),
-              label: Text(suppliers.isEmpty ? 'Erst einen Lieferanten anlegen' : 'Einkaufspreis hinzufügen'),
-            ),
-          ),
+        if (canWrite && suppliers.isEmpty)
+          const Padding(padding: EdgeInsets.all(16), child: Text('Für Einkaufspreise erst einen Lieferanten anlegen.')),
       ],
     );
   }
@@ -441,17 +503,14 @@ class _SupplierList extends StatelessWidget {
     final canWrite = session.can('articles.write');
     return OnlineListView<OnlineSupplier>(
       load: (q) => session.client.suppliers(query: q),
-      emptyText: 'Keine Lieferanten vorhanden.',
+      emptyText: 'Noch keine Lieferanten angelegt.',
       searchHint: 'Lieferanten suchen',
       itemBuilder: (context, s, reload) => Card(
         child: ListTile(
           leading: const Icon(Icons.local_shipping_outlined),
           title: Text(s.name),
-          subtitle: Text([
-            if (s.contactPerson != null) s.contactPerson!,
-            if (s.email != null) s.email!,
-            if (s.minimumOrderQuantity != null) 'Mindestmenge ${s.minimumOrderQuantity!.replaceAll('.', ',')}',
-          ].join(' · ')),
+          // Wie offline: Anschrift als Untertitel.
+          subtitle: s.address == null ? null : Text(s.address!),
           trailing: canWrite
               ? IconButton(
                   tooltip: 'Lieferant löschen',
@@ -526,14 +585,17 @@ class _GroupList extends StatelessWidget {
     final canWrite = session.can('articles.write');
     return OnlineListView<OnlineArticleGroup>(
       load: (_) => session.client.articleGroups(),
-      emptyText: 'Keine Artikelgruppen vorhanden.',
+      emptyText: 'Noch keine Artikelgruppen angelegt.',
       itemBuilder: (context, g, reload) => Card(
         child: ListTile(
           leading: const Icon(Icons.category_outlined),
           title: Text(g.name),
-          subtitle: Text('Aufschlag ${g.markupPercent.toString().replaceAll('.', ',')} %'),
-          trailing: canWrite
-              ? IconButton(
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('+${g.markupPercent.toStringAsFixed(1).replaceAll('.', ',')} %'),
+              if (canWrite)
+                IconButton(
                   tooltip: 'Gruppe löschen',
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () async {
@@ -543,7 +605,8 @@ class _GroupList extends StatelessWidget {
                     if (context.mounted && await runOnline(context, () => session.client.deleteArticleGroup(g.id))) reload();
                   },
                 )
-              : null,
+            ],
+          ),
           onTap: canWrite
               ? () async {
                   if (await _edit(context, g)) reload();

@@ -72,7 +72,9 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 final customers = snapshot.data!;
-                if (customers.isEmpty) return const Center(child: Text('Keine Kunden gefunden.'));
+                if (customers.isEmpty) {
+                  return Center(child: Text(_query.isEmpty ? 'Noch keine Kunden angelegt.' : 'Keine Kunden gefunden.'));
+                }
                 return RefreshIndicator(
                   onRefresh: () async => _reload(),
                   child: ListView.separated(
@@ -86,7 +88,7 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
                           leading: const Icon(Icons.person_outline),
                           title: Text(c.name),
                           subtitle: c.address != null ? Text(c.address!) : null,
-                          trailing: canWrite ? const Icon(Icons.edit_outlined) : null,
+                          trailing: const Icon(Icons.chevron_right),
                           onTap: canWrite ? () => _edit(c) : null,
                         ),
                       );

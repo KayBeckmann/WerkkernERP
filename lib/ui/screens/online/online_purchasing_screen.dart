@@ -12,15 +12,17 @@ import 'online_articles_screen.dart' show formatQuantity;
 import 'online_form.dart';
 import 'online_mail.dart';
 
+/// Wie offline (`purchase_orders_screen.dart`).
 const purchaseOrderStatusLabels = {
   'draft': 'Entwurf',
-  'finalized': 'bestellt',
-  'partiallyReceived': 'teilweise geliefert',
-  'fullyReceived': 'vollständig geliefert',
+  'finalized': 'Finalisiert',
+  'partiallyReceived': 'Teilweise erhalten',
+  'fullyReceived': 'Vollständig erhalten',
 };
 
-/// Bestellungen an Lieferanten (C5.2): Entwürfe, Bestellvorschläge aus
-/// dem Unterbestand, Finalisieren mit Nummer, Wareneingang, PDF.
+/// Bestellungen an Lieferanten (C5.2) — Aufbau wie offline
+/// (`purchase_orders_screen.dart`): Liste mit Nummer, Lieferant und
+/// Status; „Mindestbestand“ und „Neue Bestellung“ unten.
 class OnlinePurchasingScreen extends StatelessWidget {
   const OnlinePurchasingScreen({super.key, required this.session});
   final OnlineSession session;
@@ -33,21 +35,23 @@ class OnlinePurchasingScreen extends StatelessWidget {
     final suppliers = await session.client.suppliers();
     if (!context.mounted) return;
     if (suppliers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erst einen Lieferanten anlegen (Artikel → Lieferanten).')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte zuerst einen Lieferanten anlegen.')));
       return;
     }
-    final values = await showOnlineForm(
-      context,
-      title: 'Neue Bestellung',
-      submitLabel: 'Anlegen',
-      fields: [
-        OnlineField('supplierId', 'Lieferant', type: OnlineFieldType.choice, required: true, options: {for (final s in suppliers) s.id: s.name}),
-      ],
+    final supplier = await showDialog<OnlineSupplier>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Lieferant wählen'),
+        children: [
+          for (final s in suppliers)
+            SimpleDialogOption(onPressed: () => Navigator.pop(context, s), child: Text(s.name)),
+        ],
+      ),
     );
-    if (values == null || !context.mounted) return;
+    if (supplier == null || !context.mounted) return;
     OnlinePurchaseOrder? created;
     await runOnline(context, () async {
-      created = await session.client.createPurchaseOrder(supplierId: values['supplierId'] as String);
+      created = await session.client.createPurchaseOrder(supplierId: supplier.id);
     });
     if (created != null && context.mounted) await _open(context, created!.id);
     reload();
@@ -63,20 +67,12 @@ class OnlinePurchasingScreen extends StatelessWidget {
     final canWrite = session.can('purchaseOrders.write');
     return OnlineListView<OnlinePurchaseOrder>(
       load: (_) => session.client.purchaseOrders(),
-      emptyText: 'Noch keine Bestellungen.',
-      header: (context, items, reload) => Align(
-        alignment: Alignment.centerLeft,
-        child: OutlinedButton.icon(
-          onPressed: () => _suggestions(context, reload),
-          icon: const Icon(Icons.lightbulb_outline),
-          label: const Text('Bestellvorschläge'),
-        ),
-      ),
+      emptyText: 'Noch keine Bestellungen angelegt.',
       itemBuilder: (context, o, reload) => Card(
         child: ListTile(
-          leading: Icon(o.isDraft ? Icons.edit_note : Icons.local_shipping_outlined),
-          title: Text('${o.number ?? 'Entwurf'} · ${o.supplierName ?? ''}'),
-          subtitle: Text('${formatOnlineDate(o.issueDate)} · ${purchaseOrderStatusLabels[o.status] ?? o.status}'),
+          leading: const Icon(Icons.shopping_cart_outlined),
+          title: Text(o.number ?? 'Entwurf'),
+          subtitle: Text('${o.supplierName ?? ''} · ${purchaseOrderStatusLabels[o.status] ?? o.status}'.trim()),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
             await _open(context, o.id);
@@ -84,38 +80,101 @@ class OnlinePurchasingScreen extends StatelessWidget {
           },
         ),
       ),
-      floatingActionButton: canWrite
-          ? (reload) => Builder(
-                builder: (context) => FloatingActionButton.extended(
-                  heroTag: 'online-purchasing-fab',
-                  onPressed: () => _create(context, reload),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Bestellung anlegen'),
-                ),
-              )
-          : null,
+      floatingActionButton: (reload) => Builder(
+        builder: (context) => Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            FloatingActionButton.extended(
+              heroTag: 'online-purchasing-low-stock-fab',
+              onPressed: () => _suggestions(context, reload),
+              icon: const Icon(Icons.warning_amber_outlined),
+              label: const Text('Mindestbestand'),
+            ),
+            if (canWrite) ...[
+              const SizedBox(width: 12),
+              FloatingActionButton.extended(
+                heroTag: 'online-purchasing-fab',
+                onPressed: () => _create(context, reload),
+                icon: const Icon(Icons.add),
+                label: const Text('Neue Bestellung'),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _SuggestionsScreen extends StatelessWidget {
+/// Mindestbestand-Meldungen wie offline (`low_stock_suggestions_screen.dart`):
+/// je Lieferant ein Vorschlag, bei nicht erreichter Mindestbestellmenge
+/// Rückfrage vor dem Anlegen.
+class _SuggestionsScreen extends StatefulWidget {
   const _SuggestionsScreen({required this.session});
   final OnlineSession session;
 
   @override
+  State<_SuggestionsScreen> createState() => _SuggestionsScreenState();
+}
+
+class _SuggestionsScreenState extends State<_SuggestionsScreen> {
+  late Future<({List<OnlinePurchaseSuggestion> suggestions, List<String> unassignable})> _future =
+      widget.session.client.purchaseSuggestions();
+
+  Future<void> _createDraft(OnlinePurchaseSuggestion s) async {
+    if (!s.meetsMinimumOrderQuantity) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Mindestbestellmenge nicht erreicht'),
+          content: Text(
+            'Die zusammengefasste Menge (${formatQuantity(s.totalQuantity)}) erreicht nicht '
+            'die Mindestbestellmenge von ${s.supplierName} '
+            '(${formatQuantity(s.minimumOrderQuantity!)}). Der Entwurf lässt sich trotzdem '
+            'anlegen und vor dem Finalisieren noch anpassen.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Trotzdem anlegen')),
+          ],
+        ),
+      );
+      if (proceed != true || !mounted) return;
+    }
+    OnlinePurchaseOrder? created;
+    await runOnline(context, () async {
+      created = await widget.session.client.purchaseOrderFromSuggestion(s.supplierId);
+    });
+    if (created == null || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OnlinePurchaseOrderScreen(session: widget.session, purchaseOrderId: created!.id),
+      ),
+    );
+    if (mounted) {
+      setState(() {
+        _future = widget.session.client.purchaseSuggestions();
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Bestellvorschläge')),
+      appBar: AppBar(title: const Text('Mindestbestand-Meldungen')),
       body: FutureBuilder<({List<OnlinePurchaseSuggestion> suggestions, List<String> unassignable})>(
-        future: session.client.purchaseSuggestions(),
+        future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) return Center(child: Text(describeOnlineError(snapshot.error!)));
           final data = snapshot.data;
           if (data == null) return const Center(child: CircularProgressIndicator());
+          if (data.suggestions.isEmpty && data.unassignable.isEmpty) {
+            return const Center(child: Text('Aktuell kein Artikel unter Mindestbestand.'));
+          }
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
-              if (data.suggestions.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Kein Artikel unter Mindestbestand.'))),
               for (final s in data.suggestions)
                 Card(
                   child: Padding(
@@ -123,44 +182,39 @@ class _SuggestionsScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(s.supplierName, style: Theme.of(context).textTheme.titleMedium),
-                        for (final i in s.items) Text('${formatQuantity(i.quantity)} × ${i.description}'),
+                        Text(s.supplierName, style: theme.textTheme.titleMedium),
+                        for (final i in s.items) Text('${i.description}: ${formatQuantity(i.quantity)}'),
                         if (!s.meetsMinimumOrderQuantity)
-                          Text(
-                            'Mindestbestellmenge ${formatQuantity(s.minimumOrderQuantity!)} nicht erreicht '
-                            '(${formatQuantity(s.totalQuantity)}) — vor dem Finalisieren ergänzen.',
-                            style: TextStyle(color: Theme.of(context).colorScheme.error),
-                          ),
-                        if (session.can('purchaseOrders.write'))
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: FilledButton(
-                              onPressed: () async {
-                                OnlinePurchaseOrder? created;
-                                await runOnline(context, () async {
-                                  created = await session.client.purchaseOrderFromSuggestion(s.supplierId);
-                                });
-                                if (created != null && context.mounted) {
-                                  await Navigator.of(context).pushReplacement(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => OnlinePurchaseOrderScreen(session: session, purchaseOrderId: created!.id),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: const Text('Als Entwurf übernehmen'),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Unter Mindestbestellmenge (${formatQuantity(s.minimumOrderQuantity!)}) — wird noch nicht erreicht.',
+                              style: TextStyle(color: theme.colorScheme.error),
                             ),
                           ),
+                        if (widget.session.can('purchaseOrders.write')) ...[
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: FilledButton(onPressed: () => _createDraft(s), child: const Text('Entwurf anlegen')),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ),
               if (data.unassignable.isNotEmpty)
                 Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.help_outline),
-                    title: const Text('Nicht zuordenbar (kein Einkaufspreis)'),
-                    subtitle: Text(data.unassignable.join(', ')),
+                  color: theme.colorScheme.errorContainer,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Nicht zuordenbar (kein Standardlieferant/Preis bekannt):'),
+                        for (final name in data.unassignable) Text(name),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -185,6 +239,10 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
   OnlinePurchaseOrder? _order;
   Object? _error;
 
+  /// Für die Zuordnungszeile im Kopf (wie offline).
+  String? _projectName;
+  String? _categoryLabel;
+
   WerkkernApiClient get _client => widget.session.client;
   bool get _canWrite => widget.session.can('purchaseOrders.write');
 
@@ -197,10 +255,30 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
   Future<void> _load() async {
     try {
       final order = await _client.purchaseOrder(widget.purchaseOrderId);
+      await _loadAssignmentNames(order);
       if (mounted) setState(() => _order = order);
     } on Exception catch (e) {
       if (mounted) setState(() => _error = e);
     }
+  }
+
+  Future<void> _loadAssignmentNames(OnlinePurchaseOrder order) async {
+    final session = widget.session;
+    try {
+      _projectName = order.projectId == null || !session.can('projects.read')
+          ? null
+          : (await _client.projects()).where((p) => p.id == order.projectId).firstOrNull?.name;
+      _categoryLabel = order.expenseCategoryId == null || !session.can('accounting.read')
+          ? null
+          : (await _client.expenseCategories()).where((c) => c.id == order.expenseCategoryId).firstOrNull?.label;
+    } on Exception {
+      // Nur Anzeige — ohne Namen bleibt die Zuordnung trotzdem gespeichert.
+    }
+  }
+
+  Future<void> _apply(OnlinePurchaseOrder updated) async {
+    await _loadAssignmentNames(updated);
+    if (mounted) setState(() => _order = updated);
   }
 
   Future<void> _saveItems(List<OnlinePurchaseOrderItem> items) async {
@@ -213,7 +291,7 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
         projectId: order.projectId,
         expenseCategoryId: order.expenseCategoryId,
       );
-      if (mounted) setState(() => _order = updated);
+      await _apply(updated);
     });
   }
 
@@ -251,14 +329,10 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
     ]);
   }
 
+  /// Nur online: Lieferant und Hinweis an den Lieferanten ändern.
   Future<void> _editHeader() async {
     final order = _order!;
-    final session = widget.session;
     final suppliers = await _client.suppliers();
-    final projects = session.modules.contains('projects') && session.can('projects.read') ? await _client.projects() : const <OnlineProject>[];
-    final categories = session.modules.contains('buchhaltung') && session.can('accounting.read')
-        ? await _client.expenseCategories()
-        : const <OnlineExpenseCategory>[];
     if (!mounted) return;
     final values = await showOnlineForm(
       context,
@@ -266,27 +340,79 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
       fields: [
         OnlineField('supplierId', 'Lieferant', type: OnlineFieldType.choice, required: true, initial: order.supplierId,
             options: {for (final s in suppliers) s.id: s.name}),
-        if (projects.isNotEmpty)
-          OnlineField('projectId', 'Projekt', type: OnlineFieldType.choice, initial: order.projectId,
-              options: {for (final p in projects) p.id: '${p.displayNumber} · ${p.name}'},
-              helper: 'Der Wareneingangs-Beleg zählt als Projektkosten.'),
-        if (categories.isNotEmpty)
-          OnlineField('expenseCategoryId', 'Beleg-Kategorie', type: OnlineFieldType.choice, initial: order.expenseCategoryId,
-              options: {for (final c in categories) c.id: c.label}),
         OnlineField('notes', 'Hinweis an den Lieferanten', type: OnlineFieldType.multiline, initial: order.notes),
       ],
     );
     if (values == null || !mounted) return;
     await runOnline(context, () async {
-      final updated = await _client.updatePurchaseOrder(
+      await _apply(await _client.updatePurchaseOrder(
         order,
         items: order.items,
         supplierId: values['supplierId'] as String,
         notes: values['notes'] as String?,
+        projectId: order.projectId,
+        expenseCategoryId: order.expenseCategoryId,
+      ));
+    });
+  }
+
+  /// Wie offline: Projekt, Beleg-Kategorie und Auftrag/Rechnung in einem
+  /// Dialog, alle optional — ohne jede Zuordnung gilt die Bestellung als
+  /// Lagerbestellung.
+  Future<void> _editAssignment() async {
+    final order = _order!;
+    final session = widget.session;
+    var projects = const <OnlineProject>[];
+    var categories = const <OnlineExpenseCategory>[];
+    var documents = const <OnlineDocument>[];
+    final loaded = await runOnline(context, () async {
+      if (session.modules.contains('projects') && session.can('projects.read')) projects = await _client.projects();
+      if (session.modules.contains('buchhaltung') && session.can('accounting.read')) {
+        categories = await _client.expenseCategories();
+      }
+      if (session.can('invoices.read')) {
+        documents = [
+          if (session.modules.contains('orders')) ...await _client.documents(kind: 'order', status: 'finalized'),
+          ...await _client.documents(kind: 'invoice', status: 'finalized'),
+        ];
+      }
+    });
+    if (!loaded || !mounted) return;
+    if (projects.isEmpty && categories.isEmpty && documents.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Keine Projekte, Beleg-Kategorien oder finalisierten Dokumente vorhanden.')),
+      );
+      return;
+    }
+    final values = await showOnlineForm(
+      context,
+      title: 'Zuordnung',
+      fields: [
+        if (projects.isNotEmpty)
+          OnlineField('projectId', 'Projekt', type: OnlineFieldType.choice, initial: order.projectId,
+              options: {null: '— keines —', for (final p in projects) p.id: p.name}),
+        if (categories.isNotEmpty)
+          OnlineField('expenseCategoryId', 'Beleg-Kategorie (SKR03)', type: OnlineFieldType.choice, initial: order.expenseCategoryId,
+              options: {null: '— ohne Kategorie —', for (final c in categories) c.id: c.label}),
+        if (documents.isNotEmpty)
+          OnlineField('sourceOrderId', 'Auftrag/Rechnung', type: OnlineFieldType.choice,
+              initial: documents.any((d) => d.id == order.sourceOrderId) ? order.sourceOrderId : null,
+              options: {
+                null: '— keines —',
+                for (final d in documents) d.id: '${d.number ?? d.id}${d.displayCustomerName == null ? '' : ' · ${d.displayCustomerName}'}',
+              }),
+      ],
+    );
+    if (values == null || !mounted) return;
+    await runOnline(context, () async {
+      await _apply(await _client.updatePurchaseOrder(
+        order,
+        items: order.items,
+        notes: order.notes,
         projectId: values.containsKey('projectId') ? values['projectId'] as String? : order.projectId,
         expenseCategoryId: values.containsKey('expenseCategoryId') ? values['expenseCategoryId'] as String? : order.expenseCategoryId,
-      );
-      if (mounted) setState(() => _order = updated);
+        sourceOrderId: values.containsKey('sourceOrderId') ? () => values['sourceOrderId'] as String? : null,
+      ));
     });
   }
 
@@ -302,28 +428,26 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
     if (!mounted) return;
     await runOnline(context, () async {
       final updated = await _client.finalizePurchaseOrder(_order!);
-      if (mounted) setState(() => _order = updated);
-    }, success: 'Bestellung finalisiert.');
+      await _apply(updated);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Finalisiert als ${updated.number}.')));
+      }
+    });
   }
 
+  /// Wie offline: je offener Position die **zusätzlich** eingegangene
+  /// Menge, leer = nichts gebucht.
   Future<void> _receive() async {
     final order = _order!;
-    final open = [
-      for (final i in order.items)
-        if (Decimal.parse(i.quantity) > Decimal.parse(i.receivedQuantity)) i,
-    ];
+    String open(OnlinePurchaseOrderItem i) => (Decimal.parse(i.quantity) - Decimal.parse(i.receivedQuantity)).toString();
     final values = await showOnlineForm(
       context,
-      title: 'Wareneingang',
+      title: 'Wareneingang erfassen',
       submitLabel: 'Buchen',
       fields: [
-        for (final i in open)
-          OnlineField(
-            i.id!,
-            '${i.description} (offen ${formatQuantity((Decimal.parse(i.quantity) - Decimal.parse(i.receivedQuantity)).toString())})',
-            type: OnlineFieldType.decimal,
-            initial: (Decimal.parse(i.quantity) - Decimal.parse(i.receivedQuantity)).toString(),
-          ),
+        for (final i in order.items)
+          if (Decimal.parse(i.quantity) > Decimal.parse(i.receivedQuantity))
+            OnlineField(i.id!, i.description, type: OnlineFieldType.decimal, helper: 'offen: ${formatQuantity(open(i))}'),
       ],
     );
     if (values == null || !mounted) return;
@@ -333,8 +457,7 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
     };
     if (receipts.isEmpty) return;
     await runOnline(context, () async {
-      final updated = await _client.receivePurchaseOrder(order.id, receipts);
-      if (mounted) setState(() => _order = updated);
+      await _apply(await _client.receivePurchaseOrder(order.id, receipts));
     }, success: 'Wareneingang gebucht.');
   }
 
@@ -378,15 +501,16 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
   Widget build(BuildContext context) {
     final order = _order;
     final editable = order != null && order.isDraft && _canWrite;
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(order == null ? 'Bestellung' : (order.number ?? 'Bestellentwurf')),
+        title: const Text('Bestellung'),
         actions: [
-          if (order != null && !order.isDraft) IconButton(tooltip: 'PDF', icon: const Icon(Icons.picture_as_pdf_outlined), onPressed: _pdf),
+          // Nur online: Mailversand, Lieferant/Hinweis ändern, Entwurf löschen.
           if (order != null && !order.isDraft && _canWrite && canSendMail(widget.session))
             IconButton(
               tooltip: 'Per E-Mail senden',
-              icon: const Icon(Icons.send_outlined),
+              icon: const Icon(Icons.mail_outline),
               onPressed: () => sendPdfByMail(
                 context,
                 session: widget.session,
@@ -396,7 +520,7 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
                 send: (pdf, {to, subject, body}) => _client.sendPurchaseOrderMail(order.id, pdf, to: to),
               ),
             ),
-          if (editable) IconButton(tooltip: 'Bestellung bearbeiten', icon: const Icon(Icons.edit_outlined), onPressed: _editHeader),
+          if (editable) IconButton(tooltip: 'Lieferant/Hinweis ändern', icon: const Icon(Icons.edit_outlined), onPressed: _editHeader),
           if (editable)
             IconButton(
               tooltip: 'Entwurf löschen',
@@ -411,65 +535,89 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
             ),
         ],
       ),
-      bottomNavigationBar: order == null || !_canWrite
-          ? null
-          : order.isDraft
-              ? SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: FilledButton(onPressed: order.items.isEmpty ? null : _finalize, child: const Text('Finalisieren')),
-                  ),
-                )
-              : order.canReceive
-                  ? SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: FilledButton.icon(onPressed: _receive, icon: const Icon(Icons.move_to_inbox), label: const Text('Wareneingang buchen')),
-                      ),
-                    )
-                  : null,
       body: _error != null
           ? Center(child: Text(describeOnlineError(_error!)))
           : order == null
               ? const Center(child: CircularProgressIndicator())
               : ListView(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
                   children: [
-                    Card(
-                      child: ListTile(
-                        title: Text(order.supplierName ?? 'Lieferant'),
-                        subtitle: Text([
-                          formatOnlineDate(order.issueDate),
-                          purchaseOrderStatusLabels[order.status] ?? order.status,
-                          if (order.notes != null) order.notes!,
-                        ].join(' · ')),
-                        trailing: Text('${Money.fromCents(order.totalNetCents)} netto'),
-                      ),
+                    Text(order.number ?? 'Entwurf', style: theme.textTheme.headlineSmall),
+                    Text('${order.supplierName ?? ''} · ${purchaseOrderStatusLabels[order.status] ?? order.status}'),
+                    if (order.notes != null) Text(order.notes!, style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            () {
+                              final parts = [
+                                if (_projectName != null) 'Projekt: $_projectName',
+                                if (_categoryLabel != null) 'Kategorie: $_categoryLabel',
+                                if (order.sourceOrderId != null) 'Dokument: ${order.sourceOrderNumber ?? '–'}',
+                              ];
+                              return parts.isEmpty ? 'Keine Zuordnung (Lagerbestellung)' : parts.join(' · ');
+                            }(),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                        if (editable) TextButton(onPressed: _editAssignment, child: const Text('Zuordnung bearbeiten')),
+                      ],
                     ),
-                    Text('Positionen', style: Theme.of(context).textTheme.titleMedium),
-                    if (order.items.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Noch keine Positionen.')),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Positionen', style: theme.textTheme.titleMedium),
+                        if (editable)
+                          TextButton.icon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Position hinzufügen')),
+                      ],
+                    ),
+                    if (order.items.isEmpty) const Text('Noch keine Positionen.'),
                     for (final (index, i) in order.items.indexed)
                       Card(
                         child: ListTile(
                           title: Text(i.description),
                           subtitle: Text([
-                            '${formatQuantity(i.quantity)} × ${i.purchasePriceCents == null ? '–' : Money.fromCents(i.purchasePriceCents!)}',
-                            if (!order.isDraft) 'geliefert ${formatQuantity(i.receivedQuantity)}',
+                            order.isDraft
+                                ? 'Menge: ${formatQuantity(i.quantity)}'
+                                : 'Menge: ${formatQuantity(i.quantity)} · erhalten: ${formatQuantity(i.receivedQuantity)}',
+                            if (i.purchasePriceCents != null) 'je ${Money.fromCents(i.purchasePriceCents!)}',
                           ].join(' · ')),
                           trailing: editable
                               ? IconButton(
                                   tooltip: 'Position entfernen',
-                                  icon: const Icon(Icons.remove_circle_outline),
+                                  icon: const Icon(Icons.delete_outline),
                                   onPressed: () => _saveItems([...order.items]..removeAt(index)),
                                 )
                               : null,
                         ),
                       ),
-                    if (editable)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Position hinzufügen')),
+                    if (order.items.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4, right: 8),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Text('Summe netto: ${Money.fromCents(order.totalNetCents)}', style: theme.textTheme.bodySmall),
+                        ),
                       ),
+                    const SizedBox(height: 24),
+                    if (order.isDraft && _canWrite)
+                      FilledButton(onPressed: order.items.isEmpty ? null : _finalize, child: const Text('Finalisieren')),
+                    if (!order.isDraft) ...[
+                      OutlinedButton.icon(
+                        onPressed: _pdf,
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        label: const Text('PDF teilen'),
+                      ),
+                      const SizedBox(height: 8),
+                      if (order.canReceive && _canWrite)
+                        OutlinedButton.icon(
+                          onPressed: _receive,
+                          icon: const Icon(Icons.inventory_outlined),
+                          label: const Text('Wareneingang erfassen'),
+                        ),
+                    ],
                   ],
                 ),
     );
