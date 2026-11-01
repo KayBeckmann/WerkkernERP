@@ -75,6 +75,11 @@ class _OnlineDashboardScreenState extends State<OnlineDashboardScreen> {
     return '${t.count ?? 0}';
   }
 
+  /// Dezimalpunkt zwischen Ziffern → Komma („2.5 Std.“ → „2,5 Std.“),
+  /// Satzzeichen bleiben.
+  static String _decimalComma(String text) =>
+      text.replaceAllMapped(RegExp(r'(\d)\.(\d)'), (m) => '${m[1]},${m[2]}');
+
   static String _formatDate(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
 
@@ -153,7 +158,7 @@ class _OnlineDashboardScreenState extends State<OnlineDashboardScreen> {
       cards.add(_KpiCard(
         key: Key('dashboard-${t.key}'),
         icon: _icons[t.key] ?? Icons.dashboard_outlined,
-        label: t.detail == null ? t.title : '${t.title} · ${t.detail!.replaceAll('.', ',')}',
+        label: t.detail == null ? t.title : '${t.title} · ${_decimalComma(t.detail!)}',
         value: _main(t),
         highlight: t.key == 'lowStock' && (t.count ?? 0) > 0,
       ));
