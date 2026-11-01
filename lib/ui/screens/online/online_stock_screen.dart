@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 
@@ -81,7 +84,7 @@ class _InventoryList extends StatelessWidget {
     final canWrite = session.can('stock.write');
     return OnlineListView<OnlineInventoryCount>(
       load: (_) => session.client.inventoryCounts(),
-      emptyText: 'Noch keine Inventur.',
+      emptyText: 'Noch keine Inventur durchgeführt.',
       appBar: (context, reload) => AppBar(
         automaticallyImplyLeading: false,
         title: const Text('Inventur'),
@@ -104,9 +107,9 @@ class _InventoryList extends StatelessWidget {
       ),
       itemBuilder: (context, c, reload) => Card(
         child: ListTile(
-          leading: Icon(c.isDraft ? Icons.fact_check_outlined : Icons.lock_outline),
+          leading: Icon(c.isDraft ? Icons.edit_note_outlined : Icons.fact_check_outlined),
           title: Text(c.label),
-          subtitle: Text('${formatOnlineDate(c.date)} · ${c.isDraft ? 'offen' : 'abgeschlossen'}'),
+          subtitle: Text('${c.isDraft ? 'Entwurf' : 'Abgeschlossen'} · Stichtag ${formatOnlineDate(c.date)}'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
             await Navigator.of(context).push(
@@ -185,6 +188,12 @@ class OnlineInventoryScreen extends StatefulWidget {
 class _OnlineInventoryScreenState extends State<OnlineInventoryScreen> {
   OnlineInventoryCount? _count;
   Object? _error;
+  bool _busy = false;
+
+  /// Ist-Mengen direkt in der Liste wie offline; gespeichert wird kurz
+  /// nach dem Tippen (nicht bei jedem Zeichen ein Serveraufruf).
+  final _controllers = <String, TextEditingController>{};
+  final _pending = <String, Timer>{};
 
   @override
   void initState() {
@@ -192,85 +201,103 @@ class _OnlineInventoryScreenState extends State<OnlineInventoryScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    for (final t in _pending.values) {
+      t.cancel();
+    }
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
   Future<void> _load() async {
     try {
       final count = await widget.session.client.inventoryCount(widget.countId);
-      if (mounted) setState(() => _count = count);
+      if (mounted) setState(() => _apply(count));
     } on Exception catch (e) {
       if (mounted) setState(() => _error = e);
     }
   }
 
-  Future<void> _enterCount(OnlineInventoryItem item) async {
-    final values = await showOnlineForm(
-      context,
-      title: item.articleName ?? 'Artikel',
-      submitLabel: 'Übernehmen',
-      fields: [
-        OnlineField(
-          'counted',
-          'Gezählte Menge',
-          type: OnlineFieldType.decimal,
-          initial: item.countedQuantity ?? item.expectedQuantity,
-        ),
-      ],
-    );
-    if (values == null || !mounted) return;
-    await runOnline(context, () async {
-      final updated = await widget.session.client.setInventoryCounted(
-        widget.countId,
-        item.id,
-        values['counted'] as String?,
+  void _apply(OnlineInventoryCount count) {
+    _count = count;
+    for (final i in count.items) {
+      // Laufende Eingaben nicht vom Serverstand überschreiben.
+      _controllers.putIfAbsent(
+        i.id,
+        () => TextEditingController(text: i.countedQuantity == null ? '' : formatQuantity(i.countedQuantity!)),
       );
-      if (mounted) setState(() => _count = updated);
-    });
+    }
   }
 
+  void _countedChanged(OnlineInventoryItem item, String text) {
+    _pending[item.id]?.cancel();
+    _pending[item.id] = Timer(const Duration(milliseconds: 600), () => _saveCounted(item.id));
+  }
+
+  Future<void> _saveCounted(String itemId) async {
+    _pending.remove(itemId)?.cancel();
+    final text = _controllers[itemId]!.text.trim().replaceAll(',', '.');
+    if (text.isNotEmpty && Decimal.tryParse(text) == null) return;
+    try {
+      final updated = await widget.session.client.setInventoryCounted(widget.countId, itemId, text.isEmpty ? null : text);
+      if (mounted) setState(() => _apply(updated));
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+    }
+  }
+
+  /// Wie offline: Mehrfachauswahl mit „Alle auswählen“.
   Future<void> _addArticles() async {
     final present = {for (final i in _count!.items) i.articleId};
-    final articles = (await widget.session.client.articles()).where((a) => !present.contains(a.id)).toList();
-    if (!mounted) return;
-    if (articles.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Alle aktiven Artikel sind bereits enthalten.')));
+    final List<OnlineArticle> candidates;
+    try {
+      candidates = (await widget.session.client.articles()).where((a) => !present.contains(a.id)).toList();
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
       return;
     }
-    final values = await showOnlineForm(
-      context,
-      title: 'Artikel aufnehmen',
-      submitLabel: 'Aufnehmen',
-      fields: [
-        OnlineField(
-          'articleId',
-          'Artikel',
-          type: OnlineFieldType.choice,
-          required: true,
-          options: {for (final a in articles) a.id: a.name},
-        ),
-      ],
+    if (!mounted) return;
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _AddArticlesDialog(candidates: candidates),
     );
-    if (values == null || !mounted) return;
+    if (selected == null || selected.isEmpty || !mounted) return;
     await runOnline(context, () async {
-      final updated = await widget.session.client.addInventoryArticles(widget.countId, [values['articleId'] as String]);
-      if (mounted) setState(() => _count = updated);
+      final updated = await widget.session.client.addInventoryArticles(widget.countId, selected);
+      if (mounted) setState(() => _apply(updated));
     });
   }
 
   Future<void> _complete() async {
-    if (!await confirmOnline(
-      context,
-      'Inventur abschließen?',
-      'Jede gezählte Abweichung zum aktuellen Bestand wird gebucht. Danach ist die Inventur unveränderlich.',
-      confirm: 'Abschließen',
-    )) {
-      return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Inventur abschließen?'),
+        content: const Text(
+          'Alle eingetragenen Abweichungen werden jetzt gebucht und im Bewegungsprotokoll '
+          'dokumentiert. Diese Aktion ist nicht umkehrbar.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Abschließen')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    // Noch nicht übertragene Eingaben zuerst speichern.
+    for (final id in [..._pending.keys]) {
+      await _saveCounted(id);
     }
     if (!mounted) return;
     await runOnline(context, () async {
       final updated = await widget.session.client.completeInventoryCount(widget.countId);
-      if (mounted) setState(() => _count = updated);
+      if (mounted) setState(() => _apply(updated));
     }, success: 'Inventur abgeschlossen, Abweichungen gebucht.');
+    if (mounted) setState(() => _busy = false);
   }
 
   @override
@@ -278,58 +305,130 @@ class _OnlineInventoryScreenState extends State<OnlineInventoryScreen> {
     final count = _count;
     final editable = count != null && count.isDraft && widget.session.can('stock.write');
     return Scaffold(
-      appBar: AppBar(
-        title: Text(count?.label ?? 'Inventur'),
-        actions: [
-          if (editable)
-            IconButton(tooltip: 'Artikel aufnehmen', icon: const Icon(Icons.playlist_add), onPressed: _addArticles),
-        ],
-      ),
-      bottomNavigationBar: editable
-          ? SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: FilledButton(onPressed: _complete, child: const Text('Inventur abschließen')),
-              ),
-            )
-          : null,
+      appBar: AppBar(title: const Text('Inventur')),
       body: _error != null
           ? Center(child: Text(describeOnlineError(_error!)))
           : count == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-                Text('${formatOnlineDate(count.date)} · ${count.isDraft ? 'offen' : 'abgeschlossen'}'),
-                const SizedBox(height: 8),
-                if (count.items.isEmpty)
-                  const Padding(padding: EdgeInsets.all(16), child: Text('Noch keine Artikel aufgenommen.')),
-                for (final i in count.items)
-                  Card(
-                    child: ListTile(
-                      title: Text(i.articleName ?? 'Artikel'),
-                      subtitle: Text(
-                        'Soll ${formatQuantity(i.expectedQuantity)}${i.unit == null ? '' : ' ${i.unit}'}'
-                        '${i.countedQuantity == null ? ' · noch nicht gezählt' : ' · gezählt ${formatQuantity(i.countedQuantity!)}'}',
-                      ),
-                      trailing: editable
-                          ? IconButton(
-                              tooltip: 'Aus Inventur entfernen',
-                              icon: const Icon(Icons.remove_circle_outline),
-                              onPressed: () async {
-                                await runOnline(
-                                  context,
-                                  () => widget.session.client.removeInventoryItem(widget.countId, i.id),
-                                );
-                                await _load();
-                              },
-                            )
-                          : null,
-                      onTap: editable ? () => _enterCount(i) : null,
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                  children: [
+                    Text(count.label, style: Theme.of(context).textTheme.headlineSmall),
+                    Text('${count.isDraft ? 'Entwurf' : 'Abgeschlossen'} · Stichtag ${formatOnlineDate(count.date)}'),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Positionen', style: Theme.of(context).textTheme.titleMedium),
+                        if (editable)
+                          TextButton.icon(onPressed: _addArticles, icon: const Icon(Icons.add), label: const Text('Artikel hinzufügen')),
+                      ],
                     ),
-                  ),
-              ],
+                    if (count.items.isEmpty) const Text('Noch keine Artikel in dieser Inventur.'),
+                    for (final i in count.items)
+                      Card(
+                        child: ListTile(
+                          title: Text(i.articleName ?? '(unbekannt)'),
+                          subtitle: Text('Soll: ${formatQuantity(i.expectedQuantity)}${i.unit == null ? '' : ' ${i.unit}'}'),
+                          trailing: editable
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 120,
+                                      child: TextField(
+                                        key: Key('online-inventory-counted-${i.articleName}'),
+                                        controller: _controllers[i.id],
+                                        textAlign: TextAlign.right,
+                                        decoration: const InputDecoration(labelText: 'Ist'),
+                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        onChanged: (text) => _countedChanged(i, text),
+                                        onSubmitted: (_) => _saveCounted(i.id),
+                                      ),
+                                    ),
+                                    // Nur online: Artikel wieder aus der Inventur nehmen.
+                                    IconButton(
+                                      tooltip: 'Aus Inventur entfernen',
+                                      icon: const Icon(Icons.remove_circle_outline),
+                                      onPressed: () async {
+                                        await runOnline(context, () => widget.session.client.removeInventoryItem(widget.countId, i.id));
+                                        await _load();
+                                      },
+                                    ),
+                                  ],
+                                )
+                              : Text('Ist: ${i.countedQuantity == null ? '–' : formatQuantity(i.countedQuantity!)}'),
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    if (editable)
+                      FilledButton(
+                        onPressed: _busy || count.items.isEmpty ? null : _complete,
+                        child: const Text('Inventur abschließen'),
+                      ),
+                  ],
+                ),
+    );
+  }
+}
+
+class _AddArticlesDialog extends StatefulWidget {
+  const _AddArticlesDialog({required this.candidates});
+  final List<OnlineArticle> candidates;
+
+  @override
+  State<_AddArticlesDialog> createState() => _AddArticlesDialogState();
+}
+
+class _AddArticlesDialogState extends State<_AddArticlesDialog> {
+  final Set<String> _selected = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Artikel hinzufügen'),
+      content: SizedBox(
+        width: 400,
+        height: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => setState(() => _selected
+                  ..clear()
+                  ..addAll(widget.candidates.map((a) => a.id))),
+                child: const Text('Alle auswählen'),
+              ),
             ),
+            Expanded(
+              child: widget.candidates.isEmpty
+                  ? const Center(child: Text('Alle Artikel sind bereits in dieser Inventur.'))
+                  : ListView(
+                      children: [
+                        for (final article in widget.candidates)
+                          CheckboxListTile(
+                            title: Text(article.name),
+                            value: _selected.contains(article.id),
+                            onChanged: (checked) => setState(() {
+                              if (checked ?? false) {
+                                _selected.add(article.id);
+                              } else {
+                                _selected.remove(article.id);
+                              }
+                            }),
+                          ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(onPressed: () => Navigator.pop(context, _selected.toList()), child: const Text('Hinzufügen')),
+      ],
     );
   }
 }

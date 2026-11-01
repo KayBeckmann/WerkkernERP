@@ -36,9 +36,12 @@ class PurchasingRoutes {
   Future<Response> _response(String companyId, PurchaseOrder order, {int status = 200}) async {
     final items = await business.purchaseOrderItems(companyId, order.id);
     final supplier = await business.findSupplier(companyId, order.supplierId);
+    final source = order.sourceOrderId == null ? null : await business.findDocument(companyId, order.sourceOrderId!);
     return jsonOk({
       ...order.toJson(),
       'supplierName': supplier?.name,
+      'sourceOrderNumber': source?.number,
+      'sourceOrderKind': source?.kind,
       'items': [for (final i in items) i.toJson()],
       'totalNetCents': _totalNetCents(items),
     }, status: status);
@@ -105,6 +108,18 @@ class PurchasingRoutes {
     return null;
   }
 
+  /// Zugeordnetes Dokument (wie offline „Zuordnung“): finalisierter
+  /// Auftrag oder finalisierte Rechnung derselben Firma.
+  Future<Response?> _validateDocument(String companyId, String? documentId) async {
+    if (documentId == null) return null;
+    final document = await business.findDocument(companyId, documentId);
+    if (document == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    if (!{'order', 'invoice'}.contains(document.kind) || document.isDraft) {
+      return jsonError('Zuordnen lässt sich nur ein finalisierter Auftrag oder eine finalisierte Rechnung.');
+    }
+    return null;
+  }
+
   Future<Response> _list(Request request) async {
     final check = await auth.requirePermission(request, 'purchaseOrders.read');
     if (check.error != null) return check.error!;
@@ -141,6 +156,9 @@ class PurchasingRoutes {
     final categoryId = trimmedOrNull(body['expenseCategoryId']);
     final invalid = await _validateRefs(companyId, supplierId: supplierId, projectId: projectId, categoryId: categoryId);
     if (invalid != null) return invalid;
+    final documentId = trimmedOrNull(body['sourceOrderId']);
+    final invalidDocument = await _validateDocument(companyId, documentId);
+    if (invalidDocument != null) return invalidDocument;
     final id = _uuid.v4();
     final parsed = await _items(body['items'] ?? const [], companyId, id);
     if (parsed.error != null) return parsed.error!;
@@ -152,6 +170,7 @@ class PurchasingRoutes {
       status: 'draft',
       issueDate: dateOrNull(body['issueDate']) ?? DateTime.utc(now.year, now.month, now.day),
       notes: trimmedOrNull(body['notes']),
+      sourceOrderId: documentId,
       projectId: projectId,
       expenseCategoryId: categoryId,
       createdByUserId: check.auth!.session.userId,
@@ -178,6 +197,13 @@ class PurchasingRoutes {
     final categoryId = trimmedOrNull(body['expenseCategoryId']);
     final invalid = await _validateRefs(companyId, supplierId: supplierId, projectId: projectId, categoryId: categoryId);
     if (invalid != null) return invalid;
+    // Ohne Angabe bleibt die bisherige Zuordnung (z. B. aus „Bestellungen
+    // aus Auftrag“) bestehen.
+    final documentId = body.containsKey('sourceOrderId') ? trimmedOrNull(body['sourceOrderId']) : existing.sourceOrderId;
+    if (documentId != existing.sourceOrderId) {
+      final invalidDocument = await _validateDocument(companyId, documentId);
+      if (invalidDocument != null) return invalidDocument;
+    }
     final parsed = await _items(body['items'], companyId, id);
     if (parsed.error != null) return parsed.error!;
     try {
@@ -189,6 +215,7 @@ class PurchasingRoutes {
           status: 'draft',
           issueDate: dateOrNull(body['issueDate']) ?? existing.issueDate,
           notes: trimmedOrNull(body['notes']),
+          sourceOrderId: documentId,
           projectId: projectId,
           expenseCategoryId: categoryId,
           createdByUserId: existing.createdByUserId,

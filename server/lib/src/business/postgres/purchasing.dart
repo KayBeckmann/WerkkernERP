@@ -144,7 +144,8 @@ mixin _PostgresPurchasing implements PurchasingStore {
       await s.execute(
         Sql.named(
           'UPDATE purchase_orders SET supplier_id = @supplierId, issue_date = @issueDate, notes = @notes, '
-          'project_id = @projectId, expense_category_id = @categoryId, updated_at = @updatedAt, version = version + 1 '
+          'project_id = @projectId, expense_category_id = @categoryId, source_order_id = @source, '
+          'updated_at = @updatedAt, version = version + 1 '
           'WHERE id = @id',
         ),
         parameters: {
@@ -154,6 +155,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
           'notes': o.notes,
           'projectId': o.projectId,
           'categoryId': o.expenseCategoryId,
+          'source': o.sourceOrderId,
           'updatedAt': o.updatedAt,
         },
       );

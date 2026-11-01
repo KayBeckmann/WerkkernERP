@@ -40,13 +40,14 @@ void main() {
     await tester.pumpAndSettle();
     await openTab(tester, 'Bestellungen');
 
-    await tester.tap(find.text('Bestellvorschläge'));
+    // Wie offline: „Mindestbestand“ unten, Entwurf je Lieferant anlegen.
+    await tester.tap(find.text('Mindestbestand'));
     await tester.pumpAndSettle();
-    expect(find.text('50 × Kabel'), findsOneWidget);
-    await tester.tap(find.text('Als Entwurf übernehmen'));
+    expect(find.text('Kabel: 50'), findsOneWidget);
+    await tester.tap(find.text('Entwurf anlegen'));
     await tester.pumpAndSettle();
-    expect(find.text('Bestellentwurf'), findsOneWidget);
-    expect(find.text('60,00 € netto'), findsOneWidget);
+    expect(find.text('Entwurf'), findsOneWidget);
+    expect(find.text('Summe netto: 60,00 €'), findsOneWidget);
 
     await tester.tap(find.text('Finalisieren'));
     await tester.pumpAndSettle();
@@ -55,13 +56,13 @@ void main() {
     final yy = (DateTime.now().toUtc().year % 100).toString().padLeft(2, '0');
     expect(find.text('B-${yy}001'), findsOneWidget);
 
-    await tester.tap(find.text('Wareneingang buchen'));
+    await tester.tap(find.text('Wareneingang erfassen'));
     await tester.pumpAndSettle();
     await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first, '20');
     await tester.tap(find.text('Buchen'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('teilweise geliefert'), findsOneWidget);
-    expect(find.textContaining('geliefert 20'), findsOneWidget);
+    expect(find.textContaining('Teilweise erhalten'), findsOneWidget);
+    expect(find.textContaining('erhalten: 20'), findsOneWidget);
 
     final stock = await tester.runAsync(() async {
       final client = server.client()..token = token;
