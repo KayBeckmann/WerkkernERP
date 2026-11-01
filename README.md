@@ -117,10 +117,13 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Audit-Protokoll, Login-Drosselung, verschlüsseltes Backup/Restore.
 - Jede Abfrage firmengebunden, fremde IDs verhalten sich wie nicht
   existierende; optimistische Versionierung statt „last write wins“.
-- In der App: „Online anmelden“ (Wolken-Symbol); Online-Firmen im selben
-  Layout wie lokale (Sidebar breit, Bottom-Bar + „Mehr“ schmal) mit Übersicht nach
-  Rechten, Dokumenten, Kunden, Artikeln, Verwaltung für Admins, PDF mit
-  demselben Generator wie offline.
+- In der App: „Online anmelden“ (Wolken-Symbol); Online-Firmen mit
+  denselben Bereichen, Namen und Bildschirmen wie lokale (Dashboard, ein
+  Bereich je Dokumentart, Stammdaten, Buchhaltung, Einstellungen; Sidebar
+  breit, Bottom-Bar + „Mehr“ schmal). Bereiche erscheinen nach Rechten
+  und Modulen; Mitglieder, Gruppen, Einladungen und Protokoll stehen für
+  Admins in den Einstellungen. PDF mit demselben Generator wie offline,
+  „Daten & Sicherung“ als Firmen-Datenexport (JSON).
 - **Online-Firmen auf der Startseite:** nach der ersten Anmeldung mit
   einem Klick öffnen. „Angemeldet bleiben“ speichert nur das
   Sitzungs-Token (Android: Keystore, Web: Browser-Speicher; nie das Passwort); die Sitzung gilt

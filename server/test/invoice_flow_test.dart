@@ -62,6 +62,42 @@ void runInvoiceFlowTests(Future<(PhaseBRepository, BusinessRepository)> Function
     return post('/documents/${order['id']}/finalize', {'version': version});
   }
 
+  test('Materialabschlag wie offline: Artikel und gewählte Freitexte, nie Stunden; zählt als Abschlag', () async {
+    final order = await post('/documents', {
+      'kind': 'order',
+      'customerId': customerId,
+      'items': [
+        ...orderItems,
+        {'kind': 'text', 'description': 'Kleinmaterial', 'quantity': '1', 'unitPriceCents': 2000, 'vatRatePercent': 19},
+        {'kind': 'text', 'description': 'Anfahrt', 'quantity': '1', 'unitPriceCents': 3000, 'vatRatePercent': 19},
+      ],
+    });
+    Matcher status(int code) => throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', code));
+    await expectLater(post('/documents/${order['id']}/material-advance', {'includeAllArticles': true}), status(409),
+        reason: 'nur finalisierte Aufträge');
+    final finalized = await post('/documents/${order['id']}/finalize', {'version': order['version']});
+    await expectLater(post('/documents/${finalized['id']}/material-advance', {'includeAllArticles': false}), status(400),
+        reason: 'ohne jede Position');
+
+    final advance = await post('/documents/${finalized['id']}/material-advance', {
+      'includeAllArticles': true,
+      'textItemIndexes': [2],
+    });
+    expect(advance['kind'], 'invoice');
+    expect(advance['status'], 'draft');
+    expect(advance['isAdvancePayment'], isTrue);
+    expect((advance['items'] as List).map((i) => (i as Map)['description']), ['Kabel', 'Kleinmaterial']);
+
+    // Finalisiert zählt er bei der Schlussrechnung als Abschlag.
+    await post('/documents/${advance['id']}/finalize', {'version': advance['version']});
+    final finalInvoice = await post('/documents/${finalized['id']}/convert', {'kind': 'invoice'});
+    expect((finalInvoice['advancePayments'] as List).single['grossCents'], 14280, reason: '(100 + 20) € + 19 %');
+
+    await c.setModules({'orders'});
+    await expectLater(post('/documents/${finalized['id']}/material-advance', {'includeAllArticles': true}), status(403),
+        reason: 'Modul Abschlagsrechnungen nötig');
+  });
+
   test('Finalisierter Auftrag bleibt bearbeitbar bis zur ersten Umwandlung (wie offline)', () async {
     Matcher conflict() => throwsA(isA<ApiException>().having((e) => e.isConflict, '409', isTrue));
     final order = await finalizedOrder();

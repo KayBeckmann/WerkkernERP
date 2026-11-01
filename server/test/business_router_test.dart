@@ -426,6 +426,31 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
     expect((audit['entries'] as List).map((e) => (e as Map)['action']), containsAll(['document.paid', 'document.unpaid', 'document.dueDate']));
   });
 
+  test('Firmen-Datenexport: nur Admin, alle Fachdaten der eigenen Firma, keine Geheimnisse', () async {
+    final a = await company('a@example.com', 'Firma A');
+    final b = await company('b@example.com', 'Firma B');
+    final customer = await post('/customers', a.auth, {'name': 'Meyer'}, expect: 201);
+    await post('/documents', a.auth, invoiceBody(customer['id'] as String), expect: 201);
+    await post('/customers', b.auth, {'name': 'Fremdkunde'}, expect: 201);
+
+    final response = await http.get(baseUrl.resolve('/company/export'), headers: a.auth);
+    expectStatus(response, 200);
+    final export = jsonDecode(response.body) as Map<String, Object?>;
+    expect(export['format'], 'werkkernerp-export');
+    expect((export['company'] as Map)['name'], 'Firma A');
+    expect((export['customers'] as List).map((c) => (c as Map)['name']), ['Meyer'], reason: 'nie Fremddaten');
+    final document = (export['documents'] as List).single as Map;
+    expect((document['items'] as List), isNotEmpty);
+    expect((export['members'] as List).single, containsPair('email', 'a@example.com'));
+    expect(response.body, isNot(contains('passwordHash')));
+    expect(response.body, isNot(contains('smtp')));
+
+    final monteur = await member(a, 'monteur@example.com', ['customers.read', 'invoices.read']);
+    expectStatus(await http.get(baseUrl.resolve('/company/export'), headers: monteur), 403);
+    final audit = jsonDecode((await http.get(baseUrl.resolve('/audit'), headers: a.auth)).body) as Map;
+    expect((audit['entries'] as List).map((e) => (e as Map)['action']), contains('company.export'));
+  });
+
   test('Fälligkeit und Zahlungsbedingungen schon im Entwurf (wie offline), Finalisieren behält sie', () async {
     final a = await company('a@example.com', 'Firma A');
     final customer = await post('/customers', a.auth, {'name': 'Kunde'}, expect: 201);
