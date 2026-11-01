@@ -46,8 +46,7 @@ void main() {
     await login(tester, server);
 
     // Artikel: Bestand korrigieren
-    await tester.tap(find.byIcon(Icons.inventory_2_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Artikel');
     await tester.tap(find.text('Kabel'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Bestand korrigieren'));
@@ -58,13 +57,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('40 m'), findsOneWidget);
     expect(find.textContaining('Inventur/Korrektur · Anfangsbestand'), findsOneWidget);
-    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar();
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
     await tester.pageBack();
     await tester.pumpAndSettle();
 
     // Lager: Unterbestand + Inventur
-    await tester.tap(find.byIcon(Icons.warehouse_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Lager');
     expect(find.textContaining('fehlen 10'), findsOneWidget);
     await tester.tap(find.text('Inventur'));
     await tester.pumpAndSettle();
@@ -84,7 +82,7 @@ void main() {
     await tester.tap(find.text('Abschließen'));
     await tester.pumpAndSettle();
     expect(find.textContaining('abgeschlossen'), findsWidgets);
-    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar();
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
     expect(find.text('Inventur abschließen'), findsNothing);
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -93,8 +91,7 @@ void main() {
     expect(find.textContaining('Kabel: +15,5 → 55,5'), findsOneWidget);
 
     // Dokument mit 60 m: Warnung beim Finalisieren, aber nicht blockierend.
-    await tester.tap(find.byIcon(Icons.receipt_long_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Dokumente');
     await tester.tap(find.textContaining('Meyer').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Finalisieren'));

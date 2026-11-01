@@ -46,6 +46,7 @@ void main() {
     // Verwaltung → E-Mail
     await tester.tap(find.byTooltip('Verwaltung'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('E-Mail'));
     await tester.tap(find.text('E-Mail'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-mail-host')), 'smtp.example.org');
@@ -54,7 +55,7 @@ void main() {
     await tester.tap(find.text('E-Mail-Einstellungen speichern'));
     await tester.pumpAndSettle();
     expect(find.text('gespeichert — leer lassen, um es zu behalten'), findsOneWidget);
-    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).removeCurrentSnackBar();
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
     await tester.pageBack();
     await tester.pumpAndSettle();
 

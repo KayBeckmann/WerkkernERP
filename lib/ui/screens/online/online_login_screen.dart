@@ -368,6 +368,7 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
       offline: offline,
       expiresAt: expiresAt,
       onEnded: () => _accounts.forgetSession(account.serverUrl, account.email),
+      keepSignedIn: _stayLoggedIn && expiresAt != null,
     );
     if (offlineWarning != null) {
       ScaffoldMessenger.of(context).showSnackBar(

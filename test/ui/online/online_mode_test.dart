@@ -42,7 +42,7 @@ void main() {
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
     await openTab(tester, 'Dokumente');
-    expect(find.text('Elektro Kay · online'), findsOneWidget);
+    expect(find.text('Elektro Kay — Dokumente'), findsOneWidget);
     expect(find.textContaining('keine lokale Kopie'), findsOneWidget);
 
     // Kunde anlegen

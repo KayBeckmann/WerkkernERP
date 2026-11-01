@@ -46,8 +46,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.notification_important_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Mahnwesen');
 
     expect(find.textContaining('2. Mahnstufe'), findsOneWidget, reason: '20 Tage ≥ 14 (Vorgabe)');
     expect(find.text('105,00 €'), findsOneWidget);

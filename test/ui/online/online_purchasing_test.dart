@@ -38,8 +38,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.shopping_cart_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Bestellungen');
 
     await tester.tap(find.text('Bestellvorschläge'));
     await tester.pumpAndSettle();
@@ -58,7 +57,7 @@ void main() {
 
     await tester.tap(find.text('Wareneingang buchen'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).first, '20');
+    await tester.enterText(find.descendant(of: find.byType(AlertDialog), matching: find.byType(TextField)).first, '20');
     await tester.tap(find.text('Buchen'));
     await tester.pumpAndSettle();
     expect(find.textContaining('teilweise geliefert'), findsOneWidget);

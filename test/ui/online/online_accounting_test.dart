@@ -48,8 +48,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.account_balance_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Buchhaltung');
 
     // Offene Posten
     expect(find.text('1190,00 €'), findsWidgets);

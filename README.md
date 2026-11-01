@@ -117,7 +117,8 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Audit-Protokoll, Login-Drosselung, verschlüsseltes Backup/Restore.
 - Jede Abfrage firmengebunden, fremde IDs verhalten sich wie nicht
   existierende; optimistische Versionierung statt „last write wins“.
-- In der App: „Online anmelden“ (Wolken-Symbol) mit Übersicht nach
+- In der App: „Online anmelden“ (Wolken-Symbol); Online-Firmen im selben
+  Layout wie lokale (Sidebar breit, Bottom-Bar + „Mehr“ schmal) mit Übersicht nach
   Rechten, Dokumenten, Kunden, Artikeln, Verwaltung für Admins, PDF mit
   demselben Generator wie offline.
 - **Online-Firmen auf der Startseite:** nach der ersten Anmeldung mit

@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:werkkernerp/ui/screens/online/online_login_screen.dart';
+import 'package:werkkernerp/ui/widgets/sidebar_nav_item.dart';
 
 import 'online_test_server.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('Fuhrpark unter „Mehr“: Fahrzeug anlegen, Leasing mit Tilgung/Zins buchen, Jahressumme', (tester) async {
+  testWidgets('Fuhrpark in der Sidebar: Fahrzeug anlegen, Leasing mit Tilgung/Zins buchen, Jahressumme', (tester) async {
     tester.view.physicalSize = const Size(1200, 2200);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -36,11 +37,8 @@ void main() {
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Mehr'), findsOneWidget, reason: 'sechs Bereiche → vier + Mehr');
-    await tester.tap(find.text('Mehr'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Fuhrpark'));
-    await tester.pumpAndSettle();
+    expect(find.widgetWithText(SidebarNavItem, 'Fuhrpark'), findsOneWidget, reason: 'breit: Sidebar wie offline');
+    await openTab(tester, 'Fuhrpark');
 
     await tester.tap(find.text('Fahrzeug anlegen'));
     await tester.pumpAndSettle();
