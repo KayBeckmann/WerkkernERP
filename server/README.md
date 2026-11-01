@@ -37,10 +37,30 @@ Container). Beim ersten Lauf legt das Skript dort eine `.env` mit
 zufälligem DB-Passwort und `SERVER_SECRET_KEY` an und überschreibt sie
 danach nie.
 
-Nach außen geht nur der Web-Port (`WEB_PORT`, Standard 8085): nginx
-liefert die App aus und reicht `/api/` an den Server weiter
-(`deploy/nginx/web.conf`). Im Nginx Proxy Manager also nur diesen Port
-eintragen; in der App als Server-Adresse `https://<domain>/api`.
+Nach außen gehen zwei Ports:
+
+- `WEB_PORT` (Standard 8085): nginx liefert die App aus und reicht
+  `/api/` an den Server weiter (`deploy/nginx/web.conf`). In der App als
+  Server-Adresse `https://<domain>/api` eintragen.
+- `SUPERADMIN_PORT` (Standard 8086): Superadmin-Panel, reicht nur
+  `/api/platform/*` weiter (`deploy/nginx/superadmin.conf`), siehe
+  `superadmin/README.md`.
+
+## SaaS-Betrieb: Superadmin, Abo, Sperre
+
+`/platform/*` (`lib/src/platform_routes.dart`) mit eigener Anmeldung
+(`POST /platform/login`, 8 h) — nur für Konten, die per
+`/app/platform_admin grant <email>` im Container freigeschaltet sind:
+Firmenliste mit Mitgliederzahl, Admin-E-Mails und Abo
+(`PUT /platform/companies/:id/billing` — Tarif, `paidUntil`, Notiz),
+`POST /platform/companies/:id/suspend` `{reason}` und `.../resume`.
+
+Eine gesperrte Firma ist komplett gesperrt: ihre Sitzungen werden
+gelöscht, `/auth/login` markiert sie mit `suspended: true`,
+`select-company`/`switch-company` antworten 403, Agent-Token wirken
+nicht mehr. Der Grund bleibt intern. Überfällig (`paidUntil` vorbei)
+wird nur angezeigt, gesperrt wird von Hand. Sperren/Entsperren/Abo
+landen im Audit-Log der Firma.
 
 ## Starten
 

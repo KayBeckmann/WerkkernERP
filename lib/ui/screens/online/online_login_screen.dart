@@ -486,9 +486,13 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
                 for (final m in login.memberships)
                   Card(
                     child: ListTile(
-                      leading: const Icon(Icons.cloud_outlined),
+                      leading: Icon(m.suspended ? Icons.lock_outline : Icons.cloud_outlined),
                       title: Text(m.companyName),
-                      subtitle: Text(m.isAdmin ? '${m.groupName} · Admin' : m.groupName),
+                      subtitle: Text(
+                        m.suspended
+                            ? 'Gesperrt — bitte an den Anbieter wenden'
+                            : (m.isAdmin ? '${m.groupName} · Admin' : m.groupName),
+                      ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: _busy ? null : () => _selectCompany(m),
                     ),

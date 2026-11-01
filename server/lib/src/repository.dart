@@ -17,6 +17,23 @@ abstract class PhaseBRepository {
   Future<CompanyProfile> getCompanyProfile(String companyId);
   Future<void> saveCompanyProfile(CompanyProfile profile);
 
+  // ---- Plattformbetrieb (SaaS, Superadmin) -------------------------------
+  /// Leeres Abo ([CompanySubscription] ohne Felder), wenn nie gesetzt.
+  Future<CompanySubscription> getSubscription(String companyId);
+  Future<void> saveSubscription(CompanySubscription subscription);
+
+  /// Alle Firmen, neueste zuerst.
+  Future<List<PlatformCompany>> listPlatformCompanies();
+
+  /// Beendet alle App-Sitzungen der Firma (Sperre wirkt sofort).
+  Future<void> deleteSessionsForCompany(String companyId);
+
+  Future<bool> isPlatformAdmin(String userId);
+  Future<void> setPlatformAdmin(String userId, {required bool admin});
+  Future<void> savePlatformSession(PlatformSession session);
+  Future<PlatformSession?> findPlatformSession(String tokenHash);
+  Future<void> deletePlatformSession(String tokenHash);
+
   // ---- Audit -----------------------------------------------------------
   Future<void> recordAudit(AuditEntry entry);
 

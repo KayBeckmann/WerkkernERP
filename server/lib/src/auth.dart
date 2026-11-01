@@ -44,6 +44,8 @@ class SessionAuthenticator {
     }
     final membership = await repository.findMembershipById(session.membershipId);
     if (membership == null || !membership.active) return null;
+    // Sperre beendet die Sitzungen ohnehin; das hier deckt den Rest ab.
+    if ((await repository.getSubscription(session.companyId)).suspended) return null;
     return (session: session, membership: membership);
   }
 
@@ -57,6 +59,7 @@ class SessionAuthenticator {
     if (membership == null || !membership.active) return null;
     final company = await repository.findCompanyById(agent.companyId);
     if (company == null || !company.enabledModules.contains('aiAgents')) return null;
+    if ((await repository.getSubscription(company.id)).suspended) return null;
     final now = DateTime.now().toUtc();
     await repository.touchAgentToken(agent.id, now);
     return (

@@ -31,6 +31,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step16Dunning,
   _step17Recurring,
   _step18TimeSheets,
+  _step19Platform,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -502,6 +503,28 @@ Future<void> _step18TimeSheets(Session db) async {
       sheet_id TEXT NOT NULL REFERENCES time_sheets(id) ON DELETE CASCADE,
       entry_id TEXT NOT NULL UNIQUE REFERENCES time_entries(id) ON DELETE CASCADE,
       PRIMARY KEY (sheet_id, entry_id)
+    );
+  ''');
+}
+
+/// SaaS-Betrieb: Abo/Sperre je Firma, Superadmins und deren Sitzungen.
+Future<void> _step19Platform(Session db) async {
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS plan TEXT');
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS paid_until DATE');
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS billing_note TEXT');
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ');
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS suspend_reason TEXT');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS platform_admins (
+      user_id TEXT PRIMARY KEY REFERENCES app_users(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS platform_sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL
     );
   ''');
 }

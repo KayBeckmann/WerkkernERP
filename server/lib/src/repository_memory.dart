@@ -16,6 +16,58 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
   final Map<String, StoredResponse> _idempotent = {};
   final List<AgentToken> _agentTokens = [];
   final List<PendingApproval> _approvals = [];
+  final Map<String, DateTime> _companyCreatedAt = {};
+  final Map<String, CompanySubscription> _subscriptions = {};
+  final Set<String> _platformAdmins = {};
+  final List<PlatformSession> _platformSessions = [];
+
+  @override
+  Future<CompanySubscription> getSubscription(String companyId) async =>
+      _subscriptions[companyId] ?? CompanySubscription(companyId: companyId);
+
+  @override
+  Future<void> saveSubscription(CompanySubscription subscription) async =>
+      _subscriptions[subscription.companyId] = subscription;
+
+  @override
+  Future<List<PlatformCompany>> listPlatformCompanies() async {
+    final result = <PlatformCompany>[];
+    for (final company in _companies.reversed) {
+      final active = _memberships.where((m) => m.companyId == company.id && m.active);
+      result.add(PlatformCompany(
+        company: company,
+        createdAt: _companyCreatedAt[company.id]!,
+        activeMembers: active.length,
+        adminEmails: [
+          for (final m in active.where((m) => m.isAdmin)) ?_users.where((u) => u.id == m.userId).firstOrNull?.email,
+        ],
+        subscription: await getSubscription(company.id),
+      ));
+    }
+    return result;
+  }
+
+  @override
+  Future<void> deleteSessionsForCompany(String companyId) async =>
+      _sessions.removeWhere((s) => s.companyId == companyId);
+
+  @override
+  Future<bool> isPlatformAdmin(String userId) async => _platformAdmins.contains(userId);
+
+  @override
+  Future<void> setPlatformAdmin(String userId, {required bool admin}) async =>
+      admin ? _platformAdmins.add(userId) : _platformAdmins.remove(userId);
+
+  @override
+  Future<void> savePlatformSession(PlatformSession session) async => _platformSessions.add(session);
+
+  @override
+  Future<PlatformSession?> findPlatformSession(String tokenHash) async =>
+      _platformSessions.where((s) => s.tokenHash == tokenHash).firstOrNull;
+
+  @override
+  Future<void> deletePlatformSession(String tokenHash) async =>
+      _platformSessions.removeWhere((s) => s.tokenHash == tokenHash);
 
   @override
   Future<void> createAgentToken(AgentToken token) async => _agentTokens.add(token);
@@ -164,6 +216,7 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
   Future<Company> createCompany({required String id, required String name}) async {
     final company = Company(id: id, name: name, enabledModules: const {});
     _companies.add(company);
+    _companyCreatedAt[id] = DateTime.now().toUtc();
     return company;
   }
 
@@ -332,6 +385,7 @@ class InMemoryPhaseBRepository implements PhaseBRepository {
   @override
   Future<void> purgeExpired(DateTime now) async {
     _sessions.removeWhere((s) => s.isExpired(now));
+    _platformSessions.removeWhere((s) => s.isExpired(now));
     _pendingLogins.removeWhere((p) => now.isAfter(p.expiresAt));
     _invitations.removeWhere((i) => now.isAfter(i.expiresAt.add(const Duration(days: 30))));
   }

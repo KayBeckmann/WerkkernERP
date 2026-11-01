@@ -2,8 +2,9 @@
 # lokal gebaut und per deploy/strato/deploy.sh übertragen — der Server
 # ist zu knapp bemessen, um selbst zu kompilieren.
 #
-# Nach außen nur ein Port: der Web-Container (App + /api/ -> Server).
-# TLS macht der Nginx Proxy Manager auf dem Host.
+# Nach außen zwei Ports: Web-App (App + /api/ -> Server) und das
+# Superadmin-Panel (nur /api/platform/*). TLS macht der Nginx Proxy
+# Manager auf dem Host.
 services:
   server-db:
     image: postgres:16-alpine
@@ -51,6 +52,15 @@ services:
     ports:
       - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8085}:80"
     mem_limit: 64m
+
+  superadmin:
+    image: werkkernerp-superadmin:${WERKKERN_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "${SUPERADMIN_BIND:-0.0.0.0}:${SUPERADMIN_PORT:-8086}:80"
+    mem_limit: 32m
 
 volumes:
   server-db-data:

@@ -70,7 +70,13 @@ class SavedOnlineAccount {
         'email': email,
         'memberships': [
           for (final m in memberships)
-            {'companyId': m.companyId, 'companyName': m.companyName, 'groupName': m.groupName, 'isAdmin': m.isAdmin},
+            {
+              'companyId': m.companyId,
+              'companyName': m.companyName,
+              'groupName': m.groupName,
+              'isAdmin': m.isAdmin,
+              if (m.suspended) 'suspended': true,
+            },
         ],
         if (token != null) 'token': token,
         if (sessionCompanyId != null) 'sessionCompanyId': sessionCompanyId,

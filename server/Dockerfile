@@ -9,12 +9,14 @@ COPY server /app/server
 WORKDIR /app/server
 RUN dart pub get
 RUN dart compile exe bin/server.dart -o bin/server \
-    && dart compile exe bin/recover_admin.dart -o bin/recover_admin
+    && dart compile exe bin/recover_admin.dart -o bin/recover_admin \
+    && dart compile exe bin/platform_admin.dart -o bin/platform_admin
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/server/bin/server /app/server
 COPY --from=build /app/server/bin/recover_admin /app/recover_admin
+COPY --from=build /app/server/bin/platform_admin /app/platform_admin
 EXPOSE 8090
 ENTRYPOINT ["/app/server"]
