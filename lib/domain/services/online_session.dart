@@ -19,6 +19,7 @@ class OnlineSession extends ChangeNotifier {
     this.offlineOnly = false,
     this.expiresAt,
     this.onEnded,
+    this.keepSignedIn = false,
   });
 
   final WerkkernApiClient client;
@@ -41,6 +42,10 @@ class OnlineSession extends ChangeNotifier {
   /// Ablauf der Server-Sitzung (7 Tage nach Passwort-Eingabe) — danach
   /// meldet die App automatisch ab.
   final DateTime? expiresAt;
+
+  /// „Angemeldet bleiben“: Sitzung liegt auf dem Gerät und überdauert
+  /// den Wechsel zur Startseite.
+  final bool keepSignedIn;
 
   /// Nach Abmelden/Ablauf: gespeicherte Sitzung auf dem Gerät verwerfen.
   final Future<void> Function()? onEnded;

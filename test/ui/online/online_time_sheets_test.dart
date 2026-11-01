@@ -47,8 +47,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.timer_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Zeiten');
     await tester.tap(find.text('Stundenzettel'));
     await tester.pumpAndSettle();
 

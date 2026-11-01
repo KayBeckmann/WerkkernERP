@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 
 /// Ein auf diesem Gerät bekanntes Online-Konto (Server + E-Mail) mit den
@@ -138,7 +139,24 @@ abstract class OnlineAccountStore extends ChangeNotifier {
   }
 }
 
-/// Android Keystore bzw. im Web WebCrypto — wie das SMTP-Passwort.
+/// Standard-Ablage der Plattform: Android Keystore; im Web der normale
+/// Browser-Speicher. Grund: Secure Storage braucht im Web WebCrypto, das
+/// Browser nur über HTTPS oder `localhost` freigeben — über
+/// `http://<LAN-IP>` scheiterte jedes Speichern still, die Startseite
+/// blieb leer (Kay-Feedback 2026-11-01). Echten Schutz bietet es im Web
+/// ohnehin nicht (der Schlüssel läge im selben Browser-Speicher).
+OnlineAccountStore defaultOnlineAccountStore() => kIsWeb ? PrefsOnlineAccountStore() : SecureOnlineAccountStore();
+
+class PrefsOnlineAccountStore extends OnlineAccountStore {
+  static const _key = 'online.accounts';
+
+  @override
+  Future<String?> readRaw() async => (await SharedPreferences.getInstance()).getString(_key);
+  @override
+  Future<void> writeRaw(String value) async => (await SharedPreferences.getInstance()).setString(_key, value);
+}
+
+/// Android Keystore — wie das SMTP-Passwort.
 class SecureOnlineAccountStore extends OnlineAccountStore {
   SecureOnlineAccountStore({FlutterSecureStorage? storage}) : _storage = storage ?? const FlutterSecureStorage();
   final FlutterSecureStorage _storage;

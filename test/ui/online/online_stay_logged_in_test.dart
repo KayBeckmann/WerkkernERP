@@ -51,7 +51,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    expect(find.text('Elektro Kay · online'), findsOneWidget);
+    expect(find.textContaining('Elektro Kay — '), findsOneWidget);
   }
 
   Future<void> backToStart(WidgetTester tester) async {
@@ -76,7 +76,7 @@ void main() {
     expect(find.textContaining('angemeldet bis'), findsOneWidget);
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    expect(find.text('Elektro Kay · online'), findsOneWidget, reason: 'ohne Passworteingabe');
+    expect(find.textContaining('Elektro Kay — '), findsOneWidget, reason: 'ohne Passworteingabe');
     expect(find.byKey(const Key('online-password')), findsNothing);
 
     // Abmelden beendet die gespeicherte Sitzung; die Firma bleibt gelistet.
@@ -102,7 +102,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('online-password')), 'passwort-12345');
     await tester.tap(find.text('Anmelden'));
     await tester.pumpAndSettle();
-    expect(find.text('Elektro Kay · online'), findsOneWidget, reason: 'keine erneute Firmenwahl');
+    expect(find.textContaining('Elektro Kay — '), findsOneWidget, reason: 'keine erneute Firmenwahl');
   });
 
   testWidgets('Zweite Firma desselben Kontos öffnet mit der gespeicherten Sitzung; ungültige Sitzung verlangt Passwort',
@@ -121,7 +121,7 @@ void main() {
 
     await tester.tap(find.text('Nord Impuls'));
     await tester.pumpAndSettle();
-    expect(find.text('Nord Impuls · online'), findsOneWidget);
+    expect(find.textContaining('Nord Impuls — '), findsOneWidget);
     await backToStart(tester);
 
     // Sitzung serverseitig beendet (z. B. Passwort auf anderem Gerät
@@ -155,7 +155,7 @@ void main() {
       home: OnlineHomeScreen(session: session, expiredBuilder: (notice) => Scaffold(body: Text(notice))),
     ));
     await tester.pumpAndSettle();
-    expect(find.text('Elektro Kay · online'), findsOneWidget);
+    expect(find.textContaining('Elektro Kay — '), findsOneWidget);
 
     await tester.pump(const Duration(minutes: 2));
     await tester.pumpAndSettle();

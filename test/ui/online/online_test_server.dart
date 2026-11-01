@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart' show NavigationDestination;
+import 'package:flutter/material.dart' show ListTile, NavigationDestination;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -10,6 +10,7 @@ import 'package:werkkernerp_server/src/business/repository_memory.dart';
 import 'package:werkkernerp_server/src/mail.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
+import 'package:werkkernerp/ui/widgets/sidebar_nav_item.dart';
 
 /// Echter Server-Router (In-Memory) hinter einem MockClient — keine
 /// Sockets, daher in `testWidgets` (FakeAsync) zuverlässig.
@@ -80,11 +81,24 @@ class OnlineTestServer {
   Future<Map<String, Object?>> put(String path, Object body, String token) => _call('PUT', path, body, token);
 }
 
-/// Wechselt in den Bereich [label] der unteren Leiste — die Übersicht ist
-/// der Einstieg, Tests für einen Fachbereich gehen ausdrücklich dorthin.
+/// Wechselt in den Bereich [label] — schmal über die untere Leiste bzw.
+/// „Mehr“, breit über die Sidebar (gleiches Layout wie offline). Die
+/// Übersicht ist der Einstieg, Tests für einen Fachbereich gehen
+/// ausdrücklich dorthin.
 Future<void> openTab(WidgetTester tester, String label) async {
   final destination = find.widgetWithText(NavigationDestination, label);
-  if (destination.evaluate().isEmpty) return;
-  await tester.tap(destination);
+  final sidebar = find.widgetWithText(SidebarNavItem, label);
+  if (destination.evaluate().isNotEmpty) {
+    await tester.tap(destination);
+  } else if (sidebar.evaluate().isNotEmpty) {
+    await tester.tap(sidebar);
+  } else if (find.widgetWithText(NavigationDestination, 'Mehr').evaluate().isNotEmpty) {
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Mehr'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, label));
+  } else {
+    return;
+  }
   await tester.pumpAndSettle();
 }
+

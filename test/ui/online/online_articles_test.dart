@@ -32,8 +32,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.inventory_2_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Artikel');
 
     Future<void> fill(String key, String value) => tester.enterText(find.byKey(Key('online-form-$key')), value);
 
@@ -96,8 +95,7 @@ void main() {
     expect(find.textContaining('130,00 € netto / m'), findsOneWidget);
 
     // Neue Rechnung: Artikel-Position übernimmt den kalkulierten Preis.
-    await tester.tap(find.byIcon(Icons.receipt_long_outlined).last);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Dokumente');
     await tester.tap(find.text('Neues Dokument'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-new-document-customer')));
