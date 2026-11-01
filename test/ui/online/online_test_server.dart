@@ -18,8 +18,10 @@ class OnlineTestServer {
   /// Versendete Mails (statt SMTP) — für Versand-Tests.
   final mailTransport = RecordingMailTransport();
 
+  final repository = InMemoryPhaseBRepository();
+
   late final handler = PhaseBRouter(
-    repository: InMemoryPhaseBRepository(),
+    repository: repository,
     business: InMemoryBusinessRepository(),
     mail: MailService(transport: mailTransport, secrets: SecretSealer(List<int>.filled(32, 7))),
   ).handler;

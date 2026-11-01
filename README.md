@@ -126,6 +126,11 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Sitzungs-Token (Android: Keystore, Web: Browser-Speicher; nie das Passwort); die Sitzung gilt
   7 Tage ab Passwort-Eingabe, danach meldet die App automatisch ab.
   Weitere Firmen desselben Kontos öffnen ohne erneutes Passwort.
+- **SaaS-Betrieb:** eigenes Superadmin-Panel (`superadmin/`, eigener
+  Container) — alle Firmen mit Abo (Tarif, „bezahlt bis“, Notiz),
+  Überfällige markiert, Firmen von Hand sperren/entsperren (gesperrt =
+  kein Login, laufende Sitzungen enden). Online-Betrieb auf Strato über
+  `deploy/strato/deploy.sh` (lokal gebaute Images).
 - **Fachmodule online** (je Firma schaltbar, Rechte je Gruppe;
   Standardrechte für Projektleiter/Monteur/Buchhaltung): Projekte mit
   Ergebnisrechnung, Zeiterfassung je Benutzer, Kunden-Stundenzettel mit

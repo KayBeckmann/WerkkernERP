@@ -1,0 +1,66 @@
+# Online-Betrieb auf Strato (~/projekte/werkkernerp). Images werden
+# lokal gebaut und per deploy/strato/deploy.sh übertragen — der Server
+# ist zu knapp bemessen, um selbst zu kompilieren.
+#
+# Nach außen zwei Ports: Web-App (App + /api/ -> Server) und das
+# Superadmin-Panel (nur /api/platform/*). TLS macht der Nginx Proxy
+# Manager auf dem Host.
+services:
+  server-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: werkkernerp_server
+      POSTGRES_USER: werkkernerp_server
+      POSTGRES_PASSWORD: ${SERVER_DB_PASSWORD:?SERVER_DB_PASSWORD fehlt in .env}
+    # Kleiner Footprint für den knappen Server.
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=20", "-c", "work_mem=2MB"]
+    volumes:
+      - server-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U werkkernerp_server"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 256m
+
+  server:
+    image: werkkernerp-server:${WERKKERN_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      server-db:
+        condition: service_healthy
+    environment:
+      PORT: "8090"
+      DB_HOST: server-db
+      DB_PORT: "5432"
+      DB_NAME: werkkernerp_server
+      DB_USER: werkkernerp_server
+      DB_PASSWORD: ${SERVER_DB_PASSWORD}
+      # Gleicher Origin über /api/ — CORS nur für fremde Web-Clients (LAN-Test).
+      CORS_ALLOWED_ORIGINS: ${SERVER_CORS_ALLOWED_ORIGINS:-*}
+      # Nur über den Web-Container erreichbar, der die echte Client-IP setzt.
+      TRUST_PROXY: "true"
+      WERKKERN_SECRET_KEY: ${SERVER_SECRET_KEY:-}
+    mem_limit: 192m
+
+  web:
+    image: werkkernerp-web:${WERKKERN_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${WEB_PORT:-8085}:80"
+    mem_limit: 64m
+
+  superadmin:
+    image: werkkernerp-superadmin:${WERKKERN_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "${SUPERADMIN_BIND:-0.0.0.0}:${SUPERADMIN_PORT:-8086}:80"
+    mem_limit: 32m
+
+volumes:
+  server-db-data:

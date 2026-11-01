@@ -4,17 +4,27 @@
 library;
 
 class OnlineMembership {
-  const OnlineMembership({required this.companyId, required this.companyName, required this.groupName, required this.isAdmin});
+  const OnlineMembership({
+    required this.companyId,
+    required this.companyName,
+    required this.groupName,
+    required this.isAdmin,
+    this.suspended = false,
+  });
   factory OnlineMembership.fromJson(Map<String, Object?> j) => OnlineMembership(
         companyId: j['companyId'] as String,
         companyName: j['companyName'] as String,
         groupName: j['groupName'] as String,
         isAdmin: j['isAdmin'] as bool,
+        suspended: j['suspended'] as bool? ?? false,
       );
   final String companyId;
   final String companyName;
   final String groupName;
   final bool isAdmin;
+
+  /// Firma vom Anbieter gesperrt (SaaS-Abo) — Anmeldung nicht möglich.
+  final bool suspended;
 }
 
 class OnlineLogin {

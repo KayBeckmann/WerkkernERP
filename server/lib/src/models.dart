@@ -295,3 +295,84 @@ class PendingApproval {
   final int? resultStatus;
   final String? resultBody;
 }
+
+/// SaaS-Abo einer Firma — nur der Plattformbetreiber (Superadmin) sieht
+/// und ändert das, nie die Firma selbst. [suspendedAt] gesetzt = Firma
+/// komplett gesperrt (kein Login, laufende Sitzungen enden), Kay-
+/// Entscheidung 2026-11-01. [paidUntil] markiert nur Überfälligkeit —
+/// gesperrt wird bewusst von Hand.
+class CompanySubscription {
+  const CompanySubscription({
+    required this.companyId,
+    this.plan,
+    this.paidUntil,
+    this.note,
+    this.suspendedAt,
+    this.suspendReason,
+  });
+
+  final String companyId;
+  final String? plan;
+
+  /// Kalendertag (UTC-Mitternacht), bis einschließlich dem bezahlt ist.
+  final DateTime? paidUntil;
+  final String? note;
+  final DateTime? suspendedAt;
+  final String? suspendReason;
+
+  bool get suspended => suspendedAt != null;
+
+  /// Überfällig ab dem Tag nach [paidUntil].
+  bool isOverdue(DateTime now) {
+    final until = paidUntil;
+    if (until == null) return false;
+    final today = DateTime.utc(now.year, now.month, now.day);
+    return today.isAfter(until);
+  }
+
+  CompanySubscription withBilling({String? plan, DateTime? paidUntil, String? note}) => CompanySubscription(
+        companyId: companyId,
+        plan: plan,
+        paidUntil: paidUntil,
+        note: note,
+        suspendedAt: suspendedAt,
+        suspendReason: suspendReason,
+      );
+
+  CompanySubscription withSuspension(DateTime? at, String? reason) => CompanySubscription(
+        companyId: companyId,
+        plan: plan,
+        paidUntil: paidUntil,
+        note: note,
+        suspendedAt: at,
+        suspendReason: at == null ? null : reason,
+      );
+}
+
+/// Firma aus Sicht des Plattformbetreibers: nur Stammdaten und
+/// Mitgliederzahl, keine Fachdaten (ADR-0001 B0.5 — kein globaler
+/// Zugriff auf Mandantendaten, auch nicht für den Betreiber).
+class PlatformCompany {
+  const PlatformCompany({
+    required this.company,
+    required this.createdAt,
+    required this.activeMembers,
+    required this.adminEmails,
+    required this.subscription,
+  });
+  final Company company;
+  final DateTime createdAt;
+  final int activeMembers;
+  final List<String> adminEmails;
+  final CompanySubscription subscription;
+}
+
+/// Sitzung im Superadmin-Panel — getrennt von den Firmensitzungen,
+/// eigenes Token, kurze Laufzeit.
+class PlatformSession {
+  const PlatformSession({required this.tokenHash, required this.userId, required this.expiresAt});
+  final String tokenHash;
+  final String userId;
+  final DateTime expiresAt;
+  bool isExpired(DateTime now) => now.isAfter(expiresAt);
+}

@@ -14,3 +14,4 @@ export 'src/recurring.dart';
 export 'src/timesheets.dart';
 export 'src/mail.dart';
 export 'src/dashboard.dart';
+export 'src/platform.dart';

@@ -15,6 +15,7 @@ import 'business/router.dart';
 import 'login_throttle.dart';
 import 'mail.dart';
 import 'permission_catalog.dart';
+import 'platform_routes.dart';
 import 'repository.dart';
 import 'util/passwords.dart';
 import 'util/responses.dart';
@@ -224,6 +225,8 @@ class PhaseBRouter {
     router.get('/permissions/effective', _effectivePermission);
     router.get('/permissions/mine', _myPermissions);
 
+    PlatformRoutes(repository: repository, loginThrottle: loginThrottle, clientAddress: _clientAddress).mount(router);
+
     if (business != null) {
       BusinessRoutes(repository: repository, business: business!, auth: _auth).mount(router);
       if (mail != null) {
@@ -303,6 +306,7 @@ class PhaseBRouter {
         'companyName': company.name,
         'groupName': group.name,
         'isAdmin': membership.isAdmin,
+        if ((await repository.getSubscription(company.id)).suspended) 'suspended': true,
       });
     }
 
@@ -335,6 +339,7 @@ class PhaseBRouter {
     final company = await repository.findCompanyById(companyId);
     final group = await repository.findGroupById(membership.groupId);
     if (company == null || group == null) return jsonError('Firma oder Gruppe nicht gefunden.', status: 404);
+    if ((await repository.getSubscription(companyId)).suspended) return jsonError(companySuspendedMessage, status: 403);
 
     final rawToken = Tokens.generate();
     final now = DateTime.now().toUtc();
@@ -374,6 +379,7 @@ class PhaseBRouter {
     final company = await repository.findCompanyById(companyId);
     final group = await repository.findGroupById(membership.groupId);
     if (company == null || group == null) return jsonError('Firma oder Gruppe nicht gefunden.', status: 404);
+    if ((await repository.getSubscription(companyId)).suspended) return jsonError(companySuspendedMessage, status: 403);
 
     final rawToken = Tokens.generate();
     await repository.saveSession(

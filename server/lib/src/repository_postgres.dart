@@ -61,6 +61,120 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   }
 
   @override
+  Future<CompanySubscription> getSubscription(String companyId) async {
+    final result = await _db.execute(
+      Sql.named('SELECT plan, paid_until, billing_note, suspended_at, suspend_reason FROM companies WHERE id = @id'),
+      parameters: {'id': companyId},
+    );
+    if (result.isEmpty) return CompanySubscription(companyId: companyId);
+    return _toSubscription(companyId, result.first, 0);
+  }
+
+  CompanySubscription _toSubscription(String companyId, ResultRow r, int offset) => CompanySubscription(
+        companyId: companyId,
+        plan: r[offset] as String?,
+        paidUntil: r[offset + 1] as DateTime?,
+        note: r[offset + 2] as String?,
+        suspendedAt: r[offset + 3] as DateTime?,
+        suspendReason: r[offset + 4] as String?,
+      );
+
+  @override
+  Future<void> saveSubscription(CompanySubscription s) async {
+    await _db.execute(
+      Sql.named(
+        'UPDATE companies SET plan = @plan, paid_until = @paidUntil, billing_note = @note, '
+        'suspended_at = @suspendedAt, suspend_reason = @reason WHERE id = @id',
+      ),
+      parameters: {
+        'id': s.companyId,
+        'plan': s.plan,
+        'paidUntil': s.paidUntil == null ? null : TypedValue(Type.date, s.paidUntil),
+        'note': s.note,
+        'suspendedAt': s.suspendedAt,
+        'reason': s.suspendReason,
+      },
+    );
+  }
+
+  @override
+  Future<List<PlatformCompany>> listPlatformCompanies() async {
+    final result = await _db.execute('''
+      SELECT c.id, c.name, c.enabled_modules, c.created_at,
+             c.plan, c.paid_until, c.billing_note, c.suspended_at, c.suspend_reason,
+             (SELECT count(*) FROM memberships m WHERE m.company_id = c.id AND m.active)::int,
+             coalesce((SELECT array_agg(u.email ORDER BY u.email) FROM memberships m
+                       JOIN app_users u ON u.id = m.user_id
+                       WHERE m.company_id = c.id AND m.active AND m.is_admin), '{}')
+      FROM companies c ORDER BY c.created_at DESC, c.id
+    ''');
+    return [
+      for (final r in result)
+        PlatformCompany(
+          company: _toCompany(r),
+          createdAt: r[3] as DateTime,
+          activeMembers: r[9] as int,
+          adminEmails: (r[10] as List).cast<String>(),
+          subscription: _toSubscription(r[0] as String, r, 4),
+        ),
+    ];
+  }
+
+  @override
+  Future<void> deleteSessionsForCompany(String companyId) async {
+    await _db.execute(
+      Sql.named('DELETE FROM company_sessions WHERE company_id = @id'),
+      parameters: {'id': companyId},
+    );
+  }
+
+  @override
+  Future<bool> isPlatformAdmin(String userId) async {
+    final result = await _db.execute(
+      Sql.named('SELECT 1 FROM platform_admins WHERE user_id = @id'),
+      parameters: {'id': userId},
+    );
+    return result.isNotEmpty;
+  }
+
+  @override
+  Future<void> setPlatformAdmin(String userId, {required bool admin}) async {
+    await _db.execute(
+      Sql.named(admin
+          ? 'INSERT INTO platform_admins (user_id) VALUES (@id) ON CONFLICT DO NOTHING'
+          : 'DELETE FROM platform_admins WHERE user_id = @id'),
+      parameters: {'id': userId},
+    );
+    if (!admin) {
+      await _db.execute(Sql.named('DELETE FROM platform_sessions WHERE user_id = @id'), parameters: {'id': userId});
+    }
+  }
+
+  @override
+  Future<void> savePlatformSession(PlatformSession session) async {
+    await _db.execute(
+      Sql.named('INSERT INTO platform_sessions (token_hash, user_id, expires_at) VALUES (@hash, @userId, @expiresAt)'),
+      parameters: {'hash': session.tokenHash, 'userId': session.userId, 'expiresAt': session.expiresAt},
+    );
+  }
+
+  @override
+  Future<PlatformSession?> findPlatformSession(String tokenHash) async {
+    final result = await _db.execute(
+      Sql.named('SELECT token_hash, user_id, expires_at FROM platform_sessions WHERE token_hash = @hash'),
+      parameters: {'hash': tokenHash},
+    );
+    if (result.isEmpty) return null;
+    final r = result.first;
+    return PlatformSession(tokenHash: r[0] as String, userId: r[1] as String, expiresAt: r[2] as DateTime);
+  }
+
+  @override
+  Future<void> deletePlatformSession(String tokenHash) async {
+    await _db.execute(Sql.named('DELETE FROM platform_sessions WHERE token_hash = @hash'), parameters: {'hash': tokenHash});
+  }
+
+  @override
   Future<void> setCompanyModules({required String companyId, required Set<String> enabledModules}) async {
     await _db.execute(
       Sql.named('UPDATE companies SET enabled_modules = @modules WHERE id = @id'),
@@ -679,6 +793,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
   @override
   Future<void> purgeExpired(DateTime now) async {
     await _db.execute(Sql.named('DELETE FROM company_sessions WHERE expires_at < @now'), parameters: {'now': now});
+    await _db.execute(Sql.named('DELETE FROM platform_sessions WHERE expires_at < @now'), parameters: {'now': now});
     await _db.execute(Sql.named('DELETE FROM pending_logins WHERE expires_at < @now'), parameters: {'now': now});
     // Stichtage in Dart berechnen: bei "@now - interval" leitet Postgres
     // den Parametertyp falsch als interval ab (42883).

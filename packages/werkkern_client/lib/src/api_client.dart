@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'platform.dart';
 
 /// Fehlerantwort des Servers. [statusCode] 409 = Konflikt (z. B.
 /// veraltete Version — der Client muss neu laden statt zu überschreiben),
@@ -479,6 +480,42 @@ class WerkkernApiClient {
   /// wie gewohnt als [ApiException]/[ApiUnreachable].
   Future<Object?> request(String method, String path, {Object? body, Map<String, String>? query}) =>
       _send(method, path, body: body, query: query);
+
+  // ---- Plattform-Verwaltung (Superadmin, SaaS-Betrieb) -------------------
+
+  /// Eigene Anmeldung fürs Superadmin-Panel; setzt [token].
+  Future<({String email, DateTime expiresAt})> platformLogin(String email, String password) async {
+    final j = _map(await _send('POST', '/platform/login', body: {'email': email, 'password': password}));
+    token = j['token'] as String;
+    return (email: j['email'] as String, expiresAt: DateTime.parse(j['expiresAt'] as String));
+  }
+
+  Future<void> platformLogout() async {
+    await _send('POST', '/platform/logout');
+    token = null;
+  }
+
+  Future<List<PlatformCompanyInfo>> platformCompanies() async {
+    final j = _map(await _send('GET', '/platform/companies'));
+    return [for (final c in j['companies'] as List) PlatformCompanyInfo.fromJson(c as Map<String, Object?>)];
+  }
+
+  /// Ersetzt Tarif, „bezahlt bis“ und Notiz (jeweils `null` = leeren).
+  Future<PlatformCompanyInfo> setPlatformBilling(String companyId, {String? plan, DateTime? paidUntil, String? note}) async =>
+      PlatformCompanyInfo.fromJson(_map(await _send('PUT', '/platform/companies/$companyId/billing', body: {
+        'plan': plan,
+        'paidUntil': paidUntil == null
+            ? null
+            : '${paidUntil.year.toString().padLeft(4, '0')}-${paidUntil.month.toString().padLeft(2, '0')}-'
+                '${paidUntil.day.toString().padLeft(2, '0')}',
+        'note': note,
+      })));
+
+  Future<PlatformCompanyInfo> suspendCompany(String companyId, {String? reason}) async => PlatformCompanyInfo.fromJson(
+      _map(await _send('POST', '/platform/companies/$companyId/suspend', body: {'reason': reason})));
+
+  Future<PlatformCompanyInfo> resumeCompany(String companyId) async =>
+      PlatformCompanyInfo.fromJson(_map(await _send('POST', '/platform/companies/$companyId/resume')));
 
   void close() => _http.close();
 }

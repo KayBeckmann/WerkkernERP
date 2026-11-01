@@ -6,6 +6,16 @@ services:
     ports:
       - "0.0.0.0:8085:80"
 
+  # Superadmin-Panel (SaaS: Firmen, Abo, Sperre) — vorher
+  # `flutter build web --release` in superadmin/.
+  superadmin:
+    build:
+      context: .
+      dockerfile: superadmin/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:8086:80"
+
   # ---- Phase B: Online-Multi-User-Server (B1) ------------------------
   # Eigenständiger Dienst, unabhängig vom Flutter-Client/Offline-
   # SQLite. Siehe server/README.md und das Vault-ADR-0001
