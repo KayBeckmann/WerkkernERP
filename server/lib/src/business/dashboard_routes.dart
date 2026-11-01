@@ -95,7 +95,12 @@ class DashboardRoutes {
           year += gross;
           if (d.issueDate.month == today.month) month += gross;
         }
-        return {'title': 'Umsatz (Rechnungen − Gutschriften)', 'amountCents': month, 'detail': 'Jahr ${Money.fromCents(year)}'};
+        return {
+          'title': 'Umsatz (Rechnungen − Gutschriften)',
+          'amountCents': month,
+          'yearAmountCents': year,
+          'detail': 'Jahr ${Money.fromCents(year)}',
+        };
       case 'drafts':
         final drafts = (await business.listDocuments(companyId, status: 'draft')).where((d) => d.createdByUserId == ctx.session.userId);
         return {'title': 'Meine Entwürfe', 'count': drafts.length};
