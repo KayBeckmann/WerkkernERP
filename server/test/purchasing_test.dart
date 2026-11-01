@@ -74,6 +74,37 @@ void runPurchasingTests(RepositoryFactory create) {
     await expectLater(c.delete('/purchase-orders/${draft['id']}'), throwsStatus(409));
   });
 
+  test('Zuordnung wie offline: finalisierter Auftrag/Rechnung, Entwurf abgewiesen, bleibt ohne Angabe bestehen', () async {
+    final s = await setup('a@example.com');
+    final c = s.c;
+    final customer = (await c.post('/customers', {'name': 'Meyer'}))['id'] as String;
+    final draftInvoice = await c.post('/documents', {
+      'kind': 'invoice',
+      'customerId': customer,
+      'items': [
+        {'kind': 'text', 'description': 'Leistung', 'quantity': '1', 'unitPriceCents': 100, 'vatRatePercent': 19},
+      ],
+    });
+    await expectLater(
+      c.post('/purchase-orders', {'supplierId': s.nord, 'sourceOrderId': draftInvoice['id']}),
+      throwsStatus(400),
+      reason: 'nur finalisierte Dokumente',
+    );
+    final invoice = await c.post('/documents/${draftInvoice['id']}/finalize', {'version': draftInvoice['version']});
+    final po = await c.post('/purchase-orders', {'supplierId': s.nord, 'sourceOrderId': invoice['id']});
+    expect(po['sourceOrderId'], invoice['id']);
+    expect(po['sourceOrderNumber'], 'R-${yy}001');
+
+    final kept = await c.put('/purchase-orders/${po['id']}', {'version': po['version'], 'items': [], 'supplierId': s.nord});
+    expect(kept['sourceOrderId'], invoice['id'], reason: 'ohne Angabe unverändert');
+    final cleared = await c.put('/purchase-orders/${po['id']}', {'version': kept['version'], 'items': [], 'sourceOrderId': null});
+    expect(cleared['sourceOrderId'], isNull);
+    await expectLater(
+      c.put('/purchase-orders/${po['id']}', {'version': cleared['version'], 'items': [], 'sourceOrderId': 'fremd'}),
+      throwsStatus(404),
+    );
+  });
+
   test('Aus Auftrag: ein Lieferant für alles bzw. günstigster je Artikel; ohne Preis nicht zuordenbar', () async {
     final s = await setup('a@example.com');
     final c = s.c;

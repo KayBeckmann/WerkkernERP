@@ -47,6 +47,8 @@ class OnlinePurchaseOrder {
     this.projectId,
     this.expenseCategoryId,
     this.sourceOrderId,
+    this.sourceOrderNumber,
+    this.sourceOrderKind,
     required this.version,
     this.items = const [],
     this.totalNetCents = 0,
@@ -65,6 +67,8 @@ class OnlinePurchaseOrder {
       projectId: j['projectId'] as String?,
       expenseCategoryId: j['expenseCategoryId'] as String?,
       sourceOrderId: j['sourceOrderId'] as String?,
+      sourceOrderNumber: j['sourceOrderNumber'] as String?,
+      sourceOrderKind: j['sourceOrderKind'] as String?,
       version: j['version'] as int,
       items: [for (final i in (j['items'] as List? ?? const [])) OnlinePurchaseOrderItem.fromJson(i as Map<String, Object?>)],
       totalNetCents: j['totalNetCents'] as int? ?? 0,
@@ -82,7 +86,11 @@ class OnlinePurchaseOrder {
   final String? notes;
   final String? projectId;
   final String? expenseCategoryId;
+  /// Zugeordneter Auftrag bzw. zugeordnete Rechnung (wie offline
+  /// „Zuordnung“) — auch bei „Bestellungen aus Auftrag“ gesetzt.
   final String? sourceOrderId;
+  final String? sourceOrderNumber;
+  final String? sourceOrderKind;
   final int version;
   final List<OnlinePurchaseOrderItem> items;
   final int totalNetCents;
@@ -135,6 +143,8 @@ extension PurchasingApi on WerkkernApiClient {
     String? notes,
     String? projectId,
     String? expenseCategoryId,
+    // Ohne Angabe bleibt die bisherige Zuordnung.
+    String? Function()? sourceOrderId,
   }) async =>
       OnlinePurchaseOrder.fromJson(_map(await request('PUT', '/purchase-orders/${order.id}', body: {
         'version': order.version,
@@ -143,6 +153,7 @@ extension PurchasingApi on WerkkernApiClient {
         'notes': notes,
         'projectId': projectId,
         'expenseCategoryId': expenseCategoryId,
+        if (sourceOrderId != null) 'sourceOrderId': sourceOrderId(),
         'items': [for (final i in items) i.toWriteJson()],
       })));
 

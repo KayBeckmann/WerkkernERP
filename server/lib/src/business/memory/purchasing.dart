@@ -81,7 +81,7 @@ mixin _InMemoryPurchasing implements PurchasingStore {
       status: 'draft',
       issueDate: order.issueDate,
       notes: order.notes,
-      sourceOrderId: _purchaseOrders[index].sourceOrderId,
+      sourceOrderId: order.sourceOrderId,
       projectId: order.projectId,
       expenseCategoryId: order.expenseCategoryId,
       createdByUserId: _purchaseOrders[index].createdByUserId,
