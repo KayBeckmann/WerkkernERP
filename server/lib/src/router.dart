@@ -33,7 +33,7 @@ class PhaseBRouter {
   PhaseBRouter({
     required this.repository,
     this.business,
-    this.sessionTtl = const Duration(hours: 8),
+    this.sessionTtl = const Duration(days: 7),
     this.invitationTtl = const Duration(days: 7),
     this.corsAllowedOrigins = const {},
     LoginThrottle? loginThrottle,
@@ -184,6 +184,7 @@ class PhaseBRouter {
     router.post('/auth/register', _register);
     router.post('/auth/login', _login);
     router.post('/auth/select-company', _selectCompany);
+    router.post('/auth/switch-company', _switchCompany);
     router.post('/auth/logout', _logout);
     router.post('/auth/change-password', _changePassword);
     router.post('/auth/accept-invitation', _acceptInvitation);
@@ -349,6 +350,46 @@ class PhaseBRouter {
     );
     return jsonOk({
       'token': rawToken,
+      'expiresAt': now.add(sessionTtl).toIso8601String(),
+      'companyName': company.name,
+      'groupName': group.name,
+      'isAdmin': membership.isAdmin,
+    });
+  }
+
+  /// Firmenwechsel aus einer bestehenden App-Sitzung, ohne Passwort.
+  /// Die neue Sitzung erbt das Ablaufdatum der alten — „angemeldet
+  /// bleiben“ verlängert sich dadurch nie über die Passwort-Eingabe
+  /// hinaus. Die alte Sitzung wird beendet.
+  Future<Response> _switchCompany(Request request) async {
+    final auth = await _auth.requireHumanSession(request);
+    if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
+    final companyId = (await _bodyJson(request))['companyId'] as String?;
+    if (companyId == null) return jsonError('companyId ist Pflicht.');
+
+    final membership = await repository.findMembership(userId: auth.session.userId, companyId: companyId);
+    if (membership == null || !membership.active) {
+      return jsonError('Keine aktive Mitgliedschaft in dieser Firma.', status: 403);
+    }
+    final company = await repository.findCompanyById(companyId);
+    final group = await repository.findGroupById(membership.groupId);
+    if (company == null || group == null) return jsonError('Firma oder Gruppe nicht gefunden.', status: 404);
+
+    final rawToken = Tokens.generate();
+    await repository.saveSession(
+      CompanySession(
+        tokenHash: Tokens.hashOf(rawToken),
+        membershipId: membership.id,
+        userId: auth.session.userId,
+        companyId: companyId,
+        createdAt: DateTime.now().toUtc(),
+        expiresAt: auth.session.expiresAt,
+      ),
+    );
+    await repository.deleteSession(auth.session.tokenHash);
+    return jsonOk({
+      'token': rawToken,
+      'expiresAt': auth.session.expiresAt.toIso8601String(),
       'companyName': company.name,
       'groupName': group.name,
       'isAdmin': membership.isAdmin,

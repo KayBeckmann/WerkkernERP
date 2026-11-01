@@ -17,6 +17,8 @@ class OnlineSession extends ChangeNotifier {
     required this.modules,
     this.offline,
     this.offlineOnly = false,
+    this.expiresAt,
+    this.onEnded,
   });
 
   final WerkkernApiClient client;
@@ -35,6 +37,13 @@ class OnlineSession extends ChangeNotifier {
   /// Ohne Anmeldung aus dem Offline-Bestand geöffnet (kein Server
   /// erreichbar) — nur markierte Dokumente, Abgleich erst nach Anmeldung.
   final bool offlineOnly;
+
+  /// Ablauf der Server-Sitzung (7 Tage nach Passwort-Eingabe) — danach
+  /// meldet die App automatisch ab.
+  final DateTime? expiresAt;
+
+  /// Nach Abmelden/Ablauf: gespeicherte Sitzung auf dem Gerät verwerfen.
+  final Future<void> Function()? onEnded;
 
   int get pendingChanges => offline?.outbox.length ?? 0;
 
@@ -65,6 +74,7 @@ class OnlineSession extends ChangeNotifier {
   Future<void> logout({bool wipeOffline = false}) async {
     if (wipeOffline) await offline?.wipe();
     if (offlineOnly) return;
+    await onEnded?.call();
     try {
       await client.logout();
     } on Exception {

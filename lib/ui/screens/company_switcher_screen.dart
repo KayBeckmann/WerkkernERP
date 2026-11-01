@@ -1,27 +1,69 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:werkkern_client/werkkern_client.dart';
 
 import '../../data/database/database.dart';
 import '../../domain/services/active_company_service.dart';
+import '../../domain/services/online_accounts.dart';
 import 'home_shell.dart';
 import 'online/online_login_screen.dart';
 
 /// Firmenauswahl/-anlage — der Einstiegspunkt der App (A0). Keine
 /// Anmeldung, kein Server: eine Liste lokal geführter Firmen zum
-/// Anlegen/Wechseln.
+/// Anlegen/Wechseln. Darunter die Online-Firmen früherer Anmeldungen —
+/// ein Klick öffnet sie (mit gespeicherter Sitzung ohne Passwort).
 class CompanySwitcherScreen extends StatefulWidget {
-  const CompanySwitcherScreen({super.key});
+  const CompanySwitcherScreen({super.key, this.accountStore, this.onlineClientFactory, this.offlineStoreFactory});
+
+  /// Für Widget-Tests; siehe [OnlineLoginScreen].
+  final OnlineAccountStore? accountStore;
+  final WerkkernApiClient Function(Uri baseUrl)? onlineClientFactory;
+  final OfflineStore? Function()? offlineStoreFactory;
 
   @override
   State<CompanySwitcherScreen> createState() => _CompanySwitcherScreenState();
 }
 
 class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
+  late final OnlineAccountStore _accounts = widget.accountStore ?? SecureOnlineAccountStore();
+  List<SavedOnlineAccount> _online = const [];
+
   @override
   void initState() {
     super.initState();
     context.read<ActiveCompanyService>().loadCompanies();
+    _accounts.addListener(_loadOnline);
+    _loadOnline();
   }
+
+  @override
+  void dispose() {
+    _accounts.removeListener(_loadOnline);
+    super.dispose();
+  }
+
+  Future<void> _loadOnline() async {
+    final accounts = await _accounts.load();
+    if (mounted) setState(() => _online = accounts);
+  }
+
+  /// Anmeldemaske (leer oder für eine bekannte Online-Firma vorbelegt).
+  Future<void> _openOnline({SavedOnlineAccount? account, String? companyId}) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OnlineLoginScreen(
+          clientFactory: widget.onlineClientFactory,
+          offlineStoreFactory: widget.offlineStoreFactory,
+          accountStore: _accounts,
+          account: account,
+          targetCompanyId: companyId,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _removeOnline(SavedOnlineAccount account, OnlineMembership membership) =>
+      _accounts.removeCompany(account, membership.companyId);
 
   Future<void> _createCompany() async {
     final name = await showDialog<String>(
@@ -70,13 +112,11 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
           IconButton(
             tooltip: 'Online anmelden',
             icon: const Icon(Icons.cloud_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const OnlineLoginScreen()),
-            ),
+            onPressed: _openOnline,
           ),
         ],
       ),
-      body: service.companies.isEmpty
+      body: service.companies.isEmpty && _online.isEmpty
           ? const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
@@ -87,21 +127,48 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
                 ),
               ),
             )
-          : ListView.separated(
+          : ListView(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-              itemCount: service.companies.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final company = service.companies[index];
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.business_outlined),
-                    title: Text(company.name),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _openCompany(service, company),
+              children: [
+                for (final company in service.companies)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Card(
+                      child: ListTile(
+                        leading: const Icon(Icons.business_outlined),
+                        title: Text(company.name),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _openCompany(service, company),
+                      ),
+                    ),
                   ),
-                );
-              },
+                if (_online.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+                    child: Text('Online', style: Theme.of(context).textTheme.titleSmall),
+                  ),
+                  for (final account in _online)
+                    for (final membership in account.memberships)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.cloud_outlined),
+                            title: Text(membership.companyName),
+                            subtitle: Text(_onlineSubtitle(account)),
+                            trailing: PopupMenuButton<String>(
+                              tooltip: 'Optionen',
+                              onSelected: (_) => _removeOnline(account, membership),
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(value: 'remove', child: Text('Von der Startseite entfernen')),
+                              ],
+                            ),
+                            onTap: () => _openOnline(account: account, companyId: membership.companyId),
+                          ),
+                        ),
+                      ),
+                ],
+              ],
             ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'company-switcher-fab',
@@ -111,6 +178,15 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
       ),
     );
   }
+}
+
+String _onlineSubtitle(SavedOnlineAccount account) {
+  final host = Uri.tryParse(account.serverUrl)?.host ?? account.serverUrl;
+  final expiresAt = account.expiresAt;
+  if (!account.hasSessionAt(DateTime.now()) || expiresAt == null) return '${account.email} · $host · Passwort nötig';
+  final d = expiresAt.toLocal();
+  final until = '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.';
+  return '${account.email} · $host · angemeldet bis $until';
 }
 
 class _NewCompanyDialog extends StatefulWidget {

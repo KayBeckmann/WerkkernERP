@@ -101,10 +101,25 @@ class WerkkernApiClient {
     );
   }
 
-  /// Setzt [token] für alle folgenden Aufrufe.
-  Future<void> selectCompany(String identityToken, String companyId) async {
+  /// Setzt [token] für alle folgenden Aufrufe; liefert das Ablaufdatum
+  /// der Sitzung (`null` bei älteren Servern).
+  Future<DateTime?> selectCompany(String identityToken, String companyId) async {
     final j = _map(await _send('POST', '/auth/select-company', body: {'identityToken': identityToken, 'companyId': companyId}));
     token = j['token'] as String;
+    return _expiresAt(j);
+  }
+
+  /// Wechselt aus der bestehenden Sitzung in eine andere eigene Firma,
+  /// ohne Passwort. Ersetzt [token]; das Ablaufdatum bleibt das alte.
+  Future<DateTime?> switchCompany(String companyId) async {
+    final j = _map(await _send('POST', '/auth/switch-company', body: {'companyId': companyId}));
+    token = j['token'] as String;
+    return _expiresAt(j);
+  }
+
+  DateTime? _expiresAt(Map<String, Object?> j) {
+    final raw = j['expiresAt'] as String?;
+    return raw == null ? null : DateTime.parse(raw);
   }
 
   /// Eigenes Passwort ändern; beendet alle anderen Sitzungen des Kontos.
