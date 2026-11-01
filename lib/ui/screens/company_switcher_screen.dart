@@ -25,7 +25,7 @@ class CompanySwitcherScreen extends StatefulWidget {
 }
 
 class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
-  late final OnlineAccountStore _accounts = widget.accountStore ?? SecureOnlineAccountStore();
+  late final OnlineAccountStore _accounts = widget.accountStore ?? defaultOnlineAccountStore();
   List<SavedOnlineAccount> _online = const [];
 
   @override

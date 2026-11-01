@@ -122,7 +122,7 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   demselben Generator wie offline.
 - **Online-Firmen auf der Startseite:** nach der ersten Anmeldung mit
   einem Klick öffnen. „Angemeldet bleiben“ speichert nur das
-  Sitzungs-Token (Secure Storage, nie das Passwort); die Sitzung gilt
+  Sitzungs-Token (Android: Keystore, Web: Browser-Speicher; nie das Passwort); die Sitzung gilt
   7 Tage ab Passwort-Eingabe, danach meldet die App automatisch ab.
   Weitere Firmen desselben Kontos öffnen ohne erneutes Passwort.
 - **Fachmodule online** (je Firma schaltbar, Rechte je Gruppe;

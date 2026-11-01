@@ -30,7 +30,7 @@ class OnlineLoginScreen extends StatefulWidget {
   final OfflineStore? Function()? offlineStoreFactory;
 
   /// Bekannte Konten/Sitzungen dieses Geräts (Startseite). Standard:
-  /// Secure Storage.
+  /// [defaultOnlineAccountStore].
   final OnlineAccountStore? accountStore;
 
   /// Von der Startseite: Server/E-Mail vorbelegen; mit gültiger
@@ -56,7 +56,7 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
   bool _busy = false;
   bool _stayLoggedIn = false;
   String? _error;
-  late final OnlineAccountStore _accounts = widget.accountStore ?? SecureOnlineAccountStore();
+  late final OnlineAccountStore _accounts = widget.accountStore ?? defaultOnlineAccountStore();
   WerkkernApiClient? _client;
   OnlineLogin? _login;
   OfflineStore? _offline;
