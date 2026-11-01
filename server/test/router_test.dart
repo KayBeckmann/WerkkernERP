@@ -557,4 +557,46 @@ void runRouterTests(Future<PhaseBRepository> Function() createRepository) {
     await http.patch(baseUrl.resolve('/memberships/$membershipId'), headers: auth, body: jsonEncode({'active': false}));
     expect((await http.get(baseUrl.resolve('/me'), headers: {'authorization': 'Bearer $monteurToken'})).statusCode, 401);
   });
+
+  test('Sitzung gilt 7 Tage; Firmenwechsel ohne Passwort erbt das Ablaufdatum und beendet die alte Sitzung',
+      () async {
+    final a = await setUpCompanyWithAdmin('admin@example.com', 'Firma A');
+    final companyB = await createCompany(await loginIdentity('admin@example.com', 'passwort-12345'), 'Firma B');
+    final select = await http.post(
+      baseUrl.resolve('/auth/select-company'),
+      body: jsonEncode({
+        'identityToken': await loginIdentity('admin@example.com', 'passwort-12345'),
+        'companyId': a.companyId,
+      }),
+    );
+    final selected = jsonDecode(select.body) as Map<String, Object?>;
+    final expiresAt = DateTime.parse(selected['expiresAt'] as String);
+    expect(expiresAt.difference(DateTime.now().toUtc()).inHours, inInclusiveRange(167, 168));
+
+    final oldAuth = {'authorization': 'Bearer ${selected['token']}'};
+    final switched = await http.post(
+      baseUrl.resolve('/auth/switch-company'),
+      headers: oldAuth,
+      body: jsonEncode({'companyId': companyB}),
+    );
+    expect(switched.statusCode, 200);
+    final body = jsonDecode(switched.body) as Map<String, Object?>;
+    expect(body['companyName'], 'Firma B');
+    expect(body['isAdmin'], isTrue);
+    expect(DateTime.parse(body['expiresAt'] as String), expiresAt, reason: 'Wechsel verlängert nie');
+    final me = await http.get(baseUrl.resolve('/me'), headers: {'authorization': 'Bearer ${body['token']}'});
+    expect((jsonDecode(me.body) as Map<String, Object?>)['companyName'], 'Firma B');
+    expect((await http.get(baseUrl.resolve('/me'), headers: oldAuth)).statusCode, 401);
+
+    // Fremde Firma: keine Mitgliedschaft → 403; ohne Sitzung → 401.
+    final other = await setUpCompanyWithAdmin('fremd@example.com', 'Firma C');
+    final denied = await http.post(
+      baseUrl.resolve('/auth/switch-company'),
+      headers: {'authorization': 'Bearer ${body['token']}'},
+      body: jsonEncode({'companyId': other.companyId}),
+    );
+    expect(denied.statusCode, 403);
+    final anonymous = await http.post(baseUrl.resolve('/auth/switch-company'), body: jsonEncode({'companyId': companyB}));
+    expect(anonymous.statusCode, 401);
+  });
 }

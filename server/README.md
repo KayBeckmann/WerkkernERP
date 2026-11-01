@@ -62,7 +62,11 @@ und laufen deshalb nacheinander (`dart_test.yaml`: `concurrency: 1`).
    zum Admin dieser Firma.
 3. `POST /auth/login` → `identityToken` + Liste der Firmen, in denen
    der Nutzer Mitglied ist.
-4. `POST /auth/select-company` → firmengebundenes Session-Token.
+4. `POST /auth/select-company` → firmengebundenes Session-Token samt
+   `expiresAt` (7 Tage, `PhaseBRouter.sessionTtl`, keine Verlängerung).
+   `POST /auth/switch-company` `{companyId}` wechselt aus einer
+   App-Sitzung ohne Passwort in eine andere eigene Firma; die neue
+   Sitzung erbt das Ablaufdatum, die alte endet.
 5. Admin verwaltet `/groups`, `/memberships`,
    `/memberships/:id/overrides/:permission`, `/company/modules` und
    `/invitations` innerhalb der **eigenen** Firma — jeder Versuch auf

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../domain/services/online_session.dart';
@@ -20,8 +22,12 @@ import 'online_time_screen.dart';
 /// Hauptansicht im Online-Modus. Tabs erscheinen nur bei wirksamem
 /// Leserecht — der Server prüft trotzdem jede Aktion selbst.
 class OnlineHomeScreen extends StatefulWidget {
-  const OnlineHomeScreen({super.key, required this.session});
+  const OnlineHomeScreen({super.key, required this.session, this.expiredBuilder});
   final OnlineSession session;
+
+  /// Anmeldemaske nach Ablauf der Sitzung (mit Hinweistext); ohne
+  /// Builder geht es zurück zur Startseite.
+  final Widget Function(String notice)? expiredBuilder;
 
   @override
   State<OnlineHomeScreen> createState() => _OnlineHomeScreenState();
@@ -35,10 +41,16 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
   /// Hinwechseln frisch, statt den Stand vom ersten Aufbau zu zeigen
   /// (z. B. Lager nach einer Bestandskorrektur im Artikelbereich).
   final _visits = <String, int>{};
+  Timer? _expiryTimer;
 
   @override
   void initState() {
     super.initState();
+    final expiresAt = widget.session.expiresAt;
+    if (expiresAt != null && !widget.session.offlineOnly) {
+      final left = expiresAt.difference(DateTime.now().toUtc());
+      _expiryTimer = Timer(left.isNegative ? Duration.zero : left, _expired);
+    }
     // Nach der Anmeldung liegengebliebene Offline-Änderungen sofort
     // übertragen (B2: Rückkehr online).
     if (!widget.session.offlineOnly && widget.session.pendingChanges > 0) {
@@ -48,6 +60,7 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
 
   @override
   void dispose() {
+    _expiryTimer?.cancel();
     widget.session.client.close();
     super.dispose();
   }
@@ -73,6 +86,22 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
     } finally {
       if (mounted) setState(() => _syncing = false);
+    }
+  }
+
+  /// Sitzung nach 7 Tagen abgelaufen: automatisch abmelden, Passwort neu
+  /// eingeben. Offline markierte Dokumente bleiben auf dem Gerät.
+  Future<void> _expired() async {
+    await widget.session.logout();
+    if (!mounted) return;
+    const notice = 'Deine Anmeldung ist abgelaufen — bitte das Passwort erneut eingeben.';
+    final builder = widget.expiredBuilder;
+    if (builder == null) {
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).pop();
+      messenger.showSnackBar(const SnackBar(content: Text(notice)));
+    } else {
+      await Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => builder(notice)));
     }
   }
 
