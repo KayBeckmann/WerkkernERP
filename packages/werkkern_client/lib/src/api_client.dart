@@ -390,10 +390,12 @@ class WerkkernApiClient {
   Future<({List<OnlineTimeEntry> entries, String totalHours, bool companyScope})> timeEntries({
     bool mineOnly = false,
     String? documentId,
+    String? projectId,
   }) async {
     final j = _map(await _send('GET', '/time-entries', query: {
       if (mineOnly) 'mine': 'true',
       'documentId': ?documentId,
+      'projectId': ?projectId,
     }));
     return (
       entries: [for (final e in j['entries'] as List) OnlineTimeEntry.fromJson(e as Map<String, Object?>)],
@@ -410,6 +412,9 @@ class WerkkernApiClient {
     String? documentId,
     String? projectId,
     String? note,
+    // Rolle mit eigenem Stundensatz (wie offline); Funktion liefert `null`
+    // = Satz des Mitglieds, ohne Angabe bleibt die bisherige Rolle.
+    String? Function()? staffRoleId,
   }) async {
     final body = {
       'date': '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
@@ -417,6 +422,7 @@ class WerkkernApiClient {
       'documentId': ?documentId,
       'projectId': ?projectId,
       'note': note,
+      if (staffRoleId != null) 'staffRoleId': staffRoleId(),
     };
     return OnlineTimeEntry.fromJson(
       _map(await (id == null ? _send('POST', '/time-entries', body: body) : _send('PUT', '/time-entries/$id', body: body))),
@@ -432,11 +438,25 @@ class WerkkernApiClient {
     return [for (final p in j['projects'] as List) OnlineProject.fromJson(p as Map<String, Object?>)];
   }
 
-  Future<OnlineProject> createProject(String name, {String? customerId}) async =>
-      OnlineProject.fromJson(_map(await _send('POST', '/projects', body: {'name': name, 'customerId': ?customerId})));
+  Future<OnlineProject> createProject(String name, {String? customerId, String? notes}) async => OnlineProject.fromJson(
+        _map(await _send('POST', '/projects', body: {'name': name, 'customerId': ?customerId, 'notes': ?notes})),
+      );
 
-  Future<OnlineProject> updateProject(String id, {String? name, String? status}) async =>
-      OnlineProject.fromJson(_map(await _send('PUT', '/projects/$id', body: {'name': ?name, 'status': ?status})));
+  /// Nur übergebene Felder ändern; [customerId]/[notes] als Funktion, damit
+  /// auch „entfernen“ (`null`) möglich ist.
+  Future<OnlineProject> updateProject(
+    String id, {
+    String? name,
+    String? status,
+    String? Function()? customerId,
+    String? Function()? notes,
+  }) async =>
+      OnlineProject.fromJson(_map(await _send('PUT', '/projects/$id', body: {
+        'name': ?name,
+        'status': ?status,
+        if (customerId != null) 'customerId': customerId(),
+        if (notes != null) 'notes': notes(),
+      })));
 
   Future<OnlineProjectDetail> projectDetail(String id) async =>
       OnlineProjectDetail.fromJson(_map(await _send('GET', '/projects/$id')));

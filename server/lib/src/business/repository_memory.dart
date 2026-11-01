@@ -12,6 +12,7 @@ import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
 import 'recurring.dart';
+import 'staff_roles.dart';
 import 'timesheets.dart';
 import 'stock.dart';
 
@@ -23,8 +24,9 @@ part 'memory/purchasing.dart';
 part 'memory/dunning.dart';
 part 'memory/recurring.dart';
 part 'memory/timesheets.dart';
+part 'memory/staff_roles.dart';
 
-class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring, _InMemoryTimeSheets implements BusinessRepository {
+class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring, _InMemoryTimeSheets, _InMemoryStaffRoles implements BusinessRepository {
   final List<Customer> _customers = [];
   @override
   final List<Article> _articles = [];
@@ -34,6 +36,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
   final List<DocumentItem> _items = [];
   @override
   final Map<String, int> _sequences = {};
+  @override
   final List<TimeEntry> _timeEntries = [];
   final List<Project> _projects = [];
 
@@ -54,6 +57,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     required String companyId,
     required String name,
     String? customerId,
+    String? notes,
     required DateTime now,
   }) async {
     final key = '$companyId|project|${now.year}';
@@ -64,6 +68,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       companyId: companyId,
       name: name,
       customerId: customerId,
+      notes: notes,
       status: 'active',
       foundingYear: now.year,
       projectNumber: number,

@@ -11,6 +11,7 @@ export 'src/accounting.dart';
 export 'src/purchasing.dart';
 export 'src/dunning.dart';
 export 'src/recurring.dart';
+export 'src/staff_roles.dart';
 export 'src/timesheets.dart';
 export 'src/mail.dart';
 export 'src/dashboard.dart';

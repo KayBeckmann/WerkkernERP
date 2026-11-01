@@ -32,6 +32,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step17Recurring,
   _step18TimeSheets,
   _step19Platform,
+  _step20StaffRolesProjectNotes,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -527,4 +528,24 @@ Future<void> _step19Platform(Session db) async {
       expires_at TIMESTAMPTZ NOT NULL
     );
   ''');
+}
+
+/// Rollen & Stundensätze wie offline (Monteur/Meister/…): firmenweiter
+/// Stamm; eine Zeitbuchung kann eine Rolle tragen, deren Satz dann statt
+/// des Mitgliedssatzes eingefroren wird. Dazu Notizen an Projekten.
+Future<void> _step20StaffRolesProjectNotes(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS staff_roles (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      hourly_cost_cents BIGINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS staff_roles_company_idx ON staff_roles (company_id)');
+  await db.execute(
+    'ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS staff_role_id TEXT REFERENCES staff_roles(id) ON DELETE SET NULL',
+  );
+  await db.execute('ALTER TABLE projects ADD COLUMN IF NOT EXISTS notes TEXT');
 }

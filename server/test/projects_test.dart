@@ -48,6 +48,17 @@ void runProjectTests(Future<(PhaseBRepository, BusinessRepository)> Function() c
   Future<Map<String, Object?>> post(WerkkernApiClient c, String path, Map<String, Object?> body) async =>
       await c.request('POST', path, body: body) as Map<String, Object?>;
 
+  test('Notizen am Projekt wie offline: beim Anlegen, ändern, entfernen', () async {
+    final a = await company('a@example.com');
+    final created = await a.client.createProject('Neubau', notes: 'Schlüssel bei Nachbar');
+    expect(created.notes, 'Schlüssel bei Nachbar');
+    final renamed = await a.client.updateProject(created.id, name: 'Neubau Meyer');
+    expect(renamed.notes, 'Schlüssel bei Nachbar', reason: 'ohne Angabe unverändert');
+    final cleared = await a.client.updateProject(created.id, notes: () => null);
+    expect(cleared.notes, isNull);
+    expect((await a.client.projectDetail(created.id)).project.name, 'Neubau Meyer');
+  });
+
   test('Projektnummer PP je Jahr; Rechnung zum Projekt R-JJPPxxx, gemeinsamer Zähler mit projektfreien', () async {
     final a = await company('a@example.com');
     final customer = await a.client.createCustomer(const OnlineCustomer(id: '', name: 'Meyer'));
