@@ -214,6 +214,7 @@ class OnlineDocument {
     this.paymentStatus = 'open',
     this.paidAt,
     this.dueDate,
+    this.finalizedAt,
     this.projectId,
     this.isAdvancePayment = false,
     this.isFixedPrice = false,
@@ -277,6 +278,7 @@ class OnlineDocument {
       paymentStatus: j['paymentStatus'] as String? ?? 'open',
       paidAt: j['paidAt'] == null ? null : DateTime.parse(j['paidAt'] as String),
       dueDate: j['dueDate'] == null ? null : DateTime.parse(j['dueDate'] as String),
+      finalizedAt: j['finalizedAt'] == null ? null : DateTime.parse(j['finalizedAt'] as String),
       projectId: j['projectId'] as String?,
       version: j['version'] as int,
       items: [
@@ -328,6 +330,7 @@ class OnlineDocument {
   final String paymentStatus;
   final DateTime? paidAt;
   final DateTime? dueDate;
+  final DateTime? finalizedAt;
 
   bool get isPaid => paymentStatus == 'paid';
 

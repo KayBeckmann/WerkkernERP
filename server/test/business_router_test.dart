@@ -425,6 +425,27 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
     final audit = jsonDecode((await http.get(baseUrl.resolve('/audit'), headers: a.auth)).body) as Map;
     expect((audit['entries'] as List).map((e) => (e as Map)['action']), containsAll(['document.paid', 'document.unpaid', 'document.dueDate']));
   });
+
+  test('Fälligkeit und Zahlungsbedingungen schon im Entwurf (wie offline), Finalisieren behält sie', () async {
+    final a = await company('a@example.com', 'Firma A');
+    final customer = await post('/customers', a.auth, {'name': 'Kunde'}, expect: 201);
+    final draft = await post('/documents', a.auth, invoiceBody(customer['id'] as String), expect: 201);
+    Future<http.Response> put(Map<String, Object?> body) =>
+        http.put(baseUrl.resolve('/documents/${draft['id']}'), headers: a.auth, body: jsonEncode(body));
+
+    final saved = await put({'version': 1, 'items': draft['items'], 'dueDate': '2026-12-01', 'paymentTerms': '14 Tage netto'});
+    expectStatus(saved, 200);
+    expect((jsonDecode(saved.body) as Map)['dueDate'], '2026-12-01');
+    expect((jsonDecode(saved.body) as Map)['paymentTerms'], '14 Tage netto');
+
+    // Ohne dueDate im Body bleibt sie stehen.
+    final kept = await put({'version': 2, 'items': draft['items']});
+    expect((jsonDecode(kept.body) as Map)['dueDate'], '2026-12-01');
+    expect((jsonDecode(kept.body) as Map)['paymentTerms'], '14 Tage netto');
+
+    final invoice = await post('/documents/${draft['id']}/finalize', a.auth, {'version': 3});
+    expect(invoice['dueDate'], '2026-12-01');
+  });
 }
 
 void expectStatus(http.Response response, int status) =>

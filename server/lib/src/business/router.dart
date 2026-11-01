@@ -544,6 +544,16 @@ class BusinessRoutes {
     if (isFixedPrice != null && !{'quote', 'order'}.contains(existing.kind)) {
       return jsonError('Festpreis-Kennzeichen gibt es nur bei Angebot/Auftrag.');
     }
+    // Fälligkeit schon im Entwurf (wie offline); finalisiert über
+    // `/due-date` mit dem Zahlungsrecht.
+    DateTime? Function()? dueDate;
+    if (body.containsKey('dueDate')) {
+      if (!existing.isDraft) return jsonError('Fälligkeit eines finalisierten Dokuments über /due-date ändern.', status: 409);
+      final raw = body['dueDate'];
+      final parsedDue = raw == null ? null : _parseDate(raw);
+      if (raw != null && parsedDue == null) return jsonError('dueDate im Format JJJJ-MM-TT.');
+      dueDate = () => parsedDue;
+    }
 
     try {
       final updated = await business.updateDraft(
@@ -559,6 +569,7 @@ class BusinessRoutes {
         now: DateTime.now().toUtc(),
         isAdvancePayment: isAdvancePayment,
         isFixedPrice: isFixedPrice,
+        dueDate: dueDate,
         userId: session.session.userId,
       );
       if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
