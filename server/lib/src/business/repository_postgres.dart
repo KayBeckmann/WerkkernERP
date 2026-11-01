@@ -14,6 +14,7 @@ import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
 import 'recurring.dart';
+import 'staff_roles.dart';
 import 'timesheets.dart';
 import 'stock.dart';
 
@@ -23,13 +24,14 @@ part 'postgres/stock.dart';
 part 'postgres/accounting.dart';
 part 'postgres/purchasing.dart';
 part 'postgres/dunning.dart';
+part 'postgres/staff_roles.dart';
 part 'postgres/recurring.dart';
 part 'postgres/timesheets.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets, _PostgresStaffRoles implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   @override
   final SessionExecutor _db;
@@ -654,7 +656,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   // ---- Zeiterfassung ------------------------------------------------------
 
   static const _timeColumns =
-      'id, company_id, user_id, document_id, work_date, hours, note, hourly_cost_cents, created_at, updated_at, project_id';
+      'id, company_id, user_id, document_id, work_date, hours, note, hourly_cost_cents, created_at, updated_at, project_id, '
+      'staff_role_id';
 
   TimeEntry _toTimeEntry(ResultRow r) => TimeEntry(
         id: r[0] as String,
@@ -668,6 +671,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         createdAt: r[8] as DateTime,
         updatedAt: r[9] as DateTime,
         projectId: r[10] as String?,
+        staffRoleId: r[11] as String?,
       );
 
   @override
@@ -716,6 +720,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'hours': t.hours,
         'note': t.note,
         'rate': t.hourlyCostCents,
+        'role': t.staffRoleId,
         'createdAt': t.createdAt,
         'updatedAt': t.updatedAt,
       };
@@ -724,7 +729,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   Future<void> createTimeEntry(TimeEntry entry) async {
     await _q(
       'INSERT INTO time_entries ($_timeColumns) VALUES (@id, @companyId, @userId, @documentId, @workDate, @hours, '
-      '@note, @rate, @createdAt, @updatedAt, @projectId)',
+      '@note, @rate, @createdAt, @updatedAt, @projectId, @role)',
       _timeParams(entry),
     );
   }
@@ -733,10 +738,10 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   Future<bool> updateTimeEntry(TimeEntry entry) async {
     final result = await _q(
       'UPDATE time_entries SET document_id = @documentId, project_id = @projectId, work_date = @workDate, '
-      'hours = @hours, note = @note, updated_at = @updatedAt WHERE company_id = @companyId AND id = @id',
+      'hours = @hours, note = @note, hourly_cost_cents = @rate, staff_role_id = @role, updated_at = @updatedAt '
+      'WHERE company_id = @companyId AND id = @id',
       _timeParams(entry)
         ..remove('userId')
-        ..remove('rate')
         ..remove('createdAt'),
     );
     return result.affectedRows > 0;
@@ -753,7 +758,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
 
   // ---- Projekte -------------------------------------------------------------
 
-  static const _projectColumns = 'id, company_id, name, customer_id, status, founding_year, project_number, created_at';
+  static const _projectColumns =
+      'id, company_id, name, customer_id, status, founding_year, project_number, created_at, notes';
 
   Project _toProject(ResultRow r) => Project(
         id: r[0] as String,
@@ -764,6 +770,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         foundingYear: r[5] as int,
         projectNumber: r[6] as int,
         createdAt: r[7] as DateTime,
+        notes: r[8] as String?,
       );
 
   @override
@@ -791,6 +798,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
     required String companyId,
     required String name,
     String? customerId,
+    String? notes,
     required DateTime now,
   }) =>
       _db.runTx((s) async {
@@ -807,6 +815,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           companyId: companyId,
           name: name,
           customerId: customerId,
+          notes: notes,
           status: 'active',
           foundingYear: now.year,
           projectNumber: sequence.first.first as int,
@@ -815,7 +824,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         await s.execute(
           Sql.named(
             'INSERT INTO projects ($_projectColumns) VALUES (@id, @companyId, @name, @customerId, @status, @year, '
-            '@number, @createdAt)',
+            '@number, @createdAt, @notes)',
           ),
           parameters: {
             'id': id,
@@ -826,6 +835,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
             'year': project.foundingYear,
             'number': project.projectNumber,
             'createdAt': now,
+            'notes': notes,
           },
         );
         return project;
@@ -834,9 +844,9 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   @override
   Future<bool> updateProject(Project p) async {
     final result = await _q(
-      'UPDATE projects SET name = @name, customer_id = @customerId, status = @status '
+      'UPDATE projects SET name = @name, customer_id = @customerId, status = @status, notes = @notes '
       'WHERE company_id = @companyId AND id = @id',
-      {'name': p.name, 'customerId': p.customerId, 'status': p.status, 'companyId': p.companyId, 'id': p.id},
+      {'name': p.name, 'customerId': p.customerId, 'status': p.status, 'notes': p.notes, 'companyId': p.companyId, 'id': p.id},
     );
     return result.affectedRows > 0;
   }

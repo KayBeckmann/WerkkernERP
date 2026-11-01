@@ -44,7 +44,7 @@ void main() {
     await tester.tap(find.textContaining('Baustelle Meyer').last);
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-time-hours')), '2,5');
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(find.text('Buchen'));
     await tester.pumpAndSettle();
     expect(find.text('2,5 Std.'), findsOneWidget);
     expect(find.text('Deine Buchungen'), findsOneWidget);

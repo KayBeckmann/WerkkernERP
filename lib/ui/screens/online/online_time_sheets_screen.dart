@@ -12,40 +12,38 @@ class OnlineTimeSheetsScreen extends StatelessWidget {
   const OnlineTimeSheetsScreen({super.key, required this.session});
   final OnlineSession session;
 
+  /// Wie offline: Tag und Bezug (Auftrag/Rechnung oder Projekt) wählen;
+  /// die eigenen Buchungen dieses Tages werden gleich übernommen.
   Future<void> _create(BuildContext context, VoidCallback reload) async {
     final documents = [
       for (final d in await session.client.documents())
         if (d.kind == 'order' || d.kind == 'invoice') d,
     ];
+    final projects = session.modules.contains('projects') && session.can('projects.read')
+        ? await session.client.projects()
+        : const <OnlineProject>[];
     if (!context.mounted) return;
-    if (documents.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kein Auftrag/keine Rechnung vorhanden.')));
+    if (documents.isEmpty && projects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kein Auftrag/keine Rechnung und kein Projekt vorhanden.')));
       return;
     }
-    final values = await showOnlineForm(
-      context,
-      title: 'Neuer Stundenzettel',
-      submitLabel: 'Anlegen',
-      fields: [
-        OnlineField(
-          'documentId',
-          'Auftrag/Rechnung',
-          type: OnlineFieldType.choice,
-          required: true,
-          options: {for (final d in documents) d.id: '${d.number ?? 'Entwurf'} · ${d.displayCustomerName ?? ''}'},
-        ),
-        OnlineField('date', 'Tag', type: OnlineFieldType.date, required: true, initial: DateTime.now()),
-      ],
+    final choice = await showDialog<({DateTime date, String? documentId, String? projectId})>(
+      context: context,
+      builder: (_) => _TimeSheetFormDialog(documents: documents, projects: projects),
     );
-    if (values == null || !context.mounted) return;
-    final documentId = values['documentId'] as String;
-    final date = values['date'] as DateTime;
+    if (choice == null || !context.mounted) return;
+    final date = choice.date;
     OnlineTimeSheet? created;
     await runOnline(context, () async {
-      // Eigene Buchungen dieses Auftrags am gewählten Tag gleich übernehmen.
-      final entries = (await session.client.timeEntries(mineOnly: true, documentId: documentId)).entries;
+      final entries = (await session.client.timeEntries(
+        mineOnly: true,
+        documentId: choice.documentId,
+        projectId: choice.projectId,
+      ))
+          .entries;
       created = await session.client.createTimeSheet(
-        documentId: documentId,
+        documentId: choice.documentId,
+        projectId: choice.projectId,
         date: date,
         entryIds: [
           for (final e in entries)
@@ -61,6 +59,12 @@ class OnlineTimeSheetsScreen extends StatelessWidget {
     reload();
   }
 
+  static String _reference(OnlineTimeSheet s) => s.documentId != null
+      ? s.documentNumber ?? 'Entwurf'
+      : s.projectId != null
+          ? s.projectName ?? 'Unbekanntes Projekt'
+          : '—';
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -70,9 +74,13 @@ class OnlineTimeSheetsScreen extends StatelessWidget {
         emptyText: 'Noch keine Stundenzettel.',
         itemBuilder: (context, s, reload) => Card(
           child: ListTile(
-            leading: Icon(s.isSigned ? Icons.verified_outlined : Icons.draw_outlined),
-            title: Text('${formatOnlineDate(s.date)}${s.supersedesId == null ? '' : ' · Nachtrag'}'),
-            subtitle: Text(s.isSigned ? 'unterschrieben' : 'Entwurf'),
+            leading: Icon(s.isSigned ? Icons.verified_outlined : Icons.edit_note_outlined),
+            // Wie offline: Bezug als Titel, Tag und Status darunter.
+            title: Text(_reference(s)),
+            subtitle: Text(
+              '${formatOnlineDate(s.date)} · ${s.isSigned ? 'Unterschrieben' : 'Entwurf'}'
+              '${s.supersedesId == null ? '' : ' · Korrektur'}',
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () async {
               await Navigator.of(context).push(
@@ -277,6 +285,97 @@ class _OnlineTimeSheetScreenState extends State<OnlineTimeSheetScreen> {
                     ],
                   ],
                 ),
+    );
+  }
+}
+
+class _TimeSheetFormDialog extends StatefulWidget {
+  const _TimeSheetFormDialog({required this.documents, required this.projects});
+  final List<OnlineDocument> documents;
+  final List<OnlineProject> projects;
+
+  @override
+  State<_TimeSheetFormDialog> createState() => _TimeSheetFormDialogState();
+}
+
+enum _SheetReference { document, project }
+
+class _TimeSheetFormDialogState extends State<_TimeSheetFormDialog> {
+  late _SheetReference _kind = widget.documents.isEmpty ? _SheetReference.project : _SheetReference.document;
+  DateTime _date = DateTime.now();
+  String? _documentId;
+  String? _projectId;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Stundenzettel erstellen'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(formatOnlineDate(_date)),
+              trailing: const Icon(Icons.edit_calendar_outlined),
+              onTap: () async {
+                final picked = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime(2000), lastDate: DateTime(2100));
+                if (picked != null) setState(() => _date = picked);
+              },
+            ),
+            if (widget.documents.isNotEmpty && widget.projects.isNotEmpty)
+              SegmentedButton<_SheetReference>(
+                segments: const [
+                  ButtonSegment(value: _SheetReference.document, label: Text('Auftrag/Rechnung')),
+                  ButtonSegment(value: _SheetReference.project, label: Text('Projekt')),
+                ],
+                selected: {_kind},
+                onSelectionChanged: (selection) => setState(() => _kind = selection.first),
+              ),
+            const SizedBox(height: 8),
+            if (_kind == _SheetReference.document)
+              DropdownButtonFormField<String?>(
+                key: const Key('online-form-documentId'),
+                isExpanded: true,
+                initialValue: _documentId,
+                decoration: const InputDecoration(labelText: 'Auftrag/Rechnung *'),
+                items: [
+                  for (final d in widget.documents)
+                    DropdownMenuItem(
+                      value: d.id,
+                      child: Text('${d.number ?? 'Entwurf'} · ${d.displayCustomerName ?? ''}', overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (v) => setState(() => _documentId = v),
+              )
+            else
+              DropdownButtonFormField<String?>(
+                key: const Key('online-form-projectId'),
+                isExpanded: true,
+                initialValue: _projectId,
+                decoration: const InputDecoration(labelText: 'Projekt *'),
+                items: [
+                  for (final p in widget.projects)
+                    DropdownMenuItem(value: p.id, child: Text('${p.displayNumber} · ${p.name}', overflow: TextOverflow.ellipsis)),
+                ],
+                onChanged: (v) => setState(() => _projectId = v),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: () {
+            final documentId = _kind == _SheetReference.document ? _documentId : null;
+            final projectId = _kind == _SheetReference.project ? _projectId : null;
+            if (documentId == null && projectId == null) return;
+            Navigator.pop(context, (date: _date, documentId: documentId, projectId: projectId));
+          },
+          child: const Text('Anlegen'),
+        ),
+      ],
     );
   }
 }

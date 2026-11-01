@@ -526,6 +526,7 @@ class OnlineTimeEntry {
     required this.hours,
     this.note,
     this.hourlyCostCents,
+    this.staffRoleId,
   });
   factory OnlineTimeEntry.fromJson(Map<String, Object?> j) => OnlineTimeEntry(
         id: j['id'] as String,
@@ -537,6 +538,7 @@ class OnlineTimeEntry {
         hours: j['hours'] as String,
         note: j['note'] as String?,
         hourlyCostCents: j['hourlyCostCents'] as int?,
+        staffRoleId: j['staffRoleId'] as String?,
       );
   final String id;
   final String userId;
@@ -549,8 +551,10 @@ class OnlineTimeEntry {
   final String hours;
   final String? note;
 
-  /// Beim Buchen eingefrorener Stundensatz des Mitglieds (`null` = nicht gepflegt).
+  /// Beim Buchen eingefrorener Stundensatz — der Rolle oder des
+  /// Mitglieds (`null` = nicht gepflegt).
   final int? hourlyCostCents;
+  final String? staffRoleId;
 }
 
 /// Projekt (C1 online). [displayNumber] = "JJ/PP".
@@ -559,6 +563,7 @@ class OnlineProject {
     required this.id,
     required this.name,
     this.customerId,
+    this.notes,
     required this.status,
     required this.displayNumber,
   });
@@ -566,12 +571,14 @@ class OnlineProject {
         id: j['id'] as String,
         name: j['name'] as String,
         customerId: j['customerId'] as String?,
+        notes: j['notes'] as String?,
         status: j['status'] as String,
         displayNumber: j['displayNumber'] as String,
       );
   final String id;
   final String name;
   final String? customerId;
+  final String? notes;
   final String status;
   final String displayNumber;
 
@@ -588,6 +595,7 @@ class OnlineProjectDetail {
     this.plannedHours,
     this.bookedHours,
     this.hoursCostCents,
+    this.expenseCostCents,
     this.resultCents,
   });
   factory OnlineProjectDetail.fromJson(Map<String, Object?> j) {
@@ -599,6 +607,7 @@ class OnlineProjectDetail {
       plannedHours: r['plannedHours'] as String?,
       bookedHours: r['bookedHours'] as String?,
       hoursCostCents: r['hoursCostCents'] as int?,
+      expenseCostCents: r['expenseCostCents'] as int?,
       resultCents: r['resultCents'] as int?,
     );
   }
@@ -608,5 +617,8 @@ class OnlineProjectDetail {
   final String? plannedHours;
   final String? bookedHours;
   final int? hoursCostCents;
+
+  /// Zugeordnete Belege (Buchhaltung); `null` ohne Leserecht.
+  final int? expenseCostCents;
   final int? resultCents;
 }

@@ -134,4 +134,42 @@ void runTimeTrackingTests(Future<(PhaseBRepository, BusinessRepository)> Functio
     await chef.setGroupPermission(monteurGroup, 'timeTracking.write', granted: false);
     await expectLater(reader.request('GET', '/time-entries'), throwsA(isA<ApiException>().having((e) => e.isForbidden, '403', isTrue)));
   });
+
+  test('Rollen wie offline: Admin pflegt, Buchung friert den Rollensatz ein, sonst Mitgliedssatz', () async {
+    final m1 = await monteur('m1@example.com');
+    final member = (await chef.members()).firstWhere((m) => m.email == 'm1@example.com');
+    await chef.updateMember(member.id, hourlyCostCents: () => 4000);
+
+    // Erster Aufruf durch den Admin legt die Vorschläge an.
+    final defaults = await chef.staffRoles();
+    expect(defaults.map((r) => r.name), ['Meister', 'Monteur', 'Projektleiter']);
+    final meister = await chef.saveStaffRole(id: defaults.first.id, name: 'Meister', hourlyCostCents: 6500);
+    await expectLater(m1.saveStaffRole(name: 'Chef', hourlyCostCents: 1), throwsA(isA<ApiException>()), reason: 'nur Admin');
+    expect((await m1.staffRoles()).length, 3, reason: 'Buchende dürfen die Rollen lesen');
+
+    final withRole = await m1.saveTimeEntry(date: DateTime(2026, 10, 24), hours: '2', documentId: orderId, staffRoleId: () => meister.id);
+    expect(withRole.staffRoleId, meister.id);
+    expect(withRole.hourlyCostCents, 6500, reason: 'Satz der Rolle');
+    final plain = await m1.saveTimeEntry(date: DateTime(2026, 10, 24), hours: '1', documentId: orderId);
+    expect(plain.hourlyCostCents, 4000, reason: 'ohne Rolle: Satz des Mitglieds');
+
+    // Spätere Satzänderung ändert gebuchte Kosten nicht; Bearbeiten ohne
+    // Rollenangabe behält Rolle und Satz.
+    await chef.saveStaffRole(id: meister.id, name: 'Meister', hourlyCostCents: 9900);
+    final edited = await m1.saveTimeEntry(id: withRole.id, date: DateTime(2026, 10, 25), hours: '3', documentId: orderId);
+    expect((edited.staffRoleId, edited.hourlyCostCents), (meister.id, 6500));
+    final cleared = await m1.saveTimeEntry(id: withRole.id, date: DateTime(2026, 10, 25), hours: '3', documentId: orderId, staffRoleId: () => null);
+    expect((cleared.staffRoleId, cleared.hourlyCostCents), (null, 4000));
+
+    // Gelöschte Rolle: Buchung behält ihren Satz, verliert nur den Bezug.
+    final again = await m1.saveTimeEntry(id: withRole.id, date: DateTime(2026, 10, 25), hours: '3', documentId: orderId, staffRoleId: () => meister.id);
+    expect(again.hourlyCostCents, 9900);
+    await chef.deleteStaffRole(meister.id);
+    final entry = (await chef.timeEntries()).entries.firstWhere((e) => e.id == withRole.id);
+    expect((entry.staffRoleId, entry.hourlyCostCents), (null, 9900));
+    await expectLater(
+      m1.saveTimeEntry(date: DateTime(2026, 10, 24), hours: '1', documentId: orderId, staffRoleId: () => meister.id),
+      throwsA(isA<ApiException>()),
+    );
+  });
 }

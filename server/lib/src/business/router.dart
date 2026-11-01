@@ -12,6 +12,7 @@ import '../util/responses.dart';
 import 'models.dart';
 import 'repository.dart';
 import 'request_util.dart';
+import 'staff_roles.dart';
 import 'stock.dart';
 import 'stock_routes.dart';
 import 'accounting_routes.dart';
@@ -21,6 +22,7 @@ import 'fleet_routes.dart';
 import 'purchasing_routes.dart';
 import 'recurring_routes.dart';
 import 'timesheets_routes.dart';
+import 'staff_roles_routes.dart';
 import 'suppliers_routes.dart';
 
 /// Fach-Endpunkte (B1 Punkt 3). Jeder Endpunkt prüft serverseitig
@@ -46,6 +48,7 @@ class BusinessRoutes {
     DashboardRoutes(repository: repository, business: business, auth: auth, dunning: dunning).mount(router);
     RecurringRoutes(repository: repository, business: business, auth: auth, parseItems: _parseItems).mount(router);
     TimeSheetRoutes(business: business, auth: auth).mount(router);
+    StaffRoleRoutes(repository: repository, business: business, auth: auth).mount(router);
 
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);
@@ -931,6 +934,15 @@ class BusinessRoutes {
     return (date: date, hours: hours, documentId: documentId, projectId: projectId, error: null);
   }
 
+  /// Rolle einer Zeitbuchung (wie offline): muss zur Firma gehören.
+  /// Liefert die Rolle oder `null`; [error] bei unbekannter ID.
+  Future<({StaffRole? role, String? error})> _staffRole(Map<String, Object?> body, String companyId) async {
+    final id = body['staffRoleId'] as String?;
+    if (id == null) return (role: null, error: null);
+    final role = await business.findStaffRole(companyId, id);
+    return role == null ? (role: null, error: 'Rolle nicht gefunden.') : (role: role, error: null);
+  }
+
   Future<Response> _createTimeEntry(Request request) async {
     final check = await auth.requirePermission(request, 'timeTracking.write');
     if (check.error != null) return check.error!;
@@ -940,6 +952,8 @@ class BusinessRoutes {
     if (parsed.error != null) {
       return jsonError(parsed.error!, status: parsed.error!.contains('nicht gefunden') ? 404 : 400);
     }
+    final role = await _staffRole(body, ctx.session.companyId);
+    if (role.error != null) return jsonError(role.error!, status: 404);
     final now = DateTime.now().toUtc();
     final entry = TimeEntry(
       id: _uuid.v4(),
@@ -950,7 +964,9 @@ class BusinessRoutes {
       workDate: parsed.date!,
       hours: parsed.hours!.toString(),
       note: _trimmed(body['note']),
-      hourlyCostCents: ctx.membership.hourlyCostCents,
+      // Satz der Rolle, sonst der des Mitglieds — beim Buchen eingefroren.
+      hourlyCostCents: role.role?.hourlyCostCents ?? ctx.membership.hourlyCostCents,
+      staffRoleId: role.role?.id,
       createdAt: now,
       updatedAt: now,
     );
@@ -997,6 +1013,15 @@ class BusinessRoutes {
       return jsonError(parsed.error!, status: parsed.error!.contains('nicht gefunden') ? 404 : 400);
     }
     final e = own.entry!;
+    // Rolle nur bei Änderung neu bewerten — sonst bleibt der beim Buchen
+    // eingefrorene Satz.
+    final roleId = body.containsKey('staffRoleId') ? body['staffRoleId'] as String? : e.staffRoleId;
+    var rate = e.hourlyCostCents;
+    if (roleId != e.staffRoleId) {
+      final role = await _staffRole({'staffRoleId': roleId}, e.companyId);
+      if (role.error != null) return jsonError(role.error!, status: 404);
+      rate = role.role?.hourlyCostCents ?? own.auth!.membership.hourlyCostCents;
+    }
     final updated = TimeEntry(
       id: e.id,
       companyId: e.companyId,
@@ -1006,7 +1031,8 @@ class BusinessRoutes {
       workDate: parsed.date!,
       hours: parsed.hours!.toString(),
       note: _trimmed(body['note']),
-      hourlyCostCents: e.hourlyCostCents,
+      hourlyCostCents: rate,
+      staffRoleId: roleId,
       createdAt: e.createdAt,
       updatedAt: DateTime.now().toUtc(),
     );
@@ -1094,6 +1120,7 @@ class BusinessRoutes {
       companyId: companyId,
       name: name,
       customerId: customerId,
+      notes: _trimmed(body['notes']),
       now: DateTime.now().toUtc(),
     );
     await auth.audit(check.auth!, 'project.create', 'project', project.id);
@@ -1194,6 +1221,7 @@ class BusinessRoutes {
       companyId: companyId,
       name: name,
       customerId: customerId,
+      notes: body.containsKey('notes') ? _trimmed(body['notes']) : existing.notes,
       status: status,
       foundingYear: existing.foundingYear,
       projectNumber: existing.projectNumber,

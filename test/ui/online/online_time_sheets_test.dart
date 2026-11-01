@@ -82,7 +82,7 @@ void main() {
     });
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.tap(find.textContaining('unterschrieben'));
+    await tester.tap(find.textContaining('Unterschrieben'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Unterschrieben von Herr Meyer'), findsOneWidget);
     expect(find.byType(Image), findsOneWidget);

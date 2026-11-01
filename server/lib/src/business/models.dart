@@ -427,6 +427,7 @@ class Project {
     required this.companyId,
     required this.name,
     this.customerId,
+    this.notes,
     required this.status,
     required this.foundingYear,
     required this.projectNumber,
@@ -436,6 +437,9 @@ class Project {
   final String companyId;
   final String name;
   final String? customerId;
+
+  /// Freitext wie offline (z. B. Ansprechpartner vor Ort, Zugang).
+  final String? notes;
 
   /// `active` | `archived`
   final String status;
@@ -451,6 +455,7 @@ class Project {
         'id': id,
         'name': name,
         'customerId': customerId,
+        'notes': notes,
         'status': status,
         'foundingYear': foundingYear,
         'projectNumber': projectNumber,
@@ -461,7 +466,8 @@ class Project {
 
 /// C3 online: Zeitbuchung eines echten Nutzers auf einen Auftrag bzw.
 /// eine Rechnung. [hourlyCostCents] ist der beim Buchen eingefrorene
-/// Stundensatz des Mitglieds (spätere Satzänderungen ändern keine
+/// Stundensatz — der der gewählten Rolle ([staffRoleId], wie offline),
+/// sonst der des Mitglieds (spätere Satzänderungen ändern keine
 /// gebuchten Kosten).
 class TimeEntry {
   const TimeEntry({
@@ -474,6 +480,7 @@ class TimeEntry {
     required this.hours,
     this.note,
     this.hourlyCostCents,
+    this.staffRoleId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -488,6 +495,7 @@ class TimeEntry {
   final String hours;
   final String? note;
   final int? hourlyCostCents;
+  final String? staffRoleId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -500,6 +508,7 @@ class TimeEntry {
         'hours': hours,
         'note': note,
         'hourlyCostCents': hourlyCostCents,
+        'staffRoleId': staffRoleId,
       };
 }
 

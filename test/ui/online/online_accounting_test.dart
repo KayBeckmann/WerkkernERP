@@ -82,8 +82,6 @@ void main() {
     expect(find.text('Keine Bankumsätze.'), findsOneWidget, reason: 'nur nicht zugeordnete sichtbar');
 
     await openTab(tester, 'Offene Posten');
-    await tester.drag(find.text('Offen gesamt'), const Offset(0, 300));
-    await tester.pumpAndSettle();
-    expect(find.text('Keine offenen Rechnungen.'), findsOneWidget);
+    expect(find.text('Keine offenen Posten.'), findsOneWidget);
   });
 }

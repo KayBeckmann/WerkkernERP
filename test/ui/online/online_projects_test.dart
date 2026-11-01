@@ -62,19 +62,23 @@ void main() {
     await openTab(tester, 'Zeiterfassung');
     await tester.tap(find.text('Zeit buchen'));
     await tester.pumpAndSettle();
+    // Bezug wie offline über den Umschalter Auftrag/Rechnung | Projekt.
+    await tester.tap(find.text('Projekt').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-time-project')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('$yy/01 · Neubau Meyer').last);
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-time-hours')), '1,5');
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(find.text('Buchen'));
     await tester.pumpAndSettle();
 
     // Projektdetail: Dokument + gebuchte Stunden.
     await openTab(tester, 'Projekte');
     await tester.tap(find.text('$yy/01 · Neubau Meyer'));
     await tester.pumpAndSettle();
-    expect(find.text('Rechnung (Entwurf)'), findsOneWidget);
-    expect(find.text('0 / 1,5'), findsOneWidget, reason: 'geplant / gebucht');
+    expect(find.text('Rechnung'), findsOneWidget);
+    expect(find.text('Entwurf'), findsOneWidget);
+    expect(find.text('Geplante Stunden (laut Angebot/Auftrag): 0 · Gebucht: 1,5'), findsOneWidget);
   });
 }

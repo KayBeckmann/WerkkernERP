@@ -150,8 +150,10 @@ class _OnlineVehicleScreenState extends State<OnlineVehicleScreen> {
         OnlineField('category', 'Kategorie', type: OnlineFieldType.choice, required: true, initial: 'fuel', options: vehicleCostCategoryLabels),
         OnlineField('amount', 'Betrag (brutto)', type: OnlineFieldType.money, required: true),
         OnlineField('description', 'Beschreibung'),
-        const OnlineField('principal', 'davon Tilgung', type: OnlineFieldType.money, helper: 'Nur bei Leasing/Finanzierung'),
-        const OnlineField('interest', 'davon Zins', type: OnlineFieldType.money),
+        // Wie offline nur bei Leasing/Finanzierung.
+        OnlineField('principal', 'Tilgungsanteil', type: OnlineFieldType.money,
+            helper: 'Optionale Aufschlüsselung der Rate', visibleWhen: (v) => v['category'] == 'leasing'),
+        OnlineField('interest', 'Zinsanteil', type: OnlineFieldType.money, visibleWhen: (v) => v['category'] == 'leasing'),
         if (projects.isNotEmpty)
           OnlineField(
             'projectId',

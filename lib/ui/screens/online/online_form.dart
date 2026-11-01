@@ -20,6 +20,7 @@ class OnlineField {
     this.initial,
     this.options = const {},
     this.helper,
+    this.visibleWhen,
   });
   final String key;
   final String label;
@@ -31,6 +32,11 @@ class OnlineField {
   /// ist als „keine Auswahl“ erlaubt, wenn das Feld nicht Pflicht ist.
   final Map<String?, String> options;
   final String? helper;
+
+  /// Feld nur zeigen, solange die Bedingung über die Auswahl-/Schalter-
+  /// Werte des Formulars gilt (z. B. Tilgung nur bei Leasing); verborgen
+  /// liefert es `null`.
+  final bool Function(Map<String, Object?> values)? visibleWhen;
 }
 
 final _dateFormat = DateFormat('dd.MM.yyyy');
@@ -97,6 +103,10 @@ class _OnlineFormDialogState extends State<_OnlineFormDialog> {
   Map<String, Object?>? _collect() {
     final result = <String, Object?>{};
     for (final f in widget.fields) {
+      if (!_visible(f)) {
+        result[f.key] = null;
+        continue;
+      }
       final text = _controllers[f.key]?.text.trim();
       Object? value;
       switch (f.type) {
@@ -131,6 +141,8 @@ class _OnlineFormDialogState extends State<_OnlineFormDialog> {
     }
     return result;
   }
+
+  bool _visible(OnlineField f) => f.visibleWhen?.call(_values) ?? true;
 
   Widget _field(OnlineField f) {
     final key = Key('online-form-${f.key}');
@@ -213,7 +225,8 @@ class _OnlineFormDialogState extends State<_OnlineFormDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final f in widget.fields) Padding(padding: const EdgeInsets.only(bottom: 8), child: _field(f)),
+              for (final f in widget.fields)
+                if (_visible(f)) Padding(padding: const EdgeInsets.only(bottom: 8), child: _field(f)),
               if (_error != null)
                 Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ],
