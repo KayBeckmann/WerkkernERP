@@ -36,23 +36,25 @@ void main() {
     await tester.pumpAndSettle();
     await openTab(tester, 'Vorlagen');
 
-    await tester.tap(find.text('Vorlage anlegen'));
+    await tester.tap(find.text('Neue Vorlage'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('recurring-label')), 'Wartungsvertrag');
+    // Kunde wie beim Dokument über den Suchdialog.
     await tester.tap(find.byKey(const Key('recurring-customer')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Hausverwaltung Meyer').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Position hinzufügen'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('online-form-description')), 'Wartungspauschale');
-    await tester.enterText(find.byKey(const Key('online-form-price')), '99');
-    await tester.tap(find.text('Übernehmen'));
+    await tester.enterText(find.byKey(const Key('online-item-description')), 'Wartungspauschale');
+    await tester.enterText(find.byKey(const Key('online-item-price')), '99');
+    await tester.tap(find.text('Hinzufügen'));
     await tester.pumpAndSettle();
     expect(find.text('117,81 €'), findsOneWidget);
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Wartungsvertrag · Hausverwaltung Meyer'), findsOneWidget);
+    expect(find.text('Wartungsvertrag'), findsOneWidget);
+    expect(find.textContaining('Hausverwaltung Meyer — monatlich — nächste Rechnung:'), findsOneWidget);
 
     // Fälligkeit liegt auf heute → sofort erzeugbar.
     await tester.tap(find.text('Fällige jetzt erzeugen'));

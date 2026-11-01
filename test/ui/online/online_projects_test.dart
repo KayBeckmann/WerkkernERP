@@ -48,20 +48,15 @@ void main() {
 
     // Dokument mit Projekt anlegen.
     await openTab(tester, 'Rechnungen');
-    await tester.tap(find.text('Neue Rechnung'));
+    await createDocument(tester, 'Neue Rechnung', 'Meyer');
+    // Projekt wie offline im Editor zuordnen und speichern.
+    await tester.tap(find.text('Ohne Projekt'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('online-new-document-customer')));
+    await tester.tap(find.text('Neubau Meyer').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Meyer').last);
+    await tester.tap(find.byTooltip('Entwurf speichern'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('— ohne Projekt —'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('$yy/01 · Neubau Meyer').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Anlegen'));
-    await tester.pumpAndSettle();
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    expect(find.text('Entwurf gespeichert.'), findsOneWidget);
 
     // Zeit direkt aufs Projekt buchen.
     await openTab(tester, 'Zeiterfassung');

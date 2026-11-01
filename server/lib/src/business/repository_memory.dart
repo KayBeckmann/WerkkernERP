@@ -266,6 +266,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     required DateTime now,
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    DateTime? Function()? dueDate,
     String? userId,
   }) async {
     // Bewusst ohne await zwischen Prüfung und Schreiben — damit ist der
@@ -285,6 +286,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       version: existing.version + 1,
       isAdvancePayment: isAdvancePayment,
       isFixedPrice: isFixedPrice,
+      dueDate: dueDate,
     );
     _documents[index] = updated;
     if (existing.stockBooked) {

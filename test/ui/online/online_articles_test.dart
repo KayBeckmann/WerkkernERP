@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:werkkern_client/werkkern_client.dart' show OnlineItemKind;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:werkkernerp/ui/screens/online/online_login_screen.dart';
 
@@ -96,19 +97,12 @@ void main() {
 
     // Neue Rechnung: Artikel-Position übernimmt den kalkulierten Preis.
     await openTab(tester, 'Rechnungen');
-    await tester.tap(find.text('Neue Rechnung'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('online-new-document-customer')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Meyer').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Anlegen'));
-    await tester.pumpAndSettle();
+    await createDocument(tester, 'Neue Rechnung', 'Meyer');
     await tester.tap(find.text('Position hinzufügen'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Artikel').last);
+    await tester.tap(find.descendant(of: find.byType(SegmentedButton<OnlineItemKind>), matching: find.text('Artikel')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Artikel aus Stamm (optional)'));
+    await tester.tap(find.byKey(const Key('online-item-article')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('NYM 3x1,5').last);
     await tester.pumpAndSettle();

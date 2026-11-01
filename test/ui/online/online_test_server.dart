@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart' show ListTile, NavigationDestination;
+import 'package:flutter/material.dart' show AlertDialog, ListTile, NavigationDestination;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -104,3 +104,12 @@ Future<void> openTab(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+
+/// Neues Dokument im aktuellen Bereich wie offline: [fabLabel] (z. B.
+/// „Neue Rechnung“) antippen, [customer] im Suchdialog wählen.
+Future<void> createDocument(WidgetTester tester, String fabLabel, String customer) async {
+  await tester.tap(find.text(fabLabel));
+  await tester.pumpAndSettle();
+  await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text(customer)));
+  await tester.pumpAndSettle();
+}

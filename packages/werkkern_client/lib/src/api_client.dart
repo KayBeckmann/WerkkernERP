@@ -162,8 +162,13 @@ class WerkkernApiClient {
 
   // ---- Artikel ----------------------------------------------------------------
 
-  Future<List<OnlineArticle>> articles({String? query}) async {
-    final j = _map(await _send('GET', '/articles', query: {if (query != null && query.isNotEmpty) 'q': query}));
+  /// Aktive Artikel; mit [includeInactive] auch deaktivierte (z. B. damit
+  /// eine bestehende Position ihren Artikel beim Bearbeiten behält).
+  Future<List<OnlineArticle>> articles({String? query, bool includeInactive = false}) async {
+    final j = _map(await _send('GET', '/articles', query: {
+      if (query != null && query.isNotEmpty) 'q': query,
+      if (includeInactive) 'includeInactive': 'true',
+    }));
     return [for (final a in j['articles'] as List) OnlineArticle.fromJson(a as Map<String, Object?>)];
   }
 
@@ -212,15 +217,26 @@ class WerkkernApiClient {
     String? idempotencyKey,
     bool? isAdvancePayment,
     bool? isFixedPrice,
-  }) async =>
-      OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', idempotencyKey: idempotencyKey, body: {
-        'version': version,
-        'items': [for (final i in items) i.toJson()],
-        'customerId': ?customerId,
-        'notes': notes,
-        'isAdvancePayment': ?isAdvancePayment,
-        'isFixedPrice': ?isFixedPrice,
-      })));
+    // Ohne Angabe lässt der Server den bisherigen Wert stehen.
+    String? Function()? paymentTerms,
+    // Nur im Entwurf (finalisiert: [setDueDate]).
+    DateTime? Function()? dueDate,
+  }) async {
+    final due = dueDate?.call();
+    return OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', idempotencyKey: idempotencyKey, body: {
+      'version': version,
+      'items': [for (final i in items) i.toJson()],
+      'customerId': ?customerId,
+      'notes': notes,
+      'isAdvancePayment': ?isAdvancePayment,
+      'isFixedPrice': ?isFixedPrice,
+      if (paymentTerms != null) 'paymentTerms': paymentTerms(),
+      if (dueDate != null) 'dueDate': due == null ? null : _isoDate(due),
+    })));
+  }
+
+  static String _isoDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   /// Gutschrift-Entwurf zu einer finalisierten Rechnung (Modul creditNotes).
   Future<OnlineDocument> createCreditNote(String invoiceId) async =>

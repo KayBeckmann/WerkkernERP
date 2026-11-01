@@ -432,6 +432,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
     required DateTime now,
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    DateTime? Function()? dueDate,
     String? userId,
   }) async {
     final updated = await _db.runTx((s) async {
@@ -471,9 +472,12 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'UPDATE documents SET customer_id = @customerId, issue_date = @issueDate, service_date = @serviceDate, '
           'payment_terms = @paymentTerms, notes = @notes, updated_at = @now, version = version + 1, '
           'is_advance_payment = coalesce(@advance, is_advance_payment), '
-          'is_fixed_price = coalesce(@fixed, is_fixed_price) WHERE company_id = @companyId AND id = @id',
+          'is_fixed_price = coalesce(@fixed, is_fixed_price), '
+          'due_date = CASE WHEN @setDue THEN @due ELSE due_date END WHERE company_id = @companyId AND id = @id',
         ),
         parameters: {
+          'setDue': TypedValue(Type.boolean, dueDate != null),
+          'due': TypedValue(Type.date, dueDate?.call()),
           'customerId': customerId,
           'issueDate': TypedValue(Type.date, issueDate),
           'serviceDate': TypedValue(Type.date, serviceDate),

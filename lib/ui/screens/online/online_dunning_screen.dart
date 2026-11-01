@@ -102,6 +102,33 @@ class OnlineDunningScreen extends StatelessWidget {
   }
 }
 
+/// Daten des Mahnschreibens aus Rechnungs-Schnappschuss und
+/// protokollierter Mahnung.
+DunningLetterPdfData onlineDunningLetterData({
+  required OnlineDocument document,
+  required OnlineDunningNotice notice,
+  required OnlineCompanyProfile company,
+}) =>
+    DunningLetterPdfData(
+      level: DunningLevel.values[notice.level],
+      date: notice.createdAt.toLocal(),
+      companyName: document.companySnapshot?.name ?? '',
+      companyAddress: document.companySnapshot?.address,
+      customerName: document.customerSnapshotName ?? '',
+      customerAddress: document.customerSnapshotAddress,
+      invoiceNumber: document.number ?? '',
+      invoiceDate: document.issueDate,
+      dueDate: document.dueDate ?? document.issueDate,
+      invoiceGross: Money.fromCents(notice.invoiceGrossCents),
+      fee: Money.fromCents(notice.feeCents),
+      interest: Money.fromCents(notice.interestCents),
+      overdueDays: notice.overdueDays,
+      interestRatePercent: notice.interestRatePercent,
+      introText: notice.introText,
+      closingText: notice.closingText,
+      footerText: document.footerTextSnapshot ?? company.footerText,
+    );
+
 /// Mahnschreiben aus Rechnungs-Schnappschuss und protokollierter Mahnung.
 Future<void> showDunningLetter(
   BuildContext context, {
@@ -111,25 +138,7 @@ Future<void> showDunningLetter(
   required OnlineCompanyProfile company,
 }) {
   final level = DunningLevel.values[notice.level];
-  final data = DunningLetterPdfData(
-    level: level,
-    date: notice.createdAt.toLocal(),
-    companyName: document.companySnapshot?.name ?? '',
-    companyAddress: document.companySnapshot?.address,
-    customerName: document.customerSnapshotName ?? '',
-    customerAddress: document.customerSnapshotAddress,
-    invoiceNumber: document.number ?? '',
-    invoiceDate: document.issueDate,
-    dueDate: document.dueDate ?? document.issueDate,
-    invoiceGross: Money.fromCents(notice.invoiceGrossCents),
-    fee: Money.fromCents(notice.feeCents),
-    interest: Money.fromCents(notice.interestCents),
-    overdueDays: notice.overdueDays,
-    interestRatePercent: notice.interestRatePercent,
-    introText: notice.introText,
-    closingText: notice.closingText,
-    footerText: document.footerTextSnapshot ?? company.footerText,
-  );
+  final data = onlineDunningLetterData(document: document, notice: notice, company: company);
   return Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => Scaffold(

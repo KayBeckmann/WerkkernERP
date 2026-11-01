@@ -47,8 +47,9 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
   /// bei nicht mehr bearbeitbarem Dokument oder wenn [expectedVersion]
   /// nicht mehr aktuell ist. Hat das Dokument schon Bestand gebucht
   /// ([Document.stockBooked]), wird die Mengendifferenz der Artikel in
-  /// derselben Transaktion nachgebucht (Bewegung durch [userId]). Liefert die neue
-  /// Fassung, `null` wenn nicht gefunden.
+  /// derselben Transaktion nachgebucht (Bewegung durch [userId]). [dueDate]
+  /// setzt die Fälligkeit mit (wie offline schon im Entwurf); ohne bleibt
+  /// sie unverändert. Liefert die neue Fassung, `null` wenn nicht gefunden.
   Future<Document?> updateDraft({
     required String companyId,
     required String id,
@@ -62,6 +63,7 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
     required DateTime now,
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    DateTime? Function()? dueDate,
     String? userId,
   });
 
