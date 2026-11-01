@@ -245,6 +245,7 @@ class OnlineListView<T> extends StatefulWidget {
     this.searchHint,
     this.header,
     this.floatingActionButton,
+    this.appBar,
   });
 
   final Future<List<T>> Function(String query) load;
@@ -255,6 +256,10 @@ class OnlineListView<T> extends StatefulWidget {
   /// Zusatz über der Liste (z. B. Summen), bekommt `reload` mit.
   final Widget Function(BuildContext context, List<T> items, VoidCallback reload)? header;
   final Widget Function(VoidCallback reload)? floatingActionButton;
+
+  /// Eigene Titelleiste wie beim Offline-Gegenstück (z. B. Artikel mit
+  /// Knopf „Artikelgruppen“), bekommt `reload` mit.
+  final PreferredSizeWidget Function(BuildContext context, VoidCallback reload)? appBar;
 
   @override
   State<OnlineListView<T>> createState() => OnlineListViewState<T>();
@@ -271,6 +276,7 @@ class OnlineListViewState<T> extends State<OnlineListView<T>> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: widget.appBar?.call(context, reload),
       body: Column(
         children: [
           if (widget.searchHint != null)

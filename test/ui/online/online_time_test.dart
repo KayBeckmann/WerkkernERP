@@ -35,8 +35,7 @@ void main() {
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Zeiten'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Zeiterfassung');
     expect(find.text('Noch keine Zeiten gebucht.'), findsOneWidget);
     await tester.tap(find.text('Zeit buchen'));
     await tester.pumpAndSettle();
@@ -50,8 +49,7 @@ void main() {
     expect(find.text('2,5 Std.'), findsOneWidget);
     expect(find.text('Deine Buchungen'), findsOneWidget);
 
-    await tester.tap(find.text('Dokumente'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Aufträge');
     await tester.tap(find.text('Auftrag (Entwurf)'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Gebucht 2,5 Std.'), findsOneWidget);

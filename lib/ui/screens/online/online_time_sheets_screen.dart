@@ -64,7 +64,7 @@ class OnlineTimeSheetsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Stundenzettel')),
+      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Stundenzettel')),
       body: OnlineListView<OnlineTimeSheet>(
         load: (_) => session.client.timeSheets(),
         emptyText: 'Noch keine Stundenzettel.',
@@ -87,7 +87,7 @@ class OnlineTimeSheetsScreen extends StatelessWidget {
             heroTag: 'online-time-sheet-fab',
             onPressed: () => _create(context, reload),
             icon: const Icon(Icons.add),
-            label: const Text('Stundenzettel anlegen'),
+            label: const Text('Stundenzettel erstellen'),
           ),
         ),
       ),

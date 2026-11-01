@@ -40,9 +40,9 @@ void main() {
     expect(find.textContaining('noch keine Rechte zugewiesen'), findsNothing);
     expect(find.text('Kunden'), findsOneWidget);
 
-    // Verwaltung: eigener Gruppe (Projektleiter) das Kunden-Leserecht entziehen.
-    await tester.tap(find.byTooltip('Verwaltung'));
-    await tester.pumpAndSettle();
+    // Einstellungen → Gruppen & Rechte: eigener Gruppe (Projektleiter) das
+    // Kunden-Leserecht entziehen.
+    await openTab(tester, 'Einstellungen');
     await tester.tap(find.text('Gruppen & Rechte'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Projektleiter'));
@@ -51,6 +51,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Mitarbeiter einladen.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Einladungen'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Einladen'));

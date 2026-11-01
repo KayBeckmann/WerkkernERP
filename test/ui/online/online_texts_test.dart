@@ -34,25 +34,32 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Dokumente');
-
-    await tester.tap(find.byTooltip('Verwaltung'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Firmendaten'));
+    // Einstellungen → Umsatzsteuer und → Dokumenttexte, je eigene Seite wie offline.
+    await openTab(tester, 'Einstellungen');
+    await tester.tap(find.text('Umsatzsteuer'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-profile-small-business')));
-    await tester.tap(find.text('Rechnung'));
+    await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('online-profile-intro-invoice')), 'Vielen Dank für Ihren Auftrag.');
-    await tester.tap(find.text('Firmendaten speichern'));
-    await tester.pumpAndSettle();
-    expect(find.text('Firmendaten gespeichert.'), findsOneWidget);
-    // Die Snackbar wandert mit zurück und verdeckt sonst „Neues Dokument“.
+    expect(find.text('Umsatzsteuer gespeichert.'), findsOneWidget);
     tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
     await tester.pageBack();
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Dokumenttexte'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rechnung'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('online-profile-intro-invoice')), 'Vielen Dank für Ihren Auftrag.');
+    await tester.tap(find.text('Speichern'));
+    await tester.pumpAndSettle();
+    expect(find.text('Dokumenttexte gespeichert.'), findsOneWidget);
+    // Die Snackbar wandert mit zurück und verdeckt sonst „Neue Rechnung“.
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await openTab(tester, 'Rechnungen');
 
-    await tester.tap(find.text('Neues Dokument'));
+    await tester.tap(find.text('Neue Rechnung'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-new-document-customer')));
     await tester.pumpAndSettle();

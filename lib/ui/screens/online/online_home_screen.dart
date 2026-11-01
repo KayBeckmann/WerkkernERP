@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../../domain/services/online_session.dart';
 import '../../widgets/app_shell.dart';
 import 'online_accounting_screen.dart';
-import 'online_admin_screen.dart';
 import 'online_agent_screen.dart';
 import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
@@ -17,11 +16,32 @@ import 'online_password_dialog.dart';
 import 'online_projects_screen.dart';
 import 'online_purchasing_screen.dart';
 import 'online_recurring_screen.dart';
+import 'online_settings_screen.dart';
 import 'online_stock_screen.dart';
 import 'online_time_screen.dart';
+import 'online_time_sheets_screen.dart';
 
 /// Hauptansicht im Online-Modus. Tabs erscheinen nur bei wirksamem
 /// Leserecht — der Server prüft trotzdem jede Aktion selbst.
+/// Tab-Titel je Dokumentart wie offline (`DocumentLabels.listTitle`).
+const onlineDocumentKindTabTitles = <String, String>{
+  'invoice': 'Rechnungen',
+  'quote': 'Angebote',
+  'order': 'Aufträge',
+  'deliveryNote': 'Lieferscheine',
+  'proforma': 'Proforma-Rechnungen',
+  'creditNote': 'Gutschriften',
+};
+
+const _documentKindIcons = <String, IconData>{
+  'invoice': Icons.receipt_long_outlined,
+  'quote': Icons.request_quote_outlined,
+  'order': Icons.assignment_outlined,
+  'deliveryNote': Icons.outbox_outlined,
+  'proforma': Icons.fact_check_outlined,
+  'creditNote': Icons.receipt_long_outlined,
+};
+
 class OnlineHomeScreen extends StatefulWidget {
   const OnlineHomeScreen({super.key, required this.session, this.expiredBuilder});
   final OnlineSession session;
@@ -165,43 +185,67 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
               // Hinwechseln frisch (siehe [_visits]).
               screen: KeyedSubtree(key: ValueKey('$title-${_visits[title] ?? 0}'), child: body),
             );
-        // Gleiche Gliederung wie offline (Fakturierung, Stammdaten,
-        // Buchhaltung); Bereiche nur bei wirksamem Leserecht + Modul.
+        // Gleiche Bereiche, Namen und Reihenfolge wie offline
+        // (`home_shell.dart`); jeweils nur bei wirksamem Leserecht + Modul.
+        final documentKinds = [
+          for (final entry in onlineDocumentKindModules.entries)
+            if (entry.value == null || session.modules.contains(entry.value)) entry.key,
+        ];
+        final accounting = session.modules.contains('buchhaltung') && session.can('accounting.read') && online;
+        final timeTracking = session.modules.contains('timeTracking') && online;
         final tabs = [
-          // Einstieg wie offline; der Server liefert nur Kacheln, für die
-          // Rechte und Module passen (ohne Verbindung keine Übersicht).
+          // Der Server liefert nur Kacheln, für die Rechte und Module
+          // passen (ohne Verbindung keine Übersicht).
           if (online && session.permissions.isNotEmpty)
-            tab('Übersicht', Icons.dashboard_outlined, ShellSection.dashboard, OnlineDashboardScreen(session: session)),
+            tab('Dashboard', Icons.dashboard_outlined, ShellSection.dashboard, OnlineDashboardScreen(session: session)),
           if (session.can('invoices.read'))
-            tab('Dokumente', Icons.receipt_long_outlined, ShellSection.fakturierung, OnlineDocumentsScreen(session: session)),
+            for (final kind in documentKinds)
+              tab(
+                onlineDocumentKindTabTitles[kind]!,
+                _documentKindIcons[kind]!,
+                ShellSection.fakturierung,
+                OnlineDocumentsScreen(session: session, kind: kind),
+              ),
           if (session.modules.contains('recurringInvoices') && session.can('invoices.read') && online)
-            tab('Wiederkehrend', Icons.autorenew, ShellSection.fakturierung, OnlineRecurringScreen(session: session)),
+            tab('Vorlagen', Icons.repeat_outlined, ShellSection.fakturierung, OnlineRecurringScreen(session: session)),
+          // Nur online: Übersicht überfälliger Rechnungen.
           if (session.modules.contains('dunning') && session.can('dunning.read') && online)
             tab('Mahnwesen', Icons.notification_important_outlined, ShellSection.fakturierung, OnlineDunningScreen(session: session)),
           if (session.can('customers.read') && online)
-            tab('Kunden', Icons.people_outline, ShellSection.stammdaten, OnlineCustomersScreen(session: session)),
-          if (session.can('articles.read') && online)
+            tab('Kunden', Icons.group_outlined, ShellSection.stammdaten, OnlineCustomersScreen(session: session)),
+          if (session.can('articles.read') && online) ...[
             tab('Artikel', Icons.inventory_2_outlined, ShellSection.stammdaten, OnlineArticlesScreen(session: session)),
+            tab('Lieferanten', Icons.local_shipping_outlined, ShellSection.stammdaten, OnlineSuppliersScreen(session: session)),
+          ],
           if (session.modules.contains('projects') && session.can('projects.read') && online)
             tab('Projekte', Icons.folder_outlined, ShellSection.stammdaten, OnlineProjectsScreen(session: session)),
           if (session.modules.contains('fleet') && session.can('fleet.read') && online)
-            tab('Fuhrpark', Icons.local_shipping_outlined, ShellSection.stammdaten, OnlineFleetScreen(session: session)),
+            tab('Fuhrpark', Icons.directions_car_outlined, ShellSection.stammdaten, OnlineFleetScreen(session: session)),
           if (session.modules.contains('bestellwesen') && session.can('purchaseOrders.read') && online)
             tab('Bestellungen', Icons.shopping_cart_outlined, ShellSection.stammdaten, OnlinePurchasingScreen(session: session)),
           if (session.modules.contains('lagerbestand') && session.can('stock.read') && online)
-            tab('Lager', Icons.warehouse_outlined, ShellSection.stammdaten, OnlineStockScreen(session: session)),
-          if (session.modules.contains('timeTracking') &&
-              (session.can('timeTracking.write') || session.can('timeTracking.read')) &&
-              online)
-            tab('Zeiten', Icons.timer_outlined, ShellSection.stammdaten, OnlineTimeScreen(session: session)),
-          if (session.modules.contains('buchhaltung') && session.can('accounting.read') && online)
-            tab('Buchhaltung', Icons.account_balance_outlined, ShellSection.buchhaltung, OnlineAccountingScreen(session: session)),
+            tab('Inventur', Icons.fact_check_outlined, ShellSection.stammdaten, OnlineStockScreen(session: session)),
+          if (timeTracking && (session.can('timeTracking.write') || session.can('timeTracking.read')))
+            tab('Zeiterfassung', Icons.schedule_outlined, ShellSection.stammdaten, OnlineTimeScreen(session: session)),
+          if (timeTracking && session.can('timeTracking.write'))
+            tab('Stundenzettel', Icons.draw_outlined, ShellSection.stammdaten, OnlineTimeSheetsScreen(session: session)),
+          if (accounting) ...[
+            tab('Offene Posten', Icons.account_balance_wallet_outlined, ShellSection.buchhaltung, OnlineOpenItemsScreen(session: session)),
+            tab('Belege', Icons.receipt_outlined, ShellSection.buchhaltung, OnlineExpensesScreen(session: session)),
+            tab('EÜR-Übersicht', Icons.insights_outlined, ShellSection.buchhaltung, OnlineEuerScreen(session: session)),
+            tab('Bankabgleich', Icons.sync_alt_outlined, ShellSection.buchhaltung, OnlineBankScreen(session: session)),
+          ],
         ];
+        // Ohne jedes Recht bleibt der Hinweis „keine Rechte“ statt einer
+        // Navigation, die nur aus den Einstellungen besteht.
+        if (online && (tabs.isNotEmpty || session.isAdmin)) {
+          tabs.add(tab('Einstellungen', Icons.settings_outlined, ShellSection.einstellungen, OnlineSettingsScreen(session: session)));
+        }
         return AppShell(
           companyName: session.companyName,
           companyCaption: online ? 'online' : 'offline',
           tabs: tabs,
-          pinnedNarrowIds: const ['Übersicht', 'Dokumente', 'Kunden'],
+          pinnedNarrowIds: const ['Dashboard', 'Rechnungen', 'Kunden'],
           contentNavigatorKey: _contentNavKey,
           onSwitchCompany: _switchCompany,
           onTabSelected: (id) => setState(() => _visits.update(id as String, (v) => v + 1, ifAbsent: () => 1)),
@@ -223,12 +267,6 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
                 tooltip: 'KI-Zugang und Freigaben',
                 icon: const Icon(Icons.smart_toy_outlined),
                 onPressed: () => _push(OnlineAgentScreen(session: session)),
-              ),
-            if (session.isAdmin && online)
-              IconButton(
-                tooltip: 'Verwaltung',
-                icon: const Icon(Icons.admin_panel_settings_outlined),
-                onPressed: () => _push(OnlineAdminScreen(session: session)),
               ),
             // Seltene Aktionen im Überlaufmenü — auf dem Handy ist in der
             // AppBar sonst kein Platz für den Firmennamen.
@@ -293,7 +331,7 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
               padding: EdgeInsets.all(24),
               child: Text(
                 'Für diese Firma sind dir noch keine Rechte zugewiesen. Der Firmen-Admin vergibt sie '
-                'über deine Gruppe oder eine individuelle Ausnahme — als Admin über „Verwaltung“ oben rechts.',
+                'über deine Gruppe oder eine individuelle Ausnahme — als Admin unter „Einstellungen“.',
                 textAlign: TextAlign.center,
               ),
             ),

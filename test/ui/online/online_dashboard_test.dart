@@ -43,14 +43,17 @@ void main() {
 
     expect(find.byKey(const Key('dashboard-openInvoices')), findsOneWidget);
     expect(find.byKey(const Key('dashboard-revenue')), findsOneWidget);
+    expect(find.byKey(const Key('dashboard-revenue-year')), findsOneWidget, reason: 'Monat und Jahr getrennt wie offline');
+    expect(find.text('Rechnungssumme dieses Jahr'), findsOneWidget);
     expect(find.text('119,00 €'), findsWidgets);
 
-    await tester.tap(find.text('Anpassen'));
+    await tester.tap(find.byTooltip('Kacheln anpassen'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-form-revenue')));
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('dashboard-revenue')), findsNothing);
+    expect(find.byKey(const Key('dashboard-revenue-year')), findsNothing);
     expect(find.byKey(const Key('dashboard-openInvoices')), findsOneWidget);
   });
 }

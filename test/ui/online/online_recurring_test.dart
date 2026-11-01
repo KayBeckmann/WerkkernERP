@@ -34,7 +34,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Wiederkehrend');
+    await openTab(tester, 'Vorlagen');
 
     await tester.tap(find.text('Vorlage anlegen'));
     await tester.pumpAndSettle();

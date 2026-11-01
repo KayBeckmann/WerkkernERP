@@ -3,6 +3,7 @@ import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../theme/app_theme.dart';
 import 'online_form.dart';
 
 const dashboardTileLabels = {
@@ -29,7 +30,7 @@ const _icons = {
   'timeSheets': Icons.draw_outlined,
   'lowStock': Icons.warning_amber_outlined,
   'purchaseOrders': Icons.shopping_cart_outlined,
-  'vehicles': Icons.local_shipping_outlined,
+  'vehicles': Icons.directions_car_outlined,
   'recurring': Icons.autorenew,
 };
 
@@ -74,51 +75,188 @@ class _OnlineDashboardScreenState extends State<OnlineDashboardScreen> {
     return '${t.count ?? 0}';
   }
 
+  static String _formatDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+
+  /// Kacheln in Reihenfolge, Beschriftung und Darstellung wie das
+  /// Offline-Dashboard; Kacheln, die es nur online gibt, folgen danach.
+  List<Widget> _cards(List<OnlineDashboardTile> tiles) {
+    final byKey = {for (final t in tiles) t.key: t};
+    final cards = <Widget>[];
+    final revenue = byKey['revenue'];
+    if (revenue != null) {
+      cards
+        ..add(_KpiCard(
+          key: const Key('dashboard-revenue'),
+          icon: Icons.euro_outlined,
+          label: 'Rechnungssumme diesen Monat',
+          value: Money.fromCents(revenue.amountCents ?? 0).toString(),
+        ))
+        ..add(_KpiCard(
+          key: const Key('dashboard-revenue-year'),
+          icon: Icons.calendar_today_outlined,
+          label: 'Rechnungssumme dieses Jahr',
+          value: Money.fromCents(revenue.yearAmountCents ?? 0).toString(),
+        ));
+    }
+    final open = byKey['openInvoices'];
+    if (open != null) {
+      cards.add(_KpiCard(
+        key: const Key('dashboard-openInvoices'),
+        icon: Icons.pending_actions_outlined,
+        label: open.detail == null ? 'Offene Rechnungen' : 'Offene Rechnungen · ${open.detail}',
+        value: '${open.count ?? 0} (${Money.fromCents(open.amountCents ?? 0)})',
+      ));
+    }
+    final overdue = byKey['overdue'];
+    if (overdue != null) {
+      cards.add(_KpiCard(
+        key: const Key('dashboard-overdue'),
+        icon: Icons.warning_amber_outlined,
+        label: 'Überfällig (Mahnstufe erreicht)',
+        value: '${overdue.count ?? 0}',
+        highlight: (overdue.count ?? 0) > 0,
+      ));
+    }
+    final projects = byKey['projects'];
+    if (projects != null) {
+      cards.add(_KpiCard(
+        key: const Key('dashboard-projects'),
+        icon: Icons.folder_outlined,
+        label: 'Aktive Projekte',
+        value: '${projects.count ?? 0}',
+      ));
+    }
+    final vehicles = byKey['vehicles'];
+    if (vehicles != null) {
+      cards.add(_KpiCard(
+        key: const Key('dashboard-vehicles'),
+        icon: Icons.directions_car_outlined,
+        label: 'TÜV fällig (< 30 Tage)',
+        value: '${vehicles.count ?? 0}',
+        highlight: (vehicles.count ?? 0) > 0,
+      ));
+    }
+    final recurring = byKey['recurring'];
+    if (recurring != null) {
+      final next = DateTime.tryParse(recurring.detail?.replaceFirst('nächste ', '') ?? '');
+      cards.add(_KpiCard(
+        key: const Key('dashboard-recurring'),
+        icon: Icons.repeat_outlined,
+        label: 'Aktive wiederkehrende Vorlagen',
+        value: next == null ? '${recurring.count ?? 0}' : '${recurring.count ?? 0} — nächste Fälligkeit ${_formatDate(next)}',
+      ));
+    }
+    const offlineKeys = {'revenue', 'openInvoices', 'overdue', 'projects', 'vehicles', 'recurring'};
+    for (final t in tiles) {
+      if (offlineKeys.contains(t.key)) continue;
+      cards.add(_KpiCard(
+        key: Key('dashboard-${t.key}'),
+        icon: _icons[t.key] ?? Icons.dashboard_outlined,
+        label: t.detail == null ? t.title : '${t.title} · ${t.detail!.replaceAll('.', ',')}',
+        value: _main(t),
+        highlight: t.key == 'lowStock' && (t.count ?? 0) > 0,
+      ));
+    }
+    return cards;
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<OnlineDashboard>(
       future: _future,
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text(describeOnlineError(snapshot.error!)));
         final data = snapshot.data;
-        if (data == null) return const Center(child: CircularProgressIndicator());
-        return RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: data.available.isEmpty ? null : () => _customize(data),
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Anpassen'),
-                ),
+        return Scaffold(
+          appBar: AppBar(
+            // Bereich der Navigation, keine eigene Seite: kein Zurück-Pfeil.
+            automaticallyImplyLeading: false,
+            title: const Text('Dashboard'),
+            actions: [
+              // Nur online: Kacheln je Nutzer ausblenden.
+              IconButton(
+                icon: const Icon(Icons.tune),
+                tooltip: 'Kacheln anpassen',
+                onPressed: data == null || data.available.isEmpty ? null : () => _customize(data),
               ),
-              if (data.tiles.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Keine Kacheln eingeblendet.'))),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final t in data.tiles)
-                    SizedBox(
-                      width: 260,
-                      child: Card(
-                        child: ListTile(
-                          key: Key('dashboard-${t.key}'),
-                          leading: Icon(_icons[t.key] ?? Icons.dashboard_outlined),
-                          title: Text(t.title),
-                          subtitle: t.detail == null ? null : Text(t.detail!.replaceAll('.', ',')),
-                          trailing: Text(_main(t), style: Theme.of(context).textTheme.titleMedium),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              IconButton(icon: const Icon(Icons.refresh_outlined), tooltip: 'Aktualisieren', onPressed: _reload),
             ],
           ),
+          body: snapshot.hasError
+              ? Center(child: Text(describeOnlineError(snapshot.error!)))
+              : data == null
+              ? const Center(child: CircularProgressIndicator())
+              : data.tiles.isEmpty
+              ? const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Keine Kacheln eingeblendet.')))
+              : RefreshIndicator(
+                  onRefresh: () async {
+                    _reload();
+                    await _future;
+                  },
+                  // Raster wie offline (2 bzw. 3 Spalten), aber mit fester
+                  // Kachelhöhe — auf schmalen Handys reicht das Seitenverhältnis
+                  // sonst nicht für Wert + zweizeilige Beschriftung.
+                  child: GridView(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: MediaQuery.sizeOf(context).width >= AppMetrics.wideLayoutBreakpoint ? 3 : 2,
+                      mainAxisExtent: 136,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    children: _cards(data.tiles),
+                  ),
+                ),
         );
       },
+    );
+  }
+}
+
+/// Kennzahl-Kachel wie offline (`dashboard_screen.dart`).
+class _KpiCard extends StatelessWidget {
+  const _KpiCard({super.key, required this.icon, required this.label, required this.value, this.highlight = false});
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      color: highlight ? colorScheme.errorContainer : null,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Icon(icon, color: highlight ? colorScheme.onErrorContainer : colorScheme.primary),
+            const Spacer(),
+            // Lange Werte („3 (1.190,00 €)“) verkleinern statt umbrechen —
+            // die Kachel hat eine feste Höhe.
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(color: highlight ? colorScheme.onErrorContainer : null),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: highlight ? colorScheme.onErrorContainer : colorScheme.onSurfaceVariant,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

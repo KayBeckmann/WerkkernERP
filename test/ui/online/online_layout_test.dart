@@ -49,14 +49,31 @@ void main() {
     for (final section in ['FAKTURIERUNG', 'STAMMDATEN', 'BUCHHALTUNG']) {
       expect(find.text(section), findsOneWidget);
     }
-    for (final item in ['Übersicht', 'Dokumente', 'Mahnwesen', 'Kunden', 'Artikel', 'Projekte', 'Fuhrpark', 'Buchhaltung']) {
+    // Gleiche Bereiche und Namen wie offline (`home_shell.dart`).
+    for (final item in [
+      'Dashboard',
+      'Rechnungen',
+      'Mahnwesen',
+      'Kunden',
+      'Artikel',
+      'Lieferanten',
+      'Projekte',
+      'Fuhrpark',
+      'Offene Posten',
+      'Belege',
+      'EÜR-Übersicht',
+      'Bankabgleich',
+      'Einstellungen',
+    ]) {
       expect(find.widgetWithText(SidebarNavItem, item), findsOneWidget, reason: item);
     }
 
-    await tester.tap(find.byTooltip('Verwaltung'));
+    await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
     await tester.pumpAndSettle();
-    expect(find.text('Verwaltung · Elektro Kay'), findsOneWidget);
-    expect(find.widgetWithText(SidebarNavItem, 'Dokumente'), findsOneWidget, reason: 'Sidebar bleibt beim Öffnen sichtbar');
+    await tester.tap(find.text('Mitglieder'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Mitglieder'), findsOneWidget);
+    expect(find.widgetWithText(SidebarNavItem, 'Rechnungen'), findsOneWidget, reason: 'Sidebar bleibt beim Öffnen sichtbar');
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -73,7 +90,7 @@ void main() {
 
     expect(find.byType(SidebarNavItem), findsNothing);
     expect(find.byType(NavigationDestination), findsNWidgets(4));
-    for (final item in ['Übersicht', 'Dokumente', 'Kunden', 'Mehr']) {
+    for (final item in ['Dashboard', 'Rechnungen', 'Kunden', 'Mehr']) {
       expect(find.widgetWithText(NavigationDestination, item), findsOneWidget, reason: item);
     }
     await tester.tap(find.widgetWithText(NavigationDestination, 'Mehr'));

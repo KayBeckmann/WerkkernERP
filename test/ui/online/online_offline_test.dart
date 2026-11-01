@@ -48,7 +48,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
-    await openTab(tester, 'Dokumente');
+    await openTab(tester, 'Rechnungen');
     expect(find.textContaining('nur ausdrücklich offline markierte'), findsOneWidget);
 
     // Dokument offline verfügbar machen.

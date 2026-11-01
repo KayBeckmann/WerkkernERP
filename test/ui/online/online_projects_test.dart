@@ -38,8 +38,7 @@ void main() {
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Projekte'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Projekte');
     await tester.tap(find.text('Projekt anlegen'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-project-name')), 'Neubau Meyer');
@@ -48,9 +47,8 @@ void main() {
     expect(find.text('$yy/01 · Neubau Meyer'), findsOneWidget);
 
     // Dokument mit Projekt anlegen.
-    await tester.tap(find.text('Dokumente'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Neues Dokument'));
+    await openTab(tester, 'Rechnungen');
+    await tester.tap(find.text('Neue Rechnung'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-new-document-customer')));
     await tester.pumpAndSettle();
@@ -66,8 +64,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Zeit direkt aufs Projekt buchen.
-    await tester.tap(find.text('Zeiten'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Zeiterfassung');
     await tester.tap(find.text('Zeit buchen'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-time-project')));
@@ -79,8 +76,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Projektdetail: Dokument + gebuchte Stunden.
-    await tester.tap(find.text('Projekte'));
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Projekte');
     await tester.tap(find.text('$yy/01 · Neubau Meyer'));
     await tester.pumpAndSettle();
     expect(find.text('Rechnung (Entwurf)'), findsOneWidget);

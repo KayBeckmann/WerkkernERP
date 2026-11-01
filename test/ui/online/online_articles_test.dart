@@ -36,8 +36,8 @@ void main() {
 
     Future<void> fill(String key, String value) => tester.enterText(find.byKey(Key('online-form-$key')), value);
 
-    // Gruppe
-    await tester.tap(find.text('Gruppen'));
+    // Gruppe — wie offline über den Knopf „Artikelgruppen“
+    await tester.tap(find.byTooltip('Artikelgruppen'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gruppe anlegen'));
     await tester.pumpAndSettle();
@@ -46,10 +46,11 @@ void main() {
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
     expect(find.text('Aufschlag 30,0 %'), findsOneWidget);
-
-    // Lieferant
-    await tester.tap(find.text('Lieferanten'));
+    await tester.pageBack();
     await tester.pumpAndSettle();
+
+    // Lieferant — eigener Bereich wie offline
+    await openTab(tester, 'Lieferanten');
     await tester.tap(find.text('Lieferant anlegen'));
     await tester.pumpAndSettle();
     await fill('name', 'Großhandel Nord');
@@ -58,8 +59,7 @@ void main() {
     expect(find.text('Großhandel Nord'), findsOneWidget);
 
     // Artikel mit Gruppe + Standardlieferant
-    await tester.tap(find.text('Artikel').first);
-    await tester.pumpAndSettle();
+    await openTab(tester, 'Artikel');
     await tester.tap(find.text('Artikel anlegen'));
     await tester.pumpAndSettle();
     await fill('name', 'NYM 3x1,5');
@@ -95,8 +95,8 @@ void main() {
     expect(find.textContaining('130,00 € netto / m'), findsOneWidget);
 
     // Neue Rechnung: Artikel-Position übernimmt den kalkulierten Preis.
-    await openTab(tester, 'Dokumente');
-    await tester.tap(find.text('Neues Dokument'));
+    await openTab(tester, 'Rechnungen');
+    await tester.tap(find.text('Neue Rechnung'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-new-document-customer')));
     await tester.pumpAndSettle();

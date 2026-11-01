@@ -2,12 +2,21 @@ import 'api_client.dart';
 
 /// Dashboard-Kachel (Werte je nach Art: count, amountCents, value).
 class OnlineDashboardTile {
-  const OnlineDashboardTile({required this.key, required this.title, this.count, this.amountCents, this.value, this.detail});
+  const OnlineDashboardTile({
+    required this.key,
+    required this.title,
+    this.count,
+    this.amountCents,
+    this.yearAmountCents,
+    this.value,
+    this.detail,
+  });
   factory OnlineDashboardTile.fromJson(Map<String, Object?> j) => OnlineDashboardTile(
         key: j['key'] as String,
         title: j['title'] as String,
         count: j['count'] as int?,
         amountCents: j['amountCents'] as int?,
+        yearAmountCents: j['yearAmountCents'] as int?,
         value: j['value'] as String?,
         detail: j['detail'] as String?,
       );
@@ -15,6 +24,9 @@ class OnlineDashboardTile {
   final String title;
   final int? count;
   final int? amountCents;
+
+  /// Umsatz-Kachel: Summe des laufenden Jahres (`amountCents` = Monat).
+  final int? yearAmountCents;
   final String? value;
   final String? detail;
 }
