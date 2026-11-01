@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart' show Money;
@@ -63,6 +67,13 @@ class OnlineSettingsScreen extends StatelessWidget {
             title: 'Rollen & Stundensätze',
             subtitle: 'Monteur, Meister, Projektleiter …',
             onTap: () => _push(context, OnlineStaffRolesScreen(session: session)),
+          ),
+        if (admin)
+          _MenuTile(
+            icon: Icons.save_outlined,
+            title: 'Daten & Sicherung',
+            subtitle: 'Alle Firmendaten exportieren',
+            onTap: () => _push(context, OnlineDataExportScreen(session: session)),
           ),
         if (admin) ...[
           const Divider(),
@@ -515,6 +526,103 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
           child: Text(_isEdit ? 'Speichern' : 'Anlegen'),
         ),
       ],
+    );
+  }
+}
+
+/// „Daten & Sicherung“ online: Die Datenbank sichert der Betreiber; hier
+/// lädt der Admin alle Firmendaten als JSON herunter (z. B. für den
+/// Steuerberater oder einen Anbieterwechsel). Ohne Passwörter/Zugangsdaten.
+class OnlineDataExportScreen extends StatefulWidget {
+  const OnlineDataExportScreen({super.key, required this.session});
+  final OnlineSession session;
+
+  @override
+  State<OnlineDataExportScreen> createState() => _OnlineDataExportScreenState();
+}
+
+class _OnlineDataExportScreenState extends State<OnlineDataExportScreen> {
+  bool _busy = false;
+
+  /// Dateiname `werkkernerp-firma-JJJJ-MM-TT.json` ohne Sonderzeichen.
+  String _fileName() {
+    final now = DateTime.now();
+    final slug = widget.session.companyName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9äöüß]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
+    final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return 'werkkernerp-${slug.isEmpty ? 'firma' : slug}-$date.json';
+  }
+
+  Future<void> _export() async {
+    setState(() => _busy = true);
+    try {
+      final data = await widget.session.client.exportCompanyData();
+      final bytes = Uint8List.fromList(utf8.encode(const JsonEncoder.withIndent('  ').convert(data)));
+      final saved = await FilePicker.saveFile(fileName: _fileName(), bytes: bytes, dialogTitle: 'Datenexport speichern');
+      if (saved != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Datenexport gespeichert.')));
+      }
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Daten & Sicherung')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sicherung', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Die Daten liegen auf dem Server und werden vom Betreiber verschlüsselt gesichert. '
+                    'Eine eigene Sicherung auf dem Gerät ist online nicht nötig.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Datenexport', style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Lädt alle Daten dieser Firma als JSON-Datei herunter: Kunden, Artikel, Lieferanten, '
+                    'Dokumente mit Positionen, Projekte, Zeiten, Stundenzettel, Fuhrpark, Lager, Bestellungen, '
+                    'Buchhaltung und Einstellungen. Passwörter und Zugangsdaten sind nicht enthalten.',
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      key: const Key('online-export-start'),
+                      onPressed: _busy ? null : _export,
+                      icon: _busy
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.download_outlined),
+                      label: const Text('Datenexport erstellen'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

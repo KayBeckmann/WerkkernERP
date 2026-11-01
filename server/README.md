@@ -165,6 +165,8 @@ wie nicht existierende. Neue Module liegen je als eigenes Modell/Store
 | Mahnwesen | `/dunning/settings`, `/dunning/overdue`, `/documents/:id/dunning-notices` | `dunning.*` (`dunning`) |
 | Wiederkehrende Rechnungen | `/recurring-templates` (+ `/generate`) | `invoices.*` (`recurringInvoices`) |
 | Stundenzettel | `/time-sheets` (+ `/entries`, `/sign`, `/correction`) | `timeTracking.write` (`timeTracking`) |
+| Rollen & Stundensätze | `/staff-roles` (lesen: wer bucht; pflegen: Admin) | `timeTracking.*` (`timeTracking`) |
+| Materialabschlag | `/documents/:id/material-advance` (Artikel und/oder gewählte Freitexte eines finalisierten Auftrags) | `invoices.write` (`advancePaymentInvoices`) |
 | Mailversand | `/mail/settings`, `/mail/test` (Admin), `/documents/:id/send`, `/dunning-notices/:id/send`, `/purchase-orders/:id/send` | Fachrecht (`smtp`) |
 | Übersicht | `/dashboard`, `/dashboard/preferences` | Kacheln nach Rechten |
 
@@ -172,6 +174,10 @@ wie nicht existierende. Neue Module liegen je als eigenes Modell/Store
   bucht in derselben Transaktion (Regel aus `werkkern_core`: genau eine
   Buchung pro Kette, Gutschrift bucht zurück), ein später bearbeiteter
   Auftrag bucht die Differenz nach.
+- **Rollen:** Eine Zeitbuchung mit Rolle friert deren Stundensatz ein,
+  ohne Rolle den des Mitglieds (wie offline Rollen-Stamm, online
+  zusätzlich der Satz je Mitglied). Der erste Abruf durch einen Admin
+  legt die Vorschläge Monteur/Meister/Projektleiter an.
 - **Wiederkehrende Rechnungen:** `bin/server.dart` prüft stündlich und
   legt je fälliger Periode einen Entwurf an; jede Periode wird in
   derselben Transaktion beansprucht, mehrere Instanzen sind unkritisch.
@@ -221,6 +227,10 @@ wie nicht existierende. Neue Module liegen je als eigenes Modell/Store
   beim Finalisieren unveränderlich ins Dokument übernommen.
 - `GET /audit?limit=` (Admin): wer hat wann was an welchem Objekt
   getan, neueste zuerst. Bewusst **ohne Inhalte** (Datenminimierung).
+- `GET /company/export` (Admin, nie über Agent-Token): alle Fachdaten
+  der Firma als JSON (online Gegenstück zu „Daten & Sicherung“) —
+  ohne Passwörter, Sitzungen, Agent-Token und SMTP-Zugangsdaten; der
+  Export steht im Audit-Protokoll.
 
 ## Schema-Migrationen
 

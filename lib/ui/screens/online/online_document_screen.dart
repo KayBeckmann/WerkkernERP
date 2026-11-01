@@ -489,6 +489,35 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     );
   }
 
+  /// Materialabschlag wie offline: alle Artikel und/oder gewählte
+  /// Freitexte des Auftrags als Abschlagsrechnung (Entwurf).
+  Future<void> _createMaterialAdvance() async {
+    final textItems = [
+      for (final (index, item) in _document!.items.indexed)
+        if (item.kind == OnlineItemKind.text) (index: index, description: item.description),
+    ];
+    final selection = await showDialog<({bool allArticles, List<int> textIndexes})>(
+      context: context,
+      builder: (_) => _MaterialAdvanceDialog(textItems: textItems),
+    );
+    if (selection == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final created = await _client.createMaterialAdvance(
+        widget.documentId,
+        includeAllArticles: selection.allArticles,
+        textItemIndexes: selection.textIndexes,
+      );
+      if (!mounted) return;
+      _snack('Materialabschlag als Entwurf angelegt.');
+      await _replaceWith(created.id);
+    } on Exception catch (e) {
+      if (mounted) _snack('Materialabschlag konnte nicht erstellt werden: ${describeOnlineError(e)}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _togglePaid() =>
       _run(() => _client.setPaid(widget.documentId, paid: !_document!.isPaid), 'Zahlungsstatus gespeichert.');
 
@@ -731,6 +760,15 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           icon: const Icon(Icons.shopping_cart_outlined),
           tooltip: 'Bestellung erstellen',
           onPressed: followUps ? () => createPurchaseOrdersFromDocument(context, session, document.id) : null,
+        ),
+      if (finalized &&
+          document.kind == 'order' &&
+          session.modules.contains('advancePaymentInvoices') &&
+          session.can('invoices.write'))
+        IconButton(
+          icon: const Icon(Icons.request_quote_outlined),
+          tooltip: 'Materialabschlag erstellen',
+          onPressed: followUps ? _createMaterialAdvance : null,
         ),
       if (!finalized)
         IconButton(
@@ -1178,3 +1216,65 @@ String onlineFinalizeConfirmSentence(String kind) => switch (kind) {
       'creditNote' => 'Die Gutschrift erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
       _ => 'Die Rechnung erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
     };
+
+class _MaterialAdvanceDialog extends StatefulWidget {
+  const _MaterialAdvanceDialog({required this.textItems});
+  final List<({int index, String description})> textItems;
+
+  @override
+  State<_MaterialAdvanceDialog> createState() => _MaterialAdvanceDialogState();
+}
+
+class _MaterialAdvanceDialogState extends State<_MaterialAdvanceDialog> {
+  bool _includeAllArticles = true;
+  final Set<int> _selected = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Materialabschlag erstellen'),
+      content: SizedBox(
+        width: 400,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text('Alle Artikel-Positionen'),
+                value: _includeAllArticles,
+                onChanged: (value) => setState(() => _includeAllArticles = value ?? false),
+              ),
+              if (widget.textItems.isNotEmpty) ...[
+                const Padding(padding: EdgeInsets.only(top: 8), child: Text('Freitext-Positionen auswählen:')),
+                for (final item in widget.textItems)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(item.description),
+                    value: _selected.contains(item.index),
+                    onChanged: (checked) => setState(() {
+                      if (checked ?? false) {
+                        _selected.add(item.index);
+                      } else {
+                        _selected.remove(item.index);
+                      }
+                    }),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, (allArticles: _includeAllArticles, textIndexes: _selected.toList()..sort())),
+          child: const Text('Erstellen'),
+        ),
+      ],
+    );
+  }
+}
