@@ -47,31 +47,32 @@ void main() {
     await tester.pumpAndSettle();
     await openTab(tester, 'Aufträge');
 
-    await tester.tap(find.text('A-${yy}001'));
+    await tester.tap(find.textContaining('A-${yy}001'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Auftrag · finalisiert'), findsOneWidget);
+    expect(find.textContaining('noch bearbeitbar, bis daraus ein Folgedokument erzeugt wird'), findsOneWidget);
     expect(find.text('Position hinzufügen'), findsOneWidget, reason: 'noch nicht umgewandelt');
-    expect(find.text('Finalisieren'), findsNothing);
+    expect(find.byTooltip('Finalisieren'), findsNothing);
     expect(find.byTooltip('Entwurf löschen'), findsNothing);
 
     await tester.enterText(find.widgetWithText(TextField, 'Notizen'), 'Nachtrag Steckdosen');
     await tester.pump();
-    expect(find.text('In Rechnung umwandeln'), findsNothing, reason: 'erst speichern, dann umwandeln');
-    await tester.tap(find.text('Speichern'));
+    expect(tester.widget<PopupMenuButton<String>>(find.widgetWithIcon(PopupMenuButton<String>, Icons.sync_alt_outlined)).enabled,
+        isFalse, reason: 'erst speichern, dann umwandeln');
+    await tester.tap(find.byTooltip('Änderungen speichern'));
     await tester.pumpAndSettle();
-    expect(find.text('Gespeichert.'), findsOneWidget);
+    expect(find.text('Änderungen gespeichert.'), findsOneWidget);
     expect(find.textContaining('A-${yy}001'), findsWidgets, reason: 'Nummer bleibt');
 
+    await tester.tap(find.byTooltip('Umwandeln'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('In Rechnung umwandeln'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Rechnung · Entwurf'), findsOneWidget);
-    // Die Umwandlung ersetzt den Auftrag im Navigationsstapel.
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('A-${yy}001'));
+    expect(find.textContaining('Rechnung (Entwurf)'), findsOneWidget);
+    // Breit: der Rechnungsentwurf steht rechts, der Auftrag links in der Liste.
+    await tester.tap(find.textContaining('A-${yy}001').first);
     await tester.pumpAndSettle();
     expect(find.text('Position hinzufügen'), findsNothing, reason: 'nach der Umwandlung gesperrt');
-    expect(find.text('Speichern'), findsNothing);
+    expect(find.byTooltip('Änderungen speichern'), findsNothing);
 
     final saved = await tester.runAsync(() async {
       final client = server.client()..token = token;

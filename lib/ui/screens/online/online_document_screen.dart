@@ -6,19 +6,34 @@ import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../../pdf/dunning_letter_pdf_builder.dart';
 import '../../../pdf/online_document_pdf.dart';
+import 'online_documents_screen.dart' show onlineEditorTitle;
+import 'online_dunning_screen.dart';
+import 'online_item_dialog.dart';
 import 'online_mail.dart';
 import 'online_purchasing_screen.dart' show createPurchaseOrdersFromDocument;
 
-/// Detail/Bearbeitung eines Online-Dokuments. Lokale Änderungen werden
+/// Detail/Bearbeitung eines Online-Dokuments — Aufbau wie der Offline-
+/// Editor (`invoice_editor_screen.dart`): Aktionen in der Titelleiste,
+/// Zahlungsbedingungen/Notizen/Projekt, Mahnwesen, Positionen nach
+/// Gruppen mit Gruppensumme, Summenkarte. Lokale Änderungen werden
 /// erst mit "Speichern" übertragen — immer mit der zuletzt gelesenen
 /// Version. Hat ein anderes Gerät inzwischen gespeichert, lehnt der
 /// Server ab (409) und die App fragt nach, statt still zu überschreiben
 /// (B2-Vorgabe "kein last write wins").
 class OnlineDocumentScreen extends StatefulWidget {
-  const OnlineDocumentScreen({super.key, required this.session, required this.documentId});
+  const OnlineDocumentScreen({super.key, required this.session, required this.documentId, this.onChanged, this.onNavigate});
   final OnlineSession session;
   final String documentId;
+
+  /// Breit-Layout (eingebettet neben der Liste): nach jeder gespeicherten
+  /// Änderung, damit die Liste nachlädt.
+  final VoidCallback? onChanged;
+
+  /// Eingebettet: statt Seitenwechsel das Folgedokument (Umwandlung,
+  /// Gutschrift) bzw. nach dem Löschen nichts (`null`) anzeigen.
+  final ValueChanged<String?>? onNavigate;
 
   @override
   State<OnlineDocumentScreen> createState() => _OnlineDocumentScreenState();
@@ -28,6 +43,14 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   OnlineDocument? _document;
   List<OnlineDocumentItem> _items = [];
   late final _notes = TextEditingController();
+  late final _paymentTerms = TextEditingController();
+  String? _projectId;
+  List<OnlineProject> _projects = const [];
+
+  /// Fälligkeit im Entwurf — wird mit „Speichern“ übertragen; finalisiert
+  /// sofort über die Zahlungs-Route (wie offline).
+  DateTime? _dueDate;
+  DunningConfig? _dunningConfig;
   bool _dirty = false;
   bool _busy = true;
   bool _isAdvancePayment = false;
@@ -68,12 +91,36 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       _client.companyProfile().then((p) {
         if (mounted) setState(() => _smallBusiness = p.smallBusinessExempt);
       }, onError: (Object _) {});
+      final session = widget.session;
+      if (_projectsEnabled) {
+        _client.projects().then((projects) {
+          if (mounted) setState(() => _projects = projects);
+        }, onError: (Object _) {});
+      }
+      if (_dunningEnabled && session.can('dunning.read')) {
+        _client.dunningSettings().then((s) {
+          if (mounted) setState(() => _dunningConfig = _configFrom(s));
+        }, onError: (Object _) {});
+      }
     }
   }
+
+  bool get _projectsEnabled => widget.session.modules.contains('projects') && widget.session.can('projects.read');
+  bool get _dunningEnabled => widget.session.modules.contains('dunning');
+
+  static DunningConfig _configFrom(Map<String, Object?> s) => DunningConfig(
+        reminder2AfterDays: s['reminder2AfterDays'] as int? ?? 14,
+        reminder3AfterDays: s['reminder3AfterDays'] as int? ?? 28,
+        feeLevel1: Money.fromCents(s['feeLevel1Cents'] as int? ?? 0),
+        feeLevel2: Money.fromCents(s['feeLevel2Cents'] as int? ?? 0),
+        feeLevel3: Money.fromCents(s['feeLevel3Cents'] as int? ?? 0),
+        interestRatePercent: (s['interestRatePercent'] as num? ?? 0).toDouble(),
+      );
 
   @override
   void dispose() {
     _notes.dispose();
+    _paymentTerms.dispose();
     super.dispose();
   }
 
@@ -194,6 +241,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     _document = document;
     _items = [...document.items];
     _notes.text = document.notes ?? '';
+    _paymentTerms.text = document.paymentTerms ?? '';
+    _projectId = document.projectId;
+    _dueDate = document.dueDate;
     _isAdvancePayment = document.isAdvancePayment;
     _isFixedPrice = document.isFixedPrice;
     _dirty = false;
@@ -240,6 +290,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       if (!mounted) return;
       setState(() => _apply(document));
       _snack(success);
+      widget.onChanged?.call();
     } on ApiUnreachable {
       if (rethrowUnreachable) {
         if (mounted) setState(() => _busy = false);
@@ -263,23 +314,36 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
 
   Future<void> _save() async {
     if (_offlineView) return _saveOffline();
-    final version = _document!.version;
+    final document = _document!;
+    final version = document.version;
     // Mit Operations-ID senden: geht die Antwort verloren, wird genau
     // diese Änderung später unter derselben ID nachgereicht.
     final opId = _pinned ? OfflineStore.newOpId() : null;
     final notes = _notes.text.trim().isEmpty ? null : _notes.text.trim();
+    final paymentTerms = _paymentTerms.text.trim().isEmpty ? null : _paymentTerms.text.trim();
+    final dueDate = _dueDate;
+    final projectId = _projectId;
+    final projectChanged = document.isDraft && _projectsEnabled && projectId != document.projectId;
     try {
       await _run(
-        () => _client.updateDocument(
-          id: widget.documentId,
-          version: version,
-          items: _items,
-          notes: notes,
-          idempotencyKey: opId,
-          isAdvancePayment: _document!.kind == 'invoice' ? _isAdvancePayment : null,
-          isFixedPrice: {'quote', 'order'}.contains(_document!.kind) ? _isFixedPrice : null,
-        ),
-        'Gespeichert.',
+        () async {
+          var saved = await _client.updateDocument(
+            id: widget.documentId,
+            version: version,
+            items: _items,
+            notes: notes,
+            paymentTerms: () => paymentTerms,
+            dueDate: document.isDraft && document.kind == 'invoice' && _dunningEnabled ? () => dueDate : null,
+            idempotencyKey: opId,
+            isAdvancePayment: document.kind == 'invoice' ? _isAdvancePayment : null,
+            isFixedPrice: {'quote', 'order'}.contains(document.kind) ? _isFixedPrice : null,
+          );
+          if (projectChanged) {
+            saved = await _client.setDocumentProject(saved.id, version: saved.version, projectId: projectId);
+          }
+          return saved;
+        },
+        document.isDraft ? 'Entwurf gespeichert.' : 'Änderungen gespeichert.',
         rethrowUnreachable: _pinned,
       );
     } on ApiUnreachable {
@@ -307,10 +371,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Vergibt die nächste Nummer und macht das Dokument unveränderlich. Kunden- und Firmendaten werden '
-              'zum jetzigen Stand eingefroren.',
-            ),
+            Text('${onlineFinalizeConfirmSentence(_document!.kind)} Diese Aktion ist nicht umkehrbar.'),
             for (final w in warnings)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -346,7 +407,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     if (confirmed != true) return;
     try {
       await _client.deleteDocument(widget.documentId);
-      if (mounted) Navigator.of(context).pop();
+      if (!mounted) return;
+      final navigate = widget.onNavigate;
+      navigate == null ? Navigator.of(context).pop() : navigate(null);
     } on Exception catch (e) {
       if (mounted) _snack(describeOnlineError(e));
     }
@@ -395,9 +458,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       final created = await _client.convertDocument(widget.documentId, targetKind);
       if (!mounted) return;
       _snack('$label als Entwurf angelegt.');
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: created.id)),
-      );
+      await _replaceWith(created.id);
     } on Exception catch (e) {
       if (mounted) _snack(describeOnlineError(e));
     } finally {
@@ -411,9 +472,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       final created = await _client.createCreditNote(widget.documentId);
       if (!mounted) return;
       _snack('Gutschrift als Entwurf angelegt — vor dem Finalisieren ggf. kürzen.');
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: created.id)),
-      );
+      await _replaceWith(created.id);
     } on Exception catch (e) {
       if (mounted) _snack(describeOnlineError(e));
     } finally {
@@ -421,152 +480,100 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     }
   }
 
+  /// Folgedokument statt dieses Dokuments zeigen.
+  Future<void> _replaceWith(String id) async {
+    final navigate = widget.onNavigate;
+    if (navigate != null) return navigate(id);
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: id)),
+    );
+  }
+
   Future<void> _togglePaid() =>
       _run(() => _client.setPaid(widget.documentId, paid: !_document!.isPaid), 'Zahlungsstatus gespeichert.');
 
+  /// Fälligkeit jederzeit änderbar (wie offline): im Entwurf Teil von
+  /// „Speichern“, finalisiert sofort über die Zahlungs-Route.
   Future<void> _pickDueDate() async {
-    final current = _document!.dueDate;
+    final document = _document!;
     final picked = await showDatePicker(
       context: context,
-      initialDate: current ?? DateTime.now().add(const Duration(days: 14)),
+      initialDate: _dueDate ?? DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
+    if (document.isDraft) {
+      setState(() {
+        _dueDate = picked;
+        _dirty = true;
+      });
+      return;
+    }
     await _run(() => _client.setDueDate(widget.documentId, picked), 'Fälligkeit gespeichert.');
   }
 
-  /// Folgeaktionen eines finalisierten Dokuments: Umwandlung und —
-  /// bei Rechnungen — Zahlungsstatus/Fälligkeit.
-  Widget _buildFinalizedSection(OnlineDocument document) {
-    final session = widget.session;
-    final dateFormat = DateFormat('dd.MM.yyyy');
-    final targets = [
-      for (final target in documentConversionTargets[document.kind] ?? const <String>{})
-        if (onlineDocumentKindModules[target] == null || session.modules.contains(onlineDocumentKindModules[target]))
-          target,
-    ];
-    final canConvert = session.can('invoices.write') && targets.isNotEmpty;
-    final canPay = session.can('invoices.payment');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (document.kind == 'invoice')
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Text über den Aktionen statt daneben — auf schmalen
-                  // Handys (~330 px) liefe eine Zeile sonst über.
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(document.isPaid ? Icons.check_circle_outline : Icons.schedule),
-                    title: Text(
-                      document.isPaid
-                          ? 'Bezahlt${document.paidAt == null ? '' : ' am ${dateFormat.format(document.paidAt!.toLocal())}'}'
-                          : 'Offen',
-                    ),
-                    subtitle: Text(
-                      document.dueDate == null ? 'Keine Fälligkeit' : 'Fällig am ${dateFormat.format(document.dueDate!)}',
-                    ),
-                  ),
-                  if (canPay)
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        TextButton(
-                          onPressed: _busy ? null : _togglePaid,
-                          child: Text(document.isPaid ? 'Als offen markieren' : 'Als bezahlt markieren'),
-                        ),
-                        TextButton(onPressed: _busy ? null : _pickDueDate, child: const Text('Fälligkeit setzen')),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          ),
-        if (document.convertedTo.isNotEmpty)
-          Card(
-            child: Column(
-              children: [
-                for (final c in document.convertedTo)
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.subdirectory_arrow_right),
-                    title: Text(c.number ?? '${onlineDocumentKindLabels[c.kind] ?? c.kind} (Entwurf)'),
-                    subtitle: Text('Folgedokument · ${onlineDocumentKindLabels[c.kind] ?? c.kind}'),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => OnlineDocumentScreen(session: session, documentId: c.id),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        if (document.creditNotes.isNotEmpty)
-          Card(
-            child: Column(
-              children: [
-                for (final c in document.creditNotes)
-                  ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.undo),
-                    title: Text('Gutschrift ${c.number ?? ''}'),
-                    trailing: Text('− ${Money.fromCents(c.grossCents)}'),
-                  ),
-              ],
-            ),
-          ),
-        if (document.kind == 'invoice' && session.modules.contains('creditNotes') && session.can('invoices.write'))
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: _busy ? null : _createCreditNote,
-              icon: const Icon(Icons.undo),
-              label: const Text('Gutschrift erstellen'),
-            ),
-          ),
-        if (document.kind == 'order' && session.modules.contains('bestellwesen') && session.can('purchaseOrders.write'))
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: _busy ? null : () => createPurchaseOrdersFromDocument(context, session, document.id),
-              icon: const Icon(Icons.shopping_cart_outlined),
-              label: const Text('Bestellungen erzeugen'),
-            ),
-          ),
-        if (canConvert)
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final target in targets)
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : () => _convert(target),
-                  icon: const Icon(Icons.transform),
-                  label: Text('In ${onlineDocumentKindLabels[target] ?? target} umwandeln'),
-                ),
-            ],
-          ),
-      ],
+  /// Mahnschreiben zur aktuellen Stufe: Mahnung protokollieren (Server
+  /// berechnet Gebühr/Zins) und als PDF zeigen bzw. direkt mailen.
+  Future<({OnlineDunningNotice notice, OnlineCompanyProfile company})?> _createNotice() async {
+    setState(() => _busy = true);
+    try {
+      final notice = await _client.createDunningNotice(widget.documentId);
+      final company = await _client.companyProfile();
+      return (notice: notice, company: company);
+    } on Exception catch (e) {
+      if (mounted) _snack(describeOnlineError(e));
+      return null;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _generateDunningLetter() async {
+    final created = await _createNotice();
+    if (created == null || !mounted) return;
+    await showDunningLetter(
+      context,
+      session: widget.session,
+      document: _document!,
+      notice: created.notice,
+      company: created.company,
     );
   }
 
-  Future<void> _addItem() async {
-    List<OnlineArticle> articles = const [];
-    if (widget.session.can('articles.read')) {
-      try {
-        articles = await _client.articles();
-      } on Exception {
-        // Ohne Artikelliste bleiben Stunden/Freitext/manuelle Artikel möglich.
-      }
+  Future<void> _sendDunningLetterByEmail(DunningLevel level) async {
+    final created = await _createNotice();
+    if (created == null || !mounted) return;
+    final data = onlineDunningLetterData(document: _document!, notice: created.notice, company: created.company);
+    await sendPdfByMail(
+      context,
+      session: widget.session,
+      title: '${dunningLetterTitle(level)} senden',
+      defaultRecipientHint: 'Leer = E-Mail des Kunden',
+      buildPdf: () => buildDunningLetterPdfFromData(data),
+      send: (pdf, {to, subject, body}) => _client.sendDunningMail(created.notice.id, pdf, to: to),
+    );
+  }
+
+  Future<List<OnlineArticle>> _loadArticles() async {
+    if (!widget.session.can('articles.read') || widget.session.offlineOnly) return const [];
+    try {
+      return await _client.articles(includeInactive: true);
+    } on Exception {
+      // Ohne Artikelliste bleiben Stunden/Freitext/manuelle Artikel möglich.
+      return const [];
     }
+  }
+
+  Future<void> _addItem() async {
+    final articles = await _loadArticles();
     if (!mounted) return;
-    final item = await showDialog<OnlineDocumentItem>(
-      context: context,
-      builder: (_) => _ItemDialog(articles: articles, forceZeroVat: _smallBusiness),
+    final item = await showOnlineItemDialog(
+      context,
+      articles: articles,
+      existingGroupLabels: onlineGroupLabels(_items),
+      allowHours: _document!.kind != 'deliveryNote',
+      forceZeroVat: _smallBusiness,
     );
     if (item == null) return;
     setState(() {
@@ -575,8 +582,28 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     });
   }
 
-  InvoiceTotals get _totals => calculateInvoiceTotals([
-        for (final i in _items)
+  /// Bestehende Position bearbeiten statt nur löschen + neu anlegen (wie
+  /// offline).
+  Future<void> _editItem(int index) async {
+    final articles = await _loadArticles();
+    if (!mounted) return;
+    final item = await showOnlineItemDialog(
+      context,
+      articles: articles,
+      existingGroupLabels: onlineGroupLabels(_items),
+      existing: _items[index],
+      allowHours: _document!.kind != 'deliveryNote',
+      forceZeroVat: _smallBusiness,
+    );
+    if (item == null) return;
+    setState(() {
+      _items = [..._items]..[index] = item;
+      _dirty = true;
+    });
+  }
+
+  static InvoiceTotals _totalsOf(Iterable<OnlineDocumentItem> items) => calculateInvoiceTotals([
+        for (final i in items)
           InvoiceLineInput(
             quantity: Decimal.parse(i.quantity),
             unitPriceCents: i.unitPriceCents,
@@ -585,81 +612,269 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           ),
       ]);
 
+  InvoiceTotals get _totals => _totalsOf(_items);
+
+  Future<bool> _confirmDiscard() async {
+    final discard = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ungespeicherte Änderungen verwerfen?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Weiter bearbeiten')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwerfen')),
+        ],
+      ),
+    );
+    return discard == true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final document = _document;
-    final label = document == null ? 'Dokument' : (onlineDocumentKindLabels[document.kind] ?? document.kind);
     return PopScope(
       canPop: !_dirty,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        final discard = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Ungespeicherte Änderungen verwerfen?'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Weiter bearbeiten')),
-              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Verwerfen')),
-            ],
-          ),
-        );
-        if (discard == true && context.mounted) {
+        if (await _confirmDiscard() && context.mounted) {
           setState(() => _dirty = false);
           Navigator.of(context).pop();
         }
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(document?.number ?? '$label (Entwurf)'),
-          actions: [
-            if (document != null && _store != null && !widget.session.offlineOnly && !_offlineView)
-              IconButton(
-                tooltip: _pinned ? 'Nicht mehr offline verfügbar' : 'Offline verfügbar machen',
-                icon: Icon(_pinned ? Icons.offline_pin : Icons.download_for_offline_outlined),
-                onPressed: _busy ? null : _togglePinned,
-              ),
-            if (document != null && !document.isDraft && !_dirty && canSendMail(widget.session) && _serverActionsAllowed)
-              IconButton(
-                tooltip: 'Per E-Mail senden',
-                icon: const Icon(Icons.send_outlined),
-                onPressed: _busy
-                    ? null
-                    : () => sendPdfByMail(
-                          context,
-                          session: widget.session,
-                          title: '${onlineDocumentKindLabels[document.kind] ?? 'Dokument'} ${document.number} senden',
-                          defaultRecipientHint: 'Leer = E-Mail des Kunden',
-                          customText: true,
-                          buildPdf: () => buildOnlineDocumentPdf(document),
-                          send: (pdf, {to, subject, body}) =>
-                              _client.sendDocumentMail(document.id, pdf, to: to, subject: subject, body: body),
-                        ),
-              ),
-            if (document != null && !_dirty)
-              IconButton(
-                tooltip: document.isDraft ? 'PDF-Vorschau (Entwurf)' : 'PDF',
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                onPressed: _busy ? null : _showPdf,
-              ),
-            if (_editable && document!.isDraft && _serverActionsAllowed)
-              IconButton(tooltip: 'Entwurf löschen', icon: const Icon(Icons.delete_outline), onPressed: _busy ? null : _delete),
-          ],
+          title: Text(document == null ? 'Dokument' : onlineEditorTitle(document)),
+          actions: document == null ? null : _buildActions(document),
         ),
         body: _error != null
             ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)))
             : document == null
                 ? const Center(child: CircularProgressIndicator())
-                : _buildBody(document, label),
-        bottomNavigationBar: document == null ? null : _buildActions(document),
+                : _buildBody(document),
+        floatingActionButton: document != null && _editable
+            ? FloatingActionButton.extended(
+                heroTag: 'online-document-editor-fab',
+                onPressed: _busy ? null : _addItem,
+                icon: const Icon(Icons.add),
+                label: const Text('Position hinzufügen'),
+              )
+            : null,
       ),
     );
   }
 
-  Widget _buildBody(OnlineDocument document, String label) {
-    final totals = _totals;
+  /// Aktionen in der Titelleiste in der Reihenfolge des Offline-Editors;
+  /// Offline-Kopie und Entwurf löschen gibt es nur online.
+  List<Widget> _buildActions(OnlineDocument document) {
+    final session = widget.session;
+    final finalized = !document.isDraft;
+    // Folgeaktionen nur mit gespeichertem Stand — sonst übernähme die
+    // Folgeurkunde nicht das, was auf dem Bildschirm steht.
+    final followUps = finalized && _serverActionsAllowed && !_dirty && !_busy;
+    final targets = [
+      for (final target in documentConversionTargets[document.kind] ?? const <String>{})
+        if (onlineDocumentKindModules[target] == null || session.modules.contains(onlineDocumentKindModules[target]))
+          target,
+    ];
+    final canFinalize = document.isDraft && session.can('invoices.finalize');
+    return [
+      if (_store != null && !session.offlineOnly && !_offlineView)
+        IconButton(
+          tooltip: _pinned ? 'Nicht mehr offline verfügbar' : 'Offline verfügbar machen',
+          icon: Icon(_pinned ? Icons.offline_pin : Icons.download_for_offline_outlined),
+          onPressed: _busy ? null : _togglePinned,
+        ),
+      if (finalized)
+        IconButton(
+          icon: const Icon(Icons.picture_as_pdf_outlined),
+          tooltip: 'PDF teilen',
+          onPressed: _busy || _dirty ? null : _showPdf,
+        ),
+      if (finalized && canSendMail(session) && _serverActionsAllowed)
+        IconButton(
+          icon: const Icon(Icons.mail_outline),
+          tooltip: 'Per E-Mail senden',
+          onPressed: _busy || _dirty
+              ? null
+              : () => sendPdfByMail(
+                    context,
+                    session: session,
+                    title: '${onlineDocumentKindLabels[document.kind] ?? 'Dokument'} ${document.number} senden',
+                    defaultRecipientHint: 'Leer = E-Mail des Kunden',
+                    customText: true,
+                    buildPdf: () => buildOnlineDocumentPdf(document),
+                    send: (pdf, {to, subject, body}) =>
+                        _client.sendDocumentMail(document.id, pdf, to: to, subject: subject, body: body),
+                  ),
+        ),
+      if (finalized && session.can('invoices.write') && targets.isNotEmpty)
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.sync_alt_outlined),
+          tooltip: 'Umwandeln',
+          enabled: followUps,
+          itemBuilder: (context) => [
+            for (final target in targets)
+              PopupMenuItem(value: target, child: Text('In ${onlineDocumentKindLabels[target] ?? target} umwandeln')),
+          ],
+          onSelected: _convert,
+        ),
+      if (finalized && document.kind == 'invoice' && session.modules.contains('creditNotes') && session.can('invoices.write'))
+        IconButton(
+          icon: const Icon(Icons.receipt_long_outlined),
+          tooltip: 'Gutschrift erstellen',
+          onPressed: followUps ? _createCreditNote : null,
+        ),
+      if (finalized &&
+          document.kind == 'order' &&
+          session.modules.contains('bestellwesen') &&
+          session.can('purchaseOrders.write'))
+        IconButton(
+          icon: const Icon(Icons.shopping_cart_outlined),
+          tooltip: 'Bestellung erstellen',
+          onPressed: followUps ? () => createPurchaseOrdersFromDocument(context, session, document.id) : null,
+        ),
+      if (!finalized)
+        IconButton(
+          icon: const Icon(Icons.visibility_outlined),
+          tooltip: 'Vorschau (unverbindlich)',
+          onPressed: _items.isEmpty || _dirty || _busy ? null : _showPdf,
+        ),
+      if (_editable)
+        IconButton(
+          icon: const Icon(Icons.save_outlined),
+          tooltip: _offlineView
+              ? 'Offline speichern'
+              : finalized
+                  ? 'Änderungen speichern'
+                  : 'Entwurf speichern',
+          onPressed: _busy || !_dirty ? null : _save,
+        ),
+      if (canFinalize)
+        IconButton(
+          icon: const Icon(Icons.check_circle_outline),
+          tooltip: 'Finalisieren',
+          // Erst speichern, dann finalisieren — finalisiert wird genau
+          // der Stand, den der Server kennt.
+          onPressed: _busy || _dirty || _items.isEmpty || !_serverActionsAllowed ? null : _finalize,
+        ),
+      if (_editable && document.isDraft && _serverActionsAllowed)
+        IconButton(tooltip: 'Entwurf löschen', icon: const Icon(Icons.delete_outline), onPressed: _busy ? null : _delete),
+    ];
+  }
+
+  static IconData _iconFor(OnlineItemKind kind) => switch (kind) {
+        OnlineItemKind.article => Icons.inventory_2_outlined,
+        OnlineItemKind.hours => Icons.schedule_outlined,
+        OnlineItemKind.text => Icons.notes_outlined,
+      };
+
+  /// Positionskarte wie offline: Typ-Symbol, Menge × Preis, Steuersatz,
+  /// Zeilenbetrag brutto, Rabatt als eigene Zeile.
+  Widget _buildItemCard(int index) {
+    final item = _items[index];
+    final quantity = item.quantity.replaceAll('.', ',');
+    final quantityLabel = item.unit == null ? quantity : '$quantity ${item.unit}';
+    final line = _totalsOf([item]);
+    final undiscounted = _totalsOf([
+      OnlineDocumentItem(
+        kind: item.kind,
+        description: item.description,
+        quantity: item.quantity,
+        unitPriceCents: item.unitPriceCents,
+        vatRatePercent: item.vatRatePercent,
+      ),
+    ]);
+    final editable = _editable;
+    return Card(
+      child: InkWell(
+        onTap: editable ? () => _editItem(index) : null,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_iconFor(item.kind), size: 18, color: Theme.of(context).colorScheme.outline),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(item.description, style: const TextStyle(fontWeight: FontWeight.w600))),
+                  if (editable)
+                    IconButton(
+                      tooltip: 'Position entfernen',
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setState(() {
+                        _items = [..._items]..removeAt(index);
+                        _dirty = true;
+                      }),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Padding(
+                padding: const EdgeInsets.only(left: 26),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
+                        '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    Text(line.totalGross.toString(), style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              if (item.discountPercent > 0)
+                Padding(
+                  padding: const EdgeInsets.only(left: 26, top: 2),
+                  child: Text(
+                    '− ${item.discountPercent.toStringAsFixed(0)} % Rabatt: −${undiscounted.totalGross - line.totalGross}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.primary),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(OnlineDocument document) {
+    final session = widget.session;
+    final theme = Theme.of(context);
     final dateFormat = DateFormat('dd.MM.yyyy');
+    final finalized = !document.isDraft;
+    final editable = _editable;
+    final totals = _totals;
+
+    // Positionen nach Gruppe (ungruppierte zuletzt), wie offline.
+    final groups = <String?, List<int>>{};
+    for (final (index, item) in _items.indexed) {
+      groups.putIfAbsent(item.groupLabel, () => []).add(index);
+    }
+    final orderedKeys = groups.keys.toList()
+      ..sort((a, b) {
+        if (a == null) return 1;
+        if (b == null) return -1;
+        return a.compareTo(b);
+      });
+
+    final level = finalized && document.kind == 'invoice' && _dunningConfig != null
+        ? dunningLevelForDue(
+            isFinalized: true,
+            isPaid: document.isPaid,
+            dueDate: document.dueDate,
+            now: DateTime.now(),
+            config: _dunningConfig!,
+          )
+        : DunningLevel.none;
+    final bookedHours = document.rawJson['bookedHours'];
+
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
         if (_busy) const LinearProgressIndicator(),
         if (_offlineView)
@@ -672,7 +887,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           ),
         for (final entry in _pending)
           Card(
-            color: entry.status == OutboxStatus.pending ? null : Theme.of(context).colorScheme.errorContainer,
+            color: entry.status == OutboxStatus.pending ? null : theme.colorScheme.errorContainer,
             child: ListTile(
               leading: Icon(entry.status == OutboxStatus.pending ? Icons.sync : Icons.sync_problem),
               title: Text(switch (entry.status) {
@@ -683,114 +898,254 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
               subtitle: entry.message == null ? null : Text(entry.message!),
               trailing: Wrap(
                 children: [
-                  if (entry.status == OutboxStatus.pending && !widget.session.offlineOnly)
+                  if (entry.status == OutboxStatus.pending && !session.offlineOnly)
                     TextButton(onPressed: _busy ? null : _syncNow, child: const Text('Abgleichen')),
-                  TextButton(
-                    onPressed: _busy ? null : () => _discardPending(entry),
-                    child: const Text('Verwerfen'),
-                  ),
+                  TextButton(onPressed: _busy ? null : () => _discardPending(entry), child: const Text('Verwerfen')),
                 ],
               ),
             ),
           ),
-        Card(
-          child: ListTile(
-            title: Text(
-              '${document.isAdvancePayment ? 'Abschlagsrechnung' : label} · ${document.isDraft ? 'Entwurf' : 'finalisiert'}'
-              '${document.kind == 'creditNote' && document.convertedFromNumber != null ? ' · zu ${document.convertedFromNumber}' : ''}',
-            ),
-            subtitle: Text(
-              [
-                'Datum ${dateFormat.format(document.issueDate)}',
-                if (document.displayCustomerName != null) 'Kunde ${document.displayCustomerName}',
-                // C3: gebuchte Ist-Stunden neben den geplanten Positionen.
-                if (document.rawJson['bookedHours'] is String && document.rawJson['bookedHours'] != '0')
-                  'Gebucht ${(document.rawJson['bookedHours'] as String).replaceAll('.', ',')} Std.',
-                'Version ${document.version}',
-              ].join(' · '),
+        if (finalized)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              '${document.finalizedAt == null ? 'Finalisiert' : 'Finalisiert am ${DateFormat('dd.MM.yyyy HH:mm').format(document.finalizedAt!.toLocal())}'} — '
+              '${editable ? 'noch bearbeitbar, bis daraus ein Folgedokument erzeugt wird.' : 'nicht mehr änderbar.'}',
+              style: TextStyle(color: theme.colorScheme.primary),
             ),
           ),
+        if (document.kind == 'creditNote' && document.convertedFromNumber != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('Gutschrift zu ${document.convertedFromNumber}'),
+          ),
+        TextField(
+          controller: _paymentTerms,
+          readOnly: !editable || _offlineView,
+          decoration: const InputDecoration(labelText: 'Zahlungsbedingungen'),
+          onChanged: (_) => setState(() => _dirty = true),
         ),
-        // Umwandeln erst mit gespeichertem Stand — sonst übernähme die
-        // Folgeurkunde nicht das, was auf dem Bildschirm steht.
-        if (!document.isDraft && _serverActionsAllowed && !_dirty) _buildFinalizedSection(document),
-        const SizedBox(height: 8),
-        Text('Positionen', style: Theme.of(context).textTheme.titleMedium),
-        if (_items.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Noch keine Positionen.')),
-        for (final (index, item) in _items.indexed)
-          Card(
-            child: ListTile(
-              title: Text(item.description),
-              subtitle: Text(
-                '${item.quantity.replaceAll('.', ',')} ${item.unit ?? ''} × ${Money.fromCents(item.unitPriceCents)}'
-                ' · ${item.vatRatePercent.toStringAsFixed(0)} %${item.groupLabel != null ? ' · ${item.groupLabel}' : ''}',
-              ),
-              trailing: _editable
-                  ? IconButton(
-                      tooltip: 'Position entfernen',
-                      icon: const Icon(Icons.remove_circle_outline),
-                      onPressed: () => setState(() {
-                        _items = [..._items]..removeAt(index);
-                        _dirty = true;
-                      }),
-                    )
-                  : null,
-            ),
-          ),
-        if (_editable)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(onPressed: _addItem, icon: const Icon(Icons.add), label: const Text('Position hinzufügen')),
-          ),
-        if (_editable && document.kind == 'invoice' && widget.session.modules.contains('advancePaymentInvoices'))
-          SwitchListTile(
-            title: const Text('Abschlagsrechnung'),
-            subtitle: const Text('Eine spätere Schlussrechnung aus demselben Auftrag zieht sie einzeln ab.'),
-            value: _isAdvancePayment,
-            onChanged: _offlineView
-                ? null
-                : (v) => setState(() {
-                      _isAdvancePayment = v;
-                      _dirty = true;
-                    }),
-          ),
-        if (_editable && {'quote', 'order'}.contains(document.kind))
-          SwitchListTile(
-            title: const Text('Festpreis vereinbart'),
-            subtitle: const Text('Ohne Festpreis übernimmt die Rechnung die gebuchten Ist-Stunden.'),
-            value: _isFixedPrice,
-            onChanged: _offlineView
-                ? null
-                : (v) => setState(() {
-                      _isFixedPrice = v;
-                      _dirty = true;
-                    }),
-          ),
         const SizedBox(height: 8),
         TextField(
           controller: _notes,
-          enabled: _editable,
+          readOnly: !editable,
           maxLines: 2,
           decoration: const InputDecoration(labelText: 'Notizen'),
           onChanged: (_) => setState(() => _dirty = true),
         ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
+        if (_projectsEnabled) ...[
+          const SizedBox(height: 8),
+          if (!editable || !document.isDraft || _offlineView)
+            Text(
+              'Projekt: ${_projects.where((p) => p.id == document.projectId).firstOrNull?.name ?? (document.projectId == null ? 'Ohne Projekt' : '…')}',
+              style: theme.textTheme.bodyMedium,
+            )
+          else
+            DropdownButtonFormField<String?>(
+              key: ValueKey('online-document-project-${_projects.length}'),
+              isExpanded: true,
+              initialValue: _projects.any((p) => p.id == _projectId) ? _projectId : null,
+              decoration: const InputDecoration(labelText: 'Projekt (optional)'),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('Ohne Projekt')),
+                for (final project in _projects.where((p) => !p.isArchived || p.id == _projectId))
+                  DropdownMenuItem<String?>(value: project.id, child: Text(project.name, overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (value) => setState(() {
+                _projectId = value;
+                _dirty = true;
+              }),
+            ),
+        ],
+        if (session.modules.contains('advancePaymentInvoices') && document.kind == 'invoice') ...[
+          const SizedBox(height: 4),
+          if (!editable || _offlineView)
+            if (document.isAdvancePayment) Text('Abschlagsrechnung', style: theme.textTheme.bodyMedium) else const SizedBox.shrink()
+          else
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Ist eine Abschlagsrechnung'),
+              value: _isAdvancePayment,
+              onChanged: (value) => setState(() {
+                _isAdvancePayment = value ?? false;
+                _dirty = true;
+              }),
+            ),
+        ],
+        if (session.modules.contains('timeTracking') && {'quote', 'order'}.contains(document.kind)) ...[
+          const SizedBox(height: 4),
+          if (!editable || _offlineView)
+            Text(
+              document.isFixedPrice ? 'Festpreis vereinbart' : 'Zeit und Material (keine Festpreis-Vereinbarung)',
+              style: theme.textTheme.bodyMedium,
+            )
+          else
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: const Text('Festpreis vereinbart'),
+              subtitle: const Text(
+                'Ohne Festpreis werden beim Umwandeln in eine Rechnung die tatsächlich '
+                'gebuchten Ist-Stunden statt der geplanten Mengen übernommen.',
+              ),
+              value: _isFixedPrice,
+              onChanged: (value) => setState(() {
+                _isFixedPrice = value ?? false;
+                _dirty = true;
+              }),
+            ),
+        ],
+        // Geplant laut Angebot vs. tatsächlich gebuchte Ist-Stunden (online
+        // auch schon im Entwurf — gebucht werden kann darauf bereits).
+        if (session.modules.contains('timeTracking') && document.kind == 'order')
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              'Geplant laut Angebot: ${_items.where((i) => i.kind == OnlineItemKind.hours).fold(Decimal.zero, (sum, i) => sum + Decimal.parse(i.quantity)).toString().replaceAll('.', ',')} Std. · '
+              'Gebucht: ${bookedHours is String ? bookedHours.replaceAll('.', ',') : '0'} Std.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+        if (_dunningEnabled && document.kind == 'invoice') ...[
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              _dueDate == null ? 'Fälligkeitsdatum (optional)' : 'Fälligkeitsdatum: ${dateFormat.format(_dueDate!)}',
+            ),
+            trailing: const Icon(Icons.calendar_today_outlined),
+            onTap: _busy || _offlineView || (finalized ? !session.can('invoices.payment') : !editable) ? null : _pickDueDate,
+          ),
+        ],
+        if (finalized && document.kind == 'invoice') ...[
+          // Wrap statt Row: auf schmalen Handys (~330 px) bricht der Knopf
+          // unter den Text, statt über den Rand zu laufen.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                document.isPaid
+                    ? 'Bezahlt am ${document.paidAt == null ? '' : dateFormat.format(document.paidAt!.toLocal())}'
+                    : document.dueDate == null
+                        ? 'Offen (kein Fälligkeitsdatum gesetzt)'
+                        : 'Offen — fällig am ${dateFormat.format(document.dueDate!)}',
+              ),
+              if (session.can('invoices.payment'))
+                TextButton(
+                  onPressed: _busy || !_serverActionsAllowed ? null : _togglePaid,
+                  child: Text(document.isPaid ? 'Als offen markieren' : 'Als bezahlt markieren'),
+                ),
+            ],
+          ),
+          if (level != DunningLevel.none)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(dunningLevelLabel(level), style: TextStyle(color: theme.colorScheme.error)),
+                  if (session.can('dunning.write')) ...[
+                    TextButton(
+                      onPressed: _busy || !_serverActionsAllowed ? null : _generateDunningLetter,
+                      child: Text('${dunningLetterTitle(level)} erzeugen'),
+                    ),
+                    if (canSendMail(session))
+                      IconButton(
+                        icon: const Icon(Icons.mail_outline),
+                        tooltip: '${dunningLetterTitle(level)} per E-Mail senden',
+                        onPressed: _busy || !_serverActionsAllowed ? null : () => _sendDunningLetterByEmail(level),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+        if (finalized && document.creditNotes.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Gutschriften zu diesem Dokument', style: theme.textTheme.titleSmall),
+                for (final c in document.creditNotes)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: Text(c.number ?? 'Gutschrift (Entwurf)'),
+                    trailing: Text('− ${Money.fromCents(c.grossCents)}'),
+                    onTap: () => _openOther(c.id),
+                  ),
+              ],
+            ),
+          ),
+        // Nur online: Folgedokumente direkt öffnen.
+        if (document.convertedTo.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Folgedokumente', style: theme.textTheme.titleSmall),
+                for (final c in document.convertedTo)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.subdirectory_arrow_right),
+                    title: Text(c.number ?? '${onlineDocumentKindLabels[c.kind] ?? c.kind} (Entwurf)'),
+                    subtitle: Text(onlineDocumentKindLabels[c.kind] ?? c.kind),
+                    onTap: () => _openOther(c.id),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 16),
+        if (_items.isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('Noch keine Positionen.')),
+        for (final key in orderedKeys) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(key ?? 'Ohne Gruppe', style: theme.textTheme.titleSmall),
+          ),
+          for (final index in groups[key]!) _buildItemCard(index),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 4, right: 8),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Gruppensumme: ${_totalsOf([for (final i in groups[key]!) _items[i]]).totalGross}',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+        Card(
+          color: theme.colorScheme.surfaceContainerHighest,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final rate in totals.sortedRates)
-                  _row('Netto ${rate.toStringAsFixed(0)} % / USt', '${totals.netByRate[rate]} / ${totals.taxByRate[rate]}'),
+                  Text('Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   Steuer: ${totals.taxByRate[rate]}'),
                 const Divider(),
-                _row('Netto', totals.totalNet.toString()),
-                _row('USt', totals.totalTax.toString()),
-                _row('Brutto', totals.totalGross.toString(), bold: true),
-                // C13: jede Abschlagsrechnung einzeln mit Nummer (wie offline).
-                for (final a in document.advancePayments)
-                  _row('Abschlagsrechnung ${a.number ?? ''}', '− ${Money.fromCents(a.grossCents)}'),
-                if (document.remainingCents != null && !_dirty)
-                  _row('Restbetrag', Money.fromCents(document.remainingCents!).toString(), bold: true),
+                Text('Gesamt: ${totals.totalGross}', style: theme.textTheme.titleMedium),
+                // Abschlagsrechnungen einzeln mit Nummer (wie offline).
+                if (document.advancePayments.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  for (final a in document.advancePayments)
+                    Text('Abschlagsrechnung ${a.number ?? ''}: −${Money.fromCents(a.grossCents)}', style: theme.textTheme.bodySmall),
+                  if (document.advancePayments.length > 1)
+                    Text(
+                      'Abschlagszahlungen gesamt: −${Money.fromCents(document.advancePayments.fold(0, (s, a) => s + a.grossCents))}',
+                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  if (document.remainingCents != null && !_dirty) ...[
+                    const Divider(),
+                    Text('Restbetrag: ${Money.fromCents(document.remainingCents!)}', style: theme.textTheme.titleMedium),
+                  ],
+                ],
               ],
             ),
           ),
@@ -804,193 +1159,22 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     );
   }
 
-  Widget _row(String label, String value, {bool bold = false}) {
-    final style = bold ? const TextStyle(fontWeight: FontWeight.bold) : null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(children: [Expanded(child: Text(label, style: style)), Text(value, style: style)]),
+  Future<void> _openOther(String id) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: id)),
     );
-  }
-
-  Widget? _buildActions(OnlineDocument document) {
-    if (!document.isDraft && !_editable) return null;
-    final canFinalize = document.isDraft && widget.session.can('invoices.finalize');
-    if (!_editable && !canFinalize) return null;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            if (_editable)
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _busy || !_dirty ? null : _save,
-                  child: Text(_offlineView ? 'Offline speichern' : 'Speichern'),
-                ),
-              ),
-            if (_editable && canFinalize) const SizedBox(width: 12),
-            if (canFinalize)
-              Expanded(
-                child: FilledButton(
-                  // Erst speichern, dann finalisieren — finalisiert wird
-                  // genau der Stand, den der Server kennt.
-                  onPressed: _busy || _dirty || _items.isEmpty || !_serverActionsAllowed ? null : _finalize,
-                  child: const Text('Finalisieren'),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+    if (mounted && !_dirty) await _reload();
   }
 }
 
-class _ItemDialog extends StatefulWidget {
-  const _ItemDialog({required this.articles, this.forceZeroVat = false});
-  final List<OnlineArticle> articles;
-
-  /// Kleinunternehmerregelung: USt fest 0 % (der Server erzwingt es ohnehin).
-  final bool forceZeroVat;
-
-  @override
-  State<_ItemDialog> createState() => _ItemDialogState();
-}
-
-class _ItemDialogState extends State<_ItemDialog> {
-  OnlineItemKind _kind = OnlineItemKind.hours;
-  OnlineArticle? _article;
-  final _description = TextEditingController();
-  final _quantity = TextEditingController(text: '1');
-  final _price = TextEditingController();
-  final _unit = TextEditingController();
-  final _group = TextEditingController();
-  late double _vat = widget.forceZeroVat ? 0 : 19;
-  String? _error;
-
-  @override
-  void dispose() {
-    for (final c in [_description, _quantity, _price, _unit, _group]) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  void _pickArticle(OnlineArticle? article) {
-    setState(() {
-      _article = article;
-      if (article != null) {
-        _description.text = article.name;
-        _unit.text = article.unit ?? '';
-        if (article.effectiveSalePriceCents != null) _price.text = Money.fromCents(article.effectiveSalePriceCents!).formatEuro();
-      }
-    });
-  }
-
-  void _submit() {
-    final quantity = Decimal.tryParse(_quantity.text.trim().replaceAll(',', '.'));
-    if (_description.text.trim().isEmpty || quantity == null || _price.text.trim().isEmpty) {
-      setState(() => _error = 'Beschreibung, Menge und Einzelpreis sind Pflicht.');
-      return;
-    }
-    final Money price;
-    try {
-      price = Money.fromEuroString(_price.text);
-    } on FormatException {
-      setState(() => _error = 'Einzelpreis ist keine gültige Zahl.');
-      return;
-    }
-    Navigator.pop(
-      context,
-      OnlineDocumentItem(
-        kind: _kind,
-        articleId: _kind == OnlineItemKind.article ? _article?.id : null,
-        description: _description.text.trim(),
-        quantity: quantity.toString(),
-        unitPriceCents: price.cents,
-        vatRatePercent: _vat,
-        unit: _unit.text.trim().isEmpty ? null : _unit.text.trim(),
-        groupLabel: _group.text.trim().isEmpty ? null : _group.text.trim(),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Position'),
-      content: SizedBox(
-        width: 400,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SegmentedButton<OnlineItemKind>(
-                segments: const [
-                  ButtonSegment(value: OnlineItemKind.article, label: Text('Artikel')),
-                  ButtonSegment(value: OnlineItemKind.hours, label: Text('Stunden')),
-                  ButtonSegment(value: OnlineItemKind.text, label: Text('Freitext')),
-                ],
-                selected: {_kind},
-                onSelectionChanged: (s) => setState(() => _kind = s.first),
-              ),
-              if (_kind == OnlineItemKind.article && widget.articles.isNotEmpty)
-                DropdownButtonFormField<OnlineArticle>(
-                  initialValue: _article,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Artikel aus Stamm (optional)'),
-                  items: [
-                    for (final a in widget.articles.where((a) => a.active))
-                      DropdownMenuItem(value: a, child: Text(a.name, overflow: TextOverflow.ellipsis)),
-                  ],
-                  onChanged: _pickArticle,
-                ),
-              TextField(key: const Key('online-item-description'), controller: _description, decoration: const InputDecoration(labelText: 'Beschreibung *')),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('online-item-quantity'),
-                      controller: _quantity,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(labelText: 'Menge *'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(child: TextField(controller: _unit, decoration: const InputDecoration(labelText: 'Einheit'))),
-                ],
-              ),
-              TextField(
-                key: const Key('online-item-price'),
-                controller: _price,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Einzelpreis netto (€) *'),
-              ),
-              DropdownButtonFormField<double>(
-                initialValue: _vat,
-                decoration: const InputDecoration(labelText: 'USt-Satz'),
-                items: const [
-                  DropdownMenuItem(value: 19, child: Text('19 %')),
-                  DropdownMenuItem(value: 7, child: Text('7 %')),
-                  DropdownMenuItem(value: 0, child: Text('0 %')),
-                ],
-                onChanged: widget.forceZeroVat ? null : (v) => setState(() => _vat = v!),
-              ),
-              if (widget.forceZeroVat)
-                const Text('Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer.', style: TextStyle(fontSize: 12)),
-              TextField(controller: _group, decoration: const InputDecoration(labelText: 'Positionsgruppe (optional)')),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
-        FilledButton(onPressed: _submit, child: const Text('Übernehmen')),
-      ],
-    );
-  }
-}
+/// Wie offline `DocumentLabels.finalizeConfirmSentence`.
+String onlineFinalizeConfirmSentence(String kind) => switch (kind) {
+      'quote' => 'Das Angebot erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+      'order' => 'Der Auftrag erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+      'deliveryNote' =>
+        'Der Lieferschein erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+      'proforma' => 'Die Proforma-Rechnung erhält jetzt eine endgültige Nummer (eigener Nummernkreis, keine '
+          'umsatzsteuerliche Rechnungsnummer) und kann danach nicht mehr geändert werden.',
+      'creditNote' => 'Die Gutschrift erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+      _ => 'Die Rechnung erhält jetzt eine endgültige Nummer und kann danach nicht mehr geändert werden.',
+    };

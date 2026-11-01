@@ -98,11 +98,11 @@ void main() {
     await openTab(tester, 'Rechnungen');
     await tester.tap(find.textContaining('Meyer').first);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Finalisieren'));
+    await tester.tap(find.byTooltip('Finalisieren'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Bestand zu gering: Kabel — benötigt 60, vorhanden 55,5'), findsOneWidget);
     await tester.tap(find.text('Finalisieren').last);
     await tester.pumpAndSettle();
-    expect(find.textContaining('finalisiert'), findsWidgets);
+    expect(find.textContaining('Finalisiert am'), findsOneWidget);
   });
 }

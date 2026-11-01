@@ -44,40 +44,44 @@ void main() {
     await tester.pumpAndSettle();
     await openTab(tester, 'Aufträge');
 
+    // Breit wie offline: Auftrag links wählen, Folgedokument erscheint rechts.
     Future<void> openOrderAndConvert() async {
-      await tester.tap(find.text('A-${yy}001'));
+      await tester.tap(find.textContaining('A-${yy}001').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Umwandeln'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('In Rechnung umwandeln'));
       await tester.pumpAndSettle();
     }
 
+    Future<void> finalize() async {
+      await tester.tap(find.byTooltip('Finalisieren'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Finalisieren').last);
+      await tester.pumpAndSettle();
+    }
+
     // Abschlag: Rechnung aus dem Auftrag, als Abschlag kennzeichnen, finalisieren.
     await openOrderAndConvert();
-    await tester.tap(find.text('Abschlagsrechnung'));
+    await tester.tap(find.text('Ist eine Abschlagsrechnung'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(find.byTooltip('Entwurf speichern'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Finalisieren'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Finalisieren').last);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Abschlagsrechnung · finalisiert'), findsOneWidget);
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    await finalize();
+    expect(find.textContaining('Rechnung R-${yy}001'), findsOneWidget);
+    expect(find.text('Abschlagsrechnung'), findsOneWidget);
 
     // Schlussrechnung zieht den Abschlag einzeln ab.
     await openOrderAndConvert();
-    await tester.tap(find.text('Finalisieren'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Finalisieren').last);
-    await tester.pumpAndSettle();
-    expect(find.text('Abschlagsrechnung R-${yy}001'), findsOneWidget);
-    expect(find.text('Restbetrag'), findsOneWidget);
-    expect(find.text('0,00 €'), findsOneWidget, reason: '1.190 € − 1.190 € Abschlag');
+    await finalize();
+    expect(find.textContaining('Rechnung R-${yy}002'), findsOneWidget);
+    expect(find.textContaining('Abschlagsrechnung R-${yy}001: −'), findsOneWidget);
+    expect(find.text('Restbetrag: 0,00 €'), findsOneWidget, reason: '1.190 € − 1.190 € Abschlag');
 
     // Gutschrift zur Schlussrechnung.
-    await tester.tap(find.text('Gutschrift erstellen'));
+    await tester.tap(find.byTooltip('Gutschrift erstellen'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Gutschrift · Entwurf · zu R-${yy}002'), findsOneWidget);
+    expect(find.textContaining('Gutschrift (Entwurf)'), findsOneWidget);
+    expect(find.text('Gutschrift zu R-${yy}002'), findsOneWidget);
   });
 }

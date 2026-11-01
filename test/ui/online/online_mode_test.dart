@@ -55,44 +55,41 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Müller GmbH'), findsOneWidget);
 
-    // Dokument anlegen
-    await tester.tap(find.text('Rechnungen'));
-    await tester.pumpAndSettle();
+    // Dokument anlegen: Kunde wie offline per Suchdialog wählen.
+    await openTab(tester, 'Rechnungen');
     await tester.tap(find.text('Neue Rechnung'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('online-new-document-customer')));
-    await tester.pumpAndSettle();
+    expect(find.text('Kunde wählen'), findsOneWidget);
     await tester.tap(find.text('Müller GmbH').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Anlegen'));
-    await tester.pumpAndSettle();
-    expect(find.text('Rechnung (Entwurf)'), findsOneWidget);
-    expect(find.textContaining('Kunde Müller GmbH'), findsOneWidget);
+    expect(find.text('Rechnung (Entwurf) — Müller GmbH'), findsOneWidget);
 
     // Position hinzufügen (Stunden 1,5 × 60 € @ 19 %)
     await tester.tap(find.text('Position hinzufügen'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Stunden'));
     await tester.enterText(find.byKey(const Key('online-item-description')), 'Montage');
     await tester.enterText(find.byKey(const Key('online-item-quantity')), '1,5');
     await tester.enterText(find.byKey(const Key('online-item-price')), '60,00');
-    await tester.tap(find.text('Übernehmen'));
+    await tester.tap(find.text('Hinzufügen'));
     await tester.pumpAndSettle();
     // Lokal mit demselben Rechenkern wie der Server: 90,00 + 17,10 = 107,10.
-    expect(find.text('107,10 €'), findsOneWidget);
-    expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Speichern')).onPressed, isNotNull);
-    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Finalisieren')).onPressed, isNull,
+    expect(find.text('107,10 €'), findsOneWidget, reason: 'Zeilenbetrag der Position');
+    expect(find.text('Gesamt: 107,10 €'), findsOneWidget);
+    expect(tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.save_outlined)).onPressed, isNotNull);
+    expect(tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.check_circle_outline)).onPressed, isNull,
         reason: 'erst speichern, dann finalisieren');
 
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(find.byTooltip('Entwurf speichern'));
     await tester.pumpAndSettle();
-    expect(find.text('Gespeichert.'), findsOneWidget);
+    expect(find.text('Entwurf gespeichert.'), findsOneWidget);
 
-    await tester.tap(find.text('Finalisieren'));
+    await tester.tap(find.byTooltip('Finalisieren'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Finalisieren').last);
     await tester.pumpAndSettle();
     final year = (DateTime.now().toUtc().year % 100).toString().padLeft(2, '0');
-    expect(find.text('R-${year}001'), findsOneWidget);
+    expect(find.text('Rechnung R-${year}001 — Müller GmbH'), findsOneWidget);
     expect(find.text('Position hinzufügen'), findsNothing, reason: 'finalisiert = unveränderlich');
   });
 
@@ -112,7 +109,7 @@ void main() {
     await tester.tap(find.text('Elektro Kay'));
     await tester.pumpAndSettle();
     await openTab(tester, 'Rechnungen');
-    await tester.tap(find.text('Rechnung (Entwurf)'));
+    await tester.tap(find.text('Kunde'));
     await tester.pumpAndSettle();
 
     // "Zweites Gerät" speichert Version 1 -> Server-Version ist jetzt 2.
@@ -122,9 +119,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-item-description')), 'Anfahrt');
     await tester.enterText(find.byKey(const Key('online-item-price')), '30');
-    await tester.tap(find.text('Übernehmen'));
+    await tester.tap(find.text('Hinzufügen'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(find.byTooltip('Entwurf speichern'));
     await tester.pumpAndSettle();
 
     expect(find.text('Zwischenzeitlich geändert'), findsOneWidget);
@@ -195,19 +192,20 @@ void main() {
     await tester.pumpAndSettle();
     await openTab(tester, 'Angebote');
 
-    await tester.tap(find.text('An-${year}001'));
+    await tester.tap(find.textContaining('An-${year}001'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Umwandeln'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('In Auftrag umwandeln'));
     await tester.pumpAndSettle();
-    expect(find.text('Auftrag (Entwurf)'), findsOneWidget);
+    expect(find.textContaining('Auftrag (Entwurf)'), findsOneWidget);
     expect(find.text('Leistung'), findsOneWidget, reason: 'Positionen übernommen');
-    await tester.pageBack();
-    await tester.pumpAndSettle();
+    // Breit: der Entwurf erscheint rechts neben der Liste (wie offline).
     await openTab(tester, 'Rechnungen');
 
-    await tester.tap(find.text('R-${year}001'));
+    await tester.tap(find.textContaining('R-${year}001'));
     await tester.pumpAndSettle();
-    expect(find.text('Offen'), findsOneWidget);
+    expect(find.text('Offen (kein Fälligkeitsdatum gesetzt)'), findsOneWidget);
     await tester.tap(find.text('Als bezahlt markieren'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Bezahlt am'), findsOneWidget);

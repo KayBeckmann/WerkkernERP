@@ -4,15 +4,18 @@ import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../theme/app_theme.dart';
 import 'online_document_screen.dart';
 
-/// Dokumente der Online-Firma — Liste mit Suche und Status, neuer
-/// Entwurf mit `invoices.write`. Wie offline ein Tab je Dokumentart
-/// ([kind]); ohne [kind] alle Arten (z. B. im Offline-Bestand).
+/// Dokumente einer Art ([kind]) der Online-Firma — wie offline
+/// (`invoices_screen.dart`) ein eigener Bereich je Dokumentart: Kunde als
+/// Titel, Nummer bzw. „Entwurf“ mit Datum oder Mahnstufe, Bruttobetrag;
+/// breit Liste und Editor nebeneinander. Zusätzlich online: Suche und
+/// der Offline-Bestand.
 class OnlineDocumentsScreen extends StatefulWidget {
-  const OnlineDocumentsScreen({super.key, required this.session, this.kind});
+  const OnlineDocumentsScreen({super.key, required this.session, required this.kind});
   final OnlineSession session;
-  final String? kind;
+  final String kind;
 
   @override
   State<OnlineDocumentsScreen> createState() => _OnlineDocumentsScreenState();
@@ -21,6 +24,12 @@ class OnlineDocumentsScreen extends StatefulWidget {
 class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
   late Future<List<OnlineDocument>> _future;
   String _query = '';
+  DunningConfig? _dunningConfig;
+
+  /// Breit-Layout: im rechten Bereich geöffnetes Dokument; der Zähler
+  /// erzwingt nach einer Änderung einen frischen Editor.
+  String? _selectedId;
+  int _selectionNonce = 0;
 
   /// Server nicht erreichbar -> Liste zeigt nur den Offline-Bestand.
   bool _showingOffline = false;
@@ -37,10 +46,30 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
     try {
       final documents = await widget.session.client.documents(kind: widget.kind, query: _query);
       _showingOffline = false;
+      await _loadDunningConfig();
       return documents;
     } on ApiUnreachable {
       if (offline == null || offline.isEmpty) rethrow;
       return _offlineDocuments(offline);
+    }
+  }
+
+  /// Mahnstufe in der Liste wie offline — Fristen aus den Einstellungen.
+  Future<void> _loadDunningConfig() async {
+    final session = widget.session;
+    if (widget.kind != 'invoice' || !session.modules.contains('dunning') || !session.can('dunning.read')) return;
+    try {
+      final s = await session.client.dunningSettings();
+      _dunningConfig = DunningConfig(
+        reminder2AfterDays: s['reminder2AfterDays'] as int? ?? 14,
+        reminder3AfterDays: s['reminder3AfterDays'] as int? ?? 28,
+        feeLevel1: Money.zero(),
+        feeLevel2: Money.zero(),
+        feeLevel3: Money.zero(),
+        interestRatePercent: 0,
+      );
+    } on Exception {
+      // Ohne Einstellungen eben ohne Mahnstufe in der Liste.
     }
   }
 
@@ -49,8 +78,10 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
     final q = _query.toLowerCase();
     return [
       for (final d in offline.documents)
-        if ((widget.kind == null || d.kind == widget.kind) &&
-            (q.isEmpty || (d.number ?? '').toLowerCase().contains(q) || (d.displayCustomerName ?? '').toLowerCase().contains(q)))
+        if (d.kind == widget.kind &&
+            (q.isEmpty ||
+                (d.number ?? '').toLowerCase().contains(q) ||
+                (d.displayCustomerName ?? '').toLowerCase().contains(q)))
           d,
     ];
   }
@@ -59,13 +90,24 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
         _future = _load();
       });
 
+  bool get _isWide => MediaQuery.sizeOf(context).width >= AppMetrics.wideLayoutBreakpoint;
+
   Future<void> _open(String id) async {
+    if (_isWide) {
+      setState(() {
+        _selectedId = id;
+        _selectionNonce++;
+      });
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => OnlineDocumentScreen(session: widget.session, documentId: id)),
     );
     if (mounted) _reload();
   }
 
+  /// Wie offline: Kunde mit Suche wählen, dann direkt den Entwurf öffnen
+  /// (das Projekt wird im Editor zugeordnet).
   Future<void> _create() async {
     final session = widget.session;
     final List<OnlineCustomer> customers;
@@ -76,42 +118,129 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
       return;
     }
     if (!mounted) return;
-    final kinds = widget.kind != null ? [widget.kind!] : [
-      for (final entry in onlineDocumentKindModules.entries)
-        // Gutschriften entstehen offline nur aus einer Rechnung — hier
-        // ebenso wenig "aus dem Nichts" anbieten.
-        if (entry.key != 'creditNote' && (entry.value == null || session.modules.contains(entry.value))) entry.key,
-    ];
-    var projects = const <OnlineProject>[];
-    if (session.modules.contains('projects') && session.can('projects.read')) {
-      try {
-        projects = await session.client.projects();
-      } on Exception {
-        // Ohne Projektliste: Dokument eben ohne Projekt.
-      }
+    if (customers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte zuerst einen Kunden anlegen.')));
+      return;
     }
-    if (!mounted) return;
-    final choice = await showDialog<({String kind, String customerId, String? projectId})>(
+    final customer = await showDialog<OnlineCustomer>(
       context: context,
-      builder: (_) => _NewDocumentDialog(customers: customers, kinds: kinds, projects: projects),
+      builder: (_) => OnlinePickCustomerDialog(customers: customers),
     );
-    if (choice == null || !mounted) return;
+    if (customer == null || !mounted) return;
     try {
-      final created = await session.client.createDocument(
-        customerId: choice.customerId,
-        kind: choice.kind,
-        projectId: choice.projectId,
-      );
-      if (mounted) await _open(created.id);
+      final created = await session.client.createDocument(customerId: customer.id, kind: widget.kind);
+      if (!mounted) return;
+      _reload();
+      await _open(created.id);
     } on Exception catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
     }
   }
 
+  Widget _buildList(List<OnlineDocument> documents) {
+    final offline = widget.session.offline;
+    final theme = Theme.of(context);
+    final dateFormat = DateFormat('dd.MM.yyyy');
+    if (documents.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _showingOffline
+                ? 'Keine offline verfügbaren Dokumente.'
+                : _query.isNotEmpty
+                    ? 'Keine Dokumente gefunden.'
+                    : onlineDocumentEmptyText(widget.kind),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () async => _reload(),
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+        itemCount: documents.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final d = documents[index];
+          final finalized = !d.isDraft;
+          final pending = offline?.pendingFor(d.id).length ?? 0;
+          final level = _dunningConfig == null || d.kind != 'invoice'
+              ? DunningLevel.none
+              : dunningLevelForDue(
+                  isFinalized: finalized,
+                  isPaid: d.isPaid,
+                  dueDate: d.dueDate,
+                  now: DateTime.now(),
+                  config: _dunningConfig!,
+                );
+          final status = finalized ? d.number ?? '' : 'Entwurf';
+          final selected = _isWide && _selectedId == d.id;
+          return Card(
+            color: selected ? theme.colorScheme.primaryContainer : null,
+            child: ListTile(
+              leading: Icon(
+                pending > 0
+                    ? Icons.sync_problem_outlined
+                    : offline?.isPinned(d.id) ?? false
+                        ? Icons.offline_pin_outlined
+                        : finalized
+                            ? Icons.receipt_long
+                            : Icons.receipt_long_outlined,
+                color: finalized && pending == 0 ? theme.colorScheme.primary : null,
+              ),
+              title: Text(d.displayCustomerName ?? '(unbekannter Kunde)'),
+              subtitle: Text(
+                level == DunningLevel.none
+                    ? '$status — ${dateFormat.format(d.issueDate)}'
+                    : '$status — ${dunningLevelLabel(level)}',
+                style: level == DunningLevel.none ? null : TextStyle(color: theme.colorScheme.error),
+              ),
+              trailing: Text(d.grossCents == null ? '–' : Money.fromCents(d.grossCents!).toString()),
+              onTap: () => _open(d.id),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDetailPane() {
+    final id = _selectedId;
+    if (id == null) {
+      return Center(
+        child: Text(
+          'Dokument auswählen oder "${onlineNewDocumentLabel(widget.kind)}" antippen.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      );
+    }
+    return OnlineDocumentScreen(
+      key: ValueKey('$id-$_selectionNonce'),
+      session: widget.session,
+      documentId: id,
+      onChanged: _reload,
+      // Gelöscht/umgewandelt: rechts das Folgedokument bzw. nichts zeigen.
+      onNavigate: (next) {
+        setState(() {
+          _selectedId = next;
+          _selectionNonce++;
+        });
+        _reload();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd.MM.yyyy');
-    return Scaffold(
+    final session = widget.session;
+    // Gutschriften entstehen nur aus einer Rechnung (wie offline).
+    final canCreate = !session.offlineOnly &&
+        widget.kind != 'creditNote' &&
+        session.can('invoices.write') &&
+        session.can('customers.read');
+    final list = Scaffold(
       body: Column(
         children: [
           Padding(
@@ -132,56 +261,8 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
                 if (snapshot.connectionState != ConnectionState.done) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                final documents = snapshot.data!;
-                final offline = widget.session.offline;
-                if (documents.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        _showingOffline
-                            ? 'Keine offline verfügbaren Dokumente.'
-                            : _query.isNotEmpty
-                            ? 'Keine Dokumente gefunden.'
-                            : onlineDocumentEmptyText(widget.kind),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                }
-                final list = RefreshIndicator(
-                  onRefresh: () async => _reload(),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-                    itemCount: documents.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final d = documents[index];
-                      final label = onlineDocumentKindLabels[d.kind] ?? d.kind;
-                      final pending = offline?.pendingFor(d.id).length ?? 0;
-                      return Card(
-                        child: ListTile(
-                          leading: Icon(
-                            pending > 0
-                                ? Icons.sync_problem_outlined
-                                : offline?.isPinned(d.id) ?? false
-                                    ? Icons.offline_pin_outlined
-                                    : d.isDraft
-                                        ? Icons.edit_note
-                                        : Icons.lock_outline,
-                          ),
-                          title: Text(d.number ?? '$label (Entwurf)'),
-                          subtitle: Text(
-                            [label, ?d.displayCustomerName, dateFormat.format(d.issueDate)].join(' · '),
-                          ),
-                          trailing: Text(d.grossCents == null ? '' : Money.fromCents(d.grossCents!).toString()),
-                          onTap: () => _open(d.id),
-                        ),
-                      );
-                    },
-                  ),
-                );
-                if (!_showingOffline || widget.session.offlineOnly) return list;
+                final list = _buildList(snapshot.data!);
+                if (!_showingOffline || session.offlineOnly) return list;
                 return Column(
                   children: [
                     const ListTile(
@@ -196,11 +277,7 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
           ),
         ],
       ),
-      // Gutschriften entstehen nur aus einer Rechnung (wie offline).
-      floatingActionButton: !widget.session.offlineOnly &&
-              widget.kind != 'creditNote' &&
-              widget.session.can('invoices.write') &&
-              widget.session.can('customers.read')
+      floatingActionButton: canCreate
           ? FloatingActionButton.extended(
               heroTag: 'online-documents-fab-${widget.kind}',
               onPressed: _create,
@@ -208,6 +285,78 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
               label: Text(onlineNewDocumentLabel(widget.kind)),
             )
           : null,
+    );
+    if (!_isWide) return list;
+    // Breit wie offline: Liste links in fester Breite, Editor rechts. Das
+    // äußere Scaffold zeigt Hinweise (Snackbars) einmal über beide
+    // Bereiche statt je einmal links und rechts.
+    return Scaffold(
+      body: Row(
+        children: [
+          SizedBox(width: 360, child: list),
+          VerticalDivider(width: 1, color: Theme.of(context).colorScheme.outlineVariant),
+          Expanded(child: _buildDetailPane()),
+        ],
+      ),
+    );
+  }
+}
+
+/// Kunde-wählen-Dialog mit Live-Suche — wie offline beim Anlegen eines
+/// Dokuments (bei vielen Kunden ist eine reine Auswahlliste unpraktisch).
+class OnlinePickCustomerDialog extends StatefulWidget {
+  const OnlinePickCustomerDialog({super.key, required this.customers});
+  final List<OnlineCustomer> customers;
+
+  @override
+  State<OnlinePickCustomerDialog> createState() => _OnlinePickCustomerDialogState();
+}
+
+class _OnlinePickCustomerDialogState extends State<OnlinePickCustomerDialog> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _query.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? widget.customers
+        : widget.customers.where((c) => c.name.toLowerCase().contains(query)).toList();
+    return AlertDialog(
+      title: const Text('Kunde wählen'),
+      content: SizedBox(
+        width: 360,
+        height: 360,
+        child: Column(
+          children: [
+            TextField(
+              key: const Key('online-pick-customer-search'),
+              controller: _searchCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Suchen', prefixIcon: Icon(Icons.search)),
+              onChanged: (value) => setState(() => _query = value),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: filtered.isEmpty
+                  ? const Center(child: Text('Kein Kunde gefunden.'))
+                  : ListView(
+                      children: [
+                        for (final customer in filtered)
+                          ListTile(title: Text(customer.name), onTap: () => Navigator.pop(context, customer)),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen'))],
     );
   }
 }
@@ -223,6 +372,14 @@ String onlineNewDocumentLabel(String? kind) => switch (kind) {
       _ => 'Neues Dokument',
     };
 
+/// Titel des Editors wie offline: „Rechnung R-26001 — Kunde“ bzw.
+/// „Rechnung (Entwurf) — Kunde“.
+String onlineEditorTitle(OnlineDocument d) {
+  final label = onlineDocumentKindLabels[d.kind] ?? d.kind;
+  final head = d.number == null ? '$label (Entwurf)' : '$label ${d.number}';
+  return d.displayCustomerName == null ? head : '$head — ${d.displayCustomerName}';
+}
+
 /// Wie offline `DocumentLabels.emptyListText`.
 String onlineDocumentEmptyText(String? kind) => switch (kind) {
       'invoice' => 'Noch keine Rechnungsentwürfe.',
@@ -234,74 +391,3 @@ String onlineDocumentEmptyText(String? kind) => switch (kind) {
           'erstellt (Rechnung öffnen → „Gutschrift erstellen").',
       _ => 'Keine Dokumente gefunden.',
     };
-
-class _NewDocumentDialog extends StatefulWidget {
-  const _NewDocumentDialog({required this.customers, required this.kinds, this.projects = const []});
-  final List<OnlineCustomer> customers;
-  final List<String> kinds;
-  final List<OnlineProject> projects;
-
-  @override
-  State<_NewDocumentDialog> createState() => _NewDocumentDialogState();
-}
-
-class _NewDocumentDialogState extends State<_NewDocumentDialog> {
-  late String _kind = widget.kinds.first;
-  String? _customerId;
-  String? _projectId;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.kinds.length == 1 ? onlineNewDocumentLabel(widget.kinds.single) : 'Neues Dokument'),
-      content: widget.customers.isEmpty
-          ? const Text('Bitte zuerst einen Kunden anlegen.')
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.kinds.length > 1)
-                DropdownButtonFormField<String>(
-                  initialValue: _kind,
-                  decoration: const InputDecoration(labelText: 'Dokumentart'),
-                  items: [
-                    for (final k in widget.kinds) DropdownMenuItem(value: k, child: Text(onlineDocumentKindLabels[k] ?? k)),
-                  ],
-                  onChanged: (v) => setState(() => _kind = v!),
-                ),
-                DropdownButtonFormField<String>(
-                  key: const Key('online-new-document-customer'),
-                  initialValue: _customerId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Kunde'),
-                  items: [
-                    for (final c in widget.customers)
-                      DropdownMenuItem(value: c.id, child: Text(c.name, overflow: TextOverflow.ellipsis)),
-                  ],
-                  onChanged: (v) => setState(() => _customerId = v),
-                ),
-                if (widget.projects.isNotEmpty)
-                  DropdownButtonFormField<String?>(
-                    initialValue: _projectId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Projekt (optional)'),
-                    items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('— ohne Projekt —')),
-                      for (final p in widget.projects)
-                        DropdownMenuItem<String?>(value: p.id, child: Text('${p.displayNumber} · ${p.name}', overflow: TextOverflow.ellipsis)),
-                    ],
-                    onChanged: (v) => setState(() => _projectId = v),
-                  ),
-              ],
-            ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
-        FilledButton(
-          onPressed: _customerId == null
-              ? null
-              : () => Navigator.pop(context, (kind: _kind, customerId: _customerId!, projectId: _projectId)),
-          child: const Text('Anlegen'),
-        ),
-      ],
-    );
-  }
-}

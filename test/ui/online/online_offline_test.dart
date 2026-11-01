@@ -52,11 +52,14 @@ void main() {
     expect(find.textContaining('nur ausdrücklich offline markierte'), findsOneWidget);
 
     // Dokument offline verfügbar machen.
-    await tester.tap(find.text('Rechnung (Entwurf)'));
+    await tester.tap(find.textContaining('Entwurf —'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Offline verfügbar machen'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('Nicht mehr offline verfügbar'), findsOneWidget);
+    // Die Snackbar liegt sonst über „Position hinzufügen“.
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
+    await tester.pumpAndSettle();
 
     // Funkloch: Änderung landet in der Outbox.
     server.offline = true;
@@ -64,18 +67,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-item-description')), 'Material vor Ort');
     await tester.enterText(find.byKey(const Key('online-item-price')), '25');
-    await tester.tap(find.text('Übernehmen'));
+    await tester.tap(find.text('Hinzufügen'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(find.byTooltip('Entwurf speichern'));
     await tester.pumpAndSettle();
     expect(find.text('Offline-Änderung, noch nicht übertragen'), findsOneWidget);
     expect(find.text('Offline-Kopie'), findsOneWidget);
     expect(find.text('Material vor Ort'), findsOneWidget);
-    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Finalisieren')).onPressed, isNull,
+    expect(tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.check_circle_outline)).onPressed, isNull,
         reason: 'Finalisieren braucht den Server');
-    // Liste im Funkloch: nur markierte Dokumente.
-    await tester.pageBack();
-    await tester.pumpAndSettle();
     expect(find.byTooltip('1 Offline-Änderung(en) abgleichen'), findsOneWidget);
 
     // Zurück online: abgleichen.
