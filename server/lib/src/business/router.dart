@@ -18,6 +18,7 @@ import 'stock_routes.dart';
 import 'accounting_routes.dart';
 import 'dashboard_routes.dart';
 import 'dunning_routes.dart';
+import 'export_routes.dart';
 import 'fleet_routes.dart';
 import 'purchasing_routes.dart';
 import 'recurring_routes.dart';
@@ -49,6 +50,7 @@ class BusinessRoutes {
     RecurringRoutes(repository: repository, business: business, auth: auth, parseItems: _parseItems).mount(router);
     TimeSheetRoutes(business: business, auth: auth).mount(router);
     StaffRoleRoutes(repository: repository, business: business, auth: auth).mount(router);
+    ExportRoutes(repository: repository, business: business, auth: auth).mount(router);
 
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);
@@ -69,6 +71,7 @@ class BusinessRoutes {
     router.post('/documents/<id>/finalize', _finalizeDocument);
     router.post('/documents/<id>/convert', _convertDocument);
     router.post('/documents/<id>/credit-note', _createCreditNote);
+    router.post('/documents/<id>/material-advance', _createMaterialAdvance);
     router.post('/documents/<id>/payment', _setPayment);
     router.put('/documents/<id>/due-date', _setDueDate);
 
@@ -1295,6 +1298,76 @@ class BusinessRoutes {
     );
     await business.createDocument(draft, items);
     await auth.audit(ctx, 'document.creditNote', 'creditNote', newId);
+    return _documentResponse(companyId, draft, status: 201);
+  }
+
+  /// Materialabschlagsrechnung wie offline (C3.2): Abschlagsrechnung zu
+  /// einem finalisierten Auftrag, vorbelegt mit allen Artikel-Positionen
+  /// ([includeAllArticles]) und/oder ausgewählten Freitext-Positionen
+  /// ([textItemIndexes] = Position in der Positionsliste). Stunden nie —
+  /// ein Materialabschlag ist Material. Danach ein normaler Entwurf.
+  Future<Response> _createMaterialAdvance(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'invoices.write', requiredModule: 'advancePaymentInvoices');
+    if (check.error != null) return check.error!;
+    final ctx = check.auth!;
+    final companyId = ctx.session.companyId;
+    final source = await business.findDocument(companyId, id);
+    if (source == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    if (source.kind != 'order') {
+      return jsonError('Eine Materialabschlagsrechnung kann nur zu einem Auftrag erstellt werden.', status: 409);
+    }
+    if (source.isDraft) {
+      return jsonError('Nur ein finalisierter Auftrag kann eine Materialabschlagsrechnung erhalten.', status: 409);
+    }
+    final body = await _body(request);
+    final includeAllArticles = body['includeAllArticles'] == true;
+    final rawIndexes = body['textItemIndexes'] ?? const [];
+    if (rawIndexes is! List || rawIndexes.any((i) => i is! int)) return jsonError('textItemIndexes: Liste von Positionsnummern.');
+    final indexes = rawIndexes.cast<int>().toSet();
+    final now = DateTime.now().toUtc();
+    final newId = _uuid.v4();
+    final sourceItems = await business.itemsFor(companyId, id);
+    final items = [
+      for (final (index, item) in sourceItems.indexed)
+        if ((includeAllArticles && item.kind == 'article') || (item.kind == 'text' && indexes.contains(index)))
+          DocumentItem(
+            id: _uuid.v4(),
+            documentId: newId,
+            kind: item.kind,
+            articleId: item.articleId,
+            description: item.description,
+            quantity: item.quantity,
+            unitPriceCents: item.unitPriceCents,
+            vatRatePercent: item.vatRatePercent,
+            unit: item.unit,
+            discountPercent: item.discountPercent,
+            groupLabel: item.groupLabel,
+            sortOrder: item.sortOrder,
+          ),
+    ];
+    if (items.isEmpty) {
+      return jsonError(
+        'Materialabschlagsrechnung ohne jede gewählte Position — „Alle Artikel“ oder mindestens einen Freitext auswählen.',
+      );
+    }
+    final draft = Document(
+      id: newId,
+      companyId: companyId,
+      customerId: source.customerId,
+      kind: 'invoice',
+      status: 'draft',
+      issueDate: DateTime.utc(now.year, now.month, now.day),
+      serviceDate: source.serviceDate,
+      createdByUserId: ctx.session.userId,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      convertedFromId: source.id,
+      projectId: source.projectId,
+      isAdvancePayment: true,
+    );
+    await business.createDocument(draft, items);
+    await auth.audit(ctx, 'document.materialAdvance', 'invoice', newId);
     return _documentResponse(companyId, draft, status: 201);
   }
 }

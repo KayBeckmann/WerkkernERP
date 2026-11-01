@@ -242,6 +242,23 @@ class WerkkernApiClient {
   Future<OnlineDocument> createCreditNote(String invoiceId) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents/$invoiceId/credit-note')));
 
+  /// Firmen-Datenexport (nur Admin): alle Fachdaten als JSON-Objekt,
+  /// ohne Passwörter und Zugangsdaten.
+  Future<Map<String, Object?>> exportCompanyData() async => _map(await _send('GET', '/company/export'));
+
+  /// Materialabschlagsrechnung zu einem finalisierten Auftrag (Modul
+  /// advancePaymentInvoices): alle Artikel-Positionen und/oder die
+  /// Freitext-Positionen an [textItemIndexes] (Position in der Liste).
+  Future<OnlineDocument> createMaterialAdvance(
+    String orderId, {
+    bool includeAllArticles = false,
+    List<int> textItemIndexes = const [],
+  }) async =>
+      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$orderId/material-advance', body: {
+        'includeAllArticles': includeAllArticles,
+        'textItemIndexes': textItemIndexes,
+      })));
+
   Future<void> deleteDocument(String id) => _send('DELETE', '/documents/$id');
 
   Future<OnlineDocument> finalizeDocument(String id, {required int version}) async =>
