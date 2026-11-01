@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:werkkern_client/werkkern_client.dart';
@@ -153,15 +154,16 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
     ).pushReplacement(MaterialPageRoute<void>(builder: (_) => OnlineHomeScreen(session: session)));
   }
 
-  /// Server-Adresse und E-Mail der letzten Anmeldung vorbelegen — das
-  /// Passwort wird bewusst nie gespeichert (angemeldet bleiben speichert
+  /// Server-Adresse und E-Mail der letzten Anmeldung vorbelegen (ohne
+  /// gespeicherte Adresse: [defaultOnlineServerUrl]). Das Passwort wird
+  /// bewusst nie gespeichert (angemeldet bleiben speichert
   /// nur das Sitzungs-Token, siehe `online_accounts.dart`).
   Future<void> _restoreLastInput() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       if (widget.account == null) {
-        _serverCtrl.text = prefs.getString(_prefServerUrl) ?? '';
+        _serverCtrl.text = prefs.getString(_prefServerUrl) ?? defaultOnlineServerUrl();
         _emailCtrl.text = prefs.getString(_prefEmail) ?? '';
         setState(() => _stayLoggedIn = prefs.getBool(_prefStayLoggedIn) ?? false);
       }
@@ -515,4 +517,18 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
       ),
     );
   }
+}
+
+const _configuredServerUrl = String.fromEnvironment('WERKKERN_SERVER');
+
+/// Vorbelegung der Server-Adresse: per `--dart-define=WERKKERN_SERVER=…`
+/// fest eingebaut (z. B. Android-Build), sonst in der Web-App der eigene
+/// Origin + `/api` — der Web-Container reicht `/api/` an den Server
+/// weiter (deploy/nginx/web.conf). Native Apps ohne Vorgabe: leer.
+String defaultOnlineServerUrl({bool web = kIsWeb, Uri? base, String configured = _configuredServerUrl}) {
+  if (configured.isNotEmpty) return configured;
+  if (!web) return '';
+  final page = base ?? Uri.base;
+  if (!page.hasScheme || !page.scheme.startsWith('http')) return '';
+  return '${page.origin}/api';
 }
