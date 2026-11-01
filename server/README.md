@@ -27,6 +27,21 @@ Sitzungen, stündliches Aufräumen abgelaufener Sitzungen/Token/
 Idempotenz-Einträge. `TRUST_PROXY=true` nur hinter dem eigenen Proxy —
 sonst könnte ein Client die Absenderadresse per `X-Forwarded-For` fälschen.
 
+## Online-Betrieb auf Strato
+
+`deploy/strato/deploy.sh` baut Web- und Server-Image **lokal** (der
+Strato-Server ist zu knapp zum Kompilieren), überträgt sie per
+`docker save | ssh docker load` und startet `~/projekte/werkkernerp`
+(Compose: `deploy/strato/docker-compose.yml`, Speicherlimits je
+Container). Beim ersten Lauf legt das Skript dort eine `.env` mit
+zufälligem DB-Passwort und `SERVER_SECRET_KEY` an und überschreibt sie
+danach nie.
+
+Nach außen geht nur der Web-Port (`WEB_PORT`, Standard 8085): nginx
+liefert die App aus und reicht `/api/` an den Server weiter
+(`deploy/nginx/web.conf`). Im Nginx Proxy Manager also nur diesen Port
+eintragen; in der App als Server-Adresse `https://<domain>/api`.
+
 ## Starten
 
 ```bash
