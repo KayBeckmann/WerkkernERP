@@ -19,6 +19,7 @@ import 'accounting_routes.dart';
 import 'dashboard_routes.dart';
 import 'dunning_routes.dart';
 import 'export_routes.dart';
+import 'company_import_routes.dart';
 import 'fleet_routes.dart';
 import 'purchasing_routes.dart';
 import 'recurring_routes.dart';
@@ -51,6 +52,7 @@ class BusinessRoutes {
     TimeSheetRoutes(business: business, auth: auth).mount(router);
     StaffRoleRoutes(repository: repository, business: business, auth: auth).mount(router);
     ExportRoutes(repository: repository, business: business, auth: auth).mount(router);
+    CompanyImportRoutes(repository: repository, business: business, auth: auth).mount(router);
 
     router.get('/customers', _listCustomers);
     router.post('/customers', _createCustomer);

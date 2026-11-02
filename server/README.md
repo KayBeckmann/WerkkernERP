@@ -235,6 +235,29 @@ wie nicht existierende. Neue Module liegen je als eigenes Modell/Store
   ohne Passwörter, Sitzungen, Agent-Token und SMTP-Zugangsdaten; der
   Export steht im Audit-Protokoll.
 
+## Umzug Einzelplatz → Online-Firma (B4)
+
+`POST /company/import` (Admin, nie über Agent-Token) liest das
+Umzugspaket der Offline-App (`werkkernerp-migration`, Formatversion in
+`werkkern_core/lib/src/migration_package.dart`) in die **leere** Firma
+ein — einmalig, alles oder nichts in einer Transaktion
+(`lib/src/business/company_import.dart`, Postgres:
+`postgres/company_import.dart`).
+
+- Body: `{package, roleAssignments: {Offline-Rollen-ID | "-" → Mitgliedschafts-ID}}`.
+  Jede Rolle mit Zeitbuchungen (und „-“ für Buchungen ohne Rolle)
+  braucht ein aktives Mitglied, sonst 422.
+- `?dryRun=1` schreibt nichts und liefert `counts`, `warnings`,
+  `errors`, `roles` und `missingAssignments` für den Assistenten.
+- IDs werden neu vergeben; finalisierte Dokumente kommen unverändert
+  (Nummer, Schnappschüsse, Zahlstatus), Nummernkreise laufen nahtlos
+  weiter, Bestand wie offline. Vorschlags-Rollen und Belegkategorien der
+  neuen Firma werden ersetzt. SMTP wird nicht übernommen (Passwort liegt
+  nur auf dem Gerät).
+- 409, wenn die Firma schon Fachdaten hat oder bereits umgezogen ist
+  (Abschnitt `import` in `company_settings`); Eintrag `company.import`
+  im Audit-Protokoll.
+
 ## Schema-Migrationen
 
 `lib/src/db/migrations.dart`: versionierte Stufen (Tabelle

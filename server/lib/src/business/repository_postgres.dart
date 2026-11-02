@@ -17,6 +17,7 @@ import 'recurring.dart';
 import 'staff_roles.dart';
 import 'timesheets.dart';
 import 'stock.dart';
+import 'company_import.dart';
 
 part 'postgres/suppliers.dart';
 part 'postgres/fleet.dart';
@@ -27,11 +28,12 @@ part 'postgres/dunning.dart';
 part 'postgres/staff_roles.dart';
 part 'postgres/recurring.dart';
 part 'postgres/timesheets.dart';
+part 'postgres/company_import.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets, _PostgresStaffRoles implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets, _PostgresStaffRoles, _PostgresCompanyImport implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   @override
   final SessionExecutor _db;
