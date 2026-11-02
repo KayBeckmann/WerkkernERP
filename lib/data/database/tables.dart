@@ -218,6 +218,13 @@ class Companies extends Table {
   /// [TimeEntries] für das Datenmodell.
   BoolColumn get timeTrackingEnabled => boolean().withDefault(const Constant(false))();
 
+  /// B4 Umzug auf den Server (Kay 2026-11-02: einmalig, kein Zurück):
+  /// gesetzt, sobald die Firma in eine Online-Firma umgezogen ist — ab
+  /// dann öffnet die App sie nur noch als schreibgeschütztes Archiv.
+  DateTimeColumn get migratedAt => dateTime().nullable()();
+  TextColumn get migratedToServer => text().nullable()();
+  TextColumn get migratedToCompanyName => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

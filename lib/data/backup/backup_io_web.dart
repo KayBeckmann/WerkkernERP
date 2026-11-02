@@ -18,3 +18,6 @@ Future<Uint8List> readTempVacuumFile(
 Future<void> writeDatabaseFile(String path, Uint8List bytes) async => _unsupported();
 
 Future<bool> sqliteQuickCheckOk(Uint8List bytes) async => _unsupported();
+
+/// Web: keine lokale Sicherung (siehe `backupSupported`).
+Future<String?> writeMigrationBackupFile(String fileName, Uint8List bytes) async => null;

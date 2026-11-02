@@ -39,7 +39,7 @@ import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 /// Nachtrag 2026-10-21; v29→v30: C2-Nachtrag Projektnummer-
 /// Nummernkreise, Nachtrag 2026-10-21; v30→v31: C3-Rest
 /// Kunden-Stundenzettel/Unterschrift, Nachtrag 2026-10-21; v31→v32:
-/// C5.1-Fix Merker stock_booked).
+/// C5.1-Fix Merker stock_booked; v32→v33: B4 Umzugsvermerk).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -281,6 +281,10 @@ void main() {
       // `from >= 27`-Guard in database.dart).
       // v31 -> v32 (C5.1-Fix: Merker stock_booked am Dokument).
       raw.execute('ALTER TABLE invoices DROP COLUMN stock_booked;');
+      // v32 -> v33 (B4: Umzugsvermerk an der Firma).
+      raw.execute('ALTER TABLE companies DROP COLUMN migrated_at;');
+      raw.execute('ALTER TABLE companies DROP COLUMN migrated_to_server;');
+      raw.execute('ALTER TABLE companies DROP COLUMN migrated_to_company_name;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -353,6 +357,7 @@ void main() {
         expect(migratedCompany.bestellwesenEnabled, isFalse);
         expect(migratedCompany.timeTrackingEnabled, isFalse);
         expect(migratedCompany.name, 'Migrations-Testfirma', reason: 'Bestandsdaten dürfen nicht verändert werden');
+        expect(migratedCompany.migratedAt, isNull, reason: 'v33: Bestandsfirmen sind nicht umgezogen');
 
         final migratedInvoice =
             await (db.select(db.invoices)..where((i) => i.id.equals(invoice.id))).getSingle();

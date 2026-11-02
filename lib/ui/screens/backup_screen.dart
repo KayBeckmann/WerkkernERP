@@ -11,7 +11,11 @@ import '../../data/backup/backup_service.dart';
 /// Cloud-Upload. Nur auf Android/Desktop verfügbar; im Web-Build (Kays
 /// LAN-Vorschau) bewusst nicht angeboten.
 class BackupScreen extends StatefulWidget {
-  const BackupScreen({super.key});
+  const BackupScreen({super.key, this.allowRestore = true});
+
+  /// `false` im Archiv einer umgezogenen Firma (B4): eine alte Sicherung
+  /// könnte sie sonst wieder bearbeitbar machen — kein Zurück.
+  final bool allowRestore;
 
   @override
   State<BackupScreen> createState() => _BackupScreenState();
@@ -192,12 +196,14 @@ class _BackupScreenState extends State<BackupScreen> {
                     icon: const Icon(Icons.backup_outlined),
                     label: const Text('Backup erstellen'),
                   ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : _restoreBackup,
-                    icon: const Icon(Icons.restore_outlined),
-                    label: const Text('Backup wiederherstellen'),
-                  ),
+                  if (widget.allowRestore) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _restoreBackup,
+                      icon: const Icon(Icons.restore_outlined),
+                      label: const Text('Backup wiederherstellen'),
+                    ),
+                  ],
                   if (_busy)
                     const Padding(
                       padding: EdgeInsets.only(top: 24),

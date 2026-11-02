@@ -854,8 +854,9 @@ class _Parser {
           throw _Invalid('${r.path}: Unterschrift ist kein gültiges Base64.');
         }
       }
-      if (status == 'signed' && signature == null)
+      if (status == 'signed' && signature == null) {
         result.errors.add('${r.path}: unterschriebener Zettel ohne Unterschrift.');
+      }
       final supersedes = r.optStr('supersedesId');
       data.timeSheets.add(
         TimeSheet(
