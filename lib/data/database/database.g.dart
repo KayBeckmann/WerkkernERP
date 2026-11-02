@@ -821,6 +821,39 @@ class $CompaniesTable extends Companies
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _migratedAtMeta = const VerificationMeta(
+    'migratedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> migratedAt = GeneratedColumn<DateTime>(
+    'migrated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _migratedToServerMeta = const VerificationMeta(
+    'migratedToServer',
+  );
+  @override
+  late final GeneratedColumn<String> migratedToServer = GeneratedColumn<String>(
+    'migrated_to_server',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _migratedToCompanyNameMeta =
+      const VerificationMeta('migratedToCompanyName');
+  @override
+  late final GeneratedColumn<String> migratedToCompanyName =
+      GeneratedColumn<String>(
+        'migrated_to_company_name',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -891,6 +924,9 @@ class $CompaniesTable extends Companies
     lagerbestandEnabled,
     bestellwesenEnabled,
     timeTrackingEnabled,
+    migratedAt,
+    migratedToServer,
+    migratedToCompanyName,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1486,6 +1522,30 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('migrated_at')) {
+      context.handle(
+        _migratedAtMeta,
+        migratedAt.isAcceptableOrUnknown(data['migrated_at']!, _migratedAtMeta),
+      );
+    }
+    if (data.containsKey('migrated_to_server')) {
+      context.handle(
+        _migratedToServerMeta,
+        migratedToServer.isAcceptableOrUnknown(
+          data['migrated_to_server']!,
+          _migratedToServerMeta,
+        ),
+      );
+    }
+    if (data.containsKey('migrated_to_company_name')) {
+      context.handle(
+        _migratedToCompanyNameMeta,
+        migratedToCompanyName.isAcceptableOrUnknown(
+          data['migrated_to_company_name']!,
+          _migratedToCompanyNameMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1767,6 +1827,18 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}time_tracking_enabled'],
       )!,
+      migratedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}migrated_at'],
+      ),
+      migratedToServer: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}migrated_to_server'],
+      ),
+      migratedToCompanyName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}migrated_to_company_name'],
+      ),
     );
   }
 
@@ -1988,6 +2060,13 @@ class Company extends DataClass implements Insertable<Company> {
   /// übrigen optionalen Module, Default aus. Siehe [StaffRoles]/
   /// [TimeEntries] für das Datenmodell.
   final bool timeTrackingEnabled;
+
+  /// B4 Umzug auf den Server (Kay 2026-11-02: einmalig, kein Zurück):
+  /// gesetzt, sobald die Firma in eine Online-Firma umgezogen ist — ab
+  /// dann öffnet die App sie nur noch als schreibgeschütztes Archiv.
+  final DateTime? migratedAt;
+  final String? migratedToServer;
+  final String? migratedToCompanyName;
   const Company({
     required this.id,
     required this.name,
@@ -2057,6 +2136,9 @@ class Company extends DataClass implements Insertable<Company> {
     required this.lagerbestandEnabled,
     required this.bestellwesenEnabled,
     required this.timeTrackingEnabled,
+    this.migratedAt,
+    this.migratedToServer,
+    this.migratedToCompanyName,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2233,6 +2315,15 @@ class Company extends DataClass implements Insertable<Company> {
     map['lagerbestand_enabled'] = Variable<bool>(lagerbestandEnabled);
     map['bestellwesen_enabled'] = Variable<bool>(bestellwesenEnabled);
     map['time_tracking_enabled'] = Variable<bool>(timeTrackingEnabled);
+    if (!nullToAbsent || migratedAt != null) {
+      map['migrated_at'] = Variable<DateTime>(migratedAt);
+    }
+    if (!nullToAbsent || migratedToServer != null) {
+      map['migrated_to_server'] = Variable<String>(migratedToServer);
+    }
+    if (!nullToAbsent || migratedToCompanyName != null) {
+      map['migrated_to_company_name'] = Variable<String>(migratedToCompanyName);
+    }
     return map;
   }
 
@@ -2380,6 +2471,15 @@ class Company extends DataClass implements Insertable<Company> {
       lagerbestandEnabled: Value(lagerbestandEnabled),
       bestellwesenEnabled: Value(bestellwesenEnabled),
       timeTrackingEnabled: Value(timeTrackingEnabled),
+      migratedAt: migratedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(migratedAt),
+      migratedToServer: migratedToServer == null && nullToAbsent
+          ? const Value.absent()
+          : Value(migratedToServer),
+      migratedToCompanyName: migratedToCompanyName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(migratedToCompanyName),
     );
   }
 
@@ -2535,6 +2635,11 @@ class Company extends DataClass implements Insertable<Company> {
       timeTrackingEnabled: serializer.fromJson<bool>(
         json['timeTrackingEnabled'],
       ),
+      migratedAt: serializer.fromJson<DateTime?>(json['migratedAt']),
+      migratedToServer: serializer.fromJson<String?>(json['migratedToServer']),
+      migratedToCompanyName: serializer.fromJson<String?>(
+        json['migratedToCompanyName'],
+      ),
     );
   }
   @override
@@ -2643,6 +2748,11 @@ class Company extends DataClass implements Insertable<Company> {
       'lagerbestandEnabled': serializer.toJson<bool>(lagerbestandEnabled),
       'bestellwesenEnabled': serializer.toJson<bool>(bestellwesenEnabled),
       'timeTrackingEnabled': serializer.toJson<bool>(timeTrackingEnabled),
+      'migratedAt': serializer.toJson<DateTime?>(migratedAt),
+      'migratedToServer': serializer.toJson<String?>(migratedToServer),
+      'migratedToCompanyName': serializer.toJson<String?>(
+        migratedToCompanyName,
+      ),
     };
   }
 
@@ -2715,6 +2825,9 @@ class Company extends DataClass implements Insertable<Company> {
     bool? lagerbestandEnabled,
     bool? bestellwesenEnabled,
     bool? timeTrackingEnabled,
+    Value<DateTime?> migratedAt = const Value.absent(),
+    Value<String?> migratedToServer = const Value.absent(),
+    Value<String?> migratedToCompanyName = const Value.absent(),
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2842,6 +2955,13 @@ class Company extends DataClass implements Insertable<Company> {
     lagerbestandEnabled: lagerbestandEnabled ?? this.lagerbestandEnabled,
     bestellwesenEnabled: bestellwesenEnabled ?? this.bestellwesenEnabled,
     timeTrackingEnabled: timeTrackingEnabled ?? this.timeTrackingEnabled,
+    migratedAt: migratedAt.present ? migratedAt.value : this.migratedAt,
+    migratedToServer: migratedToServer.present
+        ? migratedToServer.value
+        : this.migratedToServer,
+    migratedToCompanyName: migratedToCompanyName.present
+        ? migratedToCompanyName.value
+        : this.migratedToCompanyName,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -3027,6 +3147,15 @@ class Company extends DataClass implements Insertable<Company> {
       timeTrackingEnabled: data.timeTrackingEnabled.present
           ? data.timeTrackingEnabled.value
           : this.timeTrackingEnabled,
+      migratedAt: data.migratedAt.present
+          ? data.migratedAt.value
+          : this.migratedAt,
+      migratedToServer: data.migratedToServer.present
+          ? data.migratedToServer.value
+          : this.migratedToServer,
+      migratedToCompanyName: data.migratedToCompanyName.present
+          ? data.migratedToCompanyName.value
+          : this.migratedToCompanyName,
     );
   }
 
@@ -3102,7 +3231,10 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('isSmallBusinessExempt: $isSmallBusinessExempt, ')
           ..write('lagerbestandEnabled: $lagerbestandEnabled, ')
           ..write('bestellwesenEnabled: $bestellwesenEnabled, ')
-          ..write('timeTrackingEnabled: $timeTrackingEnabled')
+          ..write('timeTrackingEnabled: $timeTrackingEnabled, ')
+          ..write('migratedAt: $migratedAt, ')
+          ..write('migratedToServer: $migratedToServer, ')
+          ..write('migratedToCompanyName: $migratedToCompanyName')
           ..write(')'))
         .toString();
   }
@@ -3177,6 +3309,9 @@ class Company extends DataClass implements Insertable<Company> {
     lagerbestandEnabled,
     bestellwesenEnabled,
     timeTrackingEnabled,
+    migratedAt,
+    migratedToServer,
+    migratedToCompanyName,
   ]);
   @override
   bool operator ==(Object other) =>
@@ -3250,7 +3385,10 @@ class Company extends DataClass implements Insertable<Company> {
           other.isSmallBusinessExempt == this.isSmallBusinessExempt &&
           other.lagerbestandEnabled == this.lagerbestandEnabled &&
           other.bestellwesenEnabled == this.bestellwesenEnabled &&
-          other.timeTrackingEnabled == this.timeTrackingEnabled);
+          other.timeTrackingEnabled == this.timeTrackingEnabled &&
+          other.migratedAt == this.migratedAt &&
+          other.migratedToServer == this.migratedToServer &&
+          other.migratedToCompanyName == this.migratedToCompanyName);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -3322,6 +3460,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<bool> lagerbestandEnabled;
   final Value<bool> bestellwesenEnabled;
   final Value<bool> timeTrackingEnabled;
+  final Value<DateTime?> migratedAt;
+  final Value<String?> migratedToServer;
+  final Value<String?> migratedToCompanyName;
   final Value<int> rowid;
   const CompaniesCompanion({
     this.id = const Value.absent(),
@@ -3392,6 +3533,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.lagerbestandEnabled = const Value.absent(),
     this.bestellwesenEnabled = const Value.absent(),
     this.timeTrackingEnabled = const Value.absent(),
+    this.migratedAt = const Value.absent(),
+    this.migratedToServer = const Value.absent(),
+    this.migratedToCompanyName = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CompaniesCompanion.insert({
@@ -3463,6 +3607,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.lagerbestandEnabled = const Value.absent(),
     this.bestellwesenEnabled = const Value.absent(),
     this.timeTrackingEnabled = const Value.absent(),
+    this.migratedAt = const Value.absent(),
+    this.migratedToServer = const Value.absent(),
+    this.migratedToCompanyName = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -3536,6 +3683,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<bool>? lagerbestandEnabled,
     Expression<bool>? bestellwesenEnabled,
     Expression<bool>? timeTrackingEnabled,
+    Expression<DateTime>? migratedAt,
+    Expression<String>? migratedToServer,
+    Expression<String>? migratedToCompanyName,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -3644,6 +3794,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         'bestellwesen_enabled': bestellwesenEnabled,
       if (timeTrackingEnabled != null)
         'time_tracking_enabled': timeTrackingEnabled,
+      if (migratedAt != null) 'migrated_at': migratedAt,
+      if (migratedToServer != null) 'migrated_to_server': migratedToServer,
+      if (migratedToCompanyName != null)
+        'migrated_to_company_name': migratedToCompanyName,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3717,6 +3871,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<bool>? lagerbestandEnabled,
     Value<bool>? bestellwesenEnabled,
     Value<bool>? timeTrackingEnabled,
+    Value<DateTime?>? migratedAt,
+    Value<String?>? migratedToServer,
+    Value<String?>? migratedToCompanyName,
     Value<int>? rowid,
   }) {
     return CompaniesCompanion(
@@ -3810,6 +3967,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       lagerbestandEnabled: lagerbestandEnabled ?? this.lagerbestandEnabled,
       bestellwesenEnabled: bestellwesenEnabled ?? this.bestellwesenEnabled,
       timeTrackingEnabled: timeTrackingEnabled ?? this.timeTrackingEnabled,
+      migratedAt: migratedAt ?? this.migratedAt,
+      migratedToServer: migratedToServer ?? this.migratedToServer,
+      migratedToCompanyName:
+          migratedToCompanyName ?? this.migratedToCompanyName,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4083,6 +4244,17 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (timeTrackingEnabled.present) {
       map['time_tracking_enabled'] = Variable<bool>(timeTrackingEnabled.value);
     }
+    if (migratedAt.present) {
+      map['migrated_at'] = Variable<DateTime>(migratedAt.value);
+    }
+    if (migratedToServer.present) {
+      map['migrated_to_server'] = Variable<String>(migratedToServer.value);
+    }
+    if (migratedToCompanyName.present) {
+      map['migrated_to_company_name'] = Variable<String>(
+        migratedToCompanyName.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4162,6 +4334,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('lagerbestandEnabled: $lagerbestandEnabled, ')
           ..write('bestellwesenEnabled: $bestellwesenEnabled, ')
           ..write('timeTrackingEnabled: $timeTrackingEnabled, ')
+          ..write('migratedAt: $migratedAt, ')
+          ..write('migratedToServer: $migratedToServer, ')
+          ..write('migratedToCompanyName: $migratedToCompanyName, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -20336,6 +20511,9 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<bool> lagerbestandEnabled,
       Value<bool> bestellwesenEnabled,
       Value<bool> timeTrackingEnabled,
+      Value<DateTime?> migratedAt,
+      Value<String?> migratedToServer,
+      Value<String?> migratedToCompanyName,
       Value<int> rowid,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
@@ -20408,6 +20586,9 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<bool> lagerbestandEnabled,
       Value<bool> bestellwesenEnabled,
       Value<bool> timeTrackingEnabled,
+      Value<DateTime?> migratedAt,
+      Value<String?> migratedToServer,
+      Value<String?> migratedToCompanyName,
       Value<int> rowid,
     });
 
@@ -21128,6 +21309,21 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<bool> get timeTrackingEnabled => $composableBuilder(
     column: $table.timeTrackingEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get migratedAt => $composableBuilder(
+    column: $table.migratedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get migratedToServer => $composableBuilder(
+    column: $table.migratedToServer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get migratedToCompanyName => $composableBuilder(
+    column: $table.migratedToCompanyName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -21957,6 +22153,21 @@ class $$CompaniesTableOrderingComposer
     column: $table.timeTrackingEnabled,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<DateTime> get migratedAt => $composableBuilder(
+    column: $table.migratedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get migratedToServer => $composableBuilder(
+    column: $table.migratedToServer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get migratedToCompanyName => $composableBuilder(
+    column: $table.migratedToCompanyName,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -22283,6 +22494,21 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<bool> get timeTrackingEnabled => $composableBuilder(
     column: $table.timeTrackingEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get migratedAt => $composableBuilder(
+    column: $table.migratedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get migratedToServer => $composableBuilder(
+    column: $table.migratedToServer,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get migratedToCompanyName => $composableBuilder(
+    column: $table.migratedToCompanyName,
     builder: (column) => column,
   );
 
@@ -22886,6 +23112,9 @@ class $$CompaniesTableTableManager
                 Value<bool> lagerbestandEnabled = const Value.absent(),
                 Value<bool> bestellwesenEnabled = const Value.absent(),
                 Value<bool> timeTrackingEnabled = const Value.absent(),
+                Value<DateTime?> migratedAt = const Value.absent(),
+                Value<String?> migratedToServer = const Value.absent(),
+                Value<String?> migratedToCompanyName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
@@ -22956,6 +23185,9 @@ class $$CompaniesTableTableManager
                 lagerbestandEnabled: lagerbestandEnabled,
                 bestellwesenEnabled: bestellwesenEnabled,
                 timeTrackingEnabled: timeTrackingEnabled,
+                migratedAt: migratedAt,
+                migratedToServer: migratedToServer,
+                migratedToCompanyName: migratedToCompanyName,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -23032,6 +23264,9 @@ class $$CompaniesTableTableManager
                 Value<bool> lagerbestandEnabled = const Value.absent(),
                 Value<bool> bestellwesenEnabled = const Value.absent(),
                 Value<bool> timeTrackingEnabled = const Value.absent(),
+                Value<DateTime?> migratedAt = const Value.absent(),
+                Value<String?> migratedToServer = const Value.absent(),
+                Value<String?> migratedToCompanyName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
@@ -23102,6 +23337,9 @@ class $$CompaniesTableTableManager
                 lagerbestandEnabled: lagerbestandEnabled,
                 bestellwesenEnabled: bestellwesenEnabled,
                 timeTrackingEnabled: timeTrackingEnabled,
+                migratedAt: migratedAt,
+                migratedToServer: migratedToServer,
+                migratedToCompanyName: migratedToCompanyName,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

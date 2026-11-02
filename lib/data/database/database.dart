@@ -48,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 32;
+  int get schemaVersion => 33;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -347,6 +347,13 @@ class AppDatabase extends _$AppDatabase {
             // ab jetzt finalisierte) — eine rückwirkende Erkennung über die
             // Bewegungen wäre nur geraten.
             await migrator.addColumn(invoices, invoices.stockBooked);
+          }
+          if (from < 33) {
+            // B4 Umzug auf den Server: Vermerk an der Firma (Bestand: nie
+            // umgezogen → alle drei leer).
+            await migrator.addColumn(companies, companies.migratedAt);
+            await migrator.addColumn(companies, companies.migratedToServer);
+            await migrator.addColumn(companies, companies.migratedToCompanyName);
           }
         },
       );

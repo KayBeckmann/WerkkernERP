@@ -6,6 +6,7 @@ import '../../data/database/database.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/online_accounts.dart';
 import 'home_shell.dart';
+import 'migrated_company_screen.dart';
 import 'online/online_login_screen.dart';
 
 /// Firmenauswahl/-anlage — der Einstiegspunkt der App (A0). Keine
@@ -80,6 +81,19 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
   }
 
   void _openCompany(ActiveCompanyService service, Company company) {
+    // B4: umgezogene Firmen nur noch als Archiv (kein Zurück).
+    if (company.migratedAt != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => MigratedCompanyScreen(
+            company: company,
+            accountStore: _accounts,
+            clientFactory: widget.onlineClientFactory,
+          ),
+        ),
+      );
+      return;
+    }
     service.select(company);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const HomeShell()),
@@ -135,8 +149,11 @@ class _CompanySwitcherScreenState extends State<CompanySwitcherScreen> {
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Card(
                       child: ListTile(
-                        leading: const Icon(Icons.business_outlined),
+                        leading: Icon(company.migratedAt == null ? Icons.business_outlined : Icons.inventory_2_outlined),
                         title: Text(company.name),
+                        subtitle: company.migratedAt == null
+                            ? null
+                            : Text('Umgezogen nach „${company.migratedToCompanyName ?? '?'}“ · nur lesen'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _openCompany(service, company),
                       ),

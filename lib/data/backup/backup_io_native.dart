@@ -109,3 +109,14 @@ Future<void> writeDatabaseFile(String path, Uint8List bytes) async {
     }
   }
 }
+
+/// B4: Sicherung unmittelbar vor dem Umzug auf den Server — ohne
+/// Dateidialog im App-Dokumentenordner (`umzug/`), damit sie auf keinen
+/// Fall fehlt. Liefert den Pfad.
+Future<String?> writeMigrationBackupFile(String fileName, Uint8List bytes) async {
+  final dir = Directory(p.join((await getApplicationDocumentsDirectory()).path, 'umzug'));
+  await dir.create(recursive: true);
+  final file = File(p.join(dir.path, fileName));
+  await file.writeAsBytes(bytes, flush: true);
+  return file.path;
+}

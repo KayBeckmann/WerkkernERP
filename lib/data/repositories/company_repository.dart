@@ -45,6 +45,17 @@ class CompanyRepository {
 
   Future<void> update(Company company) => _db.update(_db.companies).replace(company);
 
+  /// B4: Firma ist auf den Server umgezogen — ab jetzt nur noch Archiv
+  /// (kein Zurück, Kay 2026-11-02).
+  Future<void> markMigrated(String id, {required String server, required String companyName, DateTime? at}) =>
+      (_db.update(_db.companies)..where((c) => c.id.equals(id))).write(
+        CompaniesCompanion(
+          migratedAt: Value(at ?? DateTime.now()),
+          migratedToServer: Value(server),
+          migratedToCompanyName: Value(companyName),
+        ),
+      );
+
   /// A5: Angebot/Auftrag pro Firma ein-/ausblenden. Schaltet nur die
   /// Sichtbarkeit in der Navigation — bereits vorhandene Angebots-/
   /// Auftragsdaten bleiben beim Deaktivieren unverändert in der
