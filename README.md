@@ -151,6 +151,14 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - **KI-Agenten (MCP):** persönliche Agent-Token mit genau den Rechten
   des Nutzers, irreversible Aktionen nur nach Bestätigung in der App;
   MCP-Server in [`packages/werkkern_mcp`](packages/werkkern_mcp/README.md).
+- **Umzug Einzelplatz → Online-Firma** (Offline-App: Einstellungen →
+  Daten & Sicherung → „Auf Server umziehen“): einmalig und ohne Zurück
+  (deutlicher Warnhinweis), nur in eine neue, leere Online-Firma. Alle
+  Daten inkl. finalisierter Dokumente mit Nummern ziehen unverändert
+  um, Nummernkreise laufen weiter; offline gebuchte Zeiten werden je
+  Rolle einem Mitglied zugeordnet. Probelauf vorab, Sicherung vor dem
+  Umzug; die lokale Firma bleibt danach als schreibgeschütztes Archiv
+  (PDFs, Sicherung). SMTP wird online neu eingerichtet.
 - Gemeinsame reine Dart-Pakete: `packages/werkkern_core` (Geld, Summen,
   Nummernformat, Umwandlungsregeln — App und Server rechnen identisch)
   und `packages/werkkern_client` (API-Client, Offline-Abgleich).
@@ -166,6 +174,8 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Online-Modus ist nicht vorgesehen (offline nur Bearbeiten markierter
   Entwürfe).
 - Import von Materiallisten aus LibreECAD (Format noch offen).
+- Rückweg Online → Offline und Zusammenführen von Firmen (bewusst nicht
+  vorgesehen).
 - Lokaler KI-Adapter für die reine Offline-App (ohne Server).
 
 ## E-Mail-Versand: Android vs. Web
