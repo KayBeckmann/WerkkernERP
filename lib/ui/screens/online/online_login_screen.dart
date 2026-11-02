@@ -155,7 +155,8 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
   }
 
   /// Server-Adresse und E-Mail der letzten Anmeldung vorbelegen (ohne
-  /// gespeicherte Adresse: [defaultOnlineServerUrl]). Das Passwort wird
+  /// gespeicherte Adresse: [defaultOnlineServerUrl], siehe
+  /// [restoredOnlineServerUrl]). Das Passwort wird
   /// bewusst nie gespeichert (angemeldet bleiben speichert
   /// nur das Sitzungs-Token, siehe `online_accounts.dart`).
   Future<void> _restoreLastInput() async {
@@ -163,7 +164,7 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted) return;
       if (widget.account == null) {
-        _serverCtrl.text = prefs.getString(_prefServerUrl) ?? defaultOnlineServerUrl();
+        _serverCtrl.text = restoredOnlineServerUrl(prefs.getString(_prefServerUrl));
         _emailCtrl.text = prefs.getString(_prefEmail) ?? '';
         setState(() => _stayLoggedIn = prefs.getBool(_prefStayLoggedIn) ?? false);
       }
@@ -521,14 +522,39 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
 
 const _configuredServerUrl = String.fromEnvironment('WERKKERN_SERVER');
 
+/// Produktiv-Backend auf Strato (deploy/strato) — Vorgabe der nativen
+/// Apps, wenn beim Build kein `WERKKERN_SERVER` gesetzt ist.
+const werkkernProductionServerUrl = 'https://erp.kay-beckmann.de/api';
+
 /// Vorbelegung der Server-Adresse: per `--dart-define=WERKKERN_SERVER=…`
-/// fest eingebaut (z. B. Android-Build), sonst in der Web-App der eigene
-/// Origin + `/api` — der Web-Container reicht `/api/` an den Server
-/// weiter (deploy/nginx/web.conf). Native Apps ohne Vorgabe: leer.
+/// fest eingebaut, sonst in der Web-App der eigene Origin + `/api` — der
+/// Web-Container reicht `/api/` an den Server weiter
+/// (deploy/nginx/web.conf). Native Apps (Android) ohne Vorgabe:
+/// [werkkernProductionServerUrl].
 String defaultOnlineServerUrl({bool web = kIsWeb, Uri? base, String configured = _configuredServerUrl}) {
   if (configured.isNotEmpty) return configured;
-  if (!web) return '';
+  if (!web) return werkkernProductionServerUrl;
   final page = base ?? Uri.base;
-  if (!page.hasScheme || !page.scheme.startsWith('http')) return '';
+  if (!page.hasScheme || !page.scheme.startsWith('http')) return werkkernProductionServerUrl;
   return '${page.origin}/api';
+}
+
+/// Zuletzt benutzte Adresse — außer sie zeigt auf ein lokales Test-Backend
+/// (localhost, Emulator, private IP), während die Vorgabe ein öffentlicher
+/// Server ist: dann gilt die Vorgabe, damit alte Testläufe sie nicht
+/// dauerhaft überdecken.
+String restoredOnlineServerUrl(String? saved, {String? fallback}) {
+  final def = fallback ?? defaultOnlineServerUrl();
+  if (saved == null || saved.trim().isEmpty) return def;
+  if (_isLocalTestServer(saved) && !_isLocalTestServer(def)) return def;
+  return saved;
+}
+
+bool _isLocalTestServer(String url) {
+  final host = Uri.tryParse(url.contains('://') ? url : 'http://$url')?.host.toLowerCase() ?? '';
+  if (host.isEmpty || host == 'localhost' || host.endsWith('.local')) return true;
+  final parts = host.split('.').map(int.tryParse).toList();
+  if (parts.length != 4 || parts.contains(null)) return false;
+  final a = parts[0]!, b = parts[1]!;
+  return a == 127 || a == 10 || (a == 192 && b == 168) || (a == 172 && b >= 16 && b <= 31);
 }
