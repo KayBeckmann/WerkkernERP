@@ -14,6 +14,7 @@ import 'purchasing.dart';
 import 'recurring.dart';
 import 'staff_roles.dart';
 import 'timesheets.dart';
+import 'company_import.dart';
 import 'stock.dart';
 
 part 'memory/suppliers.dart';
@@ -442,6 +443,72 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       throw BusinessConflict(
         'Dokument wurde zwischenzeitlich geändert (Version ${existing.version}, erwartet $expectedVersion).',
       );
+    }
+  }
+
+  // ---- B4 Umzug -------------------------------------------------------------
+
+  @override
+  Future<bool> companyHasBusinessData(String companyId) async {
+    bool any<T>(Iterable<T> items, String Function(T) company) => items.any((e) => company(e) == companyId);
+    return any(_customers, (c) => c.companyId) ||
+        any(_articles, (a) => a.companyId) ||
+        any(_documents, (d) => d.companyId) ||
+        any(_projects, (p) => p.companyId) ||
+        any(_timeEntries, (t) => t.companyId) ||
+        any(_suppliers, (s) => s.companyId) ||
+        any(_articleGroups, (g) => g.companyId) ||
+        any(_vehicles, (v) => v.companyId) ||
+        any(_expenses, (e) => e.companyId) ||
+        any(_bankTransactions, (b) => b.companyId) ||
+        any(_purchaseOrders, (o) => o.companyId) ||
+        any(_stockMovements, (m) => m.companyId) ||
+        any(_inventoryCounts, (c) => c.companyId) ||
+        any(_recurringTemplates, (t) => t.companyId) ||
+        any(_timeSheets, (t) => t.companyId);
+  }
+
+  /// In-Memory schreibt nur nach vollständiger Prüfung durch den Parser —
+  /// hier kann nichts mehr scheitern, daher ohne Rückabwicklung.
+  @override
+  Future<void> importCompanyData(String companyId, CompanyImportData data) async {
+    _staffRoles.removeWhere((r) => r.companyId == companyId);
+    _expenseCategories.removeWhere((c) => c.companyId == companyId);
+    _customers.addAll(data.customers);
+    _suppliers.addAll(data.suppliers);
+    _articleGroups.addAll(data.articleGroups);
+    _articles.addAll(data.articles);
+    for (final p in data.articlePrices) {
+      _prices[_priceKey(p.articleId, p.supplierId)] = (companyId: companyId, price: p);
+    }
+    _projects.addAll(data.projects);
+    _documents.addAll(data.documents);
+    _items.addAll(data.documentItems);
+    _vehicles.addAll(data.vehicles);
+    _vehicleCosts.addAll(data.vehicleCosts);
+    _recurringTemplates.addAll(data.recurringTemplates);
+    _recurringItems.addAll(data.recurringItems);
+    _expenseCategories.addAll(data.expenseCategories);
+    _expenses.addAll(data.expenses);
+    _bankTransactions.addAll(data.bankTransactions);
+    _purchaseOrders.addAll(data.purchaseOrders);
+    _purchaseOrderItems.addAll(data.purchaseOrderItems);
+    _stockMovements.addAll(data.stockMovements);
+    _inventoryCounts.addAll(data.inventoryCounts);
+    _inventoryItems.addAll(data.inventoryItems);
+    _staffRoles.addAll(data.staffRoles);
+    _timeEntries.addAll(data.timeEntries);
+    _timeSheets.addAll(data.timeSheets);
+    for (final e in data.timeSheetEntries.entries) {
+      for (final entryId in e.value) {
+        _sheetByEntry[entryId] = e.key;
+      }
+    }
+    for (final s in data.numberSequences) {
+      _sequences['$companyId|${s.documentType}|${s.year}'] = s.lastNumber;
+    }
+    for (final e in data.settings.entries) {
+      _companySettings['$companyId|${e.key}'] = Map.of(e.value);
     }
   }
 }
