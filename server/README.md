@@ -42,8 +42,11 @@ Nach außen gehen zwei Ports:
 - `WEB_PORT` (Standard 8085): nginx liefert die App aus und reicht
   `/api/` an den Server weiter (`deploy/nginx/web.conf`). In der App als
   Server-Adresse `https://<domain>/api` eintragen — die Web-App belegt
-  das selbst vor (eigener Origin + `/api`); Android-Builds per
-  `--dart-define=WERKKERN_SERVER=https://<domain>/api`.
+  das selbst vor (eigener Origin + `/api`); Android-Builds belegen
+  `https://erp.kay-beckmann.de/api` vor (anderer Server per
+  `--dart-define=WERKKERN_SERVER=https://<domain>/api`). Eine zuletzt
+  benutzte lokale Test-Adresse (localhost, private IP) überdeckt diese
+  Vorgabe nicht.
 - `SUPERADMIN_PORT` (Standard 8086): Superadmin-Panel, reicht nur
   `/api/platform/*` weiter (`deploy/nginx/superadmin.conf`), siehe
   `superadmin/README.md`.
