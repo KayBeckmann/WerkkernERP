@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
@@ -162,7 +163,7 @@ void main() {
         final order = (await invoices.finalize(companyId: company.id, id: draft.id))!;
         expect((await invoices.itemsFor(order.id)).single.staffRoleId, monteur.id);
 
-        for (final (hours, roleId) in [(4.0, monteur.id), (3.5, monteur.id), (2.0, meister.id), (1.0, null)]) {
+        for (final (hours, roleId) in [(4.0, monteur.id), (3.5, monteur.id), (2.0, meister.id)]) {
           await timeEntries.create(
             companyId: company.id,
             date: DateTime.now(),
@@ -171,6 +172,15 @@ void main() {
             invoiceId: order.id,
           );
         }
+        // Altbestand ohne Rolle (vor C3.4 gebucht).
+        await db.into(db.timeEntries).insert(TimeEntriesCompanion.insert(
+              id: 'alt-ohne-rolle',
+              companyId: company.id,
+              date: DateTime.now(),
+              hours: 1,
+              invoiceId: Value(order.id),
+              createdAt: DateTime.now(),
+            ));
 
         final invoiceDraft = await invoices.convertTo(
           companyId: company.id,

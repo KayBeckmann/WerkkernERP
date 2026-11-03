@@ -58,7 +58,7 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     final chef = await h.company('chef@example.com', permissions: permissions, modules: const {'timeTracking'});
     await h.member(chef, 'monteur@example.com');
     // Vorschlags-Rollen (vom ersten Öffnen) werden ersetzt, nicht verdoppelt.
-    expect(((await chef.get('/staff-roles'))['staffRoles'] as List), hasLength(3));
+    expect(((await chef.get('/staff-roles', query: const {'seed': '1'}))['staffRoles'] as List), hasLength(3));
     final monteur = await membershipOf(chef, 'monteur@example.com');
     final admin = await membershipOf(chef, 'chef@example.com');
 

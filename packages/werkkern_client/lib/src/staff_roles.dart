@@ -25,10 +25,11 @@ class OnlineStaffRole {
 }
 
 extension StaffRoleApi on WerkkernApiClient {
-  /// Für Admins legt der Server beim ersten Aufruf die Vorschläge
-  /// Monteur/Meister/Projektleiter an (wie offline).
-  Future<List<OnlineStaffRole>> staffRoles() async {
-    final j = await request('GET', '/staff-roles') as Map<String, Object?>;
+  /// Mit [seedDefaults] legt der Server für Admins, solange es noch keine
+  /// Rollen gibt, die Vorschläge Monteur/Meister/Projektleiter an — wie
+  /// offline nur aus der Rollenverwaltung heraus.
+  Future<List<OnlineStaffRole>> staffRoles({bool seedDefaults = false}) async {
+    final j = await request('GET', '/staff-roles', query: seedDefaults ? const {'seed': '1'} : null) as Map<String, Object?>;
     return [for (final r in j['staffRoles'] as List) OnlineStaffRole.fromJson(r as Map<String, Object?>)];
   }
 

@@ -969,12 +969,21 @@ class BusinessRoutes {
 
   /// Rolle einer Zeitbuchung (wie offline): muss zur Firma gehören.
   /// Liefert die Rolle oder `null`; [error] bei unbekannter ID.
+  /// C3.4 (Kay 2026-11-03): Pflicht, sobald die Firma Rollen hat — 422,
+  /// damit sich gebuchte Stunden je Rolle abrechnen lassen.
   Future<({StaffRole? role, String? error})> _staffRole(Map<String, Object?> body, String companyId) async {
     final id = body['staffRoleId'] as String?;
-    if (id == null) return (role: null, error: null);
+    if (id == null) {
+      final required = (await business.listStaffRoles(companyId)).isNotEmpty;
+      return (role: null, error: required ? _roleRequired : null);
+    }
     final role = await business.findStaffRole(companyId, id);
     return role == null ? (role: null, error: 'Rolle nicht gefunden.') : (role: role, error: null);
   }
+
+  static const _roleRequired = 'Bitte eine Rolle wählen — sie bestimmt den Stundensatz beim Abrechnen.';
+
+  Response _roleError(String error) => jsonError(error, status: error == _roleRequired ? 422 : 404);
 
   Future<Response> _createTimeEntry(Request request) async {
     final check = await auth.requirePermission(request, 'timeTracking.write');
@@ -986,7 +995,7 @@ class BusinessRoutes {
       return jsonError(parsed.error!, status: parsed.error!.contains('nicht gefunden') ? 404 : 400);
     }
     final role = await _staffRole(body, ctx.session.companyId);
-    if (role.error != null) return jsonError(role.error!, status: 404);
+    if (role.error != null) return _roleError(role.error!);
     final now = DateTime.now().toUtc();
     final entry = TimeEntry(
       id: _uuid.v4(),
@@ -1050,9 +1059,10 @@ class BusinessRoutes {
     // eingefrorene Satz.
     final roleId = body.containsKey('staffRoleId') ? body['staffRoleId'] as String? : e.staffRoleId;
     var rate = e.hourlyCostCents;
+    // Auch eine Altbuchung ohne Rolle braucht beim Ändern eine (C3.4).
+    final role = await _staffRole({'staffRoleId': roleId}, e.companyId);
+    if (role.error != null) return _roleError(role.error!);
     if (roleId != e.staffRoleId) {
-      final role = await _staffRole({'staffRoleId': roleId}, e.companyId);
-      if (role.error != null) return jsonError(role.error!, status: 404);
       rate = role.role?.hourlyCostCents ?? own.auth!.membership.hourlyCostCents;
     }
     final updated = TimeEntry(

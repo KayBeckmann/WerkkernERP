@@ -66,8 +66,11 @@ class StaffRoleRoutes {
     if (!mayRead || !await _moduleEnabled(ctx)) return jsonError('Keine Berechtigung: timeTracking.', status: 403);
     final companyId = ctx.session.companyId;
     var roles = await business.listStaffRoles(companyId);
-    // Wie offline: Vorschläge beim ersten Öffnen durch den Admin anlegen.
-    if (roles.isEmpty && ctx.membership.isAdmin && !ctx.session.isAgent) {
+    // Wie offline: Vorschläge nur beim Öffnen der Rollenverwaltung durch
+    // den Admin (`?seed=1`) — nicht schon beim Zeitbuchen, sonst wäre die
+    // Rolle (C3.4: Pflicht, sobald es Rollen gibt) sofort Pflicht.
+    final seed = request.url.queryParameters['seed'] == '1';
+    if (seed && roles.isEmpty && ctx.membership.isAdmin && !ctx.session.isAgent) {
       final now = DateTime.now().toUtc();
       for (final name in defaultStaffRoleNames) {
         await business.createStaffRole(

@@ -73,6 +73,34 @@ class TimeEntryRepository {
     return Money.fromCents(totalCents);
   }
 
+  /// C3.4 (Kay 2026-11-03): Sobald die Firma Rollen hat, braucht jede
+  /// Buchung eine Rolle — sonst lässt sie sich nicht je Rolle abrechnen.
+  /// Ohne Rollen bleibt die Rolle optional. Eine Rolle muss zur Firma
+  /// gehören.
+  Future<void> _checkRole(String companyId, String? staffRoleId) async {
+    final roles =
+        await (_db.select(_db.staffRoles)..where((r) => r.companyId.equals(companyId))).get();
+    if (staffRoleId == null) {
+      if (roles.isNotEmpty) {
+        throw ArgumentError('Bitte eine Rolle wählen — sie bestimmt den Stundensatz beim Abrechnen.');
+      }
+      return;
+    }
+    if (!roles.any((r) => r.id == staffRoleId)) {
+      throw ArgumentError('Die Rolle gehört nicht zu dieser Firma.');
+    }
+  }
+
+  /// Zuletzt gebuchte Rolle — Vorbelegung der nächsten Buchung.
+  Future<String?> lastUsedRoleId(String companyId) async {
+    final last = await (_db.select(_db.timeEntries)
+          ..where((t) => t.companyId.equals(companyId) & t.staffRoleId.isNotNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+          ..limit(1))
+        .getSingleOrNull();
+    return last?.staffRoleId;
+  }
+
   /// Legt eine Zeitbuchung an. Mindestens eines von [invoiceId]/
   /// [projectId] ist Pflicht (wirft [ArgumentError], wenn beide fehlen —
   /// die Tabelle selbst erzwingt das nicht, siehe Doc-Kommentar bei
@@ -93,6 +121,7 @@ class TimeEntryRepository {
     if (invoiceId == null && projectId == null) {
       throw ArgumentError('Eine Zeitbuchung braucht einen Auftrag/eine Rechnung oder ein Projekt.');
     }
+    await _checkRole(companyId, staffRoleId);
 
     var resolvedProjectId = projectId;
     if (invoiceId != null && resolvedProjectId == null) {
@@ -156,6 +185,7 @@ class TimeEntryRepository {
     if (nextInvoiceId == null && nextProjectId == null) {
       throw ArgumentError('Eine Zeitbuchung braucht einen Auftrag/eine Rechnung oder ein Projekt.');
     }
+    await _checkRole(companyId, staffRoleId.present ? staffRoleId.value : existing.staffRoleId);
 
     await (_db.update(_db.timeEntries)..where((t) => t.id.equals(id))).write(
       TimeEntriesCompanion(

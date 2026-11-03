@@ -78,6 +78,54 @@ void main() {
       );
     });
 
+    test('C3.4: Rolle ist Pflicht, sobald die Firma Rollen hat; letzte Rolle wird vorgeschlagen', () async {
+      final company = await companies.create(name: 'Elektro Beckmann');
+      await companies.update(company.copyWith(projectsEnabled: true));
+      final project = await projects.create(companyId: company.id, name: 'Projekt Nord');
+      // Ohne Rollen: weiter optional.
+      final legacy = await timeEntries.create(companyId: company.id, date: DateTime.now(), hours: 1, projectId: project.id);
+      expect(await timeEntries.lastUsedRoleId(company.id), isNull);
+
+      final role = await staffRoles.create(companyId: company.id, name: 'Monteur');
+      expect(
+        () => timeEntries.create(companyId: company.id, date: DateTime.now(), hours: 1, projectId: project.id),
+        throwsArgumentError,
+      );
+      final other = await companies.create(name: 'Andere Firma');
+      final foreign = await staffRoles.create(companyId: other.id, name: 'Fremd');
+      expect(
+        () => timeEntries.create(
+          companyId: company.id,
+          date: DateTime.now(),
+          hours: 1,
+          projectId: project.id,
+          staffRoleId: foreign.id,
+        ),
+        throwsArgumentError,
+      );
+      await timeEntries.create(
+        companyId: company.id,
+        date: DateTime.now(),
+        hours: 2,
+        projectId: project.id,
+        staffRoleId: role.id,
+      );
+      expect(await timeEntries.lastUsedRoleId(company.id), role.id);
+
+      // Altbuchung ohne Rolle: Bearbeiten verlangt jetzt eine Rolle.
+      expect(
+        () => timeEntries.update(companyId: company.id, id: legacy.id, hours: 1.5),
+        throwsArgumentError,
+      );
+      final fixed = await timeEntries.update(
+        companyId: company.id,
+        id: legacy.id,
+        hours: 1.5,
+        staffRoleId: Value(role.id),
+      );
+      expect(fixed!.staffRoleId, role.id);
+    });
+
     test(
       'create() mit invoiceId übernimmt automatisch die Projektzuordnung des Dokuments',
       () async {
@@ -177,13 +225,16 @@ void main() {
           projectId: project.id,
           staffRoleId: role.id,
         );
-        await timeEntries.create(
-          companyId: company.id,
-          date: DateTime.now(),
-          hours: 2,
-          projectId: project.id,
-          // Keine Rolle — Standalone-Normalfall ohne Personen-/Rollenbezug.
-        );
+        // Altbestand ohne Rolle (vor C3.4 gebucht) — neu geht das nicht
+        // mehr, sobald es Rollen gibt, daher direkt in die Tabelle.
+        await db.into(db.timeEntries).insert(TimeEntriesCompanion.insert(
+              id: 'alt-ohne-rolle',
+              companyId: company.id,
+              date: DateTime.now(),
+              hours: 2,
+              projectId: Value(project.id),
+              createdAt: DateTime.now(),
+            ));
 
         expect(
           await timeEntries.totalHoursForProject(companyId: company.id, projectId: project.id),

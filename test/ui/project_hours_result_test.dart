@@ -134,7 +134,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('A-').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(DropdownButtonFormField<String?>, '— ohne Rolle —'));
+      await tester.tap(find.byKey(const Key('time-entry-role')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Monteur').last);
       await tester.pumpAndSettle();

@@ -131,7 +131,17 @@ void main() {
     );
     await invoices.finalize(companyId: companyId, id: order.id);
     await times.create(companyId: companyId, date: today, hours: 2.5, staffRoleId: monteur.id, invoiceId: order.id);
-    await times.create(companyId: companyId, date: today, hours: 1, projectId: project.id, note: 'Aufmaß');
+    // Altbestand ohne Rolle (vor C3.4 gebucht) — neu verlangt die App eine
+    // Rolle, sobald es Rollen gibt.
+    await db.into(db.timeEntries).insert(TimeEntriesCompanion.insert(
+          id: 'alt-ohne-rolle',
+          companyId: companyId,
+          date: today,
+          hours: 1,
+          projectId: Value(project.id),
+          note: const Value('Aufmaß'),
+          createdAt: DateTime.now(),
+        ));
     final advance = await invoices.createMaterialAdvanceDraft(
       companyId: companyId,
       sourceOrderId: order.id,

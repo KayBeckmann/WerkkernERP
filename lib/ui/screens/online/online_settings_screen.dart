@@ -368,10 +368,10 @@ class OnlineStaffRolesScreen extends StatefulWidget {
 }
 
 class _OnlineStaffRolesScreenState extends State<OnlineStaffRolesScreen> {
-  late Future<List<OnlineStaffRole>> _future = widget.session.client.staffRoles();
+  late Future<List<OnlineStaffRole>> _future = widget.session.client.staffRoles(seedDefaults: true);
 
   void _reload() => setState(() {
-        _future = widget.session.client.staffRoles();
+        _future = widget.session.client.staffRoles(seedDefaults: true);
       });
 
   Future<void> _edit([OnlineStaffRole? existing]) async {

@@ -194,9 +194,27 @@ void runInvoiceFlowTests(Future<(PhaseBRepository, BusinessRepository)> Function
     final order = await post('/documents', {'kind': 'order', 'customerId': customerId, 'items': items});
     expect(((order['items'] as List).last as Map)['staffRoleId'], monteur['id']);
     final finalized = await post('/documents/${order['id']}/finalize', {'version': order['version']});
-    for (final (hours, role) in [('4', monteur['id']), ('3.5', monteur['id']), ('2', meister['id']), ('1', null)]) {
+    for (final (hours, role) in [('4', monteur['id']), ('3.5', monteur['id']), ('2', meister['id'])]) {
       await post('/time-entries', {'date': '2026-10-24', 'hours': hours, 'documentId': finalized['id'], 'staffRoleId': role});
     }
+    // Neue Buchung ohne Rolle geht nicht mehr, sobald es Rollen gibt …
+    await expectLater(
+      post('/time-entries', {'date': '2026-10-24', 'hours': '1', 'documentId': finalized['id']}),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 422)),
+    );
+    // … Altbestand ohne Rolle (vor C3.4 gebucht) wird trotzdem abgerechnet.
+    final (_, business) = repositories;
+    final now = DateTime.now().toUtc();
+    await business.createTimeEntry(TimeEntry(
+      id: 'alt-ohne-rolle',
+      companyId: companyId,
+      userId: (await business.listTimeEntries(companyId)).first.userId,
+      documentId: finalized['id'] as String,
+      workDate: DateTime.utc(2026, 10, 20),
+      hours: '1',
+      createdAt: now,
+      updatedAt: now,
+    ));
     final invoice = await post('/documents/${order['id']}/convert', {'kind': 'invoice'});
     final lines = (invoice['items'] as List).cast<Map>().where((i) => i['kind'] == 'hours').toList();
     expect(lines.map((i) => (i['staffRoleId'], i['quantity'], i['unitPriceCents'])), [
