@@ -74,6 +74,15 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - **Zeiterfassung** mit Rollen-Stundensätzen, Festpreis-Kennzeichen,
   Materialabschlag und **Kunden-Stundenzettel mit Touch-Unterschrift**
   (keine qualifizierte elektronische Signatur).
+- **Stunden je Rolle abrechnen**: jede Rolle hat einen Verrechnungssatz
+  (Preis je Stunde für den Kunden) neben dem Kostensatz. Stunden-Positionen
+  bekommen die Einheit „h“ und eine Rolle, deren Satz als Preis
+  vorgeschlagen wird. Sobald es Rollen gibt, braucht jede Zeitbuchung eine.
+  Auftrag und Rechnung zeigen geplant/gebucht je Rolle; aus einem Auftrag
+  ohne Festpreis wird je Rolle eine Ist-Stunden-Position (Preis aus der
+  Auftrags-Position dieser Rolle, sonst Verrechnungssatz). Zuschläge
+  (Nacht/Überstunden/Wochenende) und Sätze je Kunde sind vorgemerkt,
+  aber noch nicht umgesetzt.
 - **Lagerbestand, Inventur, Bewegungsprotokoll und Bestellwesen**
   (Mindestbestand, Mindestbestellmenge, Wareneingang, SKR03-Beleg).
 - **Fuhrpark**: Fahrzeuge, TÜV-Fälligkeit, Kostenbuchungen inkl.
