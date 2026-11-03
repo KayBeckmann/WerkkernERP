@@ -277,7 +277,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
 
   static const _itemColumns =
       'i.id, i.document_id, i.kind, i.article_id, i.description, i.quantity, i.unit_price_cents, i.vat_rate_percent, '
-      'i.unit, i.discount_percent, i.group_label, i.sort_order';
+      'i.unit, i.discount_percent, i.group_label, i.sort_order, i.staff_role_id';
 
   DocumentItem _toItem(ResultRow r) => DocumentItem(
         id: r[0] as String,
@@ -292,6 +292,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         discountPercent: r[9] as double,
         groupLabel: r[10] as String?,
         sortOrder: r[11] as int,
+        staffRoleId: r[12] as String?,
       );
 
   @override
@@ -310,8 +311,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       await s.execute(
         Sql.named(
           'INSERT INTO document_items (id, document_id, kind, article_id, description, quantity, unit_price_cents, '
-          'vat_rate_percent, unit, discount_percent, group_label, sort_order) VALUES (@id, @documentId, @kind, '
-          '@articleId, @description, @quantity, @price, @vat, @unit, @discount, @groupLabel, @sortOrder)',
+          'vat_rate_percent, unit, discount_percent, group_label, sort_order, staff_role_id) VALUES (@id, @documentId, '
+          '@kind, @articleId, @description, @quantity, @price, @vat, @unit, @discount, @groupLabel, @sortOrder, @role)',
         ),
         parameters: {
           'id': i.id,
@@ -326,6 +327,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'discount': i.discountPercent,
           'groupLabel': i.groupLabel,
           'sortOrder': i.sortOrder,
+          'role': i.staffRoleId,
         },
       );
     }

@@ -365,6 +365,17 @@ class BusinessRoutes {
         ? await finalizedSummaries((await business.listConvertedFrom(companyId, document.id)).where((d) => d.kind == 'creditNote'))
         : const <Map<String, Object?>>[];
     final advanceSum = advancePayments.fold<int>(0, (sum, a) => sum + (a['grossCents'] as int));
+    // C3.4: Gebucht je Rolle — bei einer aus einem Auftrag umgewandelten
+    // Rechnung zusätzlich die Zeiten des Auftrags (dort wird gebucht).
+    final bookedForRoles = [
+      ...booked,
+      if (document.kind == 'invoice' && source != null && source.kind == 'order')
+        ...await business.listTimeEntries(companyId, documentId: source.id),
+    ];
+    final bookedByRole = <String?, Decimal>{};
+    for (final t in bookedForRoles) {
+      bookedByRole[t.staffRoleId] = (bookedByRole[t.staffRoleId] ?? Decimal.zero) + Decimal.parse(t.hours);
+    }
     return jsonOk({
       ...document.toJson(),
       'editable': isDocumentEditable(kind: document.kind, isDraft: document.isDraft, hasConversions: convertedTo.isNotEmpty),
@@ -372,6 +383,9 @@ class BusinessRoutes {
       // C3: "Geplant laut Angebot vs. gebucht" — Summe aller auf dieses
       // Dokument gebuchten Stunden (Firmensicht, ohne Personenbezug).
       'bookedHours': booked.fold<Decimal>(Decimal.zero, (sum, t) => sum + Decimal.parse(t.hours)).toString(),
+      'bookedHoursByRole': [
+        for (final e in bookedByRole.entries) {'staffRoleId': e.key, 'hours': e.value.toString()},
+      ],
       'convertedTo': [
         for (final d in convertedTo) {'id': d.id, 'kind': d.kind, 'number': d.number, 'status': d.status},
       ],
@@ -450,6 +464,11 @@ class BusinessRoutes {
         // Fremder Artikel wird exakt wie ein nicht existierender behandelt.
         return (items: null, error: 'Position ${index + 1}: Artikel nicht gefunden.');
       }
+      // C3.4: Rolle nur an Stunden-Positionen, muss zur Firma gehören.
+      final staffRoleId = kind == 'hours' ? entry['staffRoleId'] as String? : null;
+      if (staffRoleId != null && await business.findStaffRole(companyId, staffRoleId) == null) {
+        return (items: null, error: 'Position ${index + 1}: Rolle nicht gefunden.');
+      }
       items.add(DocumentItem(
         id: _uuid.v4(),
         documentId: documentId,
@@ -462,6 +481,7 @@ class BusinessRoutes {
         unit: _trimmed(entry['unit']),
         discountPercent: discount.toDouble(),
         groupLabel: _trimmed(entry['groupLabel']),
+        staffRoleId: staffRoleId,
         sortOrder: index,
       ));
     }
@@ -731,19 +751,39 @@ class BusinessRoutes {
     final newId = _uuid.v4();
     final sourceItems = await business.itemsFor(companyId, id);
     // C3.2 Zeit und Material: Auftrag ohne Festpreis -> Rechnung ersetzt
-    // die geplanten Stunden-Positionen durch EINE Position mit den
-    // gebuchten Ist-Stunden (Preis/USt/Einheit der ersten Stunden-
-    // Position) — wie offline, nur bei aktiver Zeiterfassung.
+    // die geplanten Stunden-Positionen durch die gebuchten Ist-Stunden,
+    // eine Position je Rolle (C3.4, `billBookedHoursByRole`) — wie
+    // offline, nur bei aktiver Zeiterfassung.
     final hoursItems = sourceItems.where((i) => i.kind == 'hours').toList();
     final timeAndMaterial = source.kind == 'order' &&
         targetKind == 'invoice' &&
         !source.isFixedPrice &&
         hoursItems.isNotEmpty &&
         (await _enabledModules(session)).contains('timeTracking');
-    Decimal? bookedHours;
+    var bookedLines = const <BookedHoursLine>[];
     if (timeAndMaterial) {
-      bookedHours = (await business.listTimeEntries(companyId, documentId: id))
-          .fold<Decimal>(Decimal.zero, (sum, t) => sum + Decimal.parse(t.hours));
+      final bookedByRole = <String?, Decimal>{};
+      for (final t in await business.listTimeEntries(companyId, documentId: id)) {
+        bookedByRole[t.staffRoleId] = (bookedByRole[t.staffRoleId] ?? Decimal.zero) + Decimal.parse(t.hours);
+      }
+      bookedLines = billBookedHoursByRole(
+        bookedHoursByRole: bookedByRole,
+        plannedItems: [
+          for (final i in hoursItems)
+            PlannedHoursItem(
+              staffRoleId: i.staffRoleId,
+              unitPriceCents: i.unitPriceCents,
+              vatRatePercent: i.vatRatePercent,
+              unit: i.unit,
+              groupLabel: i.groupLabel,
+            ),
+        ],
+        roles: [
+          for (final r in await business.listStaffRoles(companyId))
+            BillingRole(id: r.id, name: r.name, billingRateCents: r.hourlyBillingCents),
+        ],
+        customerId: source.customerId,
+      );
     }
     var sortOrder = 0;
     final items = [
@@ -761,19 +801,21 @@ class BusinessRoutes {
             unit: item.unit,
             discountPercent: item.discountPercent,
             groupLabel: item.groupLabel,
+            staffRoleId: item.staffRoleId,
             sortOrder: sortOrder++,
           ),
-      if (timeAndMaterial)
+      for (final line in bookedLines)
         DocumentItem(
           id: _uuid.v4(),
           documentId: newId,
           kind: 'hours',
-          description: 'Geleistete Stunden (Ist-Zeit)',
-          quantity: bookedHours.toString(),
-          unitPriceCents: hoursItems.first.unitPriceCents,
-          vatRatePercent: hoursItems.first.vatRatePercent,
-          unit: hoursItems.first.unit,
-          groupLabel: hoursItems.first.groupLabel,
+          description: line.description,
+          quantity: line.hours.toString(),
+          unitPriceCents: line.unitPriceCents,
+          vatRatePercent: line.vatRatePercent,
+          unit: line.unit,
+          groupLabel: line.groupLabel,
+          staffRoleId: line.staffRoleId,
           sortOrder: sortOrder++,
         ),
     ];
@@ -941,12 +983,21 @@ class BusinessRoutes {
 
   /// Rolle einer Zeitbuchung (wie offline): muss zur Firma gehören.
   /// Liefert die Rolle oder `null`; [error] bei unbekannter ID.
+  /// C3.4 (Kay 2026-11-03): Pflicht, sobald die Firma Rollen hat — 422,
+  /// damit sich gebuchte Stunden je Rolle abrechnen lassen.
   Future<({StaffRole? role, String? error})> _staffRole(Map<String, Object?> body, String companyId) async {
     final id = body['staffRoleId'] as String?;
-    if (id == null) return (role: null, error: null);
+    if (id == null) {
+      final required = (await business.listStaffRoles(companyId)).isNotEmpty;
+      return (role: null, error: required ? _roleRequired : null);
+    }
     final role = await business.findStaffRole(companyId, id);
     return role == null ? (role: null, error: 'Rolle nicht gefunden.') : (role: role, error: null);
   }
+
+  static const _roleRequired = 'Bitte eine Rolle wählen — sie bestimmt den Stundensatz beim Abrechnen.';
+
+  Response _roleError(String error) => jsonError(error, status: error == _roleRequired ? 422 : 404);
 
   Future<Response> _createTimeEntry(Request request) async {
     final check = await auth.requirePermission(request, 'timeTracking.write');
@@ -958,7 +1009,7 @@ class BusinessRoutes {
       return jsonError(parsed.error!, status: parsed.error!.contains('nicht gefunden') ? 404 : 400);
     }
     final role = await _staffRole(body, ctx.session.companyId);
-    if (role.error != null) return jsonError(role.error!, status: 404);
+    if (role.error != null) return _roleError(role.error!);
     final now = DateTime.now().toUtc();
     final entry = TimeEntry(
       id: _uuid.v4(),
@@ -1022,9 +1073,10 @@ class BusinessRoutes {
     // eingefrorene Satz.
     final roleId = body.containsKey('staffRoleId') ? body['staffRoleId'] as String? : e.staffRoleId;
     var rate = e.hourlyCostCents;
+    // Auch eine Altbuchung ohne Rolle braucht beim Ändern eine (C3.4).
+    final role = await _staffRole({'staffRoleId': roleId}, e.companyId);
+    if (role.error != null) return _roleError(role.error!);
     if (roleId != e.staffRoleId) {
-      final role = await _staffRole({'staffRoleId': roleId}, e.companyId);
-      if (role.error != null) return jsonError(role.error!, status: 404);
       rate = role.role?.hourlyCostCents ?? own.auth!.membership.hourlyCostCents;
     }
     final updated = TimeEntry(
@@ -1280,6 +1332,7 @@ class BusinessRoutes {
           unit: item.unit,
           discountPercent: item.discountPercent,
           groupLabel: item.groupLabel,
+          staffRoleId: item.staffRoleId,
           sortOrder: item.sortOrder,
         ),
     ];

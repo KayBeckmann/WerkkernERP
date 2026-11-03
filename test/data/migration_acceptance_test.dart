@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart' show BooleanExpressionOperators, Value;
@@ -82,7 +83,7 @@ void main() {
     ).create(companyId: companyId, name: 'Neubau', customerId: customer.id);
     final monteur = await StaffRoleRepository(
       db,
-    ).create(companyId: companyId, name: 'Monteur', hourlyCostRateCents: 4500);
+    ).create(companyId: companyId, name: 'Monteur', hourlyCostRateCents: 4500, hourlyBillingRateCents: 7000);
 
     // Bestellung mit Wareneingang → Bestand 50 m.
     final orders = PurchaseOrderRepository(db, numbers);
@@ -126,12 +127,23 @@ void main() {
           vatRatePercent: 19,
           discountPercent: 10,
           groupLabel: 'Arbeit',
+          staffRoleId: monteur.id,
         ),
       ],
     );
     await invoices.finalize(companyId: companyId, id: order.id);
     await times.create(companyId: companyId, date: today, hours: 2.5, staffRoleId: monteur.id, invoiceId: order.id);
-    await times.create(companyId: companyId, date: today, hours: 1, projectId: project.id, note: 'Aufmaß');
+    // Altbestand ohne Rolle (vor C3.4 gebucht) — neu verlangt die App eine
+    // Rolle, sobald es Rollen gibt.
+    await db.into(db.timeEntries).insert(TimeEntriesCompanion.insert(
+          id: 'alt-ohne-rolle',
+          companyId: companyId,
+          date: today,
+          hours: 1,
+          projectId: Value(project.id),
+          note: const Value('Aufmaß'),
+          createdAt: DateTime.now(),
+        ));
     final advance = await invoices.createMaterialAdvanceDraft(
       companyId: companyId,
       sourceOrderId: order.id,
@@ -204,6 +216,8 @@ void main() {
     await client.importCompany(package, roleAssignments: {monteur.id: me, migrationNoRoleKey: me});
 
     // ---- Vergleich -----------------------------------------------------------
+    final roleRepo = StaffRoleRepository(db);
+    final onlineRoleList = await client.staffRoles();
     company = (await CompanyRepository(db).findById(companyId))!;
     final offlineDocs = await (db.select(db.invoices)..where((i) => i.companyId.equals(companyId))).get();
     final onlineDocs = await client.documents();
@@ -232,7 +246,28 @@ void main() {
         _withoutDocumentId(offlinePdf),
         reason: '${offline.invoiceNumber}: PDF gleich',
       );
+      // C3.4: Rolle an den Stunden-Positionen zieht mit um.
+      final offlineRoles = [
+        for (final i in await invoices.itemsFor(offline.id))
+          if (i.kind == InvoiceItemKind.hours) i.staffRoleId == null ? null : (await roleRepo.findById(companyId: companyId, id: i.staffRoleId!))!.name,
+      ];
+      final onlineItemRoles = [
+        for (final i in online.items)
+          if (i.kind == OnlineItemKind.hours) i.staffRoleId == null ? null : onlineRoleList.firstWhere((r) => r.id == i.staffRoleId).name,
+      ];
+      expect(onlineItemRoles, offlineRoles, reason: '${offline.invoiceNumber}: Rollen der Stunden-Positionen');
+      if (offline.id == finalInvoice.id) {
+        expect(offlineRoles, ['Monteur'], reason: 'Schlussrechnung: Ist-Stunden je Rolle');
+        final text = await _pdfText(offlinePdf);
+        if (text != null) {
+          expect(text, contains('Monteur – geleistete Stunden (Ist-Zeit)'));
+        } else {
+          markTestSkipped('pdftotext fehlt — PDF-Textprüfung übersprungen');
+        }
+      }
     }
+    final monteurOnline = onlineRoleList.singleWhere((r) => r.name == 'Monteur');
+    expect((monteurOnline.hourlyCostCents, monteurOnline.hourlyBillingCents), (4500, 7000));
 
     // Offene Posten nach derselben Regel wie der Offline-Bildschirm
     // (überfällige Rechnung + noch offene Abschlagsrechnung).
@@ -304,3 +339,18 @@ void main() {
 /// Trailer — alles andere muss byte-gleich sein.
 String _withoutDocumentId(List<int> pdf) =>
     latin1.decode(pdf).replaceAll(RegExp(r'/ID\[<[0-9a-f]+><[0-9a-f]+>\]'), '/ID[]');
+
+/// Text einer PDF über `pdftotext` (poppler) — `null`, wenn das Werkzeug
+/// fehlt, dann entfällt nur diese Zusatzprüfung.
+Future<String?> _pdfText(List<int> pdf) async {
+  final dir = await Directory.systemTemp.createTemp('werkkern_pdf_');
+  try {
+    final file = File('${dir.path}/doc.pdf')..writeAsBytesSync(pdf);
+    final result = await Process.run('pdftotext', [file.path, '-']);
+    return result.exitCode == 0 ? result.stdout as String : null;
+  } on ProcessException {
+    return null;
+  } finally {
+    await dir.delete(recursive: true);
+  }
+}

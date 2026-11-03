@@ -24,10 +24,17 @@ class _OnlineTimeScreenState extends State<OnlineTimeScreen> {
   final Map<String, String> _roleNames = {};
   List<OnlineStaffRole> _roles = const [];
 
+  /// Rolle der eigenen letzten Buchung — Vorbelegung (C3.4).
+  String? _lastRoleId;
+
   OnlineSession get _session => widget.session;
 
   Future<({List<OnlineTimeEntry> entries, String totalHours, bool companyScope})> _load() async {
     final result = await _session.client.timeEntries();
+    _lastRoleId = result.entries
+        .where((e) => e.staffRoleId != null && (e.userEmail == null || e.userEmail == _session.email))
+        .firstOrNull
+        ?.staffRoleId;
     // Bezüge und Rollen nur für die Anzeige — fehlen Rechte, bleibt „–“.
     if (_session.can('invoices.read')) {
       try {
@@ -94,7 +101,14 @@ class _OnlineTimeScreenState extends State<OnlineTimeScreen> {
     if (!mounted) return;
     final result = await showDialog<_TimeResult>(
       context: context,
-      builder: (_) => _TimeEntryDialog(documents: documents, projects: projects, roles: _roles, existing: existing, label: _label),
+      builder: (_) => _TimeEntryDialog(
+        documents: documents,
+        projects: projects,
+        roles: _roles,
+        existing: existing,
+        label: _label,
+        initialRoleId: _lastRoleId,
+      ),
     );
     if (result == null) return;
     try {
@@ -215,7 +229,8 @@ class _TimeResult {
 }
 
 /// Zeitbuchung wie offline: Bezug entweder Auftrag/Rechnung oder Projekt
-/// (Umschalter), Rolle optional — ihr Stundensatz wird eingefroren.
+/// (Umschalter). Rolle Pflicht, sobald die Firma Rollen hat (C3.4) — ihr
+/// Stundensatz wird eingefroren.
 class _TimeEntryDialog extends StatefulWidget {
   const _TimeEntryDialog({
     required this.documents,
@@ -223,12 +238,16 @@ class _TimeEntryDialog extends StatefulWidget {
     this.projects = const [],
     this.roles = const [],
     this.existing,
+    this.initialRoleId,
   });
   final List<OnlineDocument> documents;
   final List<OnlineProject> projects;
   final List<OnlineStaffRole> roles;
   final String Function(OnlineDocument) label;
   final OnlineTimeEntry? existing;
+
+  /// Vorbelegung neuer Buchungen: Rolle der eigenen letzten Buchung.
+  final String? initialRoleId;
 
   @override
   State<_TimeEntryDialog> createState() => _TimeEntryDialogState();
@@ -244,7 +263,10 @@ class _TimeEntryDialogState extends State<_TimeEntryDialog> {
               : _ReferenceKind.document;
   late String? _documentId = widget.documents.any((d) => d.id == widget.existing?.documentId) ? widget.existing?.documentId : null;
   late String? _projectId = widget.projects.any((p) => p.id == widget.existing?.projectId) ? widget.existing?.projectId : null;
-  late String? _staffRoleId = widget.roles.any((r) => r.id == widget.existing?.staffRoleId) ? widget.existing?.staffRoleId : null;
+  late String? _staffRoleId = () {
+    final wanted = widget.existing == null ? widget.initialRoleId : widget.existing!.staffRoleId;
+    return widget.roles.any((r) => r.id == wanted) ? wanted : null;
+  }();
   late final _hours = TextEditingController(text: widget.existing?.hours.replaceAll('.', ',') ?? '1');
   late final _note = TextEditingController(text: widget.existing?.note);
   String? _error;
@@ -261,6 +283,10 @@ class _TimeEntryDialogState extends State<_TimeEntryDialog> {
     final reference = _referenceKind == _ReferenceKind.document ? _documentId : _projectId;
     if (reference == null || hours == null || hours <= Decimal.zero || hours > Decimal.fromInt(24)) {
       setState(() => _error = 'Auftrag/Rechnung bzw. Projekt wählen und Stunden zwischen 0 und 24 angeben.');
+      return;
+    }
+    if (widget.roles.isNotEmpty && _staffRoleId == null) {
+      setState(() => _error = 'Bitte eine Rolle wählen — sie bestimmt den Stundensatz beim Abrechnen.');
       return;
     }
     Navigator.pop(
@@ -350,12 +376,8 @@ class _TimeEntryDialogState extends State<_TimeEntryDialog> {
                   key: const Key('online-time-role'),
                   initialValue: _staffRoleId,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Rolle (optional)',
-                    helperText: 'Ohne Rolle gilt dein Stundensatz.',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Rolle *'),
                   items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('— ohne Rolle —')),
                     for (final r in widget.roles) DropdownMenuItem<String?>(value: r.id, child: Text(r.name)),
                   ],
                   onChanged: (v) => setState(() => _staffRoleId = v),

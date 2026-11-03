@@ -3,7 +3,7 @@ part of '../repository_postgres.dart';
 mixin _PostgresStaffRoles implements StaffRoleStore {
   Future<Result> _q(String sql, [Map<String, Object?> parameters = const {}]);
 
-  static const _roleColumns = 'id, company_id, name, hourly_cost_cents, created_at';
+  static const _roleColumns = 'id, company_id, name, hourly_cost_cents, created_at, hourly_billing_cents';
 
   StaffRole _toRole(ResultRow r) => StaffRole(
         id: r[0] as String,
@@ -11,6 +11,7 @@ mixin _PostgresStaffRoles implements StaffRoleStore {
         name: r[2] as String,
         hourlyCostCents: r[3] as int,
         createdAt: r[4] as DateTime,
+        hourlyBillingCents: r[5] as int,
       );
 
   @override
@@ -34,16 +35,24 @@ mixin _PostgresStaffRoles implements StaffRoleStore {
   @override
   Future<void> createStaffRole(StaffRole r) async {
     await _q(
-      'INSERT INTO staff_roles ($_roleColumns) VALUES (@id, @companyId, @name, @rate, @createdAt)',
-      {'id': r.id, 'companyId': r.companyId, 'name': r.name, 'rate': r.hourlyCostCents, 'createdAt': r.createdAt},
+      'INSERT INTO staff_roles ($_roleColumns) VALUES (@id, @companyId, @name, @rate, @createdAt, @billing)',
+      {
+        'id': r.id,
+        'companyId': r.companyId,
+        'name': r.name,
+        'rate': r.hourlyCostCents,
+        'createdAt': r.createdAt,
+        'billing': r.hourlyBillingCents,
+      },
     );
   }
 
   @override
   Future<bool> updateStaffRole(StaffRole r) async {
     final result = await _q(
-      'UPDATE staff_roles SET name = @name, hourly_cost_cents = @rate WHERE company_id = @companyId AND id = @id',
-      {'id': r.id, 'companyId': r.companyId, 'name': r.name, 'rate': r.hourlyCostCents},
+      'UPDATE staff_roles SET name = @name, hourly_cost_cents = @rate, hourly_billing_cents = @billing '
+      'WHERE company_id = @companyId AND id = @id',
+      {'id': r.id, 'companyId': r.companyId, 'name': r.name, 'rate': r.hourlyCostCents, 'billing': r.hourlyBillingCents},
     );
     return result.affectedRows > 0;
   }

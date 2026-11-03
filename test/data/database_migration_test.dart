@@ -39,7 +39,8 @@ import 'package:werkkernerp/data/repositories/supplier_repository.dart';
 /// Nachtrag 2026-10-21; v29→v30: C2-Nachtrag Projektnummer-
 /// Nummernkreise, Nachtrag 2026-10-21; v30→v31: C3-Rest
 /// Kunden-Stundenzettel/Unterschrift, Nachtrag 2026-10-21; v31→v32:
-/// C5.1-Fix Merker stock_booked; v32→v33: B4 Umzugsvermerk).
+/// C5.1-Fix Merker stock_booked; v32→v33: B4 Umzugsvermerk; v33→v34:
+/// C3.4 Stunden je Rolle).
 /// Statt das Spaltentyp-/
 /// Datumsspeicherformat von drifts NativeDatabase zu raten,
 /// wird eine ECHTE aktuelle Datenbank von drift selbst erzeugt und
@@ -285,6 +286,9 @@ void main() {
       raw.execute('ALTER TABLE companies DROP COLUMN migrated_at;');
       raw.execute('ALTER TABLE companies DROP COLUMN migrated_to_server;');
       raw.execute('ALTER TABLE companies DROP COLUMN migrated_to_company_name;');
+      // v33 -> v34 (C3.4: Rolle an der Position; `staff_roles` ist oben
+      // schon komplett gedroppt, siehe `from >= 27`-Guard).
+      raw.execute('ALTER TABLE invoice_items DROP COLUMN staff_role_id;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -528,6 +532,7 @@ void main() {
             await (db.select(db.invoiceItems)..where((i) => i.invoiceId.equals(invoice.id))).getSingle();
         expect(migratedItem.unit, isNull);
         expect(migratedItem.discountPercent, 0);
+        expect(migratedItem.staffRoleId, isNull, reason: "v34: Bestandspositionen haben keine Rolle");
         expect(
           migratedItem.description,
           'Bestandsposition',
@@ -696,4 +701,33 @@ void main() {
       }
     },
   );
+
+  test('Migration v33→v34 (C3.4): bestehende Rolle bekommt Verrechnungssatz 0, Positionen keine Rolle', () async {
+    final file = File(dbPath);
+    var db = AppDatabase.forTesting(NativeDatabase(file, setup: (r) => r.execute('PRAGMA foreign_keys = ON;')));
+    final company = await CompanyRepository(db).create(name: 'Firma mit Rollen');
+    await db.into(db.staffRoles).insert(StaffRolesCompanion.insert(
+          id: 'role-alt',
+          companyId: company.id,
+          name: 'Monteur',
+          createdAt: DateTime(2026, 10, 20),
+          hourlyCostRateCents: const Value(4200),
+        ));
+    await db.close();
+
+    final raw = sqlite3.open(dbPath);
+    raw.execute('ALTER TABLE staff_roles DROP COLUMN hourly_billing_rate_cents;');
+    raw.execute('ALTER TABLE invoice_items DROP COLUMN staff_role_id;');
+    raw.execute('PRAGMA user_version = 33;');
+    raw.close();
+
+    db = AppDatabase.forTesting(NativeDatabase(file, setup: (r) => r.execute('PRAGMA foreign_keys = ON;')));
+    try {
+      final role = await (db.select(db.staffRoles)..where((r) => r.id.equals('role-alt'))).getSingle();
+      expect(role.hourlyCostRateCents, 4200, reason: 'Bestandsdaten dürfen nicht verändert werden');
+      expect(role.hourlyBillingRateCents, 0);
+    } finally {
+      await db.close();
+    }
+  });
 }

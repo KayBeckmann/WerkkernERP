@@ -54,7 +54,7 @@ void main() {
       final monteurCard = find.ancestor(of: find.text('Monteur'), matching: find.byType(Card));
       await tester.tap(find.descendant(of: monteurCard, matching: find.byIcon(Icons.edit_outlined)));
       await tester.pumpAndSettle();
-      await tester.enterText(find.widgetWithText(TextField, 'Stundenkostensatz (€)'), '40,00');
+      await tester.enterText(find.widgetWithText(TextField, 'Kostensatz (€/h)'), '40,00');
       await tester.tap(find.text('Speichern'));
       await tester.pumpAndSettle();
       await tester.pageBack();
@@ -134,7 +134,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.textContaining('A-').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(DropdownButtonFormField<String?>, '— ohne Rolle —'));
+      await tester.tap(find.byKey(const Key('time-entry-role')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Monteur').last);
       await tester.pumpAndSettle();

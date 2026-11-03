@@ -49,6 +49,7 @@ class _SettingsStaffRolesScreenState extends State<SettingsStaffRolesScreen> {
           companyId: companyId,
           name: result.name,
           hourlyCostRateCents: result.hourlyCostRateCents,
+          hourlyBillingRateCents: result.hourlyBillingRateCents,
         );
     _reload();
   }
@@ -65,6 +66,7 @@ class _SettingsStaffRolesScreenState extends State<SettingsStaffRolesScreen> {
           id: role.id,
           name: result.name,
           hourlyCostRateCents: result.hourlyCostRateCents,
+          hourlyBillingRateCents: result.hourlyBillingRateCents,
         );
     _reload();
   }
@@ -76,7 +78,8 @@ class _SettingsStaffRolesScreenState extends State<SettingsStaffRolesScreen> {
         title: const Text('Rolle löschen?'),
         content: Text(
           '"${role.name}" löschen? Bereits gebuchte Zeiten mit dieser Rolle bleiben erhalten, '
-          'verlieren aber ihren Stundenkostensatz-Bezug.',
+          'verlieren aber ihren Stundenkostensatz-Bezug. Positionen in Dokumenten behalten '
+          'ihren Preis und Text.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
@@ -107,9 +110,12 @@ class _SettingsStaffRolesScreenState extends State<SettingsStaffRolesScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 child: Text(
-                  'Rollen sind reine Stundensatz-Kategorien (kein Login/Mehrbenutzer-Konzept) — '
-                  'eine Zeitbuchung kann optional eine Rolle wählen, darüber fließt ein '
-                  'Stundenkostensatz in die Projekt-Ergebnisrechnung ein.',
+                  'Rollen sind reine Stundensatz-Kategorien (kein Login/Mehrbenutzer-Konzept). '
+                  'Der Verrechnungssatz ist der Preis je Stunde für den Kunden: er wird in '
+                  'Stunden-Positionen vorgeschlagen und beim Abrechnen gebuchter Zeiten genutzt. '
+                  'Der Kostensatz (was dich die Stunde kostet) fließt in die '
+                  'Projekt-Ergebnisrechnung ein. Sobald es Rollen gibt, braucht jede '
+                  'Zeitbuchung eine Rolle.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -117,7 +123,10 @@ class _SettingsStaffRolesScreenState extends State<SettingsStaffRolesScreen> {
                 Card(
                   child: ListTile(
                     title: Text(role.name),
-                    subtitle: Text('${Money.fromCents(role.hourlyCostRateCents)} / Std.'),
+                    subtitle: Text(
+                      'Verrechnung: ${role.hourlyBillingRateCents == 0 ? 'nicht hinterlegt' : '${Money.fromCents(role.hourlyBillingRateCents)} / Std.'}'
+                      ' · Kosten: ${Money.fromCents(role.hourlyCostRateCents)} / Std.',
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -148,9 +157,14 @@ class _SettingsStaffRolesScreenState extends State<SettingsStaffRolesScreen> {
 }
 
 class _StaffRoleFormResult {
-  const _StaffRoleFormResult({required this.name, required this.hourlyCostRateCents});
+  const _StaffRoleFormResult({
+    required this.name,
+    required this.hourlyCostRateCents,
+    required this.hourlyBillingRateCents,
+  });
   final String name;
   final int hourlyCostRateCents;
+  final int hourlyBillingRateCents;
 }
 
 class _StaffRoleFormDialog extends StatefulWidget {
@@ -166,6 +180,11 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
   late final _rateCtrl = TextEditingController(
     text: widget.existing == null ? null : Money.fromCents(widget.existing!.hourlyCostRateCents).formatEuro(),
   );
+  late final _billingCtrl = TextEditingController(
+    text: widget.existing == null || widget.existing!.hourlyBillingRateCents == 0
+        ? null
+        : Money.fromCents(widget.existing!.hourlyBillingRateCents).formatEuro(),
+  );
 
   bool get _isEdit => widget.existing != null;
 
@@ -173,6 +192,7 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
   void dispose() {
     _nameCtrl.dispose();
     _rateCtrl.dispose();
+    _billingCtrl.dispose();
     super.dispose();
   }
 
@@ -189,8 +209,20 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
             decoration: const InputDecoration(labelText: 'Name *'),
           ),
           TextField(
+            key: const Key('staff-role-billing'),
+            controller: _billingCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Verrechnungssatz (€/h)',
+              helperText: 'Preis je Stunde für den Kunden',
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          TextField(
             controller: _rateCtrl,
-            decoration: const InputDecoration(labelText: 'Stundenkostensatz (€)'),
+            decoration: const InputDecoration(
+              labelText: 'Kostensatz (€/h)',
+              helperText: 'Was dich die Stunde kostet (Projekt-Ergebnis)',
+            ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
         ],
@@ -201,9 +233,15 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
           onPressed: () {
             final name = _nameCtrl.text.trim();
             if (name.isEmpty) return;
-            final rateText = _rateCtrl.text.trim();
-            final cents = rateText.isEmpty ? 0 : Money.fromEuroString(rateText).cents;
-            Navigator.pop(context, _StaffRoleFormResult(name: name, hourlyCostRateCents: cents));
+            int cents(TextEditingController c) => c.text.trim().isEmpty ? 0 : Money.fromEuroString(c.text.trim()).cents;
+            Navigator.pop(
+              context,
+              _StaffRoleFormResult(
+                name: name,
+                hourlyCostRateCents: cents(_rateCtrl),
+                hourlyBillingRateCents: cents(_billingCtrl),
+              ),
+            );
           },
           child: Text(_isEdit ? 'Speichern' : 'Anlegen'),
         ),

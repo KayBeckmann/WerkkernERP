@@ -42,6 +42,10 @@ class OnlineDocumentScreen extends StatefulWidget {
 class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   OnlineDocument? _document;
   List<OnlineDocumentItem> _items = [];
+
+  /// C3.4: Rollen für Stunden-Positionen (Auswahl im Dialog, Anzeige an
+  /// der Position). Leer ohne Zeiterfassung oder ohne Leserecht.
+  List<OnlineStaffRole> _staffRoles = const [];
   late final _notes = TextEditingController();
   late final _paymentTerms = TextEditingController();
   String? _projectId;
@@ -92,6 +96,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
         if (mounted) setState(() => _smallBusiness = p.smallBusinessExempt);
       }, onError: (Object _) {});
       final session = widget.session;
+      if (session.modules.contains('timeTracking') &&
+          (session.isAdmin || session.can('timeTracking.read') || session.can('timeTracking.write'))) {
+        _client.staffRoles().then((roles) {
+          if (mounted) setState(() => _staffRoles = roles);
+        }, onError: (Object _) {});
+      }
       if (_projectsEnabled) {
         _client.projects().then((projects) {
           if (mounted) setState(() => _projects = projects);
@@ -603,6 +613,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       existingGroupLabels: onlineGroupLabels(_items),
       allowHours: _document!.kind != 'deliveryNote',
       forceZeroVat: _smallBusiness,
+      staffRoles: _staffRoles,
     );
     if (item == null) return;
     setState(() {
@@ -623,12 +634,50 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       existing: _items[index],
       allowHours: _document!.kind != 'deliveryNote',
       forceZeroVat: _smallBusiness,
+      staffRoles: _staffRoles,
     );
     if (item == null) return;
     setState(() {
       _items = [..._items]..[index] = item;
       _dirty = true;
     });
+  }
+
+  Widget _hoursByRole(OnlineDocument document, ThemeData theme) {
+    final booked = document.rawJson['bookedHoursByRole'];
+    final rows = compareHoursByRole(
+      plannedItems: [
+        for (final i in _items)
+          if (i.kind == OnlineItemKind.hours) (i.staffRoleId, Decimal.parse(i.quantity)),
+      ],
+      bookedEntries: [
+        if (booked is List)
+          for (final e in booked.cast<Map<String, Object?>>())
+            (e['staffRoleId'] as String?, Decimal.parse(e['hours'] as String)),
+      ],
+      knownRoleIds: {for (final r in _staffRoles) r.id},
+    );
+    final isOrder = document.kind == 'order';
+    if (rows.isEmpty || (!isOrder && rows.every((r) => r.booked == Decimal.zero))) return const SizedBox.shrink();
+    String name(String? id) => id == null ? 'ohne Rolle' : _staffRoles.firstWhere((r) => r.id == id).name;
+    final small = theme.textTheme.bodySmall;
+    return Padding(
+      key: const Key('online-hours-by-role'),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isOrder ? 'Stunden je Rolle (geplant · gebucht)' : 'Stunden je Rolle (berechnet · gebucht)',
+              style: small?.copyWith(fontWeight: FontWeight.w600)),
+          for (final row in rows)
+            Text(
+              '${name(row.staffRoleId)}: ${isOrder ? 'geplant' : 'berechnet'} ${formatHours(row.planned)} h · '
+              'gebucht ${formatHours(row.booked)} h',
+              style: small,
+            ),
+        ],
+      ),
+    );
   }
 
   static InvoiceTotals _totalsOf(Iterable<OnlineDocumentItem> items) => calculateInvoiceTotals([
@@ -836,6 +885,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                   Icon(_iconFor(item.kind), size: 18, color: Theme.of(context).colorScheme.outline),
                   const SizedBox(width: 8),
                   Expanded(child: Text(item.description, style: const TextStyle(fontWeight: FontWeight.w600))),
+                  if (_staffRoles.where((r) => r.id == item.staffRoleId).firstOrNull case final role?)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Chip(label: Text(role.name), visualDensity: VisualDensity.compact),
+                    ),
                   if (editable)
                     IconButton(
                       tooltip: 'Position entfernen',
@@ -909,7 +963,6 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             config: _dunningConfig!,
           )
         : DunningLevel.none;
-    final bookedHours = document.rawJson['bookedHours'];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
@@ -1034,17 +1087,10 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
               }),
             ),
         ],
-        // Geplant laut Angebot vs. tatsächlich gebuchte Ist-Stunden (online
-        // auch schon im Entwurf — gebucht werden kann darauf bereits).
-        if (session.modules.contains('timeTracking') && document.kind == 'order')
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Text(
-              'Geplant laut Angebot: ${_items.where((i) => i.kind == OnlineItemKind.hours).fold(Decimal.zero, (sum, i) => sum + Decimal.parse(i.quantity)).toString().replaceAll('.', ',')} Std. · '
-              'Gebucht: ${bookedHours is String ? bookedHours.replaceAll('.', ',') : '0'} Std.',
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
+        // Geplant vs. gebucht je Rolle (C3.4, wie offline) — online auch
+        // schon im Entwurf, gebucht werden kann darauf bereits.
+        if (session.modules.contains('timeTracking') && (document.kind == 'order' || document.kind == 'invoice'))
+          _hoursByRole(document, theme),
         if (_dunningEnabled && document.kind == 'invoice') ...[
           const SizedBox(height: 8),
           ListTile(

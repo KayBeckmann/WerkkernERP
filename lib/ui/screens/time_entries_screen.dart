@@ -71,6 +71,7 @@ class _TimeEntriesScreenState extends State<TimeEntriesScreen> {
     final invoices = await invoiceRepo.listAllForCompany(companyId, kind: DocumentKind.invoice);
     final projects = await projectRepo.listForCompany(companyId);
     final roles = await staffRoleRepo.listForCompany(companyId);
+    final lastRoleId = await timeEntryRepo.lastUsedRoleId(companyId);
     if (!mounted) return;
 
     final result = await showDialog<_TimeEntryFormResult>(
@@ -79,6 +80,7 @@ class _TimeEntriesScreenState extends State<TimeEntriesScreen> {
         documents: [...orders, ...invoices],
         projects: projects,
         roles: roles,
+        initialRoleId: roles.any((r) => r.id == lastRoleId) ? lastRoleId : null,
       ),
     );
     if (result == null || !mounted) return;
@@ -210,10 +212,18 @@ class _TimeEntryFormResult {
 /// ODER ein Projekt (Segmented-Auswahl), mindestens einer der beiden
 /// ist Pflicht (siehe `TimeEntryRepository.create()`).
 class _TimeEntryFormDialog extends StatefulWidget {
-  const _TimeEntryFormDialog({required this.documents, required this.projects, required this.roles});
+  const _TimeEntryFormDialog({
+    required this.documents,
+    required this.projects,
+    required this.roles,
+    this.initialRoleId,
+  });
   final List<Invoice> documents;
   final List<Project> projects;
   final List<StaffRole> roles;
+
+  /// Vorbelegung: Rolle der letzten Buchung (C3.4).
+  final String? initialRoleId;
 
   @override
   State<_TimeEntryFormDialog> createState() => _TimeEntryFormDialogState();
@@ -223,7 +233,8 @@ class _TimeEntryFormDialogState extends State<_TimeEntryFormDialog> {
   _ReferenceKind _referenceKind = _ReferenceKind.document;
   String? _invoiceId;
   String? _projectId;
-  String? _staffRoleId;
+  late String? _staffRoleId = widget.initialRoleId;
+  String? _roleError;
   DateTime _date = DateTime.now();
   final _hoursCtrl = TextEditingController(text: '1');
   final _noteCtrl = TextEditingController();
@@ -306,16 +317,21 @@ class _TimeEntryFormDialogState extends State<_TimeEntryFormDialog> {
                   onChanged: (value) => setState(() => _projectId = value),
                 ),
               if (widget.roles.isNotEmpty)
+                // C3.4: Rolle ist Pflicht, sobald es Rollen gibt (sonst
+                // lassen sich die Stunden nicht je Rolle abrechnen).
                 DropdownButtonFormField<String?>(
+                  key: const Key('time-entry-role'),
                   isExpanded: true,
                   initialValue: _staffRoleId,
-                  decoration: const InputDecoration(labelText: 'Rolle (optional)'),
+                  decoration: InputDecoration(labelText: 'Rolle *', errorText: _roleError),
                   items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('— ohne Rolle —')),
                     for (final role in widget.roles)
                       DropdownMenuItem(value: role.id, child: Text(role.name)),
                   ],
-                  onChanged: (value) => setState(() => _staffRoleId = value),
+                  onChanged: (value) => setState(() {
+                    _staffRoleId = value;
+                    _roleError = null;
+                  }),
                 ),
               TextField(
                 controller: _noteCtrl,
@@ -334,6 +350,10 @@ class _TimeEntryFormDialogState extends State<_TimeEntryFormDialog> {
             final referenceId =
                 _referenceKind == _ReferenceKind.document ? _invoiceId : _projectId;
             if (referenceId == null) return;
+            if (widget.roles.isNotEmpty && _staffRoleId == null) {
+              setState(() => _roleError = 'Bitte eine Rolle wählen.');
+              return;
+            }
             Navigator.pop(
               context,
               _TimeEntryFormResult(

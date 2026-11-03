@@ -177,10 +177,18 @@ wie nicht existierende. Neue Module liegen je als eigenes Modell/Store
   bucht in derselben Transaktion (Regel aus `werkkern_core`: genau eine
   Buchung pro Kette, Gutschrift bucht zurück), ein später bearbeiteter
   Auftrag bucht die Differenz nach.
-- **Rollen:** Eine Zeitbuchung mit Rolle friert deren Stundensatz ein,
+- **Rollen:** Eine Zeitbuchung mit Rolle friert deren Kostensatz ein,
   ohne Rolle den des Mitglieds (wie offline Rollen-Stamm, online
-  zusätzlich der Satz je Mitglied). Der erste Abruf durch einen Admin
-  legt die Vorschläge Monteur/Meister/Projektleiter an.
+  zusätzlich der Satz je Mitglied). `GET /staff-roles?seed=1` durch einen
+  Admin legt die Vorschläge Monteur/Meister/Projektleiter an (nur die
+  Rollenverwaltung der App fragt so).
+- **Stunden je Rolle (C3.4):** `hourlyBillingCents` an der Rolle ist der
+  Verrechnungssatz (Preis für den Kunden, 0 = nicht hinterlegt),
+  `staffRoleId` an Stunden-Positionen muss zur Firma gehören. Hat die
+  Firma Rollen, verlangt `POST/PUT /time-entries` eine Rolle (sonst 422).
+  Umwandeln Auftrag → Rechnung ohne Festpreis erzeugt eine Ist-Stunden-
+  Position je Rolle (`billBookedHoursByRole` in `werkkern_core`, gleiche
+  Regel wie offline); Dokumente liefern `bookedHoursByRole`.
 - **Wiederkehrende Rechnungen:** `bin/server.dart` prüft stündlich und
   legt je fälliger Periode einen Entwurf an; jede Periode wird in
   derselben Transaktion beansprucht, mehrere Instanzen sind unkritisch.
@@ -245,6 +253,8 @@ ein — einmalig, alles oder nichts in einer Transaktion
 `postgres/company_import.dart`).
 
 - Body: `{package, roleAssignments: {Offline-Rollen-ID | "-" → Mitgliedschafts-ID}}`.
+  Formatversion 2 (C3.4) bringt Verrechnungssätze und Rollen an
+  Stunden-Positionen mit; Version 1 wird weiter angenommen.
   Jede Rolle mit Zeitbuchungen (und „-“ für Buchungen ohne Rolle)
   braucht ein aktives Mitglied, sonst 422.
 - `?dryRun=1` schreibt nichts und liefert `counts`, `warnings`,

@@ -173,6 +173,72 @@ void runInvoiceFlowTests(Future<(PhaseBRepository, BusinessRepository)> Function
     expect(items.last['unit'], 'h');
   });
 
+  test('C3.4: Ist-Stunden je Rolle, Preis aus Auftrags-Position der Rolle, sonst Verrechnungssatz', () async {
+    final monteur = await post('/staff-roles', {'name': 'Monteur', 'hourlyCostCents': 4000, 'hourlyBillingCents': 6500});
+    final meister = await post('/staff-roles', {'name': 'Meister', 'hourlyBillingCents': 8500});
+    expect(monteur['hourlyBillingCents'], 6500);
+    expect(meister['hourlyCostCents'], 0);
+    final updated = await put('/staff-roles/${meister['id']}', {'hourlyBillingCents': 9000});
+    expect(updated['hourlyBillingCents'], 9000);
+    expect(updated['name'], 'Meister');
+
+    final items = [
+      orderItems.first,
+      {...orderItems.last, 'unitPriceCents': 6000, 'staffRoleId': monteur['id']},
+    ];
+    // Rolle einer fremden/unbekannten Firma wird abgelehnt.
+    await expectLater(
+      post('/documents', {'kind': 'order', 'customerId': customerId, 'items': [{...orderItems.last, 'staffRoleId': 'fremd'}]}),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 400)),
+    );
+    final order = await post('/documents', {'kind': 'order', 'customerId': customerId, 'items': items});
+    expect(((order['items'] as List).last as Map)['staffRoleId'], monteur['id']);
+    final finalized = await post('/documents/${order['id']}/finalize', {'version': order['version']});
+    for (final (hours, role) in [('4', monteur['id']), ('3.5', monteur['id']), ('2', meister['id'])]) {
+      await post('/time-entries', {'date': '2026-10-24', 'hours': hours, 'documentId': finalized['id'], 'staffRoleId': role});
+    }
+    // Neue Buchung ohne Rolle geht nicht mehr, sobald es Rollen gibt …
+    await expectLater(
+      post('/time-entries', {'date': '2026-10-24', 'hours': '1', 'documentId': finalized['id']}),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 422)),
+    );
+    // … Altbestand ohne Rolle (vor C3.4 gebucht) wird trotzdem abgerechnet.
+    final (_, business) = repositories;
+    final now = DateTime.now().toUtc();
+    await business.createTimeEntry(TimeEntry(
+      id: 'alt-ohne-rolle',
+      companyId: companyId,
+      userId: (await business.listTimeEntries(companyId)).first.userId,
+      documentId: finalized['id'] as String,
+      workDate: DateTime.utc(2026, 10, 20),
+      hours: '1',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    final invoice = await post('/documents/${order['id']}/convert', {'kind': 'invoice'});
+    final lines = (invoice['items'] as List).cast<Map>().where((i) => i['kind'] == 'hours').toList();
+    expect(lines.map((i) => (i['staffRoleId'], i['quantity'], i['unitPriceCents'])), [
+      (monteur['id'], '7.5', 6000),
+      (meister['id'], '2', 9000),
+      (null, '1', 6000),
+    ]);
+    expect(lines.first['description'], 'Monteur – geleistete Stunden (Ist-Zeit)');
+    expect(lines[1]['unit'], 'h');
+    // Gebucht je Rolle im Auftrag und in der daraus erzeugten Rechnung.
+    Map<String?, String> byRole(Map<String, Object?> doc) => {
+          for (final e in (doc['bookedHoursByRole'] as List).cast<Map>()) e['staffRoleId'] as String?: e['hours'] as String,
+        };
+    final orderView = await c.request('GET', '/documents/${order['id']}') as Map<String, Object?>;
+    expect(byRole(orderView), {monteur['id']: '7.5', meister['id']: '2', null: '1'});
+    expect(byRole(invoice), {monteur['id']: '7.5', meister['id']: '2', null: '1'});
+
+    // Rolle löschen: Position bleibt, verliert nur den Bezug.
+    await c.request('DELETE', '/staff-roles/${meister['id']}');
+    final reloaded = await c.request('GET', '/documents/${invoice['id']}') as Map<String, Object?>;
+    final meisterLine = (reloaded['items'] as List).cast<Map>().firstWhere((i) => i['unitPriceCents'] == 9000);
+    expect(meisterLine['staffRoleId'], isNull);
+  });
+
   test('Mit Festpreis: geplante Stunden bleiben, Kennzeichen wandert mit', () async {
     final order = await finalizedOrder(fixedPrice: true);
     expect(order['isFixedPrice'], isTrue);

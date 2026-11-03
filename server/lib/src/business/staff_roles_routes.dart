@@ -42,12 +42,19 @@ class StaffRoleRoutes {
     return (auth: admin, error: null);
   }
 
-  ({String? name, int? rate, String? error}) _parse(Map<String, Object?> body, {StaffRole? existing}) {
+  ({String? name, int? rate, int? billing, String? error}) _parse(Map<String, Object?> body, {StaffRole? existing}) {
     final name = trimmedOrNull(body['name']) ?? existing?.name;
-    if (name == null) return (name: null, rate: null, error: 'name ist Pflicht.');
+    if (name == null) return (name: null, rate: null, billing: null, error: 'name ist Pflicht.');
     final raw = body.containsKey('hourlyCostCents') ? body['hourlyCostCents'] : existing?.hourlyCostCents ?? 0;
-    if (raw is! int || raw < 0) return (name: null, rate: null, error: 'hourlyCostCents (Cent, ≥ 0) ist Pflicht.');
-    return (name: name, rate: raw, error: null);
+    if (raw is! int || raw < 0) {
+      return (name: null, rate: null, billing: null, error: 'hourlyCostCents (Cent, ≥ 0) ist Pflicht.');
+    }
+    final billing =
+        body.containsKey('hourlyBillingCents') ? body['hourlyBillingCents'] : existing?.hourlyBillingCents ?? 0;
+    if (billing is! int || billing < 0) {
+      return (name: null, rate: null, billing: null, error: 'hourlyBillingCents (Cent, ≥ 0) erwartet.');
+    }
+    return (name: name, rate: raw, billing: billing, error: null);
   }
 
   Future<Response> _list(Request request) async {
@@ -59,8 +66,11 @@ class StaffRoleRoutes {
     if (!mayRead || !await _moduleEnabled(ctx)) return jsonError('Keine Berechtigung: timeTracking.', status: 403);
     final companyId = ctx.session.companyId;
     var roles = await business.listStaffRoles(companyId);
-    // Wie offline: Vorschläge beim ersten Öffnen durch den Admin anlegen.
-    if (roles.isEmpty && ctx.membership.isAdmin && !ctx.session.isAgent) {
+    // Wie offline: Vorschläge nur beim Öffnen der Rollenverwaltung durch
+    // den Admin (`?seed=1`) — nicht schon beim Zeitbuchen, sonst wäre die
+    // Rolle (C3.4: Pflicht, sobald es Rollen gibt) sofort Pflicht.
+    final seed = request.url.queryParameters['seed'] == '1';
+    if (seed && roles.isEmpty && ctx.membership.isAdmin && !ctx.session.isAgent) {
       final now = DateTime.now().toUtc();
       for (final name in defaultStaffRoleNames) {
         await business.createStaffRole(
@@ -82,6 +92,7 @@ class StaffRoleRoutes {
       companyId: admin.auth!.session.companyId,
       name: parsed.name!,
       hourlyCostCents: parsed.rate!,
+      hourlyBillingCents: parsed.billing!,
       createdAt: DateTime.now().toUtc(),
     );
     await business.createStaffRole(role);
@@ -102,6 +113,7 @@ class StaffRoleRoutes {
       companyId: companyId,
       name: parsed.name!,
       hourlyCostCents: parsed.rate!,
+      hourlyBillingCents: parsed.billing!,
       createdAt: existing.createdAt,
     );
     await business.updateStaffRole(role);

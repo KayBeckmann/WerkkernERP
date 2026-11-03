@@ -52,6 +52,6 @@ void main() {
     await openTab(tester, 'Aufträge');
     await tester.tap(find.textContaining('Entwurf —'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Gebucht: 2,5 Std.'), findsOneWidget);
+    expect(find.text('ohne Rolle: geplant 0 h · gebucht 2,5 h'), findsOneWidget);
   });
 }

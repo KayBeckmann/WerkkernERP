@@ -83,7 +83,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('online-role-rate')), '65');
     await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
-    expect(find.text('65,00 € / Std.'), findsOneWidget);
+    expect(find.text('Verrechnung: nicht hinterlegt · Kosten: 65,00 € / Std.'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -97,6 +97,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('$yy/01 · Neubau').last);
     await tester.pumpAndSettle();
+    // C3.4: Es gibt Rollen → ohne Rolle wird nicht gebucht.
+    await tester.tap(find.text('Buchen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bitte eine Rolle wählen — sie bestimmt den Stundensatz beim Abrechnen.'), findsOneWidget);
     await tester.tap(find.byKey(const Key('online-time-role')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Elektromeister').last);

@@ -584,6 +584,13 @@ class InvoiceItems extends Table {
   /// Positionsgruppe (z. B. "Elektroinstallation EG") — ungleich der
   /// Artikelgruppe im Stamm. `null` = ungruppierte Position.
   TextColumn get groupLabel => text().nullable()();
+
+  /// Rolle einer Stunden-Position (C3.4, Kay 2026-11-03: „aus den Rollen
+  /// aussuchen“). `null` = ohne Rolle (alte Dokumente, Firmen ohne
+  /// Rollen). Der Preis steht trotzdem in [unitPriceCents] — eine spätere
+  /// Satzänderung der Rolle ändert diese Position nicht.
+  TextColumn get staffRoleId =>
+      text().nullable().references(StaffRoles, #id, onDelete: KeyAction.setNull)();
   IntColumn get sortOrder => integer()();
 
   @override
@@ -1202,6 +1209,12 @@ class StaffRoles extends Table {
   /// explizit nichts, statt einen unbekannten/geratenen Wert
   /// vorzutäuschen.
   IntColumn get hourlyCostRateCents => integer().withDefault(const Constant(0))();
+
+  /// Verrechnungssatz in Cent — Preis je Stunde für den Kunden (C3.4,
+  /// Kay 2026-11-03), getrennt vom Kostensatz oben. 0 = nicht hinterlegt:
+  /// eine Stunden-Position mit dieser Rolle bekommt dann keinen Preis
+  /// vorbelegt (siehe `resolveHourlyBillingRateCents` in werkkern_core).
+  IntColumn get hourlyBillingRateCents => integer().withDefault(const Constant(0))();
   DateTimeColumn get createdAt => dateTime()();
 
   @override

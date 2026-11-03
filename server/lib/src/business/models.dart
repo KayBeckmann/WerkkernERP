@@ -355,6 +355,7 @@ class DocumentItem {
     this.unit,
     this.discountPercent = 0,
     this.groupLabel,
+    this.staffRoleId,
     required this.sortOrder,
   });
   final String id;
@@ -370,6 +371,9 @@ class DocumentItem {
   final String? unit;
   final double discountPercent;
   final String? groupLabel;
+
+  /// Rolle einer Stunden-Position (C3.4) — `null` = ohne Rolle.
+  final String? staffRoleId;
   final int sortOrder;
 
   Map<String, Object?> toJson() => {
@@ -383,6 +387,7 @@ class DocumentItem {
         'unit': unit,
         'discountPercent': discountPercent,
         'groupLabel': groupLabel,
+        'staffRoleId': staffRoleId,
         'sortOrder': sortOrder,
       };
 }

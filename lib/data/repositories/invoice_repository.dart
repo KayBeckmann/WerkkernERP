@@ -1,7 +1,8 @@
 import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
-import 'package:werkkern_core/werkkern_core.dart' show documentConversionTargets;
+import 'package:werkkern_core/werkkern_core.dart'
+    show BillingRole, PlannedHoursItem, billBookedHoursByRole, documentConversionTargets;
 
 import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
@@ -26,6 +27,7 @@ class InvoiceItemInput {
     this.unit,
     this.discountPercent = 0,
     this.groupLabel,
+    this.staffRoleId,
   });
 
   final String? id;
@@ -42,6 +44,9 @@ class InvoiceItemInput {
   /// Rabatt in Prozent auf diese Position — Kay-Nachtrag 2026-10-16.
   final double discountPercent;
   final String? groupLabel;
+
+  /// Rolle einer Stunden-Position (C3.4) — `null` = ohne Rolle.
+  final String? staffRoleId;
 }
 
 /// C13 Abschlagsrechnungen — eine einzelne, bereits finalisierte
@@ -593,16 +598,13 @@ class InvoiceRepository {
   /// Zeiterfassungs-Modul oder in bestehenden Aufrufern, die das noch
   /// nicht kennen) — ist er gesetzt UND wird ein Auftrag ohne Festpreis
   /// (`!source.isFixedPrice`) in eine Rechnung gewandelt, ersetzt
-  /// [convertTo] alle Stunden-Positionen durch **eine** zusammengefasste
-  /// Position mit den tatsächlich gebuchten Ist-Stunden (siehe Doc-
-  /// Kommentar bei `Invoices.isFixedPrice`, Nachtrag 2026-10-20: "Sofern
-  /// keine Festpreise vereinbart sind, müssen am Ende aber gebuchte
-  /// Zeiten in die Rechnung überführt werden"). Vereinfachung, bewusst
-  /// dokumentiert: Preis/Einheit/MwSt./Gruppe der ERSTEN Stunden-
-  /// Position werden übernommen — bei mehreren unterschiedlich
-  /// bepreisten Stunden-Positionen im Auftrag ist das eine bewusste
-  /// Vereinfachung für diesen ersten Entwurf, vor dem Finalisieren im
-  /// Rechnungseditor frei korrigierbar.
+  /// [convertTo] alle Stunden-Positionen durch die tatsächlich gebuchten
+  /// Ist-Stunden (siehe Doc-Kommentar bei `Invoices.isFixedPrice`,
+  /// Nachtrag 2026-10-20: "Sofern keine Festpreise vereinbart sind,
+  /// müssen am Ende aber gebuchte Zeiten in die Rechnung überführt
+  /// werden") — **eine Position je Rolle** (C3.4, Kay 2026-11-03), Preis
+  /// aus der Auftrags-Position derselben Rolle, sonst Verrechnungssatz;
+  /// Regeln siehe `billBookedHoursByRole` in werkkern_core.
   Future<Invoice> convertTo({
     required String companyId,
     required String sourceId,
@@ -626,25 +628,18 @@ class InvoiceRepository {
 
       final sourceItems = await itemsFor(sourceId);
 
-      double? actualBookedHours;
-      if (timeEntryRepository != null &&
+      final billBookedHours = timeEntryRepository != null &&
           source.kind == DocumentKind.order &&
           targetKind == DocumentKind.invoice &&
           !source.isFixedPrice &&
-          sourceItems.any((i) => i.kind == InvoiceItemKind.hours)) {
-        actualBookedHours = await timeEntryRepository.totalHoursForInvoice(sourceId);
-      }
+          sourceItems.any((i) => i.kind == InvoiceItemKind.hours);
 
       final newItems = <InvoiceItemInput>[];
-      InvoiceItem? firstHoursItem;
       for (final item in sourceItems) {
         if (targetKind == DocumentKind.deliveryNote && item.kind == InvoiceItemKind.hours) {
           continue; // Lieferschein enthält nie Stunden (bestehende Regel).
         }
-        if (actualBookedHours != null && item.kind == InvoiceItemKind.hours) {
-          firstHoursItem ??= item;
-          continue;
-        }
+        if (billBookedHours && item.kind == InvoiceItemKind.hours) continue;
         newItems.add(
           InvoiceItemInput(
             kind: item.kind,
@@ -656,21 +651,48 @@ class InvoiceRepository {
             unit: item.unit,
             discountPercent: item.discountPercent,
             groupLabel: item.groupLabel,
+            staffRoleId: item.staffRoleId,
           ),
         );
       }
-      if (firstHoursItem != null) {
-        newItems.add(
-          InvoiceItemInput(
-            kind: InvoiceItemKind.hours,
-            description: 'Geleistete Stunden (Ist-Zeit)',
-            quantity: Decimal.parse(actualBookedHours!.toString()),
-            unitPriceCents: firstHoursItem.unitPriceCents,
-            vatRatePercent: firstHoursItem.vatRatePercent,
-            unit: firstHoursItem.unit,
-            groupLabel: firstHoursItem.groupLabel,
-          ),
+      if (billBookedHours) {
+        final bookedByRole = <String?, Decimal>{};
+        for (final entry in await timeEntryRepository.listForInvoice(sourceId)) {
+          bookedByRole[entry.staffRoleId] =
+              (bookedByRole[entry.staffRoleId] ?? Decimal.zero) + Decimal.parse(entry.hours.toString());
+        }
+        final roles = await (_db.select(_db.staffRoles)..where((r) => r.companyId.equals(companyId))).get();
+        final lines = billBookedHoursByRole(
+          bookedHoursByRole: bookedByRole,
+          plannedItems: [
+            for (final item in sourceItems.where((i) => i.kind == InvoiceItemKind.hours))
+              PlannedHoursItem(
+                staffRoleId: item.staffRoleId,
+                unitPriceCents: item.unitPriceCents,
+                vatRatePercent: item.vatRatePercent,
+                unit: item.unit,
+                groupLabel: item.groupLabel,
+              ),
+          ],
+          roles: [
+            for (final r in roles) BillingRole(id: r.id, name: r.name, billingRateCents: r.hourlyBillingRateCents),
+          ],
+          customerId: source.customerId,
         );
+        for (final line in lines) {
+          newItems.add(
+            InvoiceItemInput(
+              kind: InvoiceItemKind.hours,
+              description: line.description,
+              quantity: line.hours,
+              unitPriceCents: line.unitPriceCents,
+              vatRatePercent: line.vatRatePercent,
+              unit: line.unit,
+              groupLabel: line.groupLabel,
+              staffRoleId: line.staffRoleId,
+            ),
+          );
+        }
       }
 
       final id = _uuid.v4();
@@ -880,6 +902,7 @@ class InvoiceRepository {
             unit: item.unit,
             discountPercent: item.discountPercent,
             groupLabel: item.groupLabel,
+            staffRoleId: item.staffRoleId,
           ),
       ];
 
@@ -1015,6 +1038,7 @@ class InvoiceRepository {
               unit: Value(item.unit),
               discountPercent: Value(item.discountPercent),
               groupLabel: Value(item.groupLabel),
+              staffRoleId: Value(item.kind == InvoiceItemKind.hours ? item.staffRoleId : null),
               sortOrder: i,
             ),
           );

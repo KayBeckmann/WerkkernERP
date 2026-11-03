@@ -48,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 33;
+  int get schemaVersion => 34;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -354,6 +354,15 @@ class AppDatabase extends _$AppDatabase {
             await migrator.addColumn(companies, companies.migratedAt);
             await migrator.addColumn(companies, companies.migratedToServer);
             await migrator.addColumn(companies, companies.migratedToCompanyName);
+          }
+          if (from < 34) {
+            // C3.4 Stunden je Rolle: Verrechnungssatz an der Rolle (Tabelle
+            // erst seit v27 — davor legt `createTable` sie schon mit der
+            // Spalte an) und Rolle an der Position (Bestand: ohne Rolle).
+            if (from >= 27) {
+              await migrator.addColumn(staffRoles, staffRoles.hourlyBillingRateCents);
+            }
+            await migrator.addColumn(invoiceItems, invoiceItems.staffRoleId);
           }
         },
       );

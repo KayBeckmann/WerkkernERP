@@ -58,7 +58,7 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     final chef = await h.company('chef@example.com', permissions: permissions, modules: const {'timeTracking'});
     await h.member(chef, 'monteur@example.com');
     // Vorschlags-Rollen (vom ersten Öffnen) werden ersetzt, nicht verdoppelt.
-    expect(((await chef.get('/staff-roles'))['staffRoles'] as List), hasLength(3));
+    expect(((await chef.get('/staff-roles', query: const {'seed': '1'}))['staffRoles'] as List), hasLength(3));
     final monteur = await membershipOf(chef, 'monteur@example.com');
     final admin = await membershipOf(chef, 'chef@example.com');
 
@@ -105,6 +105,11 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
 
     final roles = (export['staffRoles']! as List).cast<Map<String, Object?>>();
     expect(roles.map((r) => r['name']), unorderedEquals(['Monteur', 'Meister']));
+    // C3.4 (Umzugsformat 2): Verrechnungssatz und Rolle an der Position.
+    final monteurRole = roles.firstWhere((r) => r['name'] == 'Monteur');
+    expect(monteurRole['hourlyBillingCents'], 6800);
+    expect(roles.firstWhere((r) => r['name'] == 'Meister')['hourlyBillingCents'], 0);
+    expect(((order['items']! as List).single as Map)['staffRoleId'], monteurRole['id']);
     final monteurUser = (await h.repository.findUserByEmail('monteur@example.com'))!.id;
     final chefUser = (await h.repository.findUserByEmail('chef@example.com'))!.id;
     final entries = (export['timeEntries']! as List).cast<Map<String, Object?>>();
@@ -202,6 +207,9 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
       }),
       throwsStatus(422),
     );
+    // Umzugsformat 1 (App vor C3.4) wird weiter angenommen.
+    final v1 = await dryRun(chef, {'package': {...sampleMigrationPackage(), 'formatVersion': 1}, 'roleAssignments': all});
+    expect(v1['errors'], isEmpty);
     await expectLater(chef.post('/company/import', {'roleAssignments': all}), throwsStatus(400));
     expect(await h.business.companyHasBusinessData(chef.companyId), isFalse, reason: 'nichts halb geschrieben');
 

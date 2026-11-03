@@ -175,6 +175,7 @@ Map<String, Object?> sampleMigrationPackage() {
             'quantity': '2',
             'unitPriceCents': 6500,
             'vatRatePercent': 19.0,
+            'staffRoleId': 'r1',
             'sortOrder': 0,
           },
         ],
@@ -330,7 +331,7 @@ Map<String, Object?> sampleMigrationPackage() {
       },
     ],
     'staffRoles': [
-      {'id': 'r1', 'name': 'Monteur', 'hourlyCostCents': 4500, 'createdAt': at},
+      {'id': 'r1', 'name': 'Monteur', 'hourlyCostCents': 4500, 'hourlyBillingCents': 6800, 'createdAt': at},
       {'id': 'r2', 'name': 'Meister', 'hourlyCostCents': 6500, 'createdAt': at},
     ],
     'timeEntries': [
