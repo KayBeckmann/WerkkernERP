@@ -147,3 +147,43 @@ List<BookedHoursLine> billBookedHoursByRole({
   }
   return lines;
 }
+
+/// Geplante und gebuchte Stunden einer Rolle (`null` = ohne Rolle).
+class RoleHoursRow {
+  const RoleHoursRow({required this.staffRoleId, required this.planned, required this.booked});
+
+  final String? staffRoleId;
+  final Decimal planned;
+  final Decimal booked;
+}
+
+/// „Geplant vs. Gebucht“ je Rolle für Auftrag/Rechnung (C3.4, Kay
+/// 2026-11-03: „Aktuell sehe ich nur, dass 2h gebucht wurden, aber nicht
+/// auf welche Rolle“). Unbekannte (gelöschte) Rollen zählen als „ohne
+/// Rolle“. Reihenfolge: Rollen in der Reihenfolge der geplanten
+/// Positionen, dann weitere gebuchte Rollen in Buchungsreihenfolge, „ohne
+/// Rolle“ zuletzt; Zeilen ohne Stunden entfallen.
+List<RoleHoursRow> compareHoursByRole({
+  required List<(String?, Decimal)> plannedItems,
+  required List<(String?, Decimal)> bookedEntries,
+  required Set<String> knownRoleIds,
+}) {
+  String? key(String? id) => id != null && knownRoleIds.contains(id) ? id : null;
+  final planned = <String?, Decimal>{};
+  final booked = <String?, Decimal>{};
+  for (final (id, hours) in plannedItems) {
+    planned[key(id)] = (planned[key(id)] ?? Decimal.zero) + hours;
+  }
+  for (final (id, hours) in bookedEntries) {
+    booked[key(id)] = (booked[key(id)] ?? Decimal.zero) + hours;
+  }
+  final order = <String?>{...planned.keys.whereType<String>(), ...booked.keys.whereType<String>(), null};
+  return [
+    for (final id in order)
+      if ((planned[id] ?? Decimal.zero) != Decimal.zero || (booked[id] ?? Decimal.zero) != Decimal.zero)
+        RoleHoursRow(staffRoleId: id, planned: planned[id] ?? Decimal.zero, booked: booked[id] ?? Decimal.zero),
+  ];
+}
+
+/// Stunden für die Anzeige: „7,5“ statt „7.5“.
+String formatHours(Decimal hours) => hours.toString().replaceAll('.', ',');

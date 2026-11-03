@@ -64,4 +64,19 @@ void main() {
     expect(lines.single.staffRoleId, isNull);
     expect(lines.single.hours, Decimal.zero);
   });
+
+  test('Geplant vs. Gebucht je Rolle: Reihenfolge, gelöschte Rolle als ohne Rolle, leere Zeilen entfallen', () {
+    final rows = compareHoursByRole(
+      plannedItems: [('x', d('2')), ('m', d('6')), (null, d('0'))],
+      bookedEntries: [('m', d('4')), ('a', d('1')), ('m', d('3.5')), ('weg', d('0.5')), (null, d('1'))],
+      knownRoleIds: {'m', 'x', 'a'},
+    );
+    expect(rows.map((r) => (r.staffRoleId, r.planned, r.booked)), [
+      ('x', d('2'), Decimal.zero),
+      ('m', d('6'), d('7.5')),
+      ('a', Decimal.zero, d('1')),
+      (null, Decimal.zero, d('1.5')),
+    ]);
+    expect(formatHours(d('7.5')), '7,5');
+  });
 }

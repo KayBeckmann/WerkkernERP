@@ -365,6 +365,17 @@ class BusinessRoutes {
         ? await finalizedSummaries((await business.listConvertedFrom(companyId, document.id)).where((d) => d.kind == 'creditNote'))
         : const <Map<String, Object?>>[];
     final advanceSum = advancePayments.fold<int>(0, (sum, a) => sum + (a['grossCents'] as int));
+    // C3.4: Gebucht je Rolle — bei einer aus einem Auftrag umgewandelten
+    // Rechnung zusätzlich die Zeiten des Auftrags (dort wird gebucht).
+    final bookedForRoles = [
+      ...booked,
+      if (document.kind == 'invoice' && source != null && source.kind == 'order')
+        ...await business.listTimeEntries(companyId, documentId: source.id),
+    ];
+    final bookedByRole = <String?, Decimal>{};
+    for (final t in bookedForRoles) {
+      bookedByRole[t.staffRoleId] = (bookedByRole[t.staffRoleId] ?? Decimal.zero) + Decimal.parse(t.hours);
+    }
     return jsonOk({
       ...document.toJson(),
       'editable': isDocumentEditable(kind: document.kind, isDraft: document.isDraft, hasConversions: convertedTo.isNotEmpty),
@@ -372,6 +383,9 @@ class BusinessRoutes {
       // C3: "Geplant laut Angebot vs. gebucht" — Summe aller auf dieses
       // Dokument gebuchten Stunden (Firmensicht, ohne Personenbezug).
       'bookedHours': booked.fold<Decimal>(Decimal.zero, (sum, t) => sum + Decimal.parse(t.hours)).toString(),
+      'bookedHoursByRole': [
+        for (final e in bookedByRole.entries) {'staffRoleId': e.key, 'hours': e.value.toString()},
+      ],
       'convertedTo': [
         for (final d in convertedTo) {'id': d.id, 'kind': d.kind, 'number': d.number, 'status': d.status},
       ],

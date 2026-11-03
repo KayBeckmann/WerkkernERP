@@ -3,14 +3,15 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
+import 'package:werkkern_core/werkkern_core.dart' show compareHoursByRole, formatHours;
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
-import '../../data/repositories/staff_role_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
+import '../../data/repositories/staff_role_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
 import '../../data/repositories/time_entry_repository.dart';
 import '../../domain/models/money.dart';
@@ -1061,6 +1062,53 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     );
   }
 
+  /// Zeiten auf dieses Dokument; bei einer aus einem Auftrag umgewandelten
+  /// Rechnung zusätzlich die des Auftrags (dort wird gebucht).
+  Future<List<TimeEntry>> _bookedEntries() async {
+    final repo = context.read<TimeEntryRepository>();
+    final invoice = _currentInvoice!;
+    final entries = await repo.listForInvoice(invoice.id);
+    final sourceId = invoice.convertedFromId;
+    if (invoice.kind == DocumentKind.invoice && sourceId != null) {
+      entries.addAll(await repo.listForInvoice(sourceId));
+    }
+    return entries;
+  }
+
+  Widget _buildHoursByRole(List<TimeEntry>? entries) {
+    final small = Theme.of(context).textTheme.bodySmall;
+    if (entries == null) return const SizedBox.shrink();
+    final rows = compareHoursByRole(
+      plannedItems: [
+        for (final i in _items)
+          if (i.kind == InvoiceItemKind.hours) (i.staffRoleId, i.quantity),
+      ],
+      bookedEntries: [for (final e in entries) (e.staffRoleId, Decimal.parse(e.hours.toString()))],
+      knownRoleIds: {for (final r in _staffRoles) r.id},
+    );
+    final isOrder = _kind == DocumentKind.order;
+    // Rechnung ohne gebuchte Zeiten: nichts zu vergleichen.
+    if (rows.isEmpty || (!isOrder && rows.every((r) => r.booked == Decimal.zero))) return const SizedBox.shrink();
+    String name(String? id) => id == null ? 'ohne Rolle' : _staffRoles.firstWhere((r) => r.id == id).name;
+    return Padding(
+      key: const Key('hours-by-role'),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isOrder ? 'Stunden je Rolle (geplant · gebucht)' : 'Stunden je Rolle (berechnet · gebucht)',
+              style: small?.copyWith(fontWeight: FontWeight.w600)),
+          for (final row in rows)
+            Text(
+              '${name(row.staffRoleId)}: ${isOrder ? 'geplant' : 'berechnet'} ${formatHours(row.planned)} h · '
+              'gebucht ${formatHours(row.booked)} h',
+              style: small,
+            ),
+        ],
+      ),
+    );
+  }
+
   /// Rollenname einer Stunden-Position (C3.4) — `null` ohne Rolle oder
   /// bei inzwischen gelöschter Rolle.
   String? _roleName(_EditableItem item) =>
@@ -1338,28 +1386,17 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               ),
           ],
           // "Geplant vs. Gebucht" (Nachtrag 2026-10-20: "Die Zeiten aus
-          // dem Angebot brauchen wir im Auftrag als Referenz") — braucht
-          // kein eigenes Feld: `convertTo()` kopiert die Angebots-
-          // Stunden-Positionen bereits unverändert in den Auftrag
-          // (bestehendes Verhalten), hier nur gegenübergestellt mit den
-          // tatsächlich gebuchten Ist-Stunden.
-          if (_timeTrackingEnabled && _kind == DocumentKind.order && isFinalized)
-            FutureBuilder<double>(
-              future: context.read<TimeEntryRepository>().totalHoursForInvoice(_currentInvoice!.id),
-              builder: (context, snapshot) {
-                final plannedHours = _items
-                    .where((i) => i.kind == InvoiceItemKind.hours)
-                    .fold(Decimal.zero, (sum, i) => sum + i.quantity);
-                final bookedHours = snapshot.data;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    'Geplant laut Angebot: $plannedHours Std. · Gebucht: '
-                    '${bookedHours == null ? '…' : bookedHours.toStringAsFixed(1)} Std.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                );
-              },
+          // dem Angebot brauchen wir im Auftrag als Referenz") — seit C3.4
+          // je Rolle (Nachtrag 2026-11-03: "Aktuell sehe ich nur, dass 2h
+          // gebucht wurden, aber nicht auf welche Rolle"). Geplant = die
+          // Stunden-Positionen dieses Dokuments; gebucht = Zeiten auf
+          // dieses Dokument, bei einer Rechnung zusätzlich auf ihren Auftrag.
+          if (_timeTrackingEnabled &&
+              (_kind == DocumentKind.order || _kind == DocumentKind.invoice) &&
+              _currentInvoice != null)
+            FutureBuilder<List<TimeEntry>>(
+              future: _bookedEntries(),
+              builder: (context, snapshot) => _buildHoursByRole(snapshot.data),
             ),
           // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17,
           // Nachbesserung nach Kay-Feedback 2026-10-17) — nur bei

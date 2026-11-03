@@ -224,6 +224,13 @@ void runInvoiceFlowTests(Future<(PhaseBRepository, BusinessRepository)> Function
     ]);
     expect(lines.first['description'], 'Monteur – geleistete Stunden (Ist-Zeit)');
     expect(lines[1]['unit'], 'h');
+    // Gebucht je Rolle im Auftrag und in der daraus erzeugten Rechnung.
+    Map<String?, String> byRole(Map<String, Object?> doc) => {
+          for (final e in (doc['bookedHoursByRole'] as List).cast<Map>()) e['staffRoleId'] as String?: e['hours'] as String,
+        };
+    final orderView = await c.request('GET', '/documents/${order['id']}') as Map<String, Object?>;
+    expect(byRole(orderView), {monteur['id']: '7.5', meister['id']: '2', null: '1'});
+    expect(byRole(invoice), {monteur['id']: '7.5', meister['id']: '2', null: '1'});
 
     // Rolle löschen: Position bleibt, verliert nur den Bezug.
     await c.request('DELETE', '/staff-roles/${meister['id']}');
