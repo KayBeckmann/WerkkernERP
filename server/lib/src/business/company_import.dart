@@ -241,7 +241,9 @@ class _Parser {
   void parse(Map<String, Object?> p, Map<String, String> roleAssignments, Set<String> memberUserIds) {
     if (p['format'] != migrationPackageFormat) throw const _Invalid('Keine WerkkernERP-Umzugsdatei.');
     final version = p['formatVersion'];
-    if (version != migrationPackageVersion) {
+    // Version 1 (vor C3.4) kennt nur keine Verrechnungssätze/Positions-
+    // Rollen — wird weiter angenommen.
+    if (version is! int || version < 1 || version > migrationPackageVersion) {
       throw _Invalid(
         'Umzugsformat $version wird nicht unterstützt (erwartet $migrationPackageVersion) — '
         'bitte App und Server auf denselben Stand bringen.',
@@ -338,13 +340,15 @@ class _Parser {
       );
     }
     _projects(_list(p, 'projects'));
+    // Rollen vor den Dokumenten: Stunden-Positionen verweisen auf sie.
+    _roles(_list(p, 'staffRoles'));
     _documents(_list(p, 'documents'));
     _fleet(_list(p, 'vehicles'), _list(p, 'vehicleCosts'));
     _recurring(_list(p, 'recurringTemplates'));
     _accounting(_list(p, 'expenseCategories'), _list(p, 'expenses'), _list(p, 'bankTransactions'));
     _purchasing(_list(p, 'purchaseOrders'));
     _stock(_list(p, 'stockMovements'), _list(p, 'inventoryCounts'));
-    _time(_list(p, 'staffRoles'), _list(p, 'timeEntries'), _list(p, 'timeSheets'), roleAssignments, memberUserIds);
+    _time(_list(p, 'timeEntries'), _list(p, 'timeSheets'), roleAssignments, memberUserIds);
     _checkNumbers();
 
     data.settings['import'] = {
@@ -510,6 +514,7 @@ class _Parser {
           unit: r.optStr('unit'),
           discountPercent: r.optNumber('discountPercent') ?? 0,
           groupLabel: r.optStr('groupLabel'),
+          staffRoleId: kind == 'hours' ? _ref('staffRole', r.optStr('staffRoleId'), r.path) : null,
           sortOrder: r.optInt('sortOrder') ?? i,
         );
       }(),
@@ -758,15 +763,10 @@ class _Parser {
     }
   }
 
-  void _time(
-    List<(int, Map<String, Object?>)> roles,
-    List<(int, Map<String, Object?>)> entries,
-    List<(int, Map<String, Object?>)> sheets,
-    Map<String, String> assignments,
-    Set<String> members,
-  ) {
-    final roleRates = <String, int>{};
-    final roleNames = <String, String>{};
+  final _roleRates = <String, int>{};
+  final _roleNames = <String, String>{};
+
+  void _roles(List<(int, Map<String, Object?>)> roles) {
     for (final (i, ro) in roles) {
       final r = _R(ro, 'staffRoles[$i]');
       final oldId = r.str('id');
@@ -775,13 +775,23 @@ class _Parser {
         companyId: companyId,
         name: r.str('name'),
         hourlyCostCents: r.optInt('hourlyCostCents') ?? 0,
+        hourlyBillingCents: r.optInt('hourlyBillingCents') ?? 0,
         createdAt: r.time('createdAt'),
       );
       data.staffRoles.add(role);
-      roleRates[oldId] = role.hourlyCostCents;
-      roleNames[oldId] = role.name;
+      _roleRates[oldId] = role.hourlyCostCents;
+      _roleNames[oldId] = role.name;
     }
+  }
 
+  void _time(
+    List<(int, Map<String, Object?>)> entries,
+    List<(int, Map<String, Object?>)> sheets,
+    Map<String, String> assignments,
+    Set<String> members,
+  ) {
+    final roleRates = _roleRates;
+    final roleNames = _roleNames;
     // Stundenzettel zuerst (Zeiten verweisen offline auf ihren Zettel);
     // der Zettel gehört dem Mitglied seiner ersten Buchung, sonst dem
     // importierenden Admin.

@@ -450,6 +450,11 @@ class BusinessRoutes {
         // Fremder Artikel wird exakt wie ein nicht existierender behandelt.
         return (items: null, error: 'Position ${index + 1}: Artikel nicht gefunden.');
       }
+      // C3.4: Rolle nur an Stunden-Positionen, muss zur Firma gehören.
+      final staffRoleId = kind == 'hours' ? entry['staffRoleId'] as String? : null;
+      if (staffRoleId != null && await business.findStaffRole(companyId, staffRoleId) == null) {
+        return (items: null, error: 'Position ${index + 1}: Rolle nicht gefunden.');
+      }
       items.add(DocumentItem(
         id: _uuid.v4(),
         documentId: documentId,
@@ -462,6 +467,7 @@ class BusinessRoutes {
         unit: _trimmed(entry['unit']),
         discountPercent: discount.toDouble(),
         groupLabel: _trimmed(entry['groupLabel']),
+        staffRoleId: staffRoleId,
         sortOrder: index,
       ));
     }
@@ -731,19 +737,39 @@ class BusinessRoutes {
     final newId = _uuid.v4();
     final sourceItems = await business.itemsFor(companyId, id);
     // C3.2 Zeit und Material: Auftrag ohne Festpreis -> Rechnung ersetzt
-    // die geplanten Stunden-Positionen durch EINE Position mit den
-    // gebuchten Ist-Stunden (Preis/USt/Einheit der ersten Stunden-
-    // Position) — wie offline, nur bei aktiver Zeiterfassung.
+    // die geplanten Stunden-Positionen durch die gebuchten Ist-Stunden,
+    // eine Position je Rolle (C3.4, `billBookedHoursByRole`) — wie
+    // offline, nur bei aktiver Zeiterfassung.
     final hoursItems = sourceItems.where((i) => i.kind == 'hours').toList();
     final timeAndMaterial = source.kind == 'order' &&
         targetKind == 'invoice' &&
         !source.isFixedPrice &&
         hoursItems.isNotEmpty &&
         (await _enabledModules(session)).contains('timeTracking');
-    Decimal? bookedHours;
+    var bookedLines = const <BookedHoursLine>[];
     if (timeAndMaterial) {
-      bookedHours = (await business.listTimeEntries(companyId, documentId: id))
-          .fold<Decimal>(Decimal.zero, (sum, t) => sum + Decimal.parse(t.hours));
+      final bookedByRole = <String?, Decimal>{};
+      for (final t in await business.listTimeEntries(companyId, documentId: id)) {
+        bookedByRole[t.staffRoleId] = (bookedByRole[t.staffRoleId] ?? Decimal.zero) + Decimal.parse(t.hours);
+      }
+      bookedLines = billBookedHoursByRole(
+        bookedHoursByRole: bookedByRole,
+        plannedItems: [
+          for (final i in hoursItems)
+            PlannedHoursItem(
+              staffRoleId: i.staffRoleId,
+              unitPriceCents: i.unitPriceCents,
+              vatRatePercent: i.vatRatePercent,
+              unit: i.unit,
+              groupLabel: i.groupLabel,
+            ),
+        ],
+        roles: [
+          for (final r in await business.listStaffRoles(companyId))
+            BillingRole(id: r.id, name: r.name, billingRateCents: r.hourlyBillingCents),
+        ],
+        customerId: source.customerId,
+      );
     }
     var sortOrder = 0;
     final items = [
@@ -761,19 +787,21 @@ class BusinessRoutes {
             unit: item.unit,
             discountPercent: item.discountPercent,
             groupLabel: item.groupLabel,
+            staffRoleId: item.staffRoleId,
             sortOrder: sortOrder++,
           ),
-      if (timeAndMaterial)
+      for (final line in bookedLines)
         DocumentItem(
           id: _uuid.v4(),
           documentId: newId,
           kind: 'hours',
-          description: 'Geleistete Stunden (Ist-Zeit)',
-          quantity: bookedHours.toString(),
-          unitPriceCents: hoursItems.first.unitPriceCents,
-          vatRatePercent: hoursItems.first.vatRatePercent,
-          unit: hoursItems.first.unit,
-          groupLabel: hoursItems.first.groupLabel,
+          description: line.description,
+          quantity: line.hours.toString(),
+          unitPriceCents: line.unitPriceCents,
+          vatRatePercent: line.vatRatePercent,
+          unit: line.unit,
+          groupLabel: line.groupLabel,
+          staffRoleId: line.staffRoleId,
           sortOrder: sortOrder++,
         ),
     ];
@@ -1280,6 +1308,7 @@ class BusinessRoutes {
           unit: item.unit,
           discountPercent: item.discountPercent,
           groupLabel: item.groupLabel,
+          staffRoleId: item.staffRoleId,
           sortOrder: item.sortOrder,
         ),
     ];

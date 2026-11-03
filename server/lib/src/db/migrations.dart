@@ -33,6 +33,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step18TimeSheets,
   _step19Platform,
   _step20StaffRolesProjectNotes,
+  _step21HoursPerRole,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -548,4 +549,14 @@ Future<void> _step20StaffRolesProjectNotes(Session db) async {
     'ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS staff_role_id TEXT REFERENCES staff_roles(id) ON DELETE SET NULL',
   );
   await db.execute('ALTER TABLE projects ADD COLUMN IF NOT EXISTS notes TEXT');
+}
+
+/// C3.4 Stunden je Rolle (Nachtrag 2026-11-03): Verrechnungssatz (Preis
+/// für den Kunden) an der Rolle, getrennt vom Kostensatz; Rolle an der
+/// Stunden-Position.
+Future<void> _step21HoursPerRole(Session db) async {
+  await db.execute('ALTER TABLE staff_roles ADD COLUMN IF NOT EXISTS hourly_billing_cents BIGINT NOT NULL DEFAULT 0');
+  await db.execute(
+    'ALTER TABLE document_items ADD COLUMN IF NOT EXISTS staff_role_id TEXT REFERENCES staff_roles(id) ON DELETE SET NULL',
+  );
 }

@@ -353,7 +353,13 @@ class MigrationPackageBuilder {
       ],
       'staffRoles': [
         for (final r in await (db.select(db.staffRoles)..where((r) => r.companyId.equals(companyId))).get())
-          {'id': r.id, 'name': r.name, 'hourlyCostCents': r.hourlyCostRateCents, 'createdAt': _ts(r.createdAt)},
+          {
+            'id': r.id,
+            'name': r.name,
+            'hourlyCostCents': r.hourlyCostRateCents,
+            'hourlyBillingCents': r.hourlyBillingRateCents,
+            'createdAt': _ts(r.createdAt),
+          },
       ],
       'timeEntries': [
         for (final t in await (db.select(db.timeEntries)..where((t) => t.companyId.equals(companyId))).get())
@@ -395,6 +401,7 @@ class MigrationPackageBuilder {
         'unit': i.unit,
         'discountPercent': i.discountPercent,
         'groupLabel': i.groupLabel,
+        'staffRoleId': i.staffRoleId,
         'sortOrder': i.sortOrder,
       };
 

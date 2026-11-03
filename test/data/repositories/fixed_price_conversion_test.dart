@@ -7,6 +7,7 @@ import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/data/repositories/customer_repository.dart';
 import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
+import 'package:werkkernerp/data/repositories/staff_role_repository.dart';
 import 'package:werkkernerp/data/repositories/time_entry_repository.dart';
 
 /// C3.2 Festpreis-Kennzeichen + Materialabschlagsrechnung (Nachtrag
@@ -122,6 +123,70 @@ void main() {
           hasLength(1),
           reason: 'Artikel-Positionen bleiben unverändert',
         );
+      },
+    );
+
+    test(
+      'C3.4: Ist-Stunden je Rolle — Preis aus Auftrags-Position der Rolle, sonst Verrechnungssatz; '
+      'ohne Rolle eigene Position; Rolle bleibt an der Position',
+      () async {
+        final company = await companies.create(name: 'Elektro Beckmann');
+        await companies.update(company.copyWith(ordersEnabled: true, timeTrackingEnabled: true));
+        final customer = await customers.create(companyId: company.id, name: 'Kunde');
+        final roles = StaffRoleRepository(db);
+        final monteur = await roles.create(companyId: company.id, name: 'Monteur', hourlyBillingRateCents: 6500);
+        final meister = await roles.create(
+          companyId: company.id,
+          name: 'Meister',
+          hourlyCostRateCents: 5000,
+          hourlyBillingRateCents: 8500,
+        );
+        final draft = await invoices.createDraft(
+          companyId: company.id,
+          customerId: customer.id,
+          kind: DocumentKind.order,
+          issueDate: DateTime.now(),
+          serviceDate: DateTime.now(),
+          items: [
+            InvoiceItemInput(
+              kind: InvoiceItemKind.hours,
+              description: 'Monteur',
+              quantity: Decimal.parse('6'),
+              unitPriceCents: 6000, // angeboten, abweichend vom Satz
+              vatRatePercent: 19,
+              unit: 'h',
+              staffRoleId: monteur.id,
+            ),
+          ],
+        );
+        final order = (await invoices.finalize(companyId: company.id, id: draft.id))!;
+        expect((await invoices.itemsFor(order.id)).single.staffRoleId, monteur.id);
+
+        for (final (hours, roleId) in [(4.0, monteur.id), (3.5, monteur.id), (2.0, meister.id), (1.0, null)]) {
+          await timeEntries.create(
+            companyId: company.id,
+            date: DateTime.now(),
+            hours: hours,
+            staffRoleId: roleId,
+            invoiceId: order.id,
+          );
+        }
+
+        final invoiceDraft = await invoices.convertTo(
+          companyId: company.id,
+          sourceId: order.id,
+          targetKind: DocumentKind.invoice,
+          timeEntryRepository: timeEntries,
+        );
+        final items = await invoices.itemsFor(invoiceDraft.id);
+        expect(items.map((i) => (i.staffRoleId, i.quantity, i.unitPriceCents)), [
+          (monteur.id, '7.5', 6000),
+          (meister.id, '2', 8500),
+          (null, '1', 6000),
+        ]);
+        expect(items.first.description, 'Monteur – geleistete Stunden (Ist-Zeit)');
+        expect(items[1].unit, 'h');
+        expect((await invoices.totalsFor(invoiceDraft.id)).totalGross.cents, 80920); // 680 € netto + 19 %
       },
     );
 

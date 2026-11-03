@@ -13,18 +13,24 @@ class StaffRole {
     required this.companyId,
     required this.name,
     required this.hourlyCostCents,
+    this.hourlyBillingCents = 0,
     required this.createdAt,
   });
   final String id;
   final String companyId;
   final String name;
   final int hourlyCostCents;
+
+  /// Verrechnungssatz (Preis je Stunde für den Kunden, C3.4) — 0 = nicht
+  /// hinterlegt, siehe `resolveHourlyBillingRateCents` in werkkern_core.
+  final int hourlyBillingCents;
   final DateTime createdAt;
 
   Map<String, Object?> toJson() => {
         'id': id,
         'name': name,
         'hourlyCostCents': hourlyCostCents,
+        'hourlyBillingCents': hourlyBillingCents,
         'createdAt': createdAt.toIso8601String(),
       };
 }

@@ -9846,6 +9846,448 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   }
 }
 
+class $StaffRolesTable extends StaffRoles
+    with TableInfo<$StaffRolesTable, StaffRole> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StaffRolesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES companies (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _hourlyCostRateCentsMeta =
+      const VerificationMeta('hourlyCostRateCents');
+  @override
+  late final GeneratedColumn<int> hourlyCostRateCents = GeneratedColumn<int>(
+    'hourly_cost_rate_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _hourlyBillingRateCentsMeta =
+      const VerificationMeta('hourlyBillingRateCents');
+  @override
+  late final GeneratedColumn<int> hourlyBillingRateCents = GeneratedColumn<int>(
+    'hourly_billing_rate_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    companyId,
+    name,
+    hourlyCostRateCents,
+    hourlyBillingRateCents,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'staff_roles';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StaffRole> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('hourly_cost_rate_cents')) {
+      context.handle(
+        _hourlyCostRateCentsMeta,
+        hourlyCostRateCents.isAcceptableOrUnknown(
+          data['hourly_cost_rate_cents']!,
+          _hourlyCostRateCentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('hourly_billing_rate_cents')) {
+      context.handle(
+        _hourlyBillingRateCentsMeta,
+        hourlyBillingRateCents.isAcceptableOrUnknown(
+          data['hourly_billing_rate_cents']!,
+          _hourlyBillingRateCentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StaffRole map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StaffRole(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      hourlyCostRateCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hourly_cost_rate_cents'],
+      )!,
+      hourlyBillingRateCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hourly_billing_rate_cents'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $StaffRolesTable createAlias(String alias) {
+    return $StaffRolesTable(attachedDatabase, alias);
+  }
+}
+
+class StaffRole extends DataClass implements Insertable<StaffRole> {
+  final String id;
+  final String companyId;
+  final String name;
+
+  /// Stundenkostensatz in Minor Units/Cent (F2-Muster) — Kays eigene
+  /// Angabe, nicht von dieser App vorgegeben. Default 0, nicht
+  /// nullable: eine Rolle ohne bewusst eingetragenen Satz kostet
+  /// explizit nichts, statt einen unbekannten/geratenen Wert
+  /// vorzutäuschen.
+  final int hourlyCostRateCents;
+
+  /// Verrechnungssatz in Cent — Preis je Stunde für den Kunden (C3.4,
+  /// Kay 2026-11-03), getrennt vom Kostensatz oben. 0 = nicht hinterlegt:
+  /// eine Stunden-Position mit dieser Rolle bekommt dann keinen Preis
+  /// vorbelegt (siehe `resolveHourlyBillingRateCents` in werkkern_core).
+  final int hourlyBillingRateCents;
+  final DateTime createdAt;
+  const StaffRole({
+    required this.id,
+    required this.companyId,
+    required this.name,
+    required this.hourlyCostRateCents,
+    required this.hourlyBillingRateCents,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['company_id'] = Variable<String>(companyId);
+    map['name'] = Variable<String>(name);
+    map['hourly_cost_rate_cents'] = Variable<int>(hourlyCostRateCents);
+    map['hourly_billing_rate_cents'] = Variable<int>(hourlyBillingRateCents);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  StaffRolesCompanion toCompanion(bool nullToAbsent) {
+    return StaffRolesCompanion(
+      id: Value(id),
+      companyId: Value(companyId),
+      name: Value(name),
+      hourlyCostRateCents: Value(hourlyCostRateCents),
+      hourlyBillingRateCents: Value(hourlyBillingRateCents),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory StaffRole.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StaffRole(
+      id: serializer.fromJson<String>(json['id']),
+      companyId: serializer.fromJson<String>(json['companyId']),
+      name: serializer.fromJson<String>(json['name']),
+      hourlyCostRateCents: serializer.fromJson<int>(
+        json['hourlyCostRateCents'],
+      ),
+      hourlyBillingRateCents: serializer.fromJson<int>(
+        json['hourlyBillingRateCents'],
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'companyId': serializer.toJson<String>(companyId),
+      'name': serializer.toJson<String>(name),
+      'hourlyCostRateCents': serializer.toJson<int>(hourlyCostRateCents),
+      'hourlyBillingRateCents': serializer.toJson<int>(hourlyBillingRateCents),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  StaffRole copyWith({
+    String? id,
+    String? companyId,
+    String? name,
+    int? hourlyCostRateCents,
+    int? hourlyBillingRateCents,
+    DateTime? createdAt,
+  }) => StaffRole(
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    name: name ?? this.name,
+    hourlyCostRateCents: hourlyCostRateCents ?? this.hourlyCostRateCents,
+    hourlyBillingRateCents:
+        hourlyBillingRateCents ?? this.hourlyBillingRateCents,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  StaffRole copyWithCompanion(StaffRolesCompanion data) {
+    return StaffRole(
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      name: data.name.present ? data.name.value : this.name,
+      hourlyCostRateCents: data.hourlyCostRateCents.present
+          ? data.hourlyCostRateCents.value
+          : this.hourlyCostRateCents,
+      hourlyBillingRateCents: data.hourlyBillingRateCents.present
+          ? data.hourlyBillingRateCents.value
+          : this.hourlyBillingRateCents,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StaffRole(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('name: $name, ')
+          ..write('hourlyCostRateCents: $hourlyCostRateCents, ')
+          ..write('hourlyBillingRateCents: $hourlyBillingRateCents, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    name,
+    hourlyCostRateCents,
+    hourlyBillingRateCents,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StaffRole &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.name == this.name &&
+          other.hourlyCostRateCents == this.hourlyCostRateCents &&
+          other.hourlyBillingRateCents == this.hourlyBillingRateCents &&
+          other.createdAt == this.createdAt);
+}
+
+class StaffRolesCompanion extends UpdateCompanion<StaffRole> {
+  final Value<String> id;
+  final Value<String> companyId;
+  final Value<String> name;
+  final Value<int> hourlyCostRateCents;
+  final Value<int> hourlyBillingRateCents;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const StaffRolesCompanion({
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.hourlyCostRateCents = const Value.absent(),
+    this.hourlyBillingRateCents = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StaffRolesCompanion.insert({
+    required String id,
+    required String companyId,
+    required String name,
+    this.hourlyCostRateCents = const Value.absent(),
+    this.hourlyBillingRateCents = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       companyId = Value(companyId),
+       name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<StaffRole> custom({
+    Expression<String>? id,
+    Expression<String>? companyId,
+    Expression<String>? name,
+    Expression<int>? hourlyCostRateCents,
+    Expression<int>? hourlyBillingRateCents,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (name != null) 'name': name,
+      if (hourlyCostRateCents != null)
+        'hourly_cost_rate_cents': hourlyCostRateCents,
+      if (hourlyBillingRateCents != null)
+        'hourly_billing_rate_cents': hourlyBillingRateCents,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StaffRolesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? companyId,
+    Value<String>? name,
+    Value<int>? hourlyCostRateCents,
+    Value<int>? hourlyBillingRateCents,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return StaffRolesCompanion(
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      name: name ?? this.name,
+      hourlyCostRateCents: hourlyCostRateCents ?? this.hourlyCostRateCents,
+      hourlyBillingRateCents:
+          hourlyBillingRateCents ?? this.hourlyBillingRateCents,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<String>(companyId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (hourlyCostRateCents.present) {
+      map['hourly_cost_rate_cents'] = Variable<int>(hourlyCostRateCents.value);
+    }
+    if (hourlyBillingRateCents.present) {
+      map['hourly_billing_rate_cents'] = Variable<int>(
+        hourlyBillingRateCents.value,
+      );
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StaffRolesCompanion(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('name: $name, ')
+          ..write('hourlyCostRateCents: $hourlyCostRateCents, ')
+          ..write('hourlyBillingRateCents: $hourlyBillingRateCents, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $InvoiceItemsTable extends InvoiceItems
     with TableInfo<$InvoiceItemsTable, InvoiceItem> {
   @override
@@ -9974,6 +10416,20 @@ class $InvoiceItemsTable extends InvoiceItems
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _staffRoleIdMeta = const VerificationMeta(
+    'staffRoleId',
+  );
+  @override
+  late final GeneratedColumn<String> staffRoleId = GeneratedColumn<String>(
+    'staff_role_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES staff_roles (id) ON DELETE SET NULL',
+    ),
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -9998,6 +10454,7 @@ class $InvoiceItemsTable extends InvoiceItems
     unit,
     discountPercent,
     groupLabel,
+    staffRoleId,
     sortOrder,
   ];
   @override
@@ -10093,6 +10550,15 @@ class $InvoiceItemsTable extends InvoiceItems
         groupLabel.isAcceptableOrUnknown(data['group_label']!, _groupLabelMeta),
       );
     }
+    if (data.containsKey('staff_role_id')) {
+      context.handle(
+        _staffRoleIdMeta,
+        staffRoleId.isAcceptableOrUnknown(
+          data['staff_role_id']!,
+          _staffRoleIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('sort_order')) {
       context.handle(
         _sortOrderMeta,
@@ -10156,6 +10622,10 @@ class $InvoiceItemsTable extends InvoiceItems
         DriftSqlType.string,
         data['${effectivePrefix}group_label'],
       ),
+      staffRoleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}staff_role_id'],
+      ),
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
@@ -10200,6 +10670,12 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
   /// Positionsgruppe (z. B. "Elektroinstallation EG") — ungleich der
   /// Artikelgruppe im Stamm. `null` = ungruppierte Position.
   final String? groupLabel;
+
+  /// Rolle einer Stunden-Position (C3.4, Kay 2026-11-03: „aus den Rollen
+  /// aussuchen“). `null` = ohne Rolle (alte Dokumente, Firmen ohne
+  /// Rollen). Der Preis steht trotzdem in [unitPriceCents] — eine spätere
+  /// Satzänderung der Rolle ändert diese Position nicht.
+  final String? staffRoleId;
   final int sortOrder;
   const InvoiceItem({
     required this.id,
@@ -10213,6 +10689,7 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     this.unit,
     required this.discountPercent,
     this.groupLabel,
+    this.staffRoleId,
     required this.sortOrder,
   });
   @override
@@ -10239,6 +10716,9 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     if (!nullToAbsent || groupLabel != null) {
       map['group_label'] = Variable<String>(groupLabel);
     }
+    if (!nullToAbsent || staffRoleId != null) {
+      map['staff_role_id'] = Variable<String>(staffRoleId);
+    }
     map['sort_order'] = Variable<int>(sortOrder);
     return map;
   }
@@ -10260,6 +10740,9 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
       groupLabel: groupLabel == null && nullToAbsent
           ? const Value.absent()
           : Value(groupLabel),
+      staffRoleId: staffRoleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(staffRoleId),
       sortOrder: Value(sortOrder),
     );
   }
@@ -10283,6 +10766,7 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
       unit: serializer.fromJson<String?>(json['unit']),
       discountPercent: serializer.fromJson<double>(json['discountPercent']),
       groupLabel: serializer.fromJson<String?>(json['groupLabel']),
+      staffRoleId: serializer.fromJson<String?>(json['staffRoleId']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
     );
   }
@@ -10303,6 +10787,7 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
       'unit': serializer.toJson<String?>(unit),
       'discountPercent': serializer.toJson<double>(discountPercent),
       'groupLabel': serializer.toJson<String?>(groupLabel),
+      'staffRoleId': serializer.toJson<String?>(staffRoleId),
       'sortOrder': serializer.toJson<int>(sortOrder),
     };
   }
@@ -10319,6 +10804,7 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     Value<String?> unit = const Value.absent(),
     double? discountPercent,
     Value<String?> groupLabel = const Value.absent(),
+    Value<String?> staffRoleId = const Value.absent(),
     int? sortOrder,
   }) => InvoiceItem(
     id: id ?? this.id,
@@ -10332,6 +10818,7 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     unit: unit.present ? unit.value : this.unit,
     discountPercent: discountPercent ?? this.discountPercent,
     groupLabel: groupLabel.present ? groupLabel.value : this.groupLabel,
+    staffRoleId: staffRoleId.present ? staffRoleId.value : this.staffRoleId,
     sortOrder: sortOrder ?? this.sortOrder,
   );
   InvoiceItem copyWithCompanion(InvoiceItemsCompanion data) {
@@ -10357,6 +10844,9 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
       groupLabel: data.groupLabel.present
           ? data.groupLabel.value
           : this.groupLabel,
+      staffRoleId: data.staffRoleId.present
+          ? data.staffRoleId.value
+          : this.staffRoleId,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
     );
   }
@@ -10375,6 +10865,7 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
           ..write('unit: $unit, ')
           ..write('discountPercent: $discountPercent, ')
           ..write('groupLabel: $groupLabel, ')
+          ..write('staffRoleId: $staffRoleId, ')
           ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
@@ -10393,6 +10884,7 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
     unit,
     discountPercent,
     groupLabel,
+    staffRoleId,
     sortOrder,
   );
   @override
@@ -10410,6 +10902,7 @@ class InvoiceItem extends DataClass implements Insertable<InvoiceItem> {
           other.unit == this.unit &&
           other.discountPercent == this.discountPercent &&
           other.groupLabel == this.groupLabel &&
+          other.staffRoleId == this.staffRoleId &&
           other.sortOrder == this.sortOrder);
 }
 
@@ -10425,6 +10918,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
   final Value<String?> unit;
   final Value<double> discountPercent;
   final Value<String?> groupLabel;
+  final Value<String?> staffRoleId;
   final Value<int> sortOrder;
   final Value<int> rowid;
   const InvoiceItemsCompanion({
@@ -10439,6 +10933,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     this.unit = const Value.absent(),
     this.discountPercent = const Value.absent(),
     this.groupLabel = const Value.absent(),
+    this.staffRoleId = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -10454,6 +10949,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     this.unit = const Value.absent(),
     this.discountPercent = const Value.absent(),
     this.groupLabel = const Value.absent(),
+    this.staffRoleId = const Value.absent(),
     required int sortOrder,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -10476,6 +10972,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     Expression<String>? unit,
     Expression<double>? discountPercent,
     Expression<String>? groupLabel,
+    Expression<String>? staffRoleId,
     Expression<int>? sortOrder,
     Expression<int>? rowid,
   }) {
@@ -10491,6 +10988,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
       if (unit != null) 'unit': unit,
       if (discountPercent != null) 'discount_percent': discountPercent,
       if (groupLabel != null) 'group_label': groupLabel,
+      if (staffRoleId != null) 'staff_role_id': staffRoleId,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (rowid != null) 'rowid': rowid,
     });
@@ -10508,6 +11006,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     Value<String?>? unit,
     Value<double>? discountPercent,
     Value<String?>? groupLabel,
+    Value<String?>? staffRoleId,
     Value<int>? sortOrder,
     Value<int>? rowid,
   }) {
@@ -10523,6 +11022,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
       unit: unit ?? this.unit,
       discountPercent: discountPercent ?? this.discountPercent,
       groupLabel: groupLabel ?? this.groupLabel,
+      staffRoleId: staffRoleId ?? this.staffRoleId,
       sortOrder: sortOrder ?? this.sortOrder,
       rowid: rowid ?? this.rowid,
     );
@@ -10566,6 +11066,9 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
     if (groupLabel.present) {
       map['group_label'] = Variable<String>(groupLabel.value);
     }
+    if (staffRoleId.present) {
+      map['staff_role_id'] = Variable<String>(staffRoleId.value);
+    }
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
@@ -10589,6 +11092,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItem> {
           ..write('unit: $unit, ')
           ..write('discountPercent: $discountPercent, ')
           ..write('groupLabel: $groupLabel, ')
+          ..write('staffRoleId: $staffRoleId, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -18330,381 +18834,6 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
   }
 }
 
-class $StaffRolesTable extends StaffRoles
-    with TableInfo<$StaffRolesTable, StaffRole> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $StaffRolesTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _companyIdMeta = const VerificationMeta(
-    'companyId',
-  );
-  @override
-  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
-    'company_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES companies (id) ON DELETE CASCADE',
-    ),
-  );
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _hourlyCostRateCentsMeta =
-      const VerificationMeta('hourlyCostRateCents');
-  @override
-  late final GeneratedColumn<int> hourlyCostRateCents = GeneratedColumn<int>(
-    'hourly_cost_rate_cents',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
-  @override
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    companyId,
-    name,
-    hourlyCostRateCents,
-    createdAt,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'staff_roles';
-  @override
-  VerificationContext validateIntegrity(
-    Insertable<StaffRole> instance, {
-    bool isInserting = false,
-  }) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('company_id')) {
-      context.handle(
-        _companyIdMeta,
-        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_companyIdMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('hourly_cost_rate_cents')) {
-      context.handle(
-        _hourlyCostRateCentsMeta,
-        hourlyCostRateCents.isAcceptableOrUnknown(
-          data['hourly_cost_rate_cents']!,
-          _hourlyCostRateCentsMeta,
-        ),
-      );
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  StaffRole map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return StaffRole(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      companyId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}company_id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      hourlyCostRateCents: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}hourly_cost_rate_cents'],
-      )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}created_at'],
-      )!,
-    );
-  }
-
-  @override
-  $StaffRolesTable createAlias(String alias) {
-    return $StaffRolesTable(attachedDatabase, alias);
-  }
-}
-
-class StaffRole extends DataClass implements Insertable<StaffRole> {
-  final String id;
-  final String companyId;
-  final String name;
-
-  /// Stundenkostensatz in Minor Units/Cent (F2-Muster) — Kays eigene
-  /// Angabe, nicht von dieser App vorgegeben. Default 0, nicht
-  /// nullable: eine Rolle ohne bewusst eingetragenen Satz kostet
-  /// explizit nichts, statt einen unbekannten/geratenen Wert
-  /// vorzutäuschen.
-  final int hourlyCostRateCents;
-  final DateTime createdAt;
-  const StaffRole({
-    required this.id,
-    required this.companyId,
-    required this.name,
-    required this.hourlyCostRateCents,
-    required this.createdAt,
-  });
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['company_id'] = Variable<String>(companyId);
-    map['name'] = Variable<String>(name);
-    map['hourly_cost_rate_cents'] = Variable<int>(hourlyCostRateCents);
-    map['created_at'] = Variable<DateTime>(createdAt);
-    return map;
-  }
-
-  StaffRolesCompanion toCompanion(bool nullToAbsent) {
-    return StaffRolesCompanion(
-      id: Value(id),
-      companyId: Value(companyId),
-      name: Value(name),
-      hourlyCostRateCents: Value(hourlyCostRateCents),
-      createdAt: Value(createdAt),
-    );
-  }
-
-  factory StaffRole.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return StaffRole(
-      id: serializer.fromJson<String>(json['id']),
-      companyId: serializer.fromJson<String>(json['companyId']),
-      name: serializer.fromJson<String>(json['name']),
-      hourlyCostRateCents: serializer.fromJson<int>(
-        json['hourlyCostRateCents'],
-      ),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'companyId': serializer.toJson<String>(companyId),
-      'name': serializer.toJson<String>(name),
-      'hourlyCostRateCents': serializer.toJson<int>(hourlyCostRateCents),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
-    };
-  }
-
-  StaffRole copyWith({
-    String? id,
-    String? companyId,
-    String? name,
-    int? hourlyCostRateCents,
-    DateTime? createdAt,
-  }) => StaffRole(
-    id: id ?? this.id,
-    companyId: companyId ?? this.companyId,
-    name: name ?? this.name,
-    hourlyCostRateCents: hourlyCostRateCents ?? this.hourlyCostRateCents,
-    createdAt: createdAt ?? this.createdAt,
-  );
-  StaffRole copyWithCompanion(StaffRolesCompanion data) {
-    return StaffRole(
-      id: data.id.present ? data.id.value : this.id,
-      companyId: data.companyId.present ? data.companyId.value : this.companyId,
-      name: data.name.present ? data.name.value : this.name,
-      hourlyCostRateCents: data.hourlyCostRateCents.present
-          ? data.hourlyCostRateCents.value
-          : this.hourlyCostRateCents,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('StaffRole(')
-          ..write('id: $id, ')
-          ..write('companyId: $companyId, ')
-          ..write('name: $name, ')
-          ..write('hourlyCostRateCents: $hourlyCostRateCents, ')
-          ..write('createdAt: $createdAt')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode =>
-      Object.hash(id, companyId, name, hourlyCostRateCents, createdAt);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is StaffRole &&
-          other.id == this.id &&
-          other.companyId == this.companyId &&
-          other.name == this.name &&
-          other.hourlyCostRateCents == this.hourlyCostRateCents &&
-          other.createdAt == this.createdAt);
-}
-
-class StaffRolesCompanion extends UpdateCompanion<StaffRole> {
-  final Value<String> id;
-  final Value<String> companyId;
-  final Value<String> name;
-  final Value<int> hourlyCostRateCents;
-  final Value<DateTime> createdAt;
-  final Value<int> rowid;
-  const StaffRolesCompanion({
-    this.id = const Value.absent(),
-    this.companyId = const Value.absent(),
-    this.name = const Value.absent(),
-    this.hourlyCostRateCents = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  StaffRolesCompanion.insert({
-    required String id,
-    required String companyId,
-    required String name,
-    this.hourlyCostRateCents = const Value.absent(),
-    required DateTime createdAt,
-    this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       companyId = Value(companyId),
-       name = Value(name),
-       createdAt = Value(createdAt);
-  static Insertable<StaffRole> custom({
-    Expression<String>? id,
-    Expression<String>? companyId,
-    Expression<String>? name,
-    Expression<int>? hourlyCostRateCents,
-    Expression<DateTime>? createdAt,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (companyId != null) 'company_id': companyId,
-      if (name != null) 'name': name,
-      if (hourlyCostRateCents != null)
-        'hourly_cost_rate_cents': hourlyCostRateCents,
-      if (createdAt != null) 'created_at': createdAt,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  StaffRolesCompanion copyWith({
-    Value<String>? id,
-    Value<String>? companyId,
-    Value<String>? name,
-    Value<int>? hourlyCostRateCents,
-    Value<DateTime>? createdAt,
-    Value<int>? rowid,
-  }) {
-    return StaffRolesCompanion(
-      id: id ?? this.id,
-      companyId: companyId ?? this.companyId,
-      name: name ?? this.name,
-      hourlyCostRateCents: hourlyCostRateCents ?? this.hourlyCostRateCents,
-      createdAt: createdAt ?? this.createdAt,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (companyId.present) {
-      map['company_id'] = Variable<String>(companyId.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (hourlyCostRateCents.present) {
-      map['hourly_cost_rate_cents'] = Variable<int>(hourlyCostRateCents.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('StaffRolesCompanion(')
-          ..write('id: $id, ')
-          ..write('companyId: $companyId, ')
-          ..write('name: $name, ')
-          ..write('hourlyCostRateCents: $hourlyCostRateCents, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class $TimeSheetsTable extends TimeSheets
     with TableInfo<$TimeSheetsTable, TimeSheet> {
   @override
@@ -20028,6 +20157,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ArticleSupplierPricesTable(this);
   late final $ProjectsTable projects = $ProjectsTable(this);
   late final $InvoicesTable invoices = $InvoicesTable(this);
+  late final $StaffRolesTable staffRoles = $StaffRolesTable(this);
   late final $InvoiceItemsTable invoiceItems = $InvoiceItemsTable(this);
   late final $NumberSequencesTable numberSequences = $NumberSequencesTable(
     this,
@@ -20054,7 +20184,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $InventoryCountItemsTable inventoryCountItems =
       $InventoryCountItemsTable(this);
-  late final $StaffRolesTable staffRoles = $StaffRolesTable(this);
   late final $TimeSheetsTable timeSheets = $TimeSheetsTable(this);
   late final $TimeEntriesTable timeEntries = $TimeEntriesTable(this);
   @override
@@ -20070,6 +20199,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     articleSupplierPrices,
     projects,
     invoices,
+    staffRoles,
     invoiceItems,
     numberSequences,
     vehicles,
@@ -20084,7 +20214,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     stockMovements,
     inventoryCounts,
     inventoryCountItems,
-    staffRoles,
     timeSheets,
     timeEntries,
   ];
@@ -20183,6 +20312,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
+        'companies',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('staff_roles', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
         'invoices',
         limitUpdateKind: UpdateKind.delete,
       ),
@@ -20191,6 +20327,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'articles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('invoice_items', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'staff_roles',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('invoice_items', kind: UpdateKind.update)],
@@ -20367,13 +20510,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('inventory_count_items', kind: UpdateKind.delete)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'companies',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('staff_roles', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -20707,6 +20843,24 @@ final class $$CompaniesTableReferences
     );
   }
 
+  static MultiTypedResultKey<$StaffRolesTable, List<StaffRole>>
+  _staffRolesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.staffRoles,
+    aliasName: 'companies__id__staff_roles__company_id',
+  );
+
+  $$StaffRolesTableProcessedTableManager get staffRolesRefs {
+    final manager = $$StaffRolesTableTableManager(
+      $_db,
+      $_db.staffRoles,
+    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_staffRolesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$NumberSequencesTable, List<NumberSequence>>
   _numberSequencesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.numberSequences,
@@ -20903,24 +21057,6 @@ final class $$CompaniesTableReferences
     final cache = $_typedResult.readTableOrNull(
       _inventoryCountsRefsTable($_db),
     );
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-
-  static MultiTypedResultKey<$StaffRolesTable, List<StaffRole>>
-  _staffRolesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.staffRoles,
-    aliasName: 'companies__id__staff_roles__company_id',
-  );
-
-  $$StaffRolesTableProcessedTableManager get staffRolesRefs {
-    final manager = $$StaffRolesTableTableManager(
-      $_db,
-      $_db.staffRoles,
-    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_staffRolesRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -21477,6 +21613,31 @@ class $$CompaniesTableFilterComposer
     return f(composer);
   }
 
+  Expression<bool> staffRolesRefs(
+    Expression<bool> Function($$StaffRolesTableFilterComposer f) f,
+  ) {
+    final $$StaffRolesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.staffRoles,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StaffRolesTableFilterComposer(
+            $db: $db,
+            $table: $db.staffRoles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<bool> numberSequencesRefs(
     Expression<bool> Function($$NumberSequencesTableFilterComposer f) f,
   ) {
@@ -21720,31 +21881,6 @@ class $$CompaniesTableFilterComposer
           }) => $$InventoryCountsTableFilterComposer(
             $db: $db,
             $table: $db.inventoryCounts,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
-  Expression<bool> staffRolesRefs(
-    Expression<bool> Function($$StaffRolesTableFilterComposer f) f,
-  ) {
-    final $$StaffRolesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.staffRoles,
-      getReferencedColumn: (t) => t.companyId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$StaffRolesTableFilterComposer(
-            $db: $db,
-            $table: $db.staffRoles,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -22662,6 +22798,31 @@ class $$CompaniesTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> staffRolesRefs<T extends Object>(
+    Expression<T> Function($$StaffRolesTableAnnotationComposer a) f,
+  ) {
+    final $$StaffRolesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.staffRoles,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StaffRolesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.staffRoles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> numberSequencesRefs<T extends Object>(
     Expression<T> Function($$NumberSequencesTableAnnotationComposer a) f,
   ) {
@@ -22916,31 +23077,6 @@ class $$CompaniesTableAnnotationComposer
     return f(composer);
   }
 
-  Expression<T> staffRolesRefs<T extends Object>(
-    Expression<T> Function($$StaffRolesTableAnnotationComposer a) f,
-  ) {
-    final $$StaffRolesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.staffRoles,
-      getReferencedColumn: (t) => t.companyId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$StaffRolesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.staffRoles,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
   Expression<T> timeSheetsRefs<T extends Object>(
     Expression<T> Function($$TimeSheetsTableAnnotationComposer a) f,
   ) {
@@ -23012,6 +23148,7 @@ class $$CompaniesTableTableManager
             bool articlesRefs,
             bool projectsRefs,
             bool invoicesRefs,
+            bool staffRolesRefs,
             bool numberSequencesRefs,
             bool vehiclesRefs,
             bool vehicleCostEntriesRefs,
@@ -23022,7 +23159,6 @@ class $$CompaniesTableTableManager
             bool purchaseOrdersRefs,
             bool stockMovementsRefs,
             bool inventoryCountsRefs,
-            bool staffRolesRefs,
             bool timeSheetsRefs,
             bool timeEntriesRefs,
           })
@@ -23358,6 +23494,7 @@ class $$CompaniesTableTableManager
                 articlesRefs = false,
                 projectsRefs = false,
                 invoicesRefs = false,
+                staffRolesRefs = false,
                 numberSequencesRefs = false,
                 vehiclesRefs = false,
                 vehicleCostEntriesRefs = false,
@@ -23368,7 +23505,6 @@ class $$CompaniesTableTableManager
                 purchaseOrdersRefs = false,
                 stockMovementsRefs = false,
                 inventoryCountsRefs = false,
-                staffRolesRefs = false,
                 timeSheetsRefs = false,
                 timeEntriesRefs = false,
               }) {
@@ -23381,6 +23517,7 @@ class $$CompaniesTableTableManager
                     if (articlesRefs) db.articles,
                     if (projectsRefs) db.projects,
                     if (invoicesRefs) db.invoices,
+                    if (staffRolesRefs) db.staffRoles,
                     if (numberSequencesRefs) db.numberSequences,
                     if (vehiclesRefs) db.vehicles,
                     if (vehicleCostEntriesRefs) db.vehicleCostEntries,
@@ -23392,7 +23529,6 @@ class $$CompaniesTableTableManager
                     if (purchaseOrdersRefs) db.purchaseOrders,
                     if (stockMovementsRefs) db.stockMovements,
                     if (inventoryCountsRefs) db.inventoryCounts,
-                    if (staffRolesRefs) db.staffRoles,
                     if (timeSheetsRefs) db.timeSheets,
                     if (timeEntriesRefs) db.timeEntries,
                   ],
@@ -23519,6 +23655,27 @@ class $$CompaniesTableTableManager
                                 table,
                                 p0,
                               ).invoicesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.companyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (staffRolesRefs)
+                        await $_getPrefetchedData<
+                          Company,
+                          $CompaniesTable,
+                          StaffRole
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompaniesTableReferences
+                              ._staffRolesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompaniesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).staffRolesRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.companyId == item.id,
@@ -23735,27 +23892,6 @@ class $$CompaniesTableTableManager
                               ),
                           typedResults: items,
                         ),
-                      if (staffRolesRefs)
-                        await $_getPrefetchedData<
-                          Company,
-                          $CompaniesTable,
-                          StaffRole
-                        >(
-                          currentTable: table,
-                          referencedTable: $$CompaniesTableReferences
-                              ._staffRolesRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$CompaniesTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).staffRolesRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.companyId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
                       if (timeSheetsRefs)
                         await $_getPrefetchedData<
                           Company,
@@ -23825,6 +23961,7 @@ typedef $$CompaniesTableProcessedTableManager =
         bool articlesRefs,
         bool projectsRefs,
         bool invoicesRefs,
+        bool staffRolesRefs,
         bool numberSequencesRefs,
         bool vehiclesRefs,
         bool vehicleCostEntriesRefs,
@@ -23835,7 +23972,6 @@ typedef $$CompaniesTableProcessedTableManager =
         bool purchaseOrdersRefs,
         bool stockMovementsRefs,
         bool inventoryCountsRefs,
-        bool staffRolesRefs,
         bool timeSheetsRefs,
         bool timeEntriesRefs,
       })
@@ -30070,6 +30206,542 @@ typedef $$InvoicesTableProcessedTableManager =
         bool timeEntriesRefs,
       })
     >;
+typedef $$StaffRolesTableCreateCompanionBuilder =
+    StaffRolesCompanion Function({
+      required String id,
+      required String companyId,
+      required String name,
+      Value<int> hourlyCostRateCents,
+      Value<int> hourlyBillingRateCents,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$StaffRolesTableUpdateCompanionBuilder =
+    StaffRolesCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> name,
+      Value<int> hourlyCostRateCents,
+      Value<int> hourlyBillingRateCents,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$StaffRolesTableReferences
+    extends BaseReferences<_$AppDatabase, $StaffRolesTable, StaffRole> {
+  $$StaffRolesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CompaniesTable _companyIdTable(_$AppDatabase db) =>
+      db.companies.createAlias('staff_roles__company_id__companies__id');
+
+  $$CompaniesTableProcessedTableManager get companyId {
+    final $_column = $_itemColumn<String>('company_id')!;
+
+    final manager = $$CompaniesTableTableManager(
+      $_db,
+      $_db.companies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$InvoiceItemsTable, List<InvoiceItem>>
+  _invoiceItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.invoiceItems,
+    aliasName: 'staff_roles__id__invoice_items__staff_role_id',
+  );
+
+  $$InvoiceItemsTableProcessedTableManager get invoiceItemsRefs {
+    final manager = $$InvoiceItemsTableTableManager(
+      $_db,
+      $_db.invoiceItems,
+    ).filter((f) => f.staffRoleId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_invoiceItemsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$TimeEntriesTable, List<TimeEntry>>
+  _timeEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.timeEntries,
+    aliasName: 'staff_roles__id__time_entries__staff_role_id',
+  );
+
+  $$TimeEntriesTableProcessedTableManager get timeEntriesRefs {
+    final manager = $$TimeEntriesTableTableManager(
+      $_db,
+      $_db.timeEntries,
+    ).filter((f) => f.staffRoleId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_timeEntriesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$StaffRolesTableFilterComposer
+    extends Composer<_$AppDatabase, $StaffRolesTable> {
+  $$StaffRolesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hourlyCostRateCents => $composableBuilder(
+    column: $table.hourlyCostRateCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hourlyBillingRateCents => $composableBuilder(
+    column: $table.hourlyBillingRateCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CompaniesTableFilterComposer get companyId {
+    final $$CompaniesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableFilterComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> invoiceItemsRefs(
+    Expression<bool> Function($$InvoiceItemsTableFilterComposer f) f,
+  ) {
+    final $$InvoiceItemsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.invoiceItems,
+      getReferencedColumn: (t) => t.staffRoleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoiceItemsTableFilterComposer(
+            $db: $db,
+            $table: $db.invoiceItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> timeEntriesRefs(
+    Expression<bool> Function($$TimeEntriesTableFilterComposer f) f,
+  ) {
+    final $$TimeEntriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeEntries,
+      getReferencedColumn: (t) => t.staffRoleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeEntriesTableFilterComposer(
+            $db: $db,
+            $table: $db.timeEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$StaffRolesTableOrderingComposer
+    extends Composer<_$AppDatabase, $StaffRolesTable> {
+  $$StaffRolesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hourlyCostRateCents => $composableBuilder(
+    column: $table.hourlyCostRateCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hourlyBillingRateCents => $composableBuilder(
+    column: $table.hourlyBillingRateCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CompaniesTableOrderingComposer get companyId {
+    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableOrderingComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$StaffRolesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StaffRolesTable> {
+  $$StaffRolesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get hourlyCostRateCents => $composableBuilder(
+    column: $table.hourlyCostRateCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get hourlyBillingRateCents => $composableBuilder(
+    column: $table.hourlyBillingRateCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$CompaniesTableAnnotationComposer get companyId {
+    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> invoiceItemsRefs<T extends Object>(
+    Expression<T> Function($$InvoiceItemsTableAnnotationComposer a) f,
+  ) {
+    final $$InvoiceItemsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.invoiceItems,
+      getReferencedColumn: (t) => t.staffRoleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$InvoiceItemsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.invoiceItems,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> timeEntriesRefs<T extends Object>(
+    Expression<T> Function($$TimeEntriesTableAnnotationComposer a) f,
+  ) {
+    final $$TimeEntriesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.timeEntries,
+      getReferencedColumn: (t) => t.staffRoleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TimeEntriesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.timeEntries,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$StaffRolesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $StaffRolesTable,
+          StaffRole,
+          $$StaffRolesTableFilterComposer,
+          $$StaffRolesTableOrderingComposer,
+          $$StaffRolesTableAnnotationComposer,
+          $$StaffRolesTableCreateCompanionBuilder,
+          $$StaffRolesTableUpdateCompanionBuilder,
+          (StaffRole, $$StaffRolesTableReferences),
+          StaffRole,
+          PrefetchHooks Function({
+            bool companyId,
+            bool invoiceItemsRefs,
+            bool timeEntriesRefs,
+          })
+        > {
+  $$StaffRolesTableTableManager(_$AppDatabase db, $StaffRolesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StaffRolesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StaffRolesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StaffRolesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> companyId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> hourlyCostRateCents = const Value.absent(),
+                Value<int> hourlyBillingRateCents = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StaffRolesCompanion(
+                id: id,
+                companyId: companyId,
+                name: name,
+                hourlyCostRateCents: hourlyCostRateCents,
+                hourlyBillingRateCents: hourlyBillingRateCents,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String companyId,
+                required String name,
+                Value<int> hourlyCostRateCents = const Value.absent(),
+                Value<int> hourlyBillingRateCents = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => StaffRolesCompanion.insert(
+                id: id,
+                companyId: companyId,
+                name: name,
+                hourlyCostRateCents: hourlyCostRateCents,
+                hourlyBillingRateCents: hourlyBillingRateCents,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$StaffRolesTable, StaffRole>(table),
+                  $$StaffRolesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                companyId = false,
+                invoiceItemsRefs = false,
+                timeEntriesRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (invoiceItemsRefs) db.invoiceItems,
+                    if (timeEntriesRefs) db.timeEntries,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (companyId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable: $$StaffRolesTableReferences
+                                        ._companyIdTable(db),
+                                    referencedColumn:
+                                        $$StaffRolesTableReferences
+                                            ._companyIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (invoiceItemsRefs)
+                        await $_getPrefetchedData<
+                          StaffRole,
+                          $StaffRolesTable,
+                          InvoiceItem
+                        >(
+                          currentTable: table,
+                          referencedTable: $$StaffRolesTableReferences
+                              ._invoiceItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$StaffRolesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).invoiceItemsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.staffRoleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (timeEntriesRefs)
+                        await $_getPrefetchedData<
+                          StaffRole,
+                          $StaffRolesTable,
+                          TimeEntry
+                        >(
+                          currentTable: table,
+                          referencedTable: $$StaffRolesTableReferences
+                              ._timeEntriesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$StaffRolesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).timeEntriesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.staffRoleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$StaffRolesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $StaffRolesTable,
+      StaffRole,
+      $$StaffRolesTableFilterComposer,
+      $$StaffRolesTableOrderingComposer,
+      $$StaffRolesTableAnnotationComposer,
+      $$StaffRolesTableCreateCompanionBuilder,
+      $$StaffRolesTableUpdateCompanionBuilder,
+      (StaffRole, $$StaffRolesTableReferences),
+      StaffRole,
+      PrefetchHooks Function({
+        bool companyId,
+        bool invoiceItemsRefs,
+        bool timeEntriesRefs,
+      })
+    >;
 typedef $$InvoiceItemsTableCreateCompanionBuilder =
     InvoiceItemsCompanion Function({
       required String id,
@@ -30083,6 +30755,7 @@ typedef $$InvoiceItemsTableCreateCompanionBuilder =
       Value<String?> unit,
       Value<double> discountPercent,
       Value<String?> groupLabel,
+      Value<String?> staffRoleId,
       required int sortOrder,
       Value<int> rowid,
     });
@@ -30099,6 +30772,7 @@ typedef $$InvoiceItemsTableUpdateCompanionBuilder =
       Value<String?> unit,
       Value<double> discountPercent,
       Value<String?> groupLabel,
+      Value<String?> staffRoleId,
       Value<int> sortOrder,
       Value<int> rowid,
     });
@@ -30135,6 +30809,23 @@ final class $$InvoiceItemsTableReferences
       $_db.articles,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_articleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $StaffRolesTable _staffRoleIdTable(_$AppDatabase db) => db.staffRoles
+      .createAlias('invoice_items__staff_role_id__staff_roles__id');
+
+  $$StaffRolesTableProcessedTableManager? get staffRoleId {
+    final $_column = $_itemColumn<String>('staff_role_id');
+    if ($_column == null) return null;
+    final manager = $$StaffRolesTableTableManager(
+      $_db,
+      $_db.staffRoles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_staffRoleIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -30239,6 +30930,29 @@ class $$InvoiceItemsTableFilterComposer
           }) => $$ArticlesTableFilterComposer(
             $db: $db,
             $table: $db.articles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$StaffRolesTableFilterComposer get staffRoleId {
+    final $$StaffRolesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.staffRoleId,
+      referencedTable: $db.staffRoles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StaffRolesTableFilterComposer(
+            $db: $db,
+            $table: $db.staffRoles,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -30353,6 +31067,29 @@ class $$InvoiceItemsTableOrderingComposer
     );
     return composer;
   }
+
+  $$StaffRolesTableOrderingComposer get staffRoleId {
+    final $$StaffRolesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.staffRoleId,
+      referencedTable: $db.staffRoles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StaffRolesTableOrderingComposer(
+            $db: $db,
+            $table: $db.staffRoles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$InvoiceItemsTableAnnotationComposer
@@ -30449,6 +31186,29 @@ class $$InvoiceItemsTableAnnotationComposer
     );
     return composer;
   }
+
+  $$StaffRolesTableAnnotationComposer get staffRoleId {
+    final $$StaffRolesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.staffRoleId,
+      referencedTable: $db.staffRoles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StaffRolesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.staffRoles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$InvoiceItemsTableTableManager
@@ -30464,7 +31224,11 @@ class $$InvoiceItemsTableTableManager
           $$InvoiceItemsTableUpdateCompanionBuilder,
           (InvoiceItem, $$InvoiceItemsTableReferences),
           InvoiceItem,
-          PrefetchHooks Function({bool invoiceId, bool articleId})
+          PrefetchHooks Function({
+            bool invoiceId,
+            bool articleId,
+            bool staffRoleId,
+          })
         > {
   $$InvoiceItemsTableTableManager(_$AppDatabase db, $InvoiceItemsTable table)
     : super(
@@ -30490,6 +31254,7 @@ class $$InvoiceItemsTableTableManager
                 Value<String?> unit = const Value.absent(),
                 Value<double> discountPercent = const Value.absent(),
                 Value<String?> groupLabel = const Value.absent(),
+                Value<String?> staffRoleId = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InvoiceItemsCompanion(
@@ -30504,6 +31269,7 @@ class $$InvoiceItemsTableTableManager
                 unit: unit,
                 discountPercent: discountPercent,
                 groupLabel: groupLabel,
+                staffRoleId: staffRoleId,
                 sortOrder: sortOrder,
                 rowid: rowid,
               ),
@@ -30520,6 +31286,7 @@ class $$InvoiceItemsTableTableManager
                 Value<String?> unit = const Value.absent(),
                 Value<double> discountPercent = const Value.absent(),
                 Value<String?> groupLabel = const Value.absent(),
+                Value<String?> staffRoleId = const Value.absent(),
                 required int sortOrder,
                 Value<int> rowid = const Value.absent(),
               }) => InvoiceItemsCompanion.insert(
@@ -30534,6 +31301,7 @@ class $$InvoiceItemsTableTableManager
                 unit: unit,
                 discountPercent: discountPercent,
                 groupLabel: groupLabel,
+                staffRoleId: staffRoleId,
                 sortOrder: sortOrder,
                 rowid: rowid,
               ),
@@ -30545,60 +31313,80 @@ class $$InvoiceItemsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({invoiceId = false, articleId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (invoiceId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.invoiceId,
-                                referencedTable: $$InvoiceItemsTableReferences
-                                    ._invoiceIdTable(db),
-                                referencedColumn: $$InvoiceItemsTableReferences
-                                    ._invoiceIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
-                    if (articleId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.articleId,
-                                referencedTable: $$InvoiceItemsTableReferences
-                                    ._articleIdTable(db),
-                                referencedColumn: $$InvoiceItemsTableReferences
-                                    ._articleIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
+          prefetchHooksCallback:
+              ({invoiceId = false, articleId = false, staffRoleId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (invoiceId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.invoiceId,
+                                    referencedTable:
+                                        $$InvoiceItemsTableReferences
+                                            ._invoiceIdTable(db),
+                                    referencedColumn:
+                                        $$InvoiceItemsTableReferences
+                                            ._invoiceIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (articleId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.articleId,
+                                    referencedTable:
+                                        $$InvoiceItemsTableReferences
+                                            ._articleIdTable(db),
+                                    referencedColumn:
+                                        $$InvoiceItemsTableReferences
+                                            ._articleIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (staffRoleId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.staffRoleId,
+                                    referencedTable:
+                                        $$InvoiceItemsTableReferences
+                                            ._staffRoleIdTable(db),
+                                    referencedColumn:
+                                        $$InvoiceItemsTableReferences
+                                            ._staffRoleIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -30615,7 +31403,7 @@ typedef $$InvoiceItemsTableProcessedTableManager =
       $$InvoiceItemsTableUpdateCompanionBuilder,
       (InvoiceItem, $$InvoiceItemsTableReferences),
       InvoiceItem,
-      PrefetchHooks Function({bool invoiceId, bool articleId})
+      PrefetchHooks Function({bool invoiceId, bool articleId, bool staffRoleId})
     >;
 typedef $$NumberSequencesTableCreateCompanionBuilder =
     NumberSequencesCompanion Function({
@@ -37856,419 +38644,6 @@ typedef $$InventoryCountItemsTableProcessedTableManager =
       InventoryCountItem,
       PrefetchHooks Function({bool inventoryCountId, bool articleId})
     >;
-typedef $$StaffRolesTableCreateCompanionBuilder =
-    StaffRolesCompanion Function({
-      required String id,
-      required String companyId,
-      required String name,
-      Value<int> hourlyCostRateCents,
-      required DateTime createdAt,
-      Value<int> rowid,
-    });
-typedef $$StaffRolesTableUpdateCompanionBuilder =
-    StaffRolesCompanion Function({
-      Value<String> id,
-      Value<String> companyId,
-      Value<String> name,
-      Value<int> hourlyCostRateCents,
-      Value<DateTime> createdAt,
-      Value<int> rowid,
-    });
-
-final class $$StaffRolesTableReferences
-    extends BaseReferences<_$AppDatabase, $StaffRolesTable, StaffRole> {
-  $$StaffRolesTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static $CompaniesTable _companyIdTable(_$AppDatabase db) =>
-      db.companies.createAlias('staff_roles__company_id__companies__id');
-
-  $$CompaniesTableProcessedTableManager get companyId {
-    final $_column = $_itemColumn<String>('company_id')!;
-
-    final manager = $$CompaniesTableTableManager(
-      $_db,
-      $_db.companies,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<$TimeEntriesTable, List<TimeEntry>>
-  _timeEntriesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.timeEntries,
-    aliasName: 'staff_roles__id__time_entries__staff_role_id',
-  );
-
-  $$TimeEntriesTableProcessedTableManager get timeEntriesRefs {
-    final manager = $$TimeEntriesTableTableManager(
-      $_db,
-      $_db.timeEntries,
-    ).filter((f) => f.staffRoleId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_timeEntriesRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
-class $$StaffRolesTableFilterComposer
-    extends Composer<_$AppDatabase, $StaffRolesTable> {
-  $$StaffRolesTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get hourlyCostRateCents => $composableBuilder(
-    column: $table.hourlyCostRateCents,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  $$CompaniesTableFilterComposer get companyId {
-    final $$CompaniesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.companyId,
-      referencedTable: $db.companies,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$CompaniesTableFilterComposer(
-            $db: $db,
-            $table: $db.companies,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<bool> timeEntriesRefs(
-    Expression<bool> Function($$TimeEntriesTableFilterComposer f) f,
-  ) {
-    final $$TimeEntriesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.timeEntries,
-      getReferencedColumn: (t) => t.staffRoleId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$TimeEntriesTableFilterComposer(
-            $db: $db,
-            $table: $db.timeEntries,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $$StaffRolesTableOrderingComposer
-    extends Composer<_$AppDatabase, $StaffRolesTable> {
-  $$StaffRolesTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get hourlyCostRateCents => $composableBuilder(
-    column: $table.hourlyCostRateCents,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  $$CompaniesTableOrderingComposer get companyId {
-    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.companyId,
-      referencedTable: $db.companies,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$CompaniesTableOrderingComposer(
-            $db: $db,
-            $table: $db.companies,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-}
-
-class $$StaffRolesTableAnnotationComposer
-    extends Composer<_$AppDatabase, $StaffRolesTable> {
-  $$StaffRolesTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<int> get hourlyCostRateCents => $composableBuilder(
-    column: $table.hourlyCostRateCents,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<DateTime> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  $$CompaniesTableAnnotationComposer get companyId {
-    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.companyId,
-      referencedTable: $db.companies,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$CompaniesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.companies,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<T> timeEntriesRefs<T extends Object>(
-    Expression<T> Function($$TimeEntriesTableAnnotationComposer a) f,
-  ) {
-    final $$TimeEntriesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.timeEntries,
-      getReferencedColumn: (t) => t.staffRoleId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$TimeEntriesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.timeEntries,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-}
-
-class $$StaffRolesTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $StaffRolesTable,
-          StaffRole,
-          $$StaffRolesTableFilterComposer,
-          $$StaffRolesTableOrderingComposer,
-          $$StaffRolesTableAnnotationComposer,
-          $$StaffRolesTableCreateCompanionBuilder,
-          $$StaffRolesTableUpdateCompanionBuilder,
-          (StaffRole, $$StaffRolesTableReferences),
-          StaffRole,
-          PrefetchHooks Function({bool companyId, bool timeEntriesRefs})
-        > {
-  $$StaffRolesTableTableManager(_$AppDatabase db, $StaffRolesTable table)
-    : super(
-        TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$StaffRolesTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$StaffRolesTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$StaffRolesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> companyId = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<int> hourlyCostRateCents = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => StaffRolesCompanion(
-                id: id,
-                companyId: companyId,
-                name: name,
-                hourlyCostRateCents: hourlyCostRateCents,
-                createdAt: createdAt,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String companyId,
-                required String name,
-                Value<int> hourlyCostRateCents = const Value.absent(),
-                required DateTime createdAt,
-                Value<int> rowid = const Value.absent(),
-              }) => StaffRolesCompanion.insert(
-                id: id,
-                companyId: companyId,
-                name: name,
-                hourlyCostRateCents: hourlyCostRateCents,
-                createdAt: createdAt,
-                rowid: rowid,
-              ),
-          withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable<$StaffRolesTable, StaffRole>(table),
-                  $$StaffRolesTableReferences(db, table, e),
-                ),
-              )
-              .toList(),
-          prefetchHooksCallback:
-              ({companyId = false, timeEntriesRefs = false}) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [
-                    if (timeEntriesRefs) db.timeEntries,
-                  ],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (companyId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.companyId,
-                                    referencedTable: $$StaffRolesTableReferences
-                                        ._companyIdTable(db),
-                                    referencedColumn:
-                                        $$StaffRolesTableReferences
-                                            ._companyIdTable(db)
-                                            .id,
-                                  )
-                                  as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (timeEntriesRefs)
-                        await $_getPrefetchedData<
-                          StaffRole,
-                          $StaffRolesTable,
-                          TimeEntry
-                        >(
-                          currentTable: table,
-                          referencedTable: $$StaffRolesTableReferences
-                              ._timeEntriesRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$StaffRolesTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).timeEntriesRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.staffRoleId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
-                  },
-                );
-              },
-        ),
-      );
-}
-
-typedef $$StaffRolesTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $StaffRolesTable,
-      StaffRole,
-      $$StaffRolesTableFilterComposer,
-      $$StaffRolesTableOrderingComposer,
-      $$StaffRolesTableAnnotationComposer,
-      $$StaffRolesTableCreateCompanionBuilder,
-      $$StaffRolesTableUpdateCompanionBuilder,
-      (StaffRole, $$StaffRolesTableReferences),
-      StaffRole,
-      PrefetchHooks Function({bool companyId, bool timeEntriesRefs})
-    >;
 typedef $$TimeSheetsTableCreateCompanionBuilder =
     TimeSheetsCompanion Function({
       required String id,
@@ -39862,6 +40237,8 @@ class $AppDatabaseManager {
       $$ProjectsTableTableManager(_db, _db.projects);
   $$InvoicesTableTableManager get invoices =>
       $$InvoicesTableTableManager(_db, _db.invoices);
+  $$StaffRolesTableTableManager get staffRoles =>
+      $$StaffRolesTableTableManager(_db, _db.staffRoles);
   $$InvoiceItemsTableTableManager get invoiceItems =>
       $$InvoiceItemsTableTableManager(_db, _db.invoiceItems);
   $$NumberSequencesTableTableManager get numberSequences =>
@@ -39897,8 +40274,6 @@ class $AppDatabaseManager {
       $$InventoryCountsTableTableManager(_db, _db.inventoryCounts);
   $$InventoryCountItemsTableTableManager get inventoryCountItems =>
       $$InventoryCountItemsTableTableManager(_db, _db.inventoryCountItems);
-  $$StaffRolesTableTableManager get staffRoles =>
-      $$StaffRolesTableTableManager(_db, _db.staffRoles);
   $$TimeSheetsTableTableManager get timeSheets =>
       $$TimeSheetsTableTableManager(_db, _db.timeSheets);
   $$TimeEntriesTableTableManager get timeEntries =>

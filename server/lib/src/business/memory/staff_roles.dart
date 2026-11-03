@@ -3,6 +3,7 @@ part of '../repository_memory.dart';
 mixin _InMemoryStaffRoles implements StaffRoleStore {
   final List<StaffRole> _staffRoles = [];
   List<TimeEntry> get _timeEntries;
+  List<DocumentItem> get _items;
 
   @override
   Future<List<StaffRole>> listStaffRoles(String companyId) async =>
@@ -46,6 +47,26 @@ mixin _InMemoryStaffRoles implements StaffRoleStore {
           updatedAt: t.updatedAt,
         );
       }
+    }
+    // Positionen behalten Preis und Text, verlieren nur den Rollenbezug
+    // (wie offline `onDelete: setNull`).
+    for (var i = 0; i < _items.length; i++) {
+      final it = _items[i];
+      if (it.staffRoleId != id) continue;
+      _items[i] = DocumentItem(
+        id: it.id,
+        documentId: it.documentId,
+        kind: it.kind,
+        articleId: it.articleId,
+        description: it.description,
+        quantity: it.quantity,
+        unitPriceCents: it.unitPriceCents,
+        vatRatePercent: it.vatRatePercent,
+        unit: it.unit,
+        discountPercent: it.discountPercent,
+        groupLabel: it.groupLabel,
+        sortOrder: it.sortOrder,
+      );
     }
     return true;
   }

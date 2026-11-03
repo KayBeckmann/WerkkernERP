@@ -83,7 +83,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('online-role-rate')), '65');
     await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
-    expect(find.text('65,00 € / Std.'), findsOneWidget);
+    expect(find.text('Verrechnung: nicht hinterlegt · Kosten: 65,00 € / Std.'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 

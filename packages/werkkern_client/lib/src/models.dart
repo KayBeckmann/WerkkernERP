@@ -149,6 +149,7 @@ class OnlineDocumentItem {
     this.unit,
     this.discountPercent = 0,
     this.groupLabel,
+    this.staffRoleId,
   });
   factory OnlineDocumentItem.fromJson(Map<String, Object?> j) => OnlineDocumentItem(
         kind: OnlineItemKind.values.byName(j['kind'] as String),
@@ -160,6 +161,7 @@ class OnlineDocumentItem {
         unit: j['unit'] as String?,
         discountPercent: (j['discountPercent'] as num? ?? 0).toDouble(),
         groupLabel: j['groupLabel'] as String?,
+        staffRoleId: j['staffRoleId'] as String?,
       );
   final OnlineItemKind kind;
   final String? articleId;
@@ -173,6 +175,9 @@ class OnlineDocumentItem {
   final double discountPercent;
   final String? groupLabel;
 
+  /// Rolle einer Stunden-Position (C3.4) — `null` = ohne Rolle.
+  final String? staffRoleId;
+
   Map<String, Object?> toJson() => {
         'kind': kind.name,
         'articleId': articleId,
@@ -183,6 +188,7 @@ class OnlineDocumentItem {
         'unit': unit,
         'discountPercent': discountPercent,
         'groupLabel': groupLabel,
+        'staffRoleId': staffRoleId,
       };
 }
 

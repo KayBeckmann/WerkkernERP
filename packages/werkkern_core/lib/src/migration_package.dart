@@ -5,7 +5,7 @@
 library;
 
 const migrationPackageFormat = 'werkkernerp-migration';
-const migrationPackageVersion = 1;
+const migrationPackageVersion = 2;
 
 /// Schlüssel in `roleAssignments` für Zeitbuchungen ohne Rolle.
 const migrationNoRoleKey = '-';

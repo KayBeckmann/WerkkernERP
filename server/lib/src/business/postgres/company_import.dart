@@ -119,6 +119,17 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
     }
     // Umwandlungsquellen zuerst (Fremdschlüssel converted_from_id).
     final inserted = <String>{};
+    // Vor den Positionen: Stunden-Positionen verweisen auf Rollen (C3.4).
+    for (final r in data.staffRoles) {
+      await insert('staff_roles', {
+        'id': r.id,
+        'company_id': companyId,
+        'name': r.name,
+        'hourly_cost_cents': r.hourlyCostCents,
+        'hourly_billing_cents': r.hourlyBillingCents,
+        'created_at': r.createdAt,
+      });
+    }
     final byId = {for (final d in data.documents) d.id: d};
     Future<void> insertDocument(Document d) async {
       if (!inserted.add(d.id)) return;
@@ -182,7 +193,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
       'sort_order': i.sortOrder,
     };
     for (final i in data.documentItems) {
-      await insert('document_items', itemRow(i, 'document_id'));
+      await insert('document_items', {...itemRow(i, 'document_id'), 'staff_role_id': i.staffRoleId});
     }
     for (final v in data.vehicles) {
       await insert('vehicles', {
@@ -338,15 +349,6 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'expected_quantity': i.expectedQuantity,
         'counted_quantity': i.countedQuantity,
         'counted_at': i.countedAt,
-      });
-    }
-    for (final r in data.staffRoles) {
-      await insert('staff_roles', {
-        'id': r.id,
-        'company_id': companyId,
-        'name': r.name,
-        'hourly_cost_cents': r.hourlyCostCents,
-        'created_at': r.createdAt,
       });
     }
     for (final t in data.timeEntries) {

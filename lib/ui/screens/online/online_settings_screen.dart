@@ -375,13 +375,18 @@ class _OnlineStaffRolesScreenState extends State<OnlineStaffRolesScreen> {
       });
 
   Future<void> _edit([OnlineStaffRole? existing]) async {
-    final result = await showDialog<({String name, int cents})>(
+    final result = await showDialog<({String name, int cents, int billingCents})>(
       context: context,
       builder: (_) => _StaffRoleFormDialog(existing: existing),
     );
     if (result == null || !mounted) return;
     try {
-      await widget.session.client.saveStaffRole(id: existing?.id, name: result.name, hourlyCostCents: result.cents);
+      await widget.session.client.saveStaffRole(
+        id: existing?.id,
+        name: result.name,
+        hourlyCostCents: result.cents,
+        hourlyBillingCents: result.billingCents,
+      );
       _reload();
     } on Exception catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
@@ -395,7 +400,8 @@ class _OnlineStaffRolesScreenState extends State<OnlineStaffRolesScreen> {
         title: const Text('Rolle löschen?'),
         content: Text(
           '"${role.name}" löschen? Bereits gebuchte Zeiten mit dieser Rolle behalten ihren '
-          'eingefrorenen Stundensatz, verlieren aber den Rollenbezug.',
+          'eingefrorenen Stundensatz, verlieren aber den Rollenbezug. Positionen in Dokumenten '
+          'behalten ihren Preis und Text.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
@@ -428,9 +434,10 @@ class _OnlineStaffRolesScreenState extends State<OnlineStaffRolesScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 child: Text(
-                  'Rollen sind Stundensatz-Kategorien — eine Zeitbuchung kann optional eine Rolle wählen, deren '
-                  'Stundenkostensatz in die Projekt-Ergebnisrechnung einfließt. Ohne Rolle gilt der Stundensatz '
-                  'des Mitglieds (Einstellungen › Mitglieder).',
+                  'Rollen sind Stundensatz-Kategorien. Der Verrechnungssatz ist der Preis je Stunde für den '
+                  'Kunden: er wird in Stunden-Positionen vorgeschlagen und beim Abrechnen gebuchter Zeiten '
+                  'genutzt. Der Kostensatz fließt in die Projekt-Ergebnisrechnung ein. Sobald es Rollen gibt, '
+                  'braucht jede Zeitbuchung eine Rolle.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -438,7 +445,10 @@ class _OnlineStaffRolesScreenState extends State<OnlineStaffRolesScreen> {
                 Card(
                   child: ListTile(
                     title: Text(role.name),
-                    subtitle: Text('${Money.fromCents(role.hourlyCostCents)} / Std.'),
+                    subtitle: Text(
+                      'Verrechnung: ${role.hourlyBillingCents == 0 ? 'nicht hinterlegt' : '${Money.fromCents(role.hourlyBillingCents)} / Std.'}'
+                      ' · Kosten: ${Money.fromCents(role.hourlyCostCents)} / Std.',
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -475,6 +485,11 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
   late final _rateCtrl = TextEditingController(
     text: widget.existing == null ? null : Money.fromCents(widget.existing!.hourlyCostCents).formatEuro(),
   );
+  late final _billingCtrl = TextEditingController(
+    text: widget.existing == null || widget.existing!.hourlyBillingCents == 0
+        ? null
+        : Money.fromCents(widget.existing!.hourlyBillingCents).formatEuro(),
+  );
   String? _error;
 
   bool get _isEdit => widget.existing != null;
@@ -483,6 +498,7 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
   void dispose() {
     _nameCtrl.dispose();
     _rateCtrl.dispose();
+    _billingCtrl.dispose();
     super.dispose();
   }
 
@@ -500,9 +516,22 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
             decoration: const InputDecoration(labelText: 'Name *'),
           ),
           TextField(
+            key: const Key('online-role-billing'),
+            controller: _billingCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Verrechnungssatz (€/h)',
+              helperText: 'Preis je Stunde für den Kunden',
+            ),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          TextField(
             key: const Key('online-role-rate'),
             controller: _rateCtrl,
-            decoration: InputDecoration(labelText: 'Stundenkostensatz (€)', errorText: _error),
+            decoration: InputDecoration(
+              labelText: 'Kostensatz (€/h)',
+              helperText: 'Was dich die Stunde kostet (Projekt-Ergebnis)',
+              errorText: _error,
+            ),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
           ),
         ],
@@ -513,15 +542,17 @@ class _StaffRoleFormDialogState extends State<_StaffRoleFormDialog> {
           onPressed: () {
             final name = _nameCtrl.text.trim();
             if (name.isEmpty) return;
-            final rateText = _rateCtrl.text.trim();
+            int parse(TextEditingController c) => c.text.trim().isEmpty ? 0 : Money.fromEuroString(c.text.trim()).cents;
             final int cents;
+            final int billingCents;
             try {
-              cents = rateText.isEmpty ? 0 : Money.fromEuroString(rateText).cents;
+              cents = parse(_rateCtrl);
+              billingCents = parse(_billingCtrl);
             } on FormatException {
               setState(() => _error = 'Bitte einen Betrag eingeben.');
               return;
             }
-            Navigator.pop(context, (name: name, cents: cents));
+            Navigator.pop(context, (name: name, cents: cents, billingCents: billingCents));
           },
           child: Text(_isEdit ? 'Speichern' : 'Anlegen'),
         ),

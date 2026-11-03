@@ -47,6 +47,7 @@ class StaffRoleRepository {
     required String companyId,
     required String name,
     int hourlyCostRateCents = 0,
+    int hourlyBillingRateCents = 0,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.staffRoles).insert(
@@ -55,6 +56,7 @@ class StaffRoleRepository {
             companyId: companyId,
             name: name,
             hourlyCostRateCents: Value(hourlyCostRateCents),
+            hourlyBillingRateCents: Value(hourlyBillingRateCents),
             createdAt: DateTime.now(),
           ),
         );
@@ -66,6 +68,7 @@ class StaffRoleRepository {
     required String id,
     String? name,
     int? hourlyCostRateCents,
+    int? hourlyBillingRateCents,
   }) async {
     final rows = await (_db.update(_db.staffRoles)
           ..where((r) => r.id.equals(id) & r.companyId.equals(companyId)))
@@ -74,6 +77,8 @@ class StaffRoleRepository {
         name: name == null ? const Value.absent() : Value(name),
         hourlyCostRateCents:
             hourlyCostRateCents == null ? const Value.absent() : Value(hourlyCostRateCents),
+        hourlyBillingRateCents:
+            hourlyBillingRateCents == null ? const Value.absent() : Value(hourlyBillingRateCents),
       ),
     );
     return rows > 0;
