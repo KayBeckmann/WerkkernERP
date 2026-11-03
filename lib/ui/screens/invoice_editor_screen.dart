@@ -9,6 +9,7 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
+import '../../data/repositories/staff_role_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
 import '../../data/repositories/time_entry_repository.dart';
@@ -75,6 +76,7 @@ class _EditableItem {
     this.unit,
     this.discountPercent = 0,
     this.groupLabel,
+    this.staffRoleId,
     this.existingId,
   });
 
@@ -91,6 +93,9 @@ class _EditableItem {
   /// Rabatt in Prozent auf diese Position — Kay-Nachtrag 2026-10-16.
   final double discountPercent;
   final String? groupLabel;
+
+  /// Rolle einer Stunden-Position (C3.4).
+  final String? staffRoleId;
   final String? existingId;
 
   Money get grossBeforeDiscount => Money.fromCents(unitPriceCents).multiplyByQuantity(quantity);
@@ -127,6 +132,7 @@ class _EditableItem {
         unit: unit,
         discountPercent: discountPercent,
         groupLabel: groupLabel,
+        staffRoleId: staffRoleId,
       );
 
   InvoiceItemInput toInput() => InvoiceItemInput(
@@ -140,6 +146,7 @@ class _EditableItem {
         unit: unit,
         discountPercent: discountPercent,
         groupLabel: groupLabel,
+        staffRoleId: staffRoleId,
       );
 }
 
@@ -153,6 +160,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _saving = false;
   bool _finalizing = false;
   List<Article> _articles = [];
+
+  /// C3.4: Rollen für Stunden-Positionen (Auswahl im Positionsdialog,
+  /// Anzeige an der Position).
+  List<StaffRole> _staffRoles = [];
   Invoice? _currentInvoice;
 
   // C1 Projekte (Kay-Priorisierungsentscheidung 2026-10-17): optionale
@@ -257,7 +268,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final articleRepo = context.read<ArticleRepository>();
     final invoiceRepo = context.read<InvoiceRepository>();
     final projectRepo = context.read<ProjectRepository>();
+    final staffRoleRepo = context.read<StaffRoleRepository>();
     _articles = await articleRepo.listForCompany(companyId);
+    _staffRoles = await staffRoleRepo.listForCompany(companyId);
     _projectsEnabled = company.projectsEnabled;
     if (_projectsEnabled) {
       _projects = await projectRepo.listForCompany(companyId);
@@ -314,6 +327,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             unit: item.unit,
             discountPercent: item.discountPercent,
             groupLabel: item.groupLabel,
+            staffRoleId: item.staffRoleId,
           ),
       ]);
     }
@@ -362,6 +376,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       existingGroupLabels: _existingGroupLabels,
       allowHours: _kind != DocumentKind.deliveryNote,
       forceZeroVat: _isSmallBusinessExempt,
+      staffRoles: _staffRoles,
     );
     if (result == null) return;
     setState(() {
@@ -376,6 +391,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           unit: result.unit,
           discountPercent: result.discountPercent,
           groupLabel: result.groupLabel,
+          staffRoleId: result.staffRoleId,
         ),
       );
     });
@@ -392,6 +408,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       existing: item.toResult(),
       allowHours: _kind != DocumentKind.deliveryNote,
       forceZeroVat: _isSmallBusinessExempt,
+      staffRoles: _staffRoles,
     );
     if (result == null) return;
     setState(() {
@@ -407,6 +424,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         unit: result.unit,
         discountPercent: result.discountPercent,
         groupLabel: result.groupLabel,
+        staffRoleId: result.staffRoleId,
       );
     });
   }
@@ -1043,6 +1061,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     );
   }
 
+  /// Rollenname einer Stunden-Position (C3.4) — `null` ohne Rolle oder
+  /// bei inzwischen gelöschter Rolle.
+  String? _roleName(_EditableItem item) =>
+      item.staffRoleId == null ? null : _staffRoles.where((r) => r.id == item.staffRoleId).firstOrNull?.name;
+
   static IconData _iconFor(InvoiceItemKind kind) => switch (kind) {
         InvoiceItemKind.article => Icons.inventory_2_outlined,
         InvoiceItemKind.hours => Icons.schedule_outlined,
@@ -1071,6 +1094,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   Expanded(
                     child: Text(item.description, style: const TextStyle(fontWeight: FontWeight.w600)),
                   ),
+                  if (_roleName(item) case final role?)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Chip(label: Text(role), visualDensity: VisualDensity.compact),
+                    ),
                   if (!isLocked)
                     IconButton(
                       icon: const Icon(Icons.delete_outline, size: 20),

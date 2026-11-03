@@ -125,6 +125,59 @@ void main() {
     ]);
   });
 
+  testWidgets('C3.4: Stunden-Position mit Einheit h und Rolle, Preis aus dem Verrechnungssatz', (tester) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final server = OnlineTestServer();
+    late String token;
+    late String monteurId;
+    await tester.runAsync(() async {
+      token = await server.seedCompany(email: 'kay@example.com', companyName: 'Elektro Kay', permissions: permissions);
+      await server.put('/company/modules', {'modules': ['timeTracking']}, token);
+      await server.post('/customers', {'name': 'Meyer'}, token);
+      monteurId = (await server.post('/staff-roles', {'name': 'Monteur', 'hourlyBillingCents': 6500}, token))['id'] as String;
+      await server.post('/staff-roles', {'name': 'Azubi'}, token);
+    });
+    await login(tester, server);
+    await openTab(tester, 'Rechnungen');
+    await tester.tap(find.text('Neue Rechnung'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Meyer')));
+    await tester.pumpAndSettle();
+
+    String text(String key) => tester.widget<TextField>(find.byKey(Key(key))).controller!.text;
+    await tester.tap(find.text('Position hinzufügen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Stunden'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(find.widgetWithText(TextField, 'Einheit')).controller!.text, 'h');
+    await tester.tap(find.byKey(const Key('online-item-role')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Azubi').last);
+    await tester.pumpAndSettle();
+    expect(text('online-item-price'), isEmpty, reason: 'ohne Verrechnungssatz kein Preis');
+    await tester.tap(find.byKey(const Key('online-item-role')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Monteur · 65,00 €/h').last);
+    await tester.pumpAndSettle();
+    expect(text('online-item-description'), 'Monteur');
+    expect(text('online-item-price'), '65,00');
+    await tester.enterText(find.byKey(const Key('online-item-quantity')), '3');
+    await tester.tap(find.text('Hinzufügen'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Chip, 'Monteur'), findsOneWidget);
+    await tester.tap(find.byTooltip('Entwurf speichern'));
+    await tester.pumpAndSettle();
+
+    final saved = await tester.runAsync(() async {
+      final client = server.client()..token = token;
+      return client.document((await client.documents(kind: 'invoice')).single.id);
+    });
+    final item = saved!.items.single;
+    expect((item.kind.name, item.unit, item.quantity, item.unitPriceCents, item.staffRoleId), ('hours', 'h', '3', 6500, monteurId));
+  });
+
   testWidgets('Überfällige Rechnung: Mahnstufe rot in der Liste, Mahnschreiben direkt aus der Rechnung', (tester) async {
     tester.view.physicalSize = const Size(1200, 2200);
     tester.view.devicePixelRatio = 1;

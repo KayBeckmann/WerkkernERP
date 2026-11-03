@@ -42,6 +42,10 @@ class OnlineDocumentScreen extends StatefulWidget {
 class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   OnlineDocument? _document;
   List<OnlineDocumentItem> _items = [];
+
+  /// C3.4: Rollen für Stunden-Positionen (Auswahl im Dialog, Anzeige an
+  /// der Position). Leer ohne Zeiterfassung oder ohne Leserecht.
+  List<OnlineStaffRole> _staffRoles = const [];
   late final _notes = TextEditingController();
   late final _paymentTerms = TextEditingController();
   String? _projectId;
@@ -92,6 +96,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
         if (mounted) setState(() => _smallBusiness = p.smallBusinessExempt);
       }, onError: (Object _) {});
       final session = widget.session;
+      if (session.modules.contains('timeTracking') &&
+          (session.isAdmin || session.can('timeTracking.read') || session.can('timeTracking.write'))) {
+        _client.staffRoles().then((roles) {
+          if (mounted) setState(() => _staffRoles = roles);
+        }, onError: (Object _) {});
+      }
       if (_projectsEnabled) {
         _client.projects().then((projects) {
           if (mounted) setState(() => _projects = projects);
@@ -603,6 +613,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       existingGroupLabels: onlineGroupLabels(_items),
       allowHours: _document!.kind != 'deliveryNote',
       forceZeroVat: _smallBusiness,
+      staffRoles: _staffRoles,
     );
     if (item == null) return;
     setState(() {
@@ -623,6 +634,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       existing: _items[index],
       allowHours: _document!.kind != 'deliveryNote',
       forceZeroVat: _smallBusiness,
+      staffRoles: _staffRoles,
     );
     if (item == null) return;
     setState(() {
@@ -836,6 +848,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                   Icon(_iconFor(item.kind), size: 18, color: Theme.of(context).colorScheme.outline),
                   const SizedBox(width: 8),
                   Expanded(child: Text(item.description, style: const TextStyle(fontWeight: FontWeight.w600))),
+                  if (_staffRoles.where((r) => r.id == item.staffRoleId).firstOrNull case final role?)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Chip(label: Text(role.name), visualDensity: VisualDensity.compact),
+                    ),
                   if (editable)
                     IconButton(
                       tooltip: 'Position entfernen',

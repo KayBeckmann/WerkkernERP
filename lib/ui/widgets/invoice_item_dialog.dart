@@ -1,6 +1,7 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:werkkern_core/werkkern_core.dart' show hoursUnit, resolveHourlyBillingRateCents;
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
@@ -25,6 +26,9 @@ Future<InvoiceItemInputResult?> showInvoiceItemDialog({
   // keine Umsatzsteuer ausweisen. `false` lässt das Verhalten für alle
   // bestehenden Aufrufer unverändert.
   bool forceZeroVat = false,
+  // C3.4 (Kay 2026-11-03): Rollen für Stunden-Positionen; leer = keine
+  // Rollenauswahl (Firma ohne Rollen, wiederkehrende Vorlagen).
+  List<StaffRole> staffRoles = const [],
 }) {
   return showDialog<InvoiceItemInputResult>(
     context: context,
@@ -34,6 +38,7 @@ Future<InvoiceItemInputResult?> showInvoiceItemDialog({
       existing: existing,
       allowHours: allowHours,
       forceZeroVat: forceZeroVat,
+      staffRoles: staffRoles,
     ),
   );
 }
@@ -49,6 +54,7 @@ class InvoiceItemInputResult {
     this.unit,
     this.discountPercent = 0,
     this.groupLabel,
+    this.staffRoleId,
   });
 
   final InvoiceItemKind kind;
@@ -65,6 +71,9 @@ class InvoiceItemInputResult {
   /// Rabatt in Prozent auf diese Position — Kay-Nachtrag 2026-10-16.
   final double discountPercent;
   final String? groupLabel;
+
+  /// Rolle einer Stunden-Position (C3.4) — `null` = ohne Rolle.
+  final String? staffRoleId;
 }
 
 class _InvoiceItemDialog extends StatefulWidget {
@@ -74,6 +83,7 @@ class _InvoiceItemDialog extends StatefulWidget {
     this.existing,
     this.allowHours = true,
     this.forceZeroVat = false,
+    this.staffRoles = const [],
   });
   final List<Article> articles;
   final List<String> existingGroupLabels;
@@ -88,6 +98,7 @@ class _InvoiceItemDialog extends StatefulWidget {
   /// die USt-Auswahl ganz aus statt sie nur zu verstecken, damit sich
   /// `_vatRate` nicht aus Versehen auf einen anderen Satz ändern kann.
   final bool forceZeroVat;
+  final List<StaffRole> staffRoles;
 
   bool get isEdit => existing != null;
 
@@ -113,6 +124,53 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
   );
   late double _vatRate =
       widget.forceZeroVat ? 0 : (widget.existing?.vatRatePercent ?? 19);
+
+  /// Gelöschte Rolle → „ohne Rolle“, damit das Dropdown einen gültigen
+  /// Wert hat.
+  late String? _staffRoleId = widget.staffRoles.any((r) => r.id == widget.existing?.staffRoleId)
+      ? widget.existing!.staffRoleId
+      : null;
+
+  /// Zuletzt aus der Rolle vorbelegte Werte — nur diese werden bei einem
+  /// Rollenwechsel ersetzt, eigene Eingaben bleiben stehen.
+  String? _autoPrice;
+  String? _autoDescription;
+
+  StaffRole? get _selectedRole => widget.staffRoles.where((r) => r.id == _staffRoleId).firstOrNull;
+
+  void _selectKind(InvoiceItemKind kind) {
+    setState(() {
+      // C3.4: Stunden haben die Einheit „h“ vorbelegt.
+      if (kind == InvoiceItemKind.hours && _unitCtrl.text.trim().isEmpty) _unitCtrl.text = hoursUnit;
+      if (kind != InvoiceItemKind.hours && _kind == InvoiceItemKind.hours && _unitCtrl.text.trim() == hoursUnit) {
+        _unitCtrl.clear();
+      }
+      _kind = kind;
+    });
+  }
+
+  /// Rolle gewählt: Preis = Verrechnungssatz, Beschreibung = Rollenname —
+  /// beides nur, solange es leer bzw. noch der letzte Vorschlag ist, und
+  /// danach frei änderbar (Kay 2026-11-03). Ohne Satz bleibt der Preis
+  /// leer und muss eingegeben werden.
+  void _selectRole(String? roleId) {
+    setState(() {
+      _staffRoleId = roleId;
+      final role = _selectedRole;
+      if (role == null) return;
+      final price = _priceCtrl.text.trim();
+      if (price.isEmpty || price == _autoPrice) {
+        final rate = resolveHourlyBillingRateCents(roleBillingRateCents: role.hourlyBillingRateCents);
+        _autoPrice = rate == null ? '' : Money.fromCents(rate).formatEuro();
+        _priceCtrl.text = _autoPrice!;
+      }
+      final description = _descriptionCtrl.text.trim();
+      if (description.isEmpty || description == _autoDescription) {
+        _autoDescription = role.name;
+        _descriptionCtrl.text = role.name;
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -175,9 +233,34 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
                   const ButtonSegment(value: InvoiceItemKind.text, label: Text('Freitext')),
                 ],
                 selected: {_kind},
-                onSelectionChanged: (selection) => setState(() => _kind = selection.first),
+                onSelectionChanged: (selection) => _selectKind(selection.first),
               ),
               const SizedBox(height: 12),
+              if (_kind == InvoiceItemKind.hours && widget.staffRoles.isNotEmpty)
+                DropdownButtonFormField<String?>(
+                  key: const Key('item-role'),
+                  isExpanded: true,
+                  initialValue: _staffRoleId,
+                  decoration: InputDecoration(
+                    labelText: 'Rolle',
+                    helperText: _selectedRole != null && _selectedRole!.hourlyBillingRateCents == 0
+                        ? 'Kein Verrechnungssatz hinterlegt — Preis bitte eingeben.'
+                        : null,
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('ohne Rolle')),
+                    for (final role in widget.staffRoles)
+                      DropdownMenuItem<String?>(
+                        value: role.id,
+                        child: Text(
+                          role.hourlyBillingRateCents == 0
+                              ? role.name
+                              : '${role.name} · ${Money.fromCents(role.hourlyBillingRateCents)}/h',
+                        ),
+                      ),
+                  ],
+                  onChanged: _selectRole,
+                ),
               if (_kind == InvoiceItemKind.article)
                 DropdownButtonFormField<Article>(
                   isExpanded: true,
@@ -323,6 +406,7 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
                 unit: _unitCtrl.text.trim().isEmpty ? null : _unitCtrl.text.trim(),
                 discountPercent: discount.clamp(0, 100),
                 groupLabel: _groupCtrl.text.trim().isEmpty ? null : _groupCtrl.text.trim(),
+                staffRoleId: _kind == InvoiceItemKind.hours ? _staffRoleId : null,
               ),
             );
           },

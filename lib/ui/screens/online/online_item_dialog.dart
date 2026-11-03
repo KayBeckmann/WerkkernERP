@@ -17,6 +17,8 @@ Future<OnlineDocumentItem?> showOnlineItemDialog(
   // Kleinunternehmerregelung (§ 19 UStG): USt fest 0 % (der Server
   // erzwingt es ohnehin).
   bool forceZeroVat = false,
+  // C3.4: Rollen für Stunden-Positionen; leer = keine Rollenauswahl.
+  List<OnlineStaffRole> staffRoles = const [],
 }) {
   return showDialog<OnlineDocumentItem>(
     context: context,
@@ -26,6 +28,7 @@ Future<OnlineDocumentItem?> showOnlineItemDialog(
       existing: existing,
       allowHours: allowHours,
       forceZeroVat: forceZeroVat,
+      staffRoles: staffRoles,
     ),
   );
 }
@@ -41,12 +44,14 @@ class _OnlineItemDialog extends StatefulWidget {
     this.existing,
     required this.allowHours,
     required this.forceZeroVat,
+    required this.staffRoles,
   });
   final List<OnlineArticle> articles;
   final List<String> existingGroupLabels;
   final OnlineDocumentItem? existing;
   final bool allowHours;
   final bool forceZeroVat;
+  final List<OnlineStaffRole> staffRoles;
 
   bool get isEdit => existing != null;
 
@@ -69,6 +74,50 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
   late final _group = TextEditingController(text: widget.existing?.groupLabel);
   late double _vat = widget.forceZeroVat ? 0 : (widget.existing?.vatRatePercent ?? 19);
   String? _error;
+
+  /// Gelöschte Rolle → „ohne Rolle“, damit das Dropdown einen gültigen
+  /// Wert hat.
+  late String? _staffRoleId = widget.staffRoles.any((r) => r.id == widget.existing?.staffRoleId)
+      ? widget.existing!.staffRoleId
+      : null;
+
+  /// Zuletzt aus der Rolle vorbelegte Werte — nur diese werden bei einem
+  /// Rollenwechsel ersetzt (wie offline).
+  String? _autoPrice;
+  String? _autoDescription;
+
+  OnlineStaffRole? get _selectedRole => widget.staffRoles.where((r) => r.id == _staffRoleId).firstOrNull;
+
+  void _selectKind(OnlineItemKind kind) {
+    setState(() {
+      // C3.4: Stunden haben die Einheit „h“ vorbelegt.
+      if (kind == OnlineItemKind.hours && _unit.text.trim().isEmpty) _unit.text = hoursUnit;
+      if (kind != OnlineItemKind.hours && _kind == OnlineItemKind.hours && _unit.text.trim() == hoursUnit) _unit.clear();
+      _kind = kind;
+    });
+  }
+
+  /// Rolle gewählt: Preis = Verrechnungssatz, Beschreibung = Rollenname,
+  /// solange leer bzw. noch der letzte Vorschlag; ohne Satz bleibt der
+  /// Preis leer (Kay 2026-11-03).
+  void _selectRole(String? roleId) {
+    setState(() {
+      _staffRoleId = roleId;
+      final role = _selectedRole;
+      if (role == null) return;
+      final price = _price.text.trim();
+      if (price.isEmpty || price == _autoPrice) {
+        final rate = resolveHourlyBillingRateCents(roleBillingRateCents: role.hourlyBillingCents);
+        _autoPrice = rate == null ? '' : Money.fromCents(rate).formatEuro();
+        _price.text = _autoPrice!;
+      }
+      final description = _description.text.trim();
+      if (description.isEmpty || description == _autoDescription) {
+        _autoDescription = role.name;
+        _description.text = role.name;
+      }
+    });
+  }
 
   static String _formatPercent(double value) =>
       (value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString()).replaceAll('.', ',');
@@ -129,6 +178,7 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
         unit: _unit.text.trim().isEmpty ? null : _unit.text.trim(),
         discountPercent: discount.clamp(0, 100).toDouble(),
         groupLabel: _group.text.trim().isEmpty ? null : _group.text.trim(),
+        staffRoleId: _kind == OnlineItemKind.hours ? _staffRoleId : null,
       ),
     );
   }
@@ -151,9 +201,34 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
                   const ButtonSegment(value: OnlineItemKind.text, label: Text('Freitext')),
                 ],
                 selected: {_kind},
-                onSelectionChanged: (selection) => setState(() => _kind = selection.first),
+                onSelectionChanged: (selection) => _selectKind(selection.first),
               ),
               const SizedBox(height: 12),
+              if (_kind == OnlineItemKind.hours && widget.staffRoles.isNotEmpty)
+                DropdownButtonFormField<String?>(
+                  key: const Key('online-item-role'),
+                  isExpanded: true,
+                  initialValue: _staffRoleId,
+                  decoration: InputDecoration(
+                    labelText: 'Rolle',
+                    helperText: _selectedRole != null && _selectedRole!.hourlyBillingCents == 0
+                        ? 'Kein Verrechnungssatz hinterlegt — Preis bitte eingeben.'
+                        : null,
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(value: null, child: Text('ohne Rolle')),
+                    for (final role in widget.staffRoles)
+                      DropdownMenuItem<String?>(
+                        value: role.id,
+                        child: Text(
+                          role.hourlyBillingCents == 0
+                              ? role.name
+                              : '${role.name} · ${Money.fromCents(role.hourlyBillingCents)}/h',
+                        ),
+                      ),
+                  ],
+                  onChanged: _selectRole,
+                ),
               if (_kind == OnlineItemKind.article && _articleChoices.isNotEmpty)
                 DropdownButtonFormField<OnlineArticle>(
                   key: const Key('online-item-article'),
