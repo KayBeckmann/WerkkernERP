@@ -234,8 +234,35 @@ Online-Server lokal starten:
 docker compose up -d --build server-db server   # http://<LAN-IP>:8190
 ```
 
-Paketkennung ist aktuell `de.kaybeckmann.werkkernerp` (Platzhalter, vor
-einer echten Veröffentlichung noch festzulegen).
+## Android-Release
+
+Paketkennung: `de.werkkern.erp` (festgelegt 2026-11-06, nicht mehr
+ändern — Android behandelt eine neue Kennung als neue App).
+
+Release-Builds werden mit Kays globalem Release-Schlüssel (Alias
+`kbrelease`) signiert. Gradle liest ihn aus der lokalen, git-ignorierten
+`android/key.properties`:
+
+```properties
+storeFile=/home/kay/.android-keys/kaybeckmann-release-key.jks
+storePassword=…
+keyAlias=kbrelease
+keyPassword=…
+```
+
+Fehlt die Datei, bricht `flutter build apk --release` ab — es wird nie
+still mit dem Debug-Schlüssel signiert.
+
+```bash
+flutter analyze && flutter test
+flutter build apk --release          # build/app/outputs/flutter-apk/app-release.apk
+/opt/android-sdk/build-tools/37.0.0/apksigner verify --print-certs \
+  build/app/outputs/flutter-apk/app-release.apk   # DN: CN=Kay Beckmann, SHA-256 8346cbaf…
+```
+
+Debug- und Release-APK haben verschiedene Signaturen: Eine installierte
+Debug-App muss vor der Release-App deinstalliert werden (lokale
+Offline-Daten vorher per Backup sichern).
 
 ## Referenz und Lizenz
 
