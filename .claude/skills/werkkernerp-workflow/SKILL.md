@@ -118,12 +118,15 @@ oder `ip -4 addr show` liefert die LAN-IP.
 
 ```bash
 flutter build apk --debug      # für Kay zum Installieren/Testen
-flutter build apk --release    # erst nach Paketname-/Signierungs-Entscheidung
+flutter build apk --release    # signiert mit kbrelease, braucht android/key.properties
 ```
 
-Paketkennung ist aktuell `de.kaybeckmann.werkkernerp` (Platzhalter aus
-A0 — laut Roadmap "vor Veröffentlichung mit Kay festlegen", für
-Entwicklung unkritisch).
+Paketkennung ist `de.werkkern.erp` (mit Kay festgelegt 2026-11-06, nie
+mehr ändern). Release-Signatur: globaler Schlüssel
+`~/.android-keys/kaybeckmann-release-key.jks` (Alias `kbrelease`), über
+die git-ignorierte `android/key.properties` eingebunden — Ablauf und
+Prüfung siehe README „Android-Release“. Ohne die Datei bricht der
+Release-Build bewusst ab; nie auf den Debug-Schlüssel zurückfallen.
 
 ## Geld- und Mengenwerte (F2)
 

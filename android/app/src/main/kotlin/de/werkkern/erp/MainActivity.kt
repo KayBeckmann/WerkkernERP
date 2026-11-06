@@ -1,4 +1,4 @@
-package de.kaybeckmann.werkkernerp
+package de.werkkern.erp
 
 import io.flutter.embedding.android.FlutterActivity
 
