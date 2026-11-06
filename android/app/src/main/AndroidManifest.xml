@@ -2,7 +2,7 @@
     <!-- Online-Betrieb: Zugriff auf das WerkkernERP-Backend. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="werkkernerp"
+        android:label="WerkkernERP"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
