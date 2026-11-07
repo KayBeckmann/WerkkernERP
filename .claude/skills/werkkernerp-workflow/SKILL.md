@@ -128,6 +128,11 @@ die git-ignorierte `android/key.properties` eingebunden — Ablauf und
 Prüfung siehe README „Android-Release“. Ohne die Datei bricht der
 Release-Build bewusst ab; nie auf den Debug-Schlüssel zurückfallen.
 
+Version bleibt bis zur ersten echten Veröffentlichung unter 1.0 (Kay
+2026-11-07, aktuell `0.9.0+2`). Vor jeder APK, die Kay bekommt, die
+Build-Nummer hinter `+` erhöhen — eine kleinere installiert Android
+nicht über die vorhandene.
+
 ## Geld- und Mengenwerte (F2)
 
 **Immer** `Money` (`lib/domain/models/money.dart`) verwenden, nie

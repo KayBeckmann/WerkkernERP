@@ -261,6 +261,11 @@ flutter build apk --release          # build/app/outputs/flutter-apk/app-release
   build/app/outputs/flutter-apk/app-release.apk   # DN: CN=Kay Beckmann, SHA-256 8346cbaf…
 ```
 
+Version in `pubspec.yaml` (`0.9.0+2`): bis zur ersten echten
+Veröffentlichung bleibt sie unter 1.0 (Kay 2026-11-07). Die Build-Nummer
+hinter dem `+` vor jeder weitergegebenen APK um eins erhöhen — Android
+installiert keine APK mit kleinerer Build-Nummer über eine vorhandene.
+
 Debug- und Release-APK haben verschiedene Signaturen: Eine installierte
 Debug-App muss vor der Release-App deinstalliert werden (lokale
 Offline-Daten vorher per Backup sichern).
