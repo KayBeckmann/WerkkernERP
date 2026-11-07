@@ -126,6 +126,16 @@ class CompanySession {
   final DateTime expiresAt;
 
   bool isExpired(DateTime now) => now.isAfter(expiresAt);
+
+  CompanySession withExpiresAt(DateTime expiresAt) => CompanySession(
+        tokenHash: tokenHash,
+        membershipId: membershipId,
+        userId: userId,
+        companyId: companyId,
+        createdAt: createdAt,
+        expiresAt: expiresAt,
+        isAgent: isAgent,
+      );
 }
 
 /// Einladung eines (noch nicht oder bereits registrierten) Nutzers in

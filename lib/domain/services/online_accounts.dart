@@ -121,6 +121,14 @@ abstract class OnlineAccountStore extends ChangeNotifier {
     await _write([account, ...others]);
   }
 
+  /// Verlängertes Ablaufdatum der gespeicherten Sitzung übernehmen (der
+  /// Server verlängert bei Nutzung); ohne gespeicherte Sitzung nichts.
+  Future<void> updateSessionExpiry(String serverUrl, String email, DateTime expiresAt) async {
+    final account = await find(serverUrl, email);
+    if (account == null || account.token == null || account.expiresAt == expiresAt) return;
+    await save(account.withSession(token: account.token, companyId: account.sessionCompanyId, expiresAt: expiresAt));
+  }
+
   /// Gespeicherte Sitzung verwerfen — Firmen bleiben auf der Startseite.
   Future<void> forgetSession(String serverUrl, String email) async {
     final account = await find(serverUrl, email);
