@@ -71,7 +71,7 @@ class PhaseBRouter {
   /// Fachdaten (B1 Punkt 3) — optional, damit reine Mitgliedschafts-
   /// Tests ohne Fach-Repository auskommen.
   final BusinessRepository? business;
-  late final SessionAuthenticator _auth = SessionAuthenticator(repository);
+  late final SessionAuthenticator _auth = SessionAuthenticator(repository, sessionTtl: sessionTtl);
   final Duration sessionTtl;
   final Duration invitationTtl;
   static const _uuid = Uuid();
@@ -187,6 +187,7 @@ class PhaseBRouter {
     router.post('/auth/select-company', _selectCompany);
     router.post('/auth/switch-company', _switchCompany);
     router.post('/auth/logout', _logout);
+    router.get('/auth/session', _session);
     router.post('/auth/change-password', _changePassword);
     router.post('/auth/accept-invitation', _acceptInvitation);
     router.get('/me', _me);
@@ -363,9 +364,8 @@ class PhaseBRouter {
   }
 
   /// Firmenwechsel aus einer bestehenden App-Sitzung, ohne Passwort.
-  /// Die neue Sitzung erbt das Ablaufdatum der alten — „angemeldet
-  /// bleiben“ verlängert sich dadurch nie über die Passwort-Eingabe
-  /// hinaus. Die alte Sitzung wird beendet.
+  /// Die neue Sitzung erbt das (durch diesen Aufruf verlängerte)
+  /// Ablaufdatum der alten; die alte Sitzung wird beendet.
   Future<Response> _switchCompany(Request request) async {
     final auth = await _auth.requireHumanSession(request);
     if (auth == null) return jsonError('Nicht angemeldet.', status: 401);
@@ -433,6 +433,15 @@ class PhaseBRouter {
     final token = _bearerToken(request);
     if (token != null) await repository.deleteSession(Tokens.hashOf(token));
     return Response(204);
+  }
+
+  /// Aktuelles Ablaufdatum der Sitzung, ohne sie zu verlängern — die App
+  /// fragt das regelmäßig ab, weil jede andere Nutzung das Ende
+  /// verschiebt (siehe [SessionAuthenticator.requireSession]).
+  Future<Response> _session(Request request) async {
+    final auth = await _auth.requireSession(request, renew: false);
+    if (auth == null || auth.session.isAgent) return jsonError('Nicht angemeldet.', status: 401);
+    return jsonOk({'expiresAt': auth.session.expiresAt.toIso8601String()});
   }
 
   Future<Response> _me(Request request) async {

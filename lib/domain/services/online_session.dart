@@ -19,6 +19,7 @@ class OnlineSession extends ChangeNotifier {
     this.offlineOnly = false,
     this.expiresAt,
     this.onEnded,
+    this.onExpiryChanged,
     this.keepSignedIn = false,
   });
 
@@ -39,9 +40,10 @@ class OnlineSession extends ChangeNotifier {
   /// erreichbar) — nur markierte Dokumente, Abgleich erst nach Anmeldung.
   final bool offlineOnly;
 
-  /// Ablauf der Server-Sitzung (7 Tage nach Passwort-Eingabe) — danach
+  /// Ablauf der Server-Sitzung — 7 Tage nach der letzten Nutzung, der
+  /// Server verlängert bei jedem Aufruf (siehe [refreshExpiry]). Danach
   /// meldet die App automatisch ab.
-  final DateTime? expiresAt;
+  DateTime? expiresAt;
 
   /// „Angemeldet bleiben“: Sitzung liegt auf dem Gerät und überdauert
   /// den Wechsel zur Startseite.
@@ -49,6 +51,20 @@ class OnlineSession extends ChangeNotifier {
 
   /// Nach Abmelden/Ablauf: gespeicherte Sitzung auf dem Gerät verwerfen.
   final Future<void> Function()? onEnded;
+
+  /// Verlängertes Ablaufdatum in der gespeicherten Sitzung übernehmen.
+  final Future<void> Function(DateTime expiresAt)? onExpiryChanged;
+
+  /// Fragt das aktuelle Ablaufdatum beim Server ab (ohne zu verlängern)
+  /// und übernimmt es. Wirft [ApiException] mit 401, wenn die Sitzung
+  /// beendet ist.
+  Future<void> refreshExpiry() async {
+    final current = await client.sessionExpiresAt();
+    if (current == null || current == expiresAt) return;
+    expiresAt = current;
+    await onExpiryChanged?.call(current);
+    notifyListeners();
+  }
 
   int get pendingChanges => offline?.outbox.length ?? 0;
 

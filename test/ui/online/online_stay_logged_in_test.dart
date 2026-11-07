@@ -10,12 +10,13 @@ import 'package:werkkernerp/domain/services/online_accounts.dart';
 import 'package:werkkernerp/domain/services/online_session.dart';
 import 'package:werkkernerp/ui/screens/company_switcher_screen.dart';
 import 'package:werkkernerp/ui/screens/online/online_home_screen.dart';
+import 'package:werkkernerp_server/src/util/tokens.dart';
 
 import 'online_test_server.dart';
 
 /// Online-Firmen auf der Startseite, „angemeldet bleiben“ (nur das
-/// Sitzungs-Token, nie das Passwort) und automatisches Abmelden nach
-/// Ablauf der 7-Tage-Sitzung.
+/// Sitzungs-Token, nie das Passwort), Verlängerung bei Nutzung und
+/// automatisches Abmelden nach 7 Tagen ohne Nutzung.
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -134,30 +135,68 @@ void main() {
     expect((await tester.runAsync(store.load))!.single.token, isNull);
   });
 
-  testWidgets('Nach Ablauf der Sitzung meldet die App automatisch ab und verlangt das Passwort', (tester) async {
-    final token = await tester.runAsync(
-      () => server.seedCompany(email: 'kay@example.com', companyName: 'Elektro Kay', permissions: const ['customers.read']),
-    );
-    var ended = false;
-    final session = OnlineSession(
-      client: server.client()..token = token,
-      serverUrl: Uri.parse('http://localhost'),
-      email: 'kay@example.com',
-      companyId: 'c',
-      companyName: 'Elektro Kay',
-      isAdmin: false,
-      permissions: const {'customers.read'},
-      modules: const {},
-      expiresAt: DateTime.now().toUtc().add(const Duration(minutes: 1)),
-      onEnded: () async => ended = true,
-    );
+  OnlineSession sessionFor(String token, {required DateTime expiresAt, void Function()? onEnded, void Function(DateTime)? onExpiryChanged}) =>
+      OnlineSession(
+        client: server.client()..token = token,
+        serverUrl: Uri.parse('http://localhost'),
+        email: 'kay@example.com',
+        companyId: 'c',
+        companyName: 'Elektro Kay',
+        isAdmin: false,
+        permissions: const {'customers.read'},
+        modules: const {},
+        expiresAt: expiresAt,
+        onEnded: () async => onEnded?.call(),
+        onExpiryChanged: (e) async => onExpiryChanged?.call(e),
+      );
+
+  Future<void> pumpHome(WidgetTester tester, OnlineSession session) async {
     await tester.pumpWidget(MaterialApp(
       home: OnlineHomeScreen(session: session, expiredBuilder: (notice) => Scaffold(body: Text(notice))),
     ));
     await tester.pumpAndSettle();
     expect(find.textContaining('Elektro Kay — '), findsOneWidget);
+  }
+
+  testWidgets('Nutzung verlängert die Anmeldung: die App übernimmt das neue Ablaufdatum statt abzumelden',
+      (tester) async {
+    // Kay 2026-11-07: „angemeldet bis 08.11.“ trotz täglicher Nutzung.
+    final token = (await tester.runAsync(
+      () => server.seedCompany(email: 'kay@example.com', companyName: 'Elektro Kay', permissions: const ['customers.read']),
+    ))!;
+    DateTime? stored;
+    final session = sessionFor(
+      token,
+      expiresAt: DateTime.now().toUtc().add(const Duration(minutes: 1)),
+      onExpiryChanged: (e) => stored = e,
+    );
+    await pumpHome(tester, session);
+    expect(session.expiresAt!.difference(DateTime.now().toUtc()).inHours, inInclusiveRange(167, 168));
+    expect(stored, session.expiresAt, reason: 'gespeicherte Sitzung zeigt das neue Datum');
 
     await tester.pump(const Duration(minutes: 2));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Elektro Kay — '), findsOneWidget, reason: 'nicht abgemeldet');
+  });
+
+  testWidgets('Nach Ablauf der Sitzung meldet die App automatisch ab und verlangt das Passwort', (tester) async {
+    final token = (await tester.runAsync(
+      () => server.seedCompany(email: 'kay@example.com', companyName: 'Elektro Kay', permissions: const ['customers.read']),
+    ))!;
+    var ended = false;
+    await pumpHome(
+      tester,
+      sessionFor(token, expiresAt: DateTime.now().toUtc().add(const Duration(days: 7)), onEnded: () => ended = true),
+    );
+
+    // Serverseitig abgelaufen (7 Tage nichts getan) — die stündliche
+    // Abfrage merkt es.
+    await tester.runAsync(() async {
+      final hash = Tokens.hashOf(token);
+      final saved = (await server.repository.findSession(hash))!;
+      await server.repository.saveSession(saved.withExpiresAt(DateTime.now().toUtc().subtract(const Duration(minutes: 1))));
+    });
+    await tester.pump(const Duration(hours: 1, minutes: 1));
     await tester.pumpAndSettle();
     expect(find.textContaining('Anmeldung ist abgelaufen'), findsOneWidget);
     expect(ended, isTrue, reason: 'gespeicherte Sitzung verworfen');

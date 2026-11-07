@@ -118,6 +118,18 @@ class WerkkernApiClient {
     return _expiresAt(j);
   }
 
+  /// Aktuelles Ablaufdatum der Sitzung, ohne sie zu verlängern. Jede
+  /// andere Nutzung verschiebt es auf „jetzt + 7 Tage“; `null` bei
+  /// älteren Servern ohne diese Abfrage.
+  Future<DateTime?> sessionExpiresAt() async {
+    try {
+      return _expiresAt(_map(await _send('GET', '/auth/session')));
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
   DateTime? _expiresAt(Map<String, Object?> j) {
     final raw = j['expiresAt'] as String?;
     return raw == null ? null : DateTime.parse(raw);

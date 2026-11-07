@@ -371,6 +371,9 @@ class _OnlineLoginScreenState extends State<OnlineLoginScreen> {
       offline: offline,
       expiresAt: expiresAt,
       onEnded: () => _accounts.forgetSession(account.serverUrl, account.email),
+      onExpiryChanged: _stayLoggedIn && expiresAt != null
+          ? (expiresAt) => _accounts.updateSessionExpiry(account.serverUrl, account.email, expiresAt)
+          : null,
       keepSignedIn: _stayLoggedIn && expiresAt != null,
     );
     if (offlineWarning != null) {

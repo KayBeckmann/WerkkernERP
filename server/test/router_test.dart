@@ -9,6 +9,7 @@ import 'package:werkkernerp_server/src/permission_catalog.dart';
 import 'package:werkkernerp_server/src/repository.dart';
 import 'package:werkkernerp_server/src/repository_memory.dart';
 import 'package:werkkernerp_server/src/router.dart';
+import 'package:werkkernerp_server/src/util/tokens.dart';
 
 void main() => runRouterTests(() async => InMemoryPhaseBRepository());
 
@@ -583,7 +584,7 @@ void runRouterTests(Future<PhaseBRepository> Function() createRepository) {
     final body = jsonDecode(switched.body) as Map<String, Object?>;
     expect(body['companyName'], 'Firma B');
     expect(body['isAdmin'], isTrue);
-    expect(DateTime.parse(body['expiresAt'] as String), expiresAt, reason: 'Wechsel verlängert nie');
+    expect(DateTime.parse(body['expiresAt'] as String), expiresAt, reason: 'Wechsel erbt das Ablaufdatum');
     final me = await http.get(baseUrl.resolve('/me'), headers: {'authorization': 'Bearer ${body['token']}'});
     expect((jsonDecode(me.body) as Map<String, Object?>)['companyName'], 'Firma B');
     expect((await http.get(baseUrl.resolve('/me'), headers: oldAuth)).statusCode, 401);
@@ -598,5 +599,39 @@ void runRouterTests(Future<PhaseBRepository> Function() createRepository) {
     expect(denied.statusCode, 403);
     final anonymous = await http.post(baseUrl.resolve('/auth/switch-company'), body: jsonEncode({'companyId': companyB}));
     expect(anonymous.statusCode, 401);
+  });
+
+  test('Nutzung verlängert die Sitzung auf 7 Tage ab jetzt, die Ablaufabfrage nicht; Abgelaufenes bleibt abgelaufen',
+      () async {
+    final a = await setUpCompanyWithAdmin('admin@example.com', 'Firma A');
+    final auth = {'authorization': 'Bearer ${a.token}'};
+    final hash = Tokens.hashOf(a.token);
+    Future<void> setExpiry(DateTime expiresAt) async =>
+        repository.saveSession((await repository.findSession(hash))!.withExpiresAt(expiresAt));
+    Future<DateTime> storedExpiry() async => (await repository.findSession(hash))!.expiresAt;
+    Future<DateTime> reportedExpiry() async {
+      final response = await http.get(baseUrl.resolve('/auth/session'), headers: auth);
+      expect(response.statusCode, 200);
+      return DateTime.parse((jsonDecode(response.body) as Map<String, Object?>)['expiresAt'] as String);
+    }
+
+    // Kay 2026-11-07: Anmeldung vom 01.11. lief trotz Nutzung am 08.11. ab.
+    final soon = DateTime.now().toUtc().add(const Duration(days: 1));
+    await setExpiry(soon);
+    expect((await reportedExpiry()).difference(soon).inSeconds.abs(), lessThan(1),
+        reason: 'Abfrage allein verlängert nicht');
+    expect((await http.get(baseUrl.resolve('/me'), headers: auth)).statusCode, 200);
+    final renewed = await storedExpiry();
+    expect(renewed.difference(DateTime.now().toUtc()).inHours, inInclusiveRange(167, 168));
+    expect((await reportedExpiry()).difference(renewed).inSeconds.abs(), lessThan(1));
+
+    // Innerhalb einer Stunde kein erneuter Schreibzugriff.
+    expect((await http.get(baseUrl.resolve('/me'), headers: auth)).statusCode, 200);
+    expect(await storedExpiry(), renewed);
+
+    await setExpiry(DateTime.now().toUtc().subtract(const Duration(minutes: 1)));
+    expect((await http.get(baseUrl.resolve('/me'), headers: auth)).statusCode, 401);
+    expect((await http.get(baseUrl.resolve('/auth/session'), headers: auth)).statusCode, 401);
+    expect((await http.get(baseUrl.resolve('/auth/session'))).statusCode, 401);
   });
 }

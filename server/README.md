@@ -103,7 +103,10 @@ und laufen deshalb nacheinander (`dart_test.yaml`: `concurrency: 1`).
 3. `POST /auth/login` → `identityToken` + Liste der Firmen, in denen
    der Nutzer Mitglied ist.
 4. `POST /auth/select-company` → firmengebundenes Session-Token samt
-   `expiresAt` (7 Tage, `PhaseBRouter.sessionTtl`, keine Verlängerung).
+   `expiresAt` (7 Tage, `PhaseBRouter.sessionTtl`). Jede Nutzung
+   verlängert auf „jetzt + 7 Tage“ (höchstens ein Schreibzugriff je
+   Stunde, ohne Obergrenze); `GET /auth/session` liefert das aktuelle
+   `expiresAt`, ohne zu verlängern.
    `POST /auth/switch-company` `{companyId}` wechselt aus einer
    App-Sitzung ohne Passwort in eine andere eigene Firma; die neue
    Sitzung erbt das Ablaufdatum, die alte endet.

@@ -23,8 +23,16 @@ const agentTokenPrefix = 'wka_';
 /// "Jede API-... Aktion serverseitig auf Firma, Mitgliedschaft,
 /// Funktion und wirksames Recht prüfen").
 class SessionAuthenticator {
-  SessionAuthenticator(this.repository);
+  SessionAuthenticator(this.repository, {this.sessionTtl = const Duration(days: 7)});
   final PhaseBRepository repository;
+
+  /// Laufzeit einer App-Sitzung ab der letzten Nutzung (Kay 2026-11-07:
+  /// „Bei Nutzung verlängern, ohne Obergrenze“).
+  final Duration sessionTtl;
+
+  /// Verlängert wird höchstens einmal je Intervall — nicht bei jedem
+  /// Request ein Schreibzugriff auf die Sitzung.
+  static const renewalInterval = Duration(hours: 1);
 
   String? bearerToken(Request request) {
     final header = request.headers['authorization'];
@@ -32,13 +40,18 @@ class SessionAuthenticator {
     return header.substring('Bearer '.length);
   }
 
-  Future<AuthContext?> requireSession(Request request) async {
+  /// Jede Nutzung einer gültigen App-Sitzung schiebt ihr Ende auf
+  /// „jetzt + [sessionTtl]“ — abgemeldet wird nur, wer [sessionTtl]
+  /// lang nichts tut. [renew] = false prüft nur (Ablaufabfrage der App,
+  /// die selbst keine Nutzung ist).
+  Future<AuthContext?> requireSession(Request request, {bool renew = true}) async {
     final token = bearerToken(request);
     if (token == null) return null;
     if (token.startsWith(agentTokenPrefix)) return _agentSession(token);
-    final session = await repository.findSession(Tokens.hashOf(token));
+    var session = await repository.findSession(Tokens.hashOf(token));
     if (session == null) return null;
-    if (session.isExpired(DateTime.now().toUtc())) {
+    final now = DateTime.now().toUtc();
+    if (session.isExpired(now)) {
       await repository.deleteSession(session.tokenHash);
       return null;
     }
@@ -46,6 +59,11 @@ class SessionAuthenticator {
     if (membership == null || !membership.active) return null;
     // Sperre beendet die Sitzungen ohnehin; das hier deckt den Rest ab.
     if ((await repository.getSubscription(session.companyId)).suspended) return null;
+    final renewed = now.add(sessionTtl);
+    if (renew && session.expiresAt.isBefore(renewed.subtract(renewalInterval))) {
+      session = session.withExpiresAt(renewed);
+      await repository.saveSession(session);
+    }
     return (session: session, membership: membership);
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:werkkern_client/werkkern_client.dart' show ApiException;
 
 import '../../../domain/services/online_session.dart';
 import '../../widgets/app_shell.dart';
@@ -66,10 +67,8 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
   @override
   void initState() {
     super.initState();
-    final expiresAt = widget.session.expiresAt;
-    if (expiresAt != null && !widget.session.offlineOnly) {
-      final left = expiresAt.difference(DateTime.now().toUtc());
-      _expiryTimer = Timer(left.isNegative ? Duration.zero : left, _expired);
+    if (widget.session.expiresAt != null && !widget.session.offlineOnly) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkExpiry());
     }
     // Nach der Anmeldung liegengebliebene Offline-Änderungen sofort
     // übertragen (B2: Rückkehr online).
@@ -111,6 +110,32 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
 
   /// Sitzung nach 7 Tagen abgelaufen: automatisch abmelden, Passwort neu
   /// eingeben. Offline markierte Dokumente bleiben auf dem Gerät.
+  /// Jede Nutzung verlängert die Sitzung serverseitig (7 Tage ab
+  /// jetzt). Die App fragt das Ablaufdatum deshalb beim Öffnen, stündlich
+  /// und beim bisher bekannten Ablauf ab, statt blind abzumelden.
+  static const _expiryCheckInterval = Duration(hours: 1);
+
+  Future<void> _checkExpiry() async {
+    _expiryTimer?.cancel();
+    try {
+      await widget.session.refreshExpiry();
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) return _expired();
+    } on Exception {
+      // Kein Netz: bekanntes Ablaufdatum gilt weiter.
+    }
+    if (!mounted) return;
+    final expiresAt = widget.session.expiresAt;
+    if (expiresAt == null) return;
+    final left = expiresAt.difference(DateTime.now().toUtc());
+    if (left <= Duration.zero) {
+      // Abgelaufen und der Server war nicht zu erreichen (sonst hätte er
+      // 401 oder ein späteres Datum geliefert).
+      return _expired();
+    }
+    _expiryTimer = Timer(left < _expiryCheckInterval ? left : _expiryCheckInterval, _checkExpiry);
+  }
+
   Future<void> _expired() async {
     await widget.session.logout();
     if (!mounted) return;
