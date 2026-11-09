@@ -89,7 +89,7 @@ class OnlineCustomer {
       };
 }
 
-/// Kontaktperson eines Kunden (z. B. Annika, Buchhaltung).
+/// Kontaktperson eines Kunden (z. B. Erika, Buchhaltung).
 class OnlineContact {
   const OnlineContact({this.id, required this.name, this.role, this.email, this.phone});
   factory OnlineContact.fromJson(Map<String, Object?> j) => OnlineContact(
@@ -107,7 +107,7 @@ class OnlineContact {
   final String? email;
   final String? phone;
 
-  /// „Vincent (Betriebstechniker)“
+  /// „Max (Betriebstechniker)“
   String get label => role == null ? name : '$name ($role)';
 
   Map<String, Object?> toWriteJson() => {'id': ?id, 'name': name, 'role': role, 'email': email, 'phone': phone};

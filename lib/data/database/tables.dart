@@ -258,8 +258,8 @@ class Customers extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Kontaktpersonen eines Kunden (Kay 2026-11-09), z. B. Vincent →
-/// Betriebstechniker, Annika → Buchhaltung. Angebote/Aufträge/Rechnungen
+/// Kontaktpersonen eines Kunden (Kay 2026-11-09), z. B. Max →
+/// Betriebstechniker, Erika → Buchhaltung. Angebote/Aufträge/Rechnungen
 /// können einer davon zugewiesen werden ([Invoices.contactId]).
 class CustomerContacts extends Table {
   TextColumn get id => text()();

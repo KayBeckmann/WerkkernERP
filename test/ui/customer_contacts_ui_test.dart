@@ -34,7 +34,7 @@ Future<String> _finalizeAndOpenMail(WidgetTester tester, String nav, String newL
   await tester.pumpAndSettle();
   await tester.tap(find.text(newLabel));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Remondis'));
+  await tester.tap(find.text('Musterwerk'));
   await tester.pumpAndSettle();
   if (contact != null) {
     await tester.ensureVisible(find.byKey(const Key('document-contact')));
@@ -101,35 +101,35 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Kunde anlegen'));
     await tester.pumpAndSettle();
-    await _field(tester, 'Name *', 'Remondis');
-    await _field(tester, 'E-Mail', 'info@remondis.example');
+    await _field(tester, 'Name *', 'Musterwerk');
+    await _field(tester, 'E-Mail', 'info@musterwerk.example');
     await _field(tester, 'Telefon', '0201 / 123-0');
-    await _field(tester, 'Rechnungs-E-Mail', 'rechnung@remondis.example');
-    await _addContact(tester, 'Vincent', 'Betriebstechniker', email: 'vincent@remondis.example', phone: '0171 111');
-    await _addContact(tester, 'Annika', 'Buchhaltung', email: 'annika@remondis.example');
-    expect(find.text('Vincent (Betriebstechniker)'), findsOneWidget);
+    await _field(tester, 'Rechnungs-E-Mail', 'rechnung@musterwerk.example');
+    await _addContact(tester, 'Max', 'Betriebstechniker', email: 'max@musterwerk.example', phone: '0171 111');
+    await _addContact(tester, 'Erika', 'Buchhaltung', email: 'erika@musterwerk.example');
+    expect(find.text('Max (Betriebstechniker)'), findsOneWidget);
     await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
 
     // Anrufen direkt aus der Liste und aus der Detailansicht.
-    await tester.tap(find.byTooltip('Remondis anrufen'));
+    await tester.tap(find.byTooltip('Musterwerk anrufen'));
     await tester.pumpAndSettle();
     expect(calls.last.toString(), 'tel:02011230', reason: 'nur Ziffern und +');
-    await tester.tap(find.text('Remondis'));
+    await tester.tap(find.text('Musterwerk'));
     await tester.pumpAndSettle();
-    expect(find.text('Annika (Buchhaltung)'), findsOneWidget);
-    expect(find.text('rechnung@remondis.example'), findsOneWidget);
-    await tester.tap(find.byTooltip('Vincent anrufen'));
+    expect(find.text('Erika (Buchhaltung)'), findsOneWidget);
+    expect(find.text('rechnung@musterwerk.example'), findsOneWidget);
+    await tester.tap(find.byTooltip('Max anrufen'));
     await tester.pumpAndSettle();
     expect(calls.last.toString(), 'tel:0171111');
-    expect(find.byTooltip('Annika anrufen'), findsNothing, reason: 'ohne Telefonnummer kein Anruf');
+    expect(find.byTooltip('Erika anrufen'), findsNothing, reason: 'ohne Telefonnummer kein Anruf');
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // Angebot an Vincent geht an Vincent, Rechnung an die Rechnungs-E-Mail.
-    expect(await _finalizeAndOpenMail(tester, 'Angebote', 'Neues Angebot', 'Vincent (Betriebstechniker)'),
-        'vincent@remondis.example');
-    expect(await _finalizeAndOpenMail(tester, 'Rechnungen', 'Neue Rechnung', 'Vincent (Betriebstechniker)'),
-        'rechnung@remondis.example');
+    // Angebot an Max geht an Max, Rechnung an die Rechnungs-E-Mail.
+    expect(await _finalizeAndOpenMail(tester, 'Angebote', 'Neues Angebot', 'Max (Betriebstechniker)'),
+        'max@musterwerk.example');
+    expect(await _finalizeAndOpenMail(tester, 'Rechnungen', 'Neue Rechnung', 'Max (Betriebstechniker)'),
+        'rechnung@musterwerk.example');
   });
 }

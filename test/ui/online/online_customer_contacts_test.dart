@@ -34,12 +34,12 @@ void main() {
       await server.put('/company/modules', {'modules': ['smtp', 'quotes']}, token);
       await server.put('/mail/settings', {'host': 'smtp.example.org', 'fromAddress': 'rechnung@elektro.example'}, token);
       final customer = await server.post('/customers', {
-        'name': 'Remondis',
-        'email': 'info@remondis.example',
-        'invoiceEmail': 'rechnung@remondis.example',
+        'name': 'Musterwerk',
+        'email': 'info@musterwerk.example',
+        'invoiceEmail': 'rechnung@musterwerk.example',
         'contacts': [
-          {'name': 'Vincent', 'role': 'Betriebstechniker', 'phone': '0171 111'},
-          {'name': 'Annika', 'role': 'Buchhaltung', 'email': 'annika@remondis.example'},
+          {'name': 'Max', 'role': 'Betriebstechniker', 'phone': '0171 111'},
+          {'name': 'Erika', 'role': 'Buchhaltung', 'email': 'erika@musterwerk.example'},
         ],
       }, token);
       customerId = customer['id'] as String;
@@ -65,10 +65,10 @@ void main() {
 
     // Kundenansicht: Kontaktpersonen, Anruf.
     await openTab(tester, 'Kunden');
-    await tester.tap(find.text('Remondis'));
+    await tester.tap(find.text('Musterwerk'));
     await tester.pumpAndSettle();
-    expect(find.text('Annika (Buchhaltung)'), findsOneWidget);
-    await tester.tap(find.byTooltip('Vincent anrufen'));
+    expect(find.text('Erika (Buchhaltung)'), findsOneWidget);
+    await tester.tap(find.byTooltip('Max anrufen'));
     await tester.pumpAndSettle();
     expect(calls.single.toString(), 'tel:0171111');
 
@@ -89,13 +89,13 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
 
-    // Angebot: Kontaktperson Annika zuweisen und speichern.
+    // Angebot: Kontaktperson Erika zuweisen und speichern.
     await openTab(tester, 'Angebote');
-    await tester.tap(find.textContaining('Remondis').first);
+    await tester.tap(find.textContaining('Musterwerk').first);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('online-document-contact-3')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Annika (Buchhaltung)').last);
+    await tester.tap(find.text('Erika (Buchhaltung)').last);
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Entwurf speichern'));
     await tester.pumpAndSettle();
@@ -108,6 +108,6 @@ void main() {
     // ohne Rechnungs-E-Mail).
     await tester.tap(find.byTooltip('Per E-Mail senden'));
     await tester.pumpAndSettle();
-    expect(find.text('Leer = annika@remondis.example (Kontaktperson Annika)'), findsOneWidget);
+    expect(find.text('Leer = erika@musterwerk.example (Kontaktperson Erika)'), findsOneWidget);
   });
 }

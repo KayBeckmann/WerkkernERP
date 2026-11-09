@@ -29,14 +29,14 @@ void runCustomerContactTests(RepositoryFactory create) {
     return c;
   }
 
-  Future<Map<String, Object?>> remondis(CompanyClient c) => c.post('/customers', {
-        'name': 'Remondis',
-        'email': 'info@remondis.example',
+  Future<Map<String, Object?>> musterwerk(CompanyClient c) => c.post('/customers', {
+        'name': 'Musterwerk',
+        'email': 'info@musterwerk.example',
         'phone': '0201 123',
-        'invoiceEmail': 'rechnung@remondis.example',
+        'invoiceEmail': 'rechnung@musterwerk.example',
         'contacts': [
-          {'name': 'Vincent', 'role': 'Betriebstechniker', 'email': 'vincent@remondis.example', 'phone': '0171 111'},
-          {'name': 'Annika', 'role': 'Buchhaltung', 'email': 'annika@remondis.example'},
+          {'name': 'Max', 'role': 'Betriebstechniker', 'email': 'max@musterwerk.example', 'phone': '0171 111'},
+          {'name': 'Erika', 'role': 'Buchhaltung', 'email': 'erika@musterwerk.example'},
         ],
       });
 
@@ -45,34 +45,34 @@ void runCustomerContactTests(RepositoryFactory create) {
 
   test('Kontaktpersonen anlegen, ändern, entfernen — ältere App-Fassungen löschen nichts', () async {
     final c = await configured('k@example.com');
-    final created = await remondis(c);
+    final created = await musterwerk(c);
     expect([for (final x in created['contacts'] as List) ((x as Map)['name'], x['role'])],
-        [('Vincent', 'Betriebstechniker'), ('Annika', 'Buchhaltung')]);
-    expect(created['invoiceEmail'], 'rechnung@remondis.example');
-    final vincent = contactId(created, 'Vincent');
+        [('Max', 'Betriebstechniker'), ('Erika', 'Buchhaltung')]);
+    expect(created['invoiceEmail'], 'rechnung@musterwerk.example');
+    final max = contactId(created, 'Max');
 
     // Ändern behält die ID, neue bekommen eine, fehlende entfallen.
     final updated = await c.put('/customers/${created['id']}', {
-      'name': 'Remondis',
+      'name': 'Musterwerk',
       'contacts': [
-        {'id': vincent, 'name': 'Vincent', 'role': 'Betriebsleiter', 'phone': '0171 222'},
+        {'id': max, 'name': 'Max', 'role': 'Betriebsleiter', 'phone': '0171 222'},
         {'name': 'Jonas', 'role': 'Lager'},
       ],
     });
-    expect(contactId(updated, 'Vincent'), vincent);
-    expect([for (final x in updated['contacts'] as List) (x as Map)['name']], ['Vincent', 'Jonas']);
-    expect(updated['invoiceEmail'], 'rechnung@remondis.example', reason: 'nicht genannt = unverändert');
+    expect(contactId(updated, 'Max'), max);
+    expect([for (final x in updated['contacts'] as List) (x as Map)['name']], ['Max', 'Jonas']);
+    expect(updated['invoiceEmail'], 'rechnung@musterwerk.example', reason: 'nicht genannt = unverändert');
 
     // Altes Format ohne contacts/invoiceEmail.
-    final legacy = await c.put('/customers/${created['id']}', {'name': 'Remondis GmbH', 'email': 'info@remondis.example'});
-    expect([for (final x in legacy['contacts'] as List) (x as Map)['name']], ['Vincent', 'Jonas']);
-    expect(legacy['invoiceEmail'], 'rechnung@remondis.example');
+    final legacy = await c.put('/customers/${created['id']}', {'name': 'Musterwerk GmbH', 'email': 'info@musterwerk.example'});
+    expect([for (final x in legacy['contacts'] as List) (x as Map)['name']], ['Max', 'Jonas']);
+    expect(legacy['invoiceEmail'], 'rechnung@musterwerk.example');
 
     // Erfundene IDs werden nicht übernommen, ungültige Angaben abgelehnt.
     final other = await c.post('/customers', {'name': 'Andere', 'contacts': [{'name': 'Fremd'}]});
     final fremd = contactId(other, 'Fremd');
     final hijack = await c.put('/customers/${created['id']}', {
-      'name': 'Remondis GmbH',
+      'name': 'Musterwerk GmbH',
       'contacts': [{'id': fremd, 'name': 'Übernahme'}],
     });
     expect(contactId(hijack, 'Übernahme'), isNot(fremd));
@@ -86,44 +86,44 @@ void runCustomerContactTests(RepositoryFactory create) {
 
   test('Kontaktperson am Dokument: nur vom eigenen Kunden, wandert bei Umwandlung mit', () async {
     final c = await configured('k2@example.com');
-    final customer = await remondis(c);
+    final customer = await musterwerk(c);
     final other = await c.post('/customers', {'name': 'Andere', 'contacts': [{'name': 'Fremd'}]});
-    final vincent = contactId(customer, 'Vincent');
+    final max = contactId(customer, 'Max');
 
     await expectLater(
       c.post('/documents', {'kind': 'quote', 'customerId': customer['id'], 'contactId': contactId(other, 'Fremd'), 'items': []}),
       status(400),
     );
-    final quote = await c.post('/documents', {'kind': 'quote', 'customerId': customer['id'], 'contactId': vincent, 'items': []});
-    expect(quote['contactId'], vincent);
+    final quote = await c.post('/documents', {'kind': 'quote', 'customerId': customer['id'], 'contactId': max, 'items': []});
+    expect(quote['contactId'], max);
 
     // Ohne contactId bleibt die Zuordnung, mit null wird sie entfernt.
     final kept = await c.put('/documents/${quote['id']}', {'version': quote['version'], 'notes': 'x', 'items': []});
-    expect(kept['contactId'], vincent);
+    expect(kept['contactId'], max);
     final cleared = await c.put('/documents/${quote['id']}', {'version': kept['version'], 'contactId': null, 'items': []});
     expect(cleared['contactId'], isNull);
     final again = await c.put('/documents/${quote['id']}', {
       'version': cleared['version'],
-      'contactId': vincent,
+      'contactId': max,
       'items': [
         {'kind': 'text', 'description': 'Leistung', 'quantity': '1', 'unitPriceCents': 10000, 'vatRatePercent': 19},
       ],
     });
 
     // Kundenwechsel im Entwurf: Kontakt des alten Kunden entfällt.
-    final draft = await c.post('/documents', {'kind': 'order', 'customerId': customer['id'], 'contactId': vincent, 'items': []});
+    final draft = await c.post('/documents', {'kind': 'order', 'customerId': customer['id'], 'contactId': max, 'items': []});
     final switched = await c.put('/documents/${draft['id']}', {'version': draft['version'], 'customerId': other['id'], 'items': []});
     expect(switched['contactId'], isNull);
 
     final finalized = await c.post('/documents/${quote['id']}/finalize', {'version': again['version']});
     final order = await c.post('/documents/${finalized['id']}/convert', {'kind': 'order'});
-    expect(order['contactId'], vincent);
+    expect(order['contactId'], max);
   });
 
   test('Empfänger: Rechnungs-E-Mail → Kontaktperson → Kunde; Angebot ohne Rechnungs-E-Mail', () async {
     final c = await configured('k3@example.com');
-    final customer = await remondis(c);
-    final vincent = contactId(customer, 'Vincent');
+    final customer = await musterwerk(c);
+    final max = contactId(customer, 'Max');
     Future<Map<String, Object?>> finalized(String kind, {String? contact}) async {
       final draft = await c.post('/documents', {
         'kind': kind,
@@ -139,11 +139,11 @@ void runCustomerContactTests(RepositoryFactory create) {
     Future<String> sendTo(Map<String, Object?> document) async =>
         (await c.post('/documents/${document['id']}/send', {'pdfBase64': _pdf}))['to'] as String;
 
-    final quote = await finalized('quote', contact: vincent);
-    final invoice = await finalized('invoice', contact: vincent);
+    final quote = await finalized('quote', contact: max);
+    final invoice = await finalized('invoice', contact: max);
     final plainInvoice = await finalized('invoice');
-    expect(await sendTo(quote), 'vincent@remondis.example', reason: 'Angebot an die Kontaktperson');
-    expect(await sendTo(invoice), 'rechnung@remondis.example', reason: 'Rechnungs-E-Mail hat Vorrang');
+    expect(await sendTo(quote), 'max@musterwerk.example', reason: 'Angebot an die Kontaktperson');
+    expect(await sendTo(invoice), 'rechnung@musterwerk.example', reason: 'Rechnungs-E-Mail hat Vorrang');
 
     // Mahnung geht ebenfalls an die Rechnungs-E-Mail.
     final due = DateTime.now().toUtc().subtract(const Duration(days: 20));
@@ -152,15 +152,15 @@ void runCustomerContactTests(RepositoryFactory create) {
     });
     final notice = await c.post('/documents/${invoice['id']}/dunning-notices');
     await c.post('/dunning-notices/${notice['id']}/send', {'pdfBase64': _pdf});
-    expect(transport.sent.last.mail.to, 'rechnung@remondis.example');
+    expect(transport.sent.last.mail.to, 'rechnung@musterwerk.example');
 
-    await c.put('/customers/${customer['id']}', {'name': 'Remondis', 'email': 'info@remondis.example', 'invoiceEmail': null});
-    expect(await sendTo(invoice), 'vincent@remondis.example', reason: 'ohne Rechnungs-E-Mail: Kontaktperson');
-    expect(await sendTo(plainInvoice), 'info@remondis.example', reason: 'ohne Kontaktperson: allgemeine E-Mail');
+    await c.put('/customers/${customer['id']}', {'name': 'Musterwerk', 'email': 'info@musterwerk.example', 'invoiceEmail': null});
+    expect(await sendTo(invoice), 'max@musterwerk.example', reason: 'ohne Rechnungs-E-Mail: Kontaktperson');
+    expect(await sendTo(plainInvoice), 'info@musterwerk.example', reason: 'ohne Kontaktperson: allgemeine E-Mail');
 
     // Kontaktperson gelöscht: Dokument verliert nur die Zuordnung.
-    await c.put('/customers/${customer['id']}', {'name': 'Remondis', 'email': 'info@remondis.example', 'contacts': []});
+    await c.put('/customers/${customer['id']}', {'name': 'Musterwerk', 'email': 'info@musterwerk.example', 'contacts': []});
     expect((await c.get('/documents/${invoice['id']}'))['contactId'], isNull);
-    expect(await sendTo(invoice), 'info@remondis.example');
+    expect(await sendTo(invoice), 'info@musterwerk.example');
   });
 }

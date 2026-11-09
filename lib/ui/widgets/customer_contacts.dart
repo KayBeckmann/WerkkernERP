@@ -5,8 +5,8 @@ import 'section_label.dart';
 
 /// Kontaktperson als reine Anzeige-/Eingabedaten — gemeinsam für den
 /// Offline-Modus (Drift) und den Online-Modus (Server). Kay 2026-11-09:
-/// mehrere Kontaktpersonen je Kunde, z. B. Vincent → Betriebstechniker,
-/// Annika → Buchhaltung.
+/// mehrere Kontaktpersonen je Kunde, z. B. Max → Betriebstechniker,
+/// Erika → Buchhaltung.
 class ContactData {
   const ContactData({this.id, required this.name, this.role, this.email, this.phone});
 
@@ -19,7 +19,7 @@ class ContactData {
   final String? email;
   final String? phone;
 
-  /// „Vincent (Betriebstechniker)“
+  /// „Max (Betriebstechniker)“
   String get label => role == null ? name : '$name ($role)';
 }
 
