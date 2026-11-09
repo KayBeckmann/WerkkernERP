@@ -166,6 +166,9 @@ class WerkkernApiClient {
     return [for (final c in j['customers'] as List) OnlineCustomer.fromJson(c as Map<String, Object?>)];
   }
 
+  Future<OnlineCustomer> customer(String id) async =>
+      OnlineCustomer.fromJson(_map(await _send('GET', '/customers/$id')));
+
   Future<OnlineCustomer> createCustomer(OnlineCustomer draft) async =>
       OnlineCustomer.fromJson(_map(await _send('POST', '/customers', body: draft.toWriteJson())));
 

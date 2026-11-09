@@ -51,7 +51,7 @@ void main() {
     await tester.tap(find.text('Kunde anlegen'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('online-customer-name')), 'Müller GmbH');
-    await tester.tap(find.text('Speichern'));
+    await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
     expect(find.text('Müller GmbH'), findsOneWidget);
 

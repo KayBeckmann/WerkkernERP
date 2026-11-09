@@ -51,6 +51,10 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   String? _projectId;
   List<OnlineProject> _projects = const [];
 
+  /// Kunde samt Kontaktpersonen (Kay 2026-11-09); `null` ohne Leserecht.
+  OnlineCustomer? _customer;
+  String? _contactId;
+
   /// Fälligkeit im Entwurf — wird mit „Speichern“ übertragen; finalisiert
   /// sofort über die Zahlungs-Route (wie offline).
   DateTime? _dueDate;
@@ -151,9 +155,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       if (store != null && store.isPinned(widget.documentId) && _pending.isEmpty) {
         await store.pin(json, store.customer(json['customerId'] as String));
       }
+      final customer = await _loadCustomer(json['customerId'] as String);
       if (!mounted) return;
       setState(() {
         _offlineView = false;
+        _customer = customer;
         _apply(OnlineDocument.fromJson(json));
       });
     } on ApiUnreachable catch (e) {
@@ -176,9 +182,43 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
         _error = 'Dieses Dokument ist nicht offline verfügbar.';
       } else {
         _offlineView = true;
+        _customer = _store?.customer(cached.customerId);
         _apply(cached);
       }
     });
+  }
+
+  /// Kunde mit Kontaktpersonen; ohne Recht oder bei Fehler `null` (die
+  /// Auswahl der Kontaktperson entfällt dann, das Dokument bleibt nutzbar).
+  Future<OnlineCustomer?> _loadCustomer(String id) async {
+    if (!widget.session.can('customers.read')) return null;
+    try {
+      return await _client.customer(id);
+    } on Exception {
+      return _store?.customer(id);
+    }
+  }
+
+  /// Hinweis im Versanddialog: wohin geht es, wenn das Feld leer bleibt
+  /// (gleiche Regel wie der Server: Rechnungs-E-Mail → Kontaktperson →
+  /// Kunde).
+  String _recipientHint({required bool billing}) {
+    final customer = _customer;
+    if (customer == null) return 'Leer = E-Mail des Kunden';
+    final contact = customer.contact(_document?.contactId);
+    final to = documentRecipient(
+      billing: billing,
+      invoiceEmail: customer.invoiceEmail,
+      contactEmail: contact?.email,
+      customerEmail: customer.email,
+    );
+    if (to == null) return 'Beim Kunden ist keine E-Mail hinterlegt';
+    final source = billing && to == customer.invoiceEmail?.trim()
+        ? 'Rechnungs-E-Mail'
+        : to == contact?.email?.trim()
+            ? 'Kontaktperson ${contact!.name}'
+            : 'E-Mail des Kunden';
+    return 'Leer = $to ($source)';
   }
 
   Future<void> _togglePinned() async {
@@ -253,6 +293,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     _notes.text = document.notes ?? '';
     _paymentTerms.text = document.paymentTerms ?? '';
     _projectId = document.projectId;
+    _contactId = document.contactId;
     _dueDate = document.dueDate;
     _isAdvancePayment = document.isAdvancePayment;
     _isFixedPrice = document.isFixedPrice;
@@ -334,6 +375,8 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     final dueDate = _dueDate;
     final projectId = _projectId;
     final projectChanged = document.isDraft && _projectsEnabled && projectId != document.projectId;
+    final contactId = _contactId;
+    final contactChanged = contactId != document.contactId;
     try {
       await _run(
         () async {
@@ -347,6 +390,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             idempotencyKey: opId,
             isAdvancePayment: document.kind == 'invoice' ? _isAdvancePayment : null,
             isFixedPrice: {'quote', 'order'}.contains(document.kind) ? _isFixedPrice : null,
+            contactId: contactChanged ? () => contactId : null,
           );
           if (projectChanged) {
             saved = await _client.setDocumentProject(saved.id, version: saved.version, projectId: projectId);
@@ -588,7 +632,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       context,
       session: widget.session,
       title: '${dunningLetterTitle(level)} senden',
-      defaultRecipientHint: 'Leer = E-Mail des Kunden',
+      defaultRecipientHint: _recipientHint(billing: true),
       buildPdf: () => buildDunningLetterPdfFromData(data),
       send: (pdf, {to, subject, body}) => _client.sendDunningMail(created.notice.id, pdf, to: to),
     );
@@ -777,7 +821,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                     context,
                     session: session,
                     title: '${onlineDocumentKindLabels[document.kind] ?? 'Dokument'} ${document.number} senden',
-                    defaultRecipientHint: 'Leer = E-Mail des Kunden',
+                    defaultRecipientHint: _recipientHint(billing: billingDocumentKinds.contains(document.kind)),
                     customText: true,
                     buildPdf: () => buildOnlineDocumentPdf(document),
                     send: (pdf, {to, subject, body}) =>
@@ -1024,6 +1068,32 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           decoration: const InputDecoration(labelText: 'Notizen'),
           onChanged: (_) => setState(() => _dirty = true),
         ),
+        if ((_customer?.contacts.isNotEmpty ?? false) || document.contactId != null) ...[
+          const SizedBox(height: 8),
+          // Offline nur Positionen/Notizen (Outbox) — Kontakt wie Projekt
+          // nur online änderbar.
+          if (!editable || _offlineView || _customer == null)
+            Text(
+              'Kontaktperson: ${_customer?.contact(document.contactId)?.label ?? (document.contactId == null ? 'Keine' : '…')}',
+              style: theme.textTheme.bodyMedium,
+            )
+          else
+            DropdownButtonFormField<String?>(
+              key: ValueKey('online-document-contact-${_customer!.contacts.length}'),
+              isExpanded: true,
+              initialValue: _customer!.contact(_contactId)?.id,
+              decoration: const InputDecoration(labelText: 'Kontaktperson (optional)'),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('Keine Kontaktperson')),
+                for (final contact in _customer!.contacts)
+                  DropdownMenuItem<String?>(value: contact.id, child: Text(contact.label, overflow: TextOverflow.ellipsis)),
+              ],
+              onChanged: (value) => setState(() {
+                _contactId = value;
+                _dirty = true;
+              }),
+            ),
+        ],
         if (_projectsEnabled) ...[
           const SizedBox(height: 8),
           if (!editable || !document.isDraft || _offlineView)

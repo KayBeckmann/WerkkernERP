@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../widgets/customer_contacts.dart';
 
-/// Kunden der Online-Firma — Liste mit Suche, Anlegen/Bearbeiten nur
-/// mit `customers.write`.
+/// Kunden der Online-Firma — Liste mit Suche und Detailansicht
+/// (Kontaktpersonen, Anrufen); Anlegen/Bearbeiten nur mit `customers.write`.
 class OnlineCustomersScreen extends StatefulWidget {
   const OnlineCustomersScreen({super.key, required this.session});
   final OnlineSession session;
@@ -29,22 +30,72 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
         _future = _load();
       });
 
-  Future<void> _edit([OnlineCustomer? existing]) async {
-    final result = await showDialog<OnlineCustomer>(
+  static CustomerFormResult _form(OnlineCustomer c) => CustomerFormResult(
+        name: c.name,
+        address: c.address,
+        email: c.email,
+        invoiceEmail: c.invoiceEmail,
+        phone: c.phone,
+        vatId: c.vatId,
+        notes: c.notes,
+        contacts: [
+          for (final x in c.contacts) ContactData(id: x.id, name: x.name, role: x.role, email: x.email, phone: x.phone),
+        ],
+      );
+
+  static OnlineCustomer _customer(String id, CustomerFormResult r) => OnlineCustomer(
+        id: id,
+        name: r.name,
+        address: r.address,
+        email: r.email,
+        phone: r.phone,
+        vatId: r.vatId,
+        notes: r.notes,
+        invoiceEmail: r.invoiceEmail,
+        contacts: [
+          for (final x in r.contacts) OnlineContact(id: x.id, name: x.name, role: x.role, email: x.email, phone: x.phone),
+        ],
+      );
+
+  /// Formular öffnen und speichern; liefert den gespeicherten Stand.
+  Future<OnlineCustomer?> _save([OnlineCustomer? existing]) async {
+    final result = await showDialog<CustomerFormResult>(
       context: context,
-      builder: (_) => OnlineCustomerDialog(existing: existing),
+      builder: (_) => CustomerFormDialog(
+        existing: existing == null ? null : _form(existing),
+        nameKey: const Key('online-customer-name'),
+      ),
     );
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) return null;
     try {
-      if (existing == null) {
-        await widget.session.client.createCustomer(result);
-      } else {
-        await widget.session.client.updateCustomer(result);
-      }
+      final saved = existing == null
+          ? await widget.session.client.createCustomer(_customer('', result))
+          : await widget.session.client.updateCustomer(_customer(existing.id, result));
       _reload();
+      return saved;
     } on Exception catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+      return null;
     }
+  }
+
+  Future<void> _open(OnlineCustomer customer) async {
+    var current = customer;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CustomerDetailPage(
+          customer: _form(customer),
+          onEdit: widget.session.can('customers.write')
+              ? (_) async {
+                  final saved = await _save(current);
+                  if (saved == null) return null;
+                  current = saved;
+                  return _form(saved);
+                }
+              : null,
+        ),
+      ),
+    );
   }
 
   @override
@@ -88,8 +139,14 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
                           leading: const Icon(Icons.person_outline),
                           title: Text(c.name),
                           subtitle: c.address != null ? Text(c.address!) : null,
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: canWrite ? () => _edit(c) : null,
+                          trailing: c.phone == null
+                              ? const Icon(Icons.chevron_right)
+                              : IconButton(
+                                  tooltip: '${c.name} anrufen',
+                                  icon: const Icon(Icons.call),
+                                  onPressed: () => callPhone(context, c.phone!),
+                                ),
+                          onTap: () => _open(c),
                         ),
                       );
                     },
@@ -103,85 +160,11 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
       floatingActionButton: canWrite
           ? FloatingActionButton.extended(
               heroTag: 'online-customers-fab',
-              onPressed: _edit,
+              onPressed: _save,
               icon: const Icon(Icons.add),
               label: const Text('Kunde anlegen'),
             )
           : null,
-    );
-  }
-}
-
-class OnlineCustomerDialog extends StatefulWidget {
-  const OnlineCustomerDialog({super.key, this.existing});
-  final OnlineCustomer? existing;
-
-  @override
-  State<OnlineCustomerDialog> createState() => _OnlineCustomerDialogState();
-}
-
-class _OnlineCustomerDialogState extends State<OnlineCustomerDialog> {
-  late final _name = TextEditingController(text: widget.existing?.name);
-  late final _address = TextEditingController(text: widget.existing?.address);
-  late final _email = TextEditingController(text: widget.existing?.email);
-  late final _phone = TextEditingController(text: widget.existing?.phone);
-  late final _vatId = TextEditingController(text: widget.existing?.vatId);
-  late final _contact = TextEditingController(text: widget.existing?.contactPerson);
-  late final _notes = TextEditingController(text: widget.existing?.notes);
-
-  @override
-  void dispose() {
-    for (final c in [_name, _address, _email, _phone, _vatId, _contact, _notes]) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  String? _value(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.existing == null ? 'Neuer Kunde' : 'Kunde bearbeiten'),
-      content: SizedBox(
-        width: 400,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(key: const Key('online-customer-name'), controller: _name, decoration: const InputDecoration(labelText: 'Name *')),
-              TextField(controller: _address, maxLines: 2, decoration: const InputDecoration(labelText: 'Anschrift')),
-              TextField(controller: _contact, decoration: const InputDecoration(labelText: 'Ansprechpartner')),
-              TextField(controller: _email, decoration: const InputDecoration(labelText: 'E-Mail')),
-              TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Telefon')),
-              TextField(controller: _vatId, decoration: const InputDecoration(labelText: 'USt-IdNr.')),
-              TextField(controller: _notes, maxLines: 2, decoration: const InputDecoration(labelText: 'Notizen')),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
-        FilledButton(
-          onPressed: () {
-            if (_name.text.trim().isEmpty) return;
-            Navigator.pop(
-              context,
-              OnlineCustomer(
-                id: widget.existing?.id ?? '',
-                name: _name.text.trim(),
-                address: _value(_address),
-                email: _value(_email),
-                phone: _value(_phone),
-                vatId: _value(_vatId),
-                contactPerson: _value(_contact),
-                notes: _value(_notes),
-              ),
-            );
-          },
-          child: const Text('Speichern'),
-        ),
-      ],
     );
   }
 }
