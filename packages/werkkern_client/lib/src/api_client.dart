@@ -166,6 +166,9 @@ class WerkkernApiClient {
     return [for (final c in j['customers'] as List) OnlineCustomer.fromJson(c as Map<String, Object?>)];
   }
 
+  Future<OnlineCustomer> customer(String id) async =>
+      OnlineCustomer.fromJson(_map(await _send('GET', '/customers/$id')));
+
   Future<OnlineCustomer> createCustomer(OnlineCustomer draft) async =>
       OnlineCustomer.fromJson(_map(await _send('POST', '/customers', body: draft.toWriteJson())));
 
@@ -206,6 +209,7 @@ class WerkkernApiClient {
     List<OnlineDocumentItem> items = const [],
     String? notes,
     String? projectId,
+    String? contactId,
   }) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents', body: {
         'kind': kind,
@@ -213,6 +217,7 @@ class WerkkernApiClient {
         'items': [for (final i in items) i.toJson()],
         'notes': ?notes,
         'projectId': ?projectId,
+        'contactId': ?contactId,
       })));
 
   /// Wirft [ApiException] mit 409, wenn [version] veraltet ist — dann
@@ -233,6 +238,8 @@ class WerkkernApiClient {
     String? Function()? paymentTerms,
     // Nur im Entwurf (finalisiert: [setDueDate]).
     DateTime? Function()? dueDate,
+    // Kontaktperson; ohne Angabe unverändert, `() => null` entfernt sie.
+    String? Function()? contactId,
   }) async {
     final due = dueDate?.call();
     return OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', idempotencyKey: idempotencyKey, body: {
@@ -244,6 +251,7 @@ class WerkkernApiClient {
       'isFixedPrice': ?isFixedPrice,
       if (paymentTerms != null) 'paymentTerms': paymentTerms(),
       if (dueDate != null) 'dueDate': due == null ? null : _isoDate(due),
+      if (contactId != null) 'contactId': contactId(),
     })));
   }
 

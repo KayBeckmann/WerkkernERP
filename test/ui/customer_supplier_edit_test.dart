@@ -45,19 +45,28 @@ void main() {
     await tester.tap(find.text('Anlegen'));
     await tester.pumpAndSettle();
 
+    // Seit 2026-11-09: Tippen öffnet die Detailansicht, Bearbeiten über
+    // den Stift.
     await tester.tap(find.text('Alter Name GmbH'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Bearbeiten'));
     await tester.pumpAndSettle();
     expect(find.text('Kunde bearbeiten'), findsOneWidget);
 
     await tester.enterText(find.widgetWithText(TextField, 'USt-IdNr.'), 'DE123456789');
     await tester.tap(find.text('Speichern'));
     await tester.pumpAndSettle();
+    expect(find.text('DE123456789'), findsOneWidget, reason: 'Detailansicht zeigt den neuen Stand');
 
-    // Zurück bearbeiten öffnen -> die USt-IdNr. muss vorausgefüllt sein,
-    // nicht nur in der DB gelandet sein.
+    // Erneut öffnen -> die USt-IdNr. muss vorausgefüllt sein, nicht nur
+    // in der DB gelandet sein.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Alter Name GmbH'));
     await tester.pumpAndSettle();
-    expect(find.text('DE123456789'), findsOneWidget);
+    await tester.tap(find.byTooltip('Bearbeiten'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextField, 'DE123456789'), findsOneWidget);
   });
 
   testWidgets('Tippen auf einen Lieferanten öffnet das Bearbeiten-Formular und speichert Änderungen', (

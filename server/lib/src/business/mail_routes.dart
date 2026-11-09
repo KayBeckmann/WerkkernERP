@@ -1,10 +1,12 @@
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
+import 'package:werkkern_core/werkkern_core.dart';
 
 import '../auth.dart';
 import '../mail.dart';
 import '../repository.dart';
 import '../util/responses.dart';
+import 'models.dart';
 import 'repository.dart';
 import 'request_util.dart';
 
@@ -183,6 +185,15 @@ class MailRoutes {
     return to != null && to.contains('@') ? to : null;
   }
 
+  /// Standard-Empfänger eines Dokuments: Rechnungs-E-Mail (nur
+  /// Rechnungsdokumente/Mahnungen) → Kontaktperson → Kunde.
+  String? _documentDefault(Customer? customer, Document document, {required bool billing}) => documentRecipient(
+        billing: billing,
+        invoiceEmail: customer?.invoiceEmail,
+        contactEmail: customer?.contact(document.contactId)?.email,
+        customerEmail: customer?.email,
+      );
+
   Future<String> _companyName(String companyId) async => (await repository.findCompanyById(companyId))?.name ?? '';
 
   Future<Response> _test(Request request) async {
@@ -222,7 +233,10 @@ class MailRoutes {
     if (document.isDraft) return jsonError('Nur finalisierte Dokumente werden versendet.', status: 409);
     final body = await readJsonBody(request);
     final customer = await business.findCustomer(companyId, document.customerId);
-    final to = _recipient(body['to'], customer?.email);
+    final to = _recipient(
+      body['to'],
+      _documentDefault(customer, document, billing: billingDocumentKinds.contains(document.kind)),
+    );
     if (to == null) return jsonError('Empfänger fehlt (beim Kunden ist keine E-Mail hinterlegt).');
     final pdf = decodePdfAttachment(body['pdfBase64']);
     if (pdf == null) return jsonError('pdfBase64 muss ein PDF bis 10 MB sein.');
@@ -251,7 +265,7 @@ class MailRoutes {
     final document = (await business.findDocument(companyId, notice.documentId))!;
     final body = await readJsonBody(request);
     final customer = await business.findCustomer(companyId, document.customerId);
-    final to = _recipient(body['to'], customer?.email);
+    final to = _recipient(body['to'], _documentDefault(customer, document, billing: true));
     if (to == null) return jsonError('Empfänger fehlt (beim Kunden ist keine E-Mail hinterlegt).');
     final pdf = decodePdfAttachment(body['pdfBase64']);
     if (pdf == null) return jsonError('pdfBase64 muss ein PDF bis 10 MB sein.');

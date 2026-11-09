@@ -117,6 +117,9 @@ class WerkkernErpApp extends StatelessWidget {
         Provider<CustomerRepository>(
           create: (context) => CustomerRepository(context.read<AppDatabase>()),
         ),
+        Provider<CustomerContactRepository>(
+          create: (context) => CustomerContactRepository(context.read<AppDatabase>()),
+        ),
         Provider<SupplierRepository>(
           create: (context) => SupplierRepository(context.read<AppDatabase>()),
         ),

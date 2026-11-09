@@ -289,6 +289,10 @@ void main() {
       // v33 -> v34 (C3.4: Rolle an der Position; `staff_roles` ist oben
       // schon komplett gedroppt, siehe `from >= 27`-Guard).
       raw.execute('ALTER TABLE invoice_items DROP COLUMN staff_role_id;');
+      // v34 -> v35 (Kontaktpersonen, Rechnungs-E-Mail, Kontakt am Dokument).
+      raw.execute('ALTER TABLE invoices DROP COLUMN contact_id;');
+      raw.execute('DROP TABLE customer_contacts;');
+      raw.execute('ALTER TABLE customers DROP COLUMN invoice_email;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -718,6 +722,10 @@ void main() {
     final raw = sqlite3.open(dbPath);
     raw.execute('ALTER TABLE staff_roles DROP COLUMN hourly_billing_rate_cents;');
     raw.execute('ALTER TABLE invoice_items DROP COLUMN staff_role_id;');
+    // v35 (Kontaktpersonen) gab es bei v33 noch nicht.
+    raw.execute('ALTER TABLE invoices DROP COLUMN contact_id;');
+    raw.execute('DROP TABLE customer_contacts;');
+    raw.execute('ALTER TABLE customers DROP COLUMN invoice_email;');
     raw.execute('PRAGMA user_version = 33;');
     raw.close();
 
@@ -726,6 +734,45 @@ void main() {
       final role = await (db.select(db.staffRoles)..where((r) => r.id.equals('role-alt'))).getSingle();
       expect(role.hourlyCostRateCents, 4200, reason: 'Bestandsdaten dürfen nicht verändert werden');
       expect(role.hourlyBillingRateCents, 0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  test('Migration v34→v35: Ansprechpartner wird erste Kontaktperson, Dokumente ohne Kontakt', () async {
+    final file = File(dbPath);
+    var db = AppDatabase.forTesting(NativeDatabase(file, setup: (r) => r.execute('PRAGMA foreign_keys = ON;')));
+    final company = await CompanyRepository(db).create(name: 'Firma mit Ansprechpartner');
+    final customers = CustomerRepository(db);
+    final remondis = await customers.create(companyId: company.id, name: 'Remondis', email: 'info@remondis.example');
+    await db.customStatement("UPDATE customers SET contact_person = ' Vincent ' WHERE id = '${remondis.id}'");
+    final ohne = await customers.create(companyId: company.id, name: 'Ohne Ansprechpartner');
+    final invoice = await InvoiceRepository(db, NumberSequenceRepository(db)).createDraft(
+      companyId: company.id,
+      customerId: remondis.id,
+      issueDate: DateTime(2026, 11, 1),
+      serviceDate: DateTime(2026, 11, 1),
+    );
+    await db.close();
+
+    final raw = sqlite3.open(dbPath);
+    raw.execute('ALTER TABLE invoices DROP COLUMN contact_id;');
+    raw.execute('DROP TABLE customer_contacts;');
+    raw.execute('ALTER TABLE customers DROP COLUMN invoice_email;');
+    raw.execute('PRAGMA user_version = 34;');
+    raw.close();
+
+    db = AppDatabase.forTesting(NativeDatabase(file, setup: (r) => r.execute('PRAGMA foreign_keys = ON;')));
+    try {
+      final contacts = await CustomerContactRepository(db).listForCustomer(companyId: company.id, customerId: remondis.id);
+      expect([for (final c in contacts) c.name], ['Vincent']);
+      expect(await CustomerContactRepository(db).listForCustomer(companyId: company.id, customerId: ohne.id), isEmpty);
+      final migrated = (await CustomerRepository(db).findById(companyId: company.id, id: remondis.id))!;
+      expect(migrated.contactPerson, isNull);
+      expect(migrated.invoiceEmail, isNull);
+      expect(migrated.email, 'info@remondis.example', reason: 'Bestandsdaten bleiben');
+      final doc = (await InvoiceRepository(db, NumberSequenceRepository(db)).findById(companyId: company.id, id: invoice.id))!;
+      expect(doc.contactId, isNull);
     } finally {
       await db.close();
     }
