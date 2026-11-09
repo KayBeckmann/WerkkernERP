@@ -53,11 +53,11 @@ void main() {
     await db.execute("INSERT INTO companies (id, name) VALUES ('c1', 'Bestandsfirma')");
     await db.execute(
       "INSERT INTO customers (id, company_id, name, contact_person, created_at) VALUES "
-      "('k1', 'c1', 'Remondis', ' Vincent ', now()), ('k2', 'c1', 'Ohne', '  ', now()), ('k3', 'c1', 'Leer', NULL, now())",
+      "('k1', 'c1', 'Musterwerk', ' Max ', now()), ('k2', 'c1', 'Ohne', '  ', now()), ('k3', 'c1', 'Leer', NULL, now())",
     );
     await migrate(db);
     final contacts = await db.execute('SELECT customer_id, name, company_id FROM customer_contacts');
-    expect([for (final r in contacts) (r[0], r[1], r[2])], [('k1', 'Vincent', 'c1')]);
+    expect([for (final r in contacts) (r[0], r[1], r[2])], [('k1', 'Max', 'c1')]);
     final remaining = await db.execute('SELECT count(*) FROM customers WHERE contact_person IS NOT NULL');
     expect(remaining.first.first, 0);
     expect(await columns('customers'), contains('invoice_email'));

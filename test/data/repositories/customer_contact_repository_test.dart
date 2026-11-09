@@ -15,7 +15,7 @@ void main() {
   late CustomerContactRepository contacts;
   late InvoiceRepository invoices;
   late Company company;
-  late Customer remondis;
+  late Customer musterwerk;
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory(setup: (r) => r.execute('PRAGMA foreign_keys = ON;')));
@@ -24,10 +24,10 @@ void main() {
     final companies = CompanyRepository(db);
     company = await companies.create(name: 'Elektro Beckmann');
     await companies.update(company.copyWith(quotesEnabled: true, ordersEnabled: true));
-    remondis = await CustomerRepository(db).create(
+    musterwerk = await CustomerRepository(db).create(
       companyId: company.id,
-      name: 'Remondis',
-      invoiceEmail: 'rechnung@remondis.example',
+      name: 'Musterwerk',
+      invoiceEmail: 'rechnung@musterwerk.example',
     );
   });
   tearDown(() => db.close());
@@ -38,19 +38,19 @@ void main() {
   test('Ersetzen: IDs bleiben, Reihenfolge folgt der Eingabe, fehlende entfallen', () async {
     final first = await contacts.replaceForCustomer(
       companyId: company.id,
-      customerId: remondis.id,
-      contacts: [input('Vincent', role: 'Betriebstechniker'), input('Annika', role: 'Buchhaltung')],
+      customerId: musterwerk.id,
+      contacts: [input('Max', role: 'Betriebstechniker'), input('Erika', role: 'Buchhaltung')],
     );
-    final vincent = first.first;
+    final max = first.first;
     final second = await contacts.replaceForCustomer(
       companyId: company.id,
-      customerId: remondis.id,
-      contacts: [input('Jonas'), input('Vincent', id: vincent.id, role: 'Betriebsleiter')],
+      customerId: musterwerk.id,
+      contacts: [input('Jonas'), input('Max', id: max.id, role: 'Betriebsleiter')],
     );
-    expect([for (final c in second) (c.name, c.role)], [('Jonas', null), ('Vincent', 'Betriebsleiter')]);
-    expect(second.last.id, vincent.id);
-    expect((await CustomerRepository(db).findById(companyId: company.id, id: remondis.id))!.invoiceEmail,
-        'rechnung@remondis.example');
+    expect([for (final c in second) (c.name, c.role)], [('Jonas', null), ('Max', 'Betriebsleiter')]);
+    expect(second.last.id, max.id);
+    expect((await CustomerRepository(db).findById(companyId: company.id, id: musterwerk.id))!.invoiceEmail,
+        'rechnung@musterwerk.example');
   });
 
   test('Fremde Firma sieht keine Kontaktpersonen, fremde IDs werden nicht übernommen', () async {
@@ -63,7 +63,7 @@ void main() {
     )).single;
     final mine = await contacts.replaceForCustomer(
       companyId: company.id,
-      customerId: remondis.id,
+      customerId: musterwerk.id,
       contacts: [input('Übernahme', id: fremd.id)],
     );
     expect(mine.single.id, isNot(fremd.id));
@@ -72,18 +72,18 @@ void main() {
   });
 
   test('Kontaktperson am Dokument: gespeichert, bei Umwandlung übernommen, beim Entfernen gelöst', () async {
-    final vincent = (await contacts.replaceForCustomer(
+    final max = (await contacts.replaceForCustomer(
       companyId: company.id,
-      customerId: remondis.id,
-      contacts: [input('Vincent')],
+      customerId: musterwerk.id,
+      contacts: [input('Max')],
     )).single;
     final quote = await invoices.createDraft(
       companyId: company.id,
-      customerId: remondis.id,
+      customerId: musterwerk.id,
       kind: DocumentKind.quote,
       issueDate: DateTime(2026, 11, 9),
       serviceDate: DateTime(2026, 11, 9),
-      contactId: vincent.id,
+      contactId: max.id,
       items: [
         InvoiceItemInput(
           kind: InvoiceItemKind.text,
@@ -94,15 +94,15 @@ void main() {
         ),
       ],
     );
-    expect(quote.contactId, vincent.id);
+    expect(quote.contactId, max.id);
     final cleared = await invoices.update(companyId: company.id, id: quote.id, contactId: const Value(null));
     expect(cleared!.contactId, isNull);
-    await invoices.update(companyId: company.id, id: quote.id, contactId: Value(vincent.id));
+    await invoices.update(companyId: company.id, id: quote.id, contactId: Value(max.id));
     await invoices.finalize(companyId: company.id, id: quote.id);
     final order = await invoices.convertTo(companyId: company.id, sourceId: quote.id, targetKind: DocumentKind.order);
-    expect(order.contactId, vincent.id);
+    expect(order.contactId, max.id);
 
-    await contacts.replaceForCustomer(companyId: company.id, customerId: remondis.id, contacts: const []);
+    await contacts.replaceForCustomer(companyId: company.id, customerId: musterwerk.id, contacts: const []);
     expect((await invoices.findById(companyId: company.id, id: order.id))!.contactId, isNull);
     expect((await invoices.findById(companyId: company.id, id: quote.id))!.contactId, isNull);
   });

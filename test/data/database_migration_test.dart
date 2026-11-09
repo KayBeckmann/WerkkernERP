@@ -744,12 +744,12 @@ void main() {
     var db = AppDatabase.forTesting(NativeDatabase(file, setup: (r) => r.execute('PRAGMA foreign_keys = ON;')));
     final company = await CompanyRepository(db).create(name: 'Firma mit Ansprechpartner');
     final customers = CustomerRepository(db);
-    final remondis = await customers.create(companyId: company.id, name: 'Remondis', email: 'info@remondis.example');
-    await db.customStatement("UPDATE customers SET contact_person = ' Vincent ' WHERE id = '${remondis.id}'");
+    final musterwerk = await customers.create(companyId: company.id, name: 'Musterwerk', email: 'info@musterwerk.example');
+    await db.customStatement("UPDATE customers SET contact_person = ' Max ' WHERE id = '${musterwerk.id}'");
     final ohne = await customers.create(companyId: company.id, name: 'Ohne Ansprechpartner');
     final invoice = await InvoiceRepository(db, NumberSequenceRepository(db)).createDraft(
       companyId: company.id,
-      customerId: remondis.id,
+      customerId: musterwerk.id,
       issueDate: DateTime(2026, 11, 1),
       serviceDate: DateTime(2026, 11, 1),
     );
@@ -764,13 +764,13 @@ void main() {
 
     db = AppDatabase.forTesting(NativeDatabase(file, setup: (r) => r.execute('PRAGMA foreign_keys = ON;')));
     try {
-      final contacts = await CustomerContactRepository(db).listForCustomer(companyId: company.id, customerId: remondis.id);
-      expect([for (final c in contacts) c.name], ['Vincent']);
+      final contacts = await CustomerContactRepository(db).listForCustomer(companyId: company.id, customerId: musterwerk.id);
+      expect([for (final c in contacts) c.name], ['Max']);
       expect(await CustomerContactRepository(db).listForCustomer(companyId: company.id, customerId: ohne.id), isEmpty);
-      final migrated = (await CustomerRepository(db).findById(companyId: company.id, id: remondis.id))!;
+      final migrated = (await CustomerRepository(db).findById(companyId: company.id, id: musterwerk.id))!;
       expect(migrated.contactPerson, isNull);
       expect(migrated.invoiceEmail, isNull);
-      expect(migrated.email, 'info@remondis.example', reason: 'Bestandsdaten bleiben');
+      expect(migrated.email, 'info@musterwerk.example', reason: 'Bestandsdaten bleiben');
       final doc = (await InvoiceRepository(db, NumberSequenceRepository(db)).findById(companyId: company.id, id: invoice.id))!;
       expect(doc.contactId, isNull);
     } finally {

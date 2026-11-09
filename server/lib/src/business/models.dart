@@ -72,7 +72,7 @@ class Customer {
       };
 }
 
-/// Kontaktperson eines Kunden (z. B. Vincent, Betriebstechniker) — kann
+/// Kontaktperson eines Kunden (z. B. Max, Betriebstechniker) — kann
 /// Angeboten/Aufträgen/Rechnungen zugewiesen werden.
 class CustomerContact {
   const CustomerContact({
