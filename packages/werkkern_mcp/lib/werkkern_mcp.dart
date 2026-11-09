@@ -31,6 +31,13 @@ Map<String, Object?> _object(Map<String, Object?> properties, [List<String> requ
 
 const _string = {'type': 'string'};
 
+/// Kontaktperson eines Kunden.
+const _contact = {
+  'type': 'object',
+  'properties': {'name': _string, 'role': _string, 'email': _string, 'phone': _string},
+  'required': ['name'],
+};
+
 final _item = {
   'type': 'object',
   'properties': {
@@ -78,14 +85,16 @@ final List<_Tool> _tools = [
   ),
   _Tool(
     'create_customer',
-    'Neuen Kunden anlegen.',
+    'Neuen Kunden anlegen. invoiceEmail = eigene Adresse für Rechnungen/Mahnungen; contacts = Kontaktpersonen '
+        '(Name, Funktion wie "Buchhaltung", E-Mail, Telefon).',
     _object({
       'name': _string,
       'address': _string,
       'email': _string,
       'phone': _string,
       'vatId': _string,
-      'contactPerson': _string,
+      'invoiceEmail': _string,
+      'contacts': {'type': 'array', 'items': _contact},
       'notes': _string,
     }, ['name']),
     (c, a) => c.request('POST', '/customers', body: a),
@@ -121,9 +130,11 @@ final List<_Tool> _tools = [
   ),
   _Tool(
     'create_document_draft',
-    'Neuen Dokument-ENTWURF anlegen (wird nie automatisch finalisiert). kind Standard: invoice.',
+    'Neuen Dokument-ENTWURF anlegen (wird nie automatisch finalisiert). kind Standard: invoice. '
+        'contactId = Kontaktperson des Kunden (aus list_customers).',
     _object({
       'customerId': _string,
+      'contactId': _string,
       'kind': {'type': 'string', 'enum': _kinds},
       'items': {'type': 'array', 'items': _item},
       'notes': _string,

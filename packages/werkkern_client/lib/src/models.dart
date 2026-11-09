@@ -43,6 +43,8 @@ class OnlineCustomer {
     this.vatId,
     this.contactPerson,
     this.notes,
+    this.invoiceEmail,
+    this.contacts = const [],
   });
   factory OnlineCustomer.fromJson(Map<String, Object?> j) => OnlineCustomer(
         id: j['id'] as String,
@@ -53,6 +55,10 @@ class OnlineCustomer {
         vatId: j['vatId'] as String?,
         contactPerson: j['contactPerson'] as String?,
         notes: j['notes'] as String?,
+        invoiceEmail: j['invoiceEmail'] as String?,
+        contacts: [
+          for (final c in (j['contacts'] as List? ?? const [])) OnlineContact.fromJson(c as Map<String, Object?>),
+        ],
       );
   final String id;
   final String name;
@@ -60,8 +66,16 @@ class OnlineCustomer {
   final String? email;
   final String? phone;
   final String? vatId;
+
+  /// Altes Einzelfeld — seit den Kontaktpersonen leer, nur noch gelesen.
   final String? contactPerson;
   final String? notes;
+
+  /// Vorrangige Adresse für Rechnungsdokumente und Mahnungen.
+  final String? invoiceEmail;
+  final List<OnlineContact> contacts;
+
+  OnlineContact? contact(String? id) => id == null ? null : contacts.where((c) => c.id == id).firstOrNull;
 
   Map<String, Object?> toWriteJson() => {
         'name': name,
@@ -69,9 +83,34 @@ class OnlineCustomer {
         'email': email,
         'phone': phone,
         'vatId': vatId,
-        'contactPerson': contactPerson,
         'notes': notes,
+        'invoiceEmail': invoiceEmail,
+        'contacts': [for (final c in contacts) c.toWriteJson()],
       };
+}
+
+/// Kontaktperson eines Kunden (z. B. Annika, Buchhaltung).
+class OnlineContact {
+  const OnlineContact({this.id, required this.name, this.role, this.email, this.phone});
+  factory OnlineContact.fromJson(Map<String, Object?> j) => OnlineContact(
+        id: j['id'] as String?,
+        name: j['name'] as String,
+        role: j['role'] as String?,
+        email: j['email'] as String?,
+        phone: j['phone'] as String?,
+      );
+
+  /// `null` bei einer neuen, noch nicht gespeicherten Kontaktperson.
+  final String? id;
+  final String name;
+  final String? role;
+  final String? email;
+  final String? phone;
+
+  /// „Vincent (Betriebstechniker)“
+  String get label => role == null ? name : '$name ($role)';
+
+  Map<String, Object?> toWriteJson() => {'id': ?id, 'name': name, 'role': role, 'email': email, 'phone': phone};
 }
 
 class OnlineArticle {
@@ -222,6 +261,7 @@ class OnlineDocument {
     this.dueDate,
     this.finalizedAt,
     this.projectId,
+    this.contactId,
     this.isAdvancePayment = false,
     this.isFixedPrice = false,
     this.convertedFromNumber,
@@ -286,6 +326,7 @@ class OnlineDocument {
       dueDate: j['dueDate'] == null ? null : DateTime.parse(j['dueDate'] as String),
       finalizedAt: j['finalizedAt'] == null ? null : DateTime.parse(j['finalizedAt'] as String),
       projectId: j['projectId'] as String?,
+      contactId: j['contactId'] as String?,
       version: j['version'] as int,
       items: [
         for (final i in (j['items'] as List? ?? const [])) OnlineDocumentItem.fromJson(i as Map<String, Object?>),
@@ -342,6 +383,9 @@ class OnlineDocument {
 
   /// Projektzuordnung (C1 online).
   final String? projectId;
+
+  /// Kontaktperson des Kunden (optional), Vorgabe-Empfänger beim Versand.
+  final String? contactId;
 
   /// C13: diese Rechnung ist eine Abschlagsrechnung.
   final bool isAdvancePayment;
