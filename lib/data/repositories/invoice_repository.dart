@@ -179,6 +179,8 @@ class InvoiceRepository {
     // quote/order sinnvoll, siehe Doc-Kommentar bei
     // `Invoices.isFixedPrice`.
     bool isFixedPrice = false,
+    // Kontaktperson des Kunden (Kay 2026-11-09), optional.
+    String? contactId,
     List<InvoiceItemInput> items = const [],
   }) async {
     _validateItemsForKind(kind, items);
@@ -200,6 +202,7 @@ class InvoiceRepository {
               isAdvancePayment: Value(isAdvancePayment),
               dueDate: Value(dueDate),
               isFixedPrice: Value(isFixedPrice),
+              contactId: Value(contactId),
               createdAt: now,
               updatedAt: now,
             ),
@@ -250,6 +253,8 @@ class InvoiceRepository {
     // echtes "wieder entfernen".
     Value<DateTime?> dueDate = const Value.absent(),
     bool? isFixedPrice,
+    // Kontaktperson: wie projectId absent/null/id.
+    Value<String?> contactId = const Value.absent(),
     List<InvoiceItemInput>? items,
   }) async {
     return _db.transaction(() async {
@@ -268,6 +273,7 @@ class InvoiceRepository {
           isAdvancePayment: Value(isAdvancePayment ?? existing.isAdvancePayment),
           dueDate: dueDate,
           isFixedPrice: Value(isFixedPrice ?? existing.isFixedPrice),
+          contactId: contactId,
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -712,6 +718,7 @@ class InvoiceRepository {
               // der Nutzer kann die Zuordnung danach wie jedes andere
               // Entwurfsfeld ändern.
               projectId: Value(source.projectId),
+              contactId: Value(source.contactId),
               // C3.2: Festpreis-Kennzeichen wandert mit, gleiches Prinzip
               // wie projectId.
               isFixedPrice: Value(source.isFixedPrice),
@@ -846,6 +853,7 @@ class InvoiceRepository {
               issueDate: now,
               serviceDate: source.serviceDate,
               projectId: Value(source.projectId),
+              contactId: Value(source.contactId),
               isAdvancePayment: const Value(true),
               convertedFromId: Value(sourceOrderId),
               createdAt: now,
@@ -918,6 +926,7 @@ class InvoiceRepository {
               issueDate: now,
               serviceDate: source.serviceDate,
               projectId: Value(source.projectId),
+              contactId: Value(source.contactId),
               convertedFromId: Value(invoiceId),
               createdAt: now,
               updatedAt: now,

@@ -3,11 +3,13 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
-import 'package:werkkern_core/werkkern_core.dart' show compareHoursByRole, formatHours;
+import 'package:werkkern_core/werkkern_core.dart'
+    show billingDocumentKinds, compareHoursByRole, documentRecipient, formatHours;
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
+import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
@@ -171,6 +173,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   // Zuordnung, nur sichtbar wenn die Firma das Modul aktiviert hat.
   List<Project> _projects = [];
   String? _projectId;
+
+  /// Kontaktpersonen des Kunden und die gewählte (Kay 2026-11-09).
+  List<CustomerContact> _contacts = [];
+  String? _contactId;
+
+  /// Aktueller Stand des Kunden (Rechnungs-E-Mail kann sich seit dem
+  /// Öffnen der Liste geändert haben).
+  Customer? _liveCustomer;
   bool _projectsEnabled = false;
 
   // Kay-Entscheidung 2026-10-17 (Abweichungen.md Abschnitt 1): ein
@@ -270,8 +280,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final invoiceRepo = context.read<InvoiceRepository>();
     final projectRepo = context.read<ProjectRepository>();
     final staffRoleRepo = context.read<StaffRoleRepository>();
+    final contactRepo = context.read<CustomerContactRepository>();
+    final customerRepo = context.read<CustomerRepository>();
     _articles = await articleRepo.listForCompany(companyId);
     _staffRoles = await staffRoleRepo.listForCompany(companyId);
+    _contacts = await contactRepo.listForCustomer(companyId: companyId, customerId: widget.customer.id);
+    _liveCustomer = await customerRepo.findById(companyId: companyId, id: widget.customer.id);
     _projectsEnabled = company.projectsEnabled;
     if (_projectsEnabled) {
       _projects = await projectRepo.listForCompany(companyId);
@@ -294,6 +308,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _notesCtrl.text = invoice.notes ?? '';
       _paymentTermsCtrl.text = invoice.paymentTerms ?? '';
       _projectId = invoice.projectId;
+      _contactId = invoice.contactId;
       _isFixedPrice = invoice.isFixedPrice;
       _isAdvancePayment = invoice.isAdvancePayment;
       _dueDate = invoice.dueDate;
@@ -430,6 +445,25 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     });
   }
 
+  String _contactLabel(String? id) {
+    final contact = _contacts.where((c) => c.id == id).firstOrNull;
+    if (contact == null) return 'Keine';
+    return contact.role == null ? contact.name : '${contact.name} (${contact.role})';
+  }
+
+  /// Vorgabe-Empfänger: Rechnungs-E-Mail (nur [billing]) → Kontaktperson
+  /// → E-Mail des Kunden; bleibt im Versanddialog frei änderbar.
+  String _defaultRecipient({required bool billing}) {
+    final customer = _liveCustomer ?? widget.customer;
+    return documentRecipient(
+          billing: billing,
+          invoiceEmail: customer.invoiceEmail,
+          contactEmail: _contacts.where((c) => c.id == _contactId).firstOrNull?.email,
+          customerEmail: customer.email,
+        ) ??
+        '';
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
@@ -451,6 +485,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           isAdvancePayment: _isAdvancePayment,
           dueDate: _dueDate,
           isFixedPrice: _isFixedPrice,
+          contactId: _contactId,
           items: items,
         );
       } else {
@@ -465,6 +500,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           isAdvancePayment: _isAdvancePayment,
           dueDate: Value(_dueDate),
           isFixedPrice: _isFixedPrice,
+          contactId: Value(_contactId),
           items: items,
         );
       }
@@ -592,7 +628,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       config: _smtpConfig,
       credentialStore: credentialStore,
       companyId: company.id,
-      initialTo: widget.customer.email ?? '',
+      initialTo: _defaultRecipient(billing: true),
       initialSubject: applyEmailTemplatePlaceholders(
         template: subjectTemplate,
         customerName: widget.customer.name,
@@ -953,7 +989,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       config: _smtpConfig,
       credentialStore: credentialStore,
       companyId: company.id,
-      initialTo: widget.customer.email ?? '',
+      initialTo: _defaultRecipient(billing: billingDocumentKinds.contains(_kind.name)),
       initialSubject: applyEmailTemplatePlaceholders(
         template: subjectTemplate,
         customerName: widget.customer.name,
@@ -1322,6 +1358,27 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
             decoration: const InputDecoration(labelText: 'Notizen'),
             maxLines: 2,
           ),
+          if (_contacts.isNotEmpty || _contactId != null) ...[
+            const SizedBox(height: 8),
+            if (isLocked)
+              Text(
+                'Kontaktperson: ${_contactLabel(_contactId)}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              )
+            else
+              DropdownButtonFormField<String?>(
+                key: const Key('document-contact'),
+                isExpanded: true,
+                initialValue: _contacts.any((c) => c.id == _contactId) ? _contactId : null,
+                decoration: const InputDecoration(labelText: 'Kontaktperson (optional)'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Keine Kontaktperson')),
+                  for (final contact in _contacts)
+                    DropdownMenuItem(value: contact.id, child: Text(_contactLabel(contact.id))),
+                ],
+                onChanged: (value) => setState(() => _contactId = value),
+              ),
+          ],
           if (_projectsEnabled) ...[
             const SizedBox(height: 8),
             if (isLocked)

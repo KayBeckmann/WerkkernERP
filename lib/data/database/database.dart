@@ -13,6 +13,7 @@ part 'database.g.dart';
   tables: [
     Companies,
     Customers,
+    CustomerContacts,
     Suppliers,
     ArticleGroups,
     Articles,
@@ -48,7 +49,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 34;
+  int get schemaVersion => 35;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -363,6 +364,20 @@ class AppDatabase extends _$AppDatabase {
               await migrator.addColumn(staffRoles, staffRoles.hourlyBillingRateCents);
             }
             await migrator.addColumn(invoiceItems, invoiceItems.staffRoleId);
+          }
+          if (from < 35) {
+            // Kontaktpersonen je Kunde, Rechnungs-E-Mail, Kontakt am
+            // Dokument (Kay 2026-11-09). Der bisherige Ansprechpartner
+            // wird zur ersten Kontaktperson.
+            await migrator.createTable(customerContacts);
+            await migrator.addColumn(customers, customers.invoiceEmail);
+            await migrator.addColumn(invoices, invoices.contactId);
+            await customStatement(
+              'INSERT INTO customer_contacts (id, company_id, customer_id, name, sort_order) '
+              "SELECT lower(hex(randomblob(16))), company_id, id, trim(contact_person), 0 FROM customers "
+              "WHERE trim(coalesce(contact_person, '')) <> ''",
+            );
+            await customStatement('UPDATE customers SET contact_person = NULL WHERE contact_person IS NOT NULL');
           }
         },
       );

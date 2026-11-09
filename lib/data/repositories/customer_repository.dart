@@ -34,6 +34,7 @@ class CustomerRepository {
     String? vatId,
     String? contactPerson,
     String? notes,
+    String? invoiceEmail,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.customers).insert(
@@ -47,6 +48,7 @@ class CustomerRepository {
             vatId: Value(vatId),
             contactPerson: Value(contactPerson),
             notes: Value(notes),
+            invoiceEmail: Value(invoiceEmail),
             createdAt: DateTime.now(),
           ),
         );
@@ -70,4 +72,67 @@ class CustomerRepository {
         .go();
     return rows > 0;
   }
+}
+
+/// Eingabe für eine Kontaktperson; [id] `null` = neu.
+typedef ContactInput = ({String? id, String name, String? role, String? email, String? phone});
+
+/// Kontaktpersonen je Kunde (Kay 2026-11-09) — wie [CustomerRepository]
+/// zwingend firmengebunden.
+class CustomerContactRepository {
+  CustomerContactRepository(this._db);
+
+  final AppDatabase _db;
+  static const _uuid = Uuid();
+
+  Future<List<CustomerContact>> listForCustomer({required String companyId, required String customerId}) =>
+      (_db.select(_db.customerContacts)
+            ..where((c) => c.companyId.equals(companyId) & c.customerId.equals(customerId))
+            ..orderBy([(c) => OrderingTerm.asc(c.sortOrder), (c) => OrderingTerm.asc(c.name)]))
+          .get();
+
+  Future<CustomerContact?> findById({required String companyId, required String id}) =>
+      (_db.select(_db.customerContacts)..where((c) => c.id.equals(id) & c.companyId.equals(companyId)))
+          .getSingleOrNull();
+
+  /// Ersetzt die Kontaktpersonen des Kunden in [contacts]-Reihenfolge:
+  /// bekannte IDs werden aktualisiert, neue angelegt, fehlende gelöscht
+  /// (Dokumente verlieren dann nur die Zuordnung, `onDelete: setNull`).
+  /// Fremde oder unbekannte IDs werden wie neue behandelt.
+  Future<List<CustomerContact>> replaceForCustomer({
+    required String companyId,
+    required String customerId,
+    required List<ContactInput> contacts,
+  }) =>
+      _db.transaction(() async {
+        final existing = {
+          for (final c in await listForCustomer(companyId: companyId, customerId: customerId)) c.id,
+        };
+        final keep = {for (final c in contacts) if (c.id != null && existing.contains(c.id)) c.id!};
+        await (_db.delete(_db.customerContacts)
+              ..where((c) =>
+                  c.companyId.equals(companyId) & c.customerId.equals(customerId) & c.id.isNotIn(keep)))
+            .go();
+        for (final (index, c) in contacts.indexed) {
+          final companion = CustomerContactsCompanion(
+            name: Value(c.name),
+            role: Value(c.role),
+            email: Value(c.email),
+            phone: Value(c.phone),
+            sortOrder: Value(index),
+          );
+          if (c.id != null && keep.contains(c.id)) {
+            await (_db.update(_db.customerContacts)..where((x) => x.id.equals(c.id!))).write(companion);
+          } else {
+            await _db.into(_db.customerContacts).insert(
+                  companion.copyWith(
+                    id: Value(_uuid.v4()),
+                    companyId: Value(companyId),
+                    customerId: Value(customerId),
+                  ),
+                );
+          }
+        }
+        return listForCustomer(companyId: companyId, customerId: customerId);
+      });
 }

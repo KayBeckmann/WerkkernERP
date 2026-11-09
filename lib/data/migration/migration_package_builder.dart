@@ -111,6 +111,14 @@ class MigrationPackageBuilder {
       'customers': [
         for (final c in await (db.select(db.customers)..where((c) => c.companyId.equals(companyId))).get())
           {
+            'invoiceEmail': c.invoiceEmail,
+            'contacts': [
+              for (final x in await (db.select(db.customerContacts)
+                    ..where((x) => x.customerId.equals(c.id))
+                    ..orderBy([(x) => OrderingTerm.asc(x.sortOrder)]))
+                  .get())
+                {'id': x.id, 'name': x.name, 'role': x.role, 'email': x.email, 'phone': x.phone, 'sortOrder': x.sortOrder},
+            ],
             'id': c.id,
             'name': c.name,
             'address': c.address,
@@ -206,6 +214,7 @@ class MigrationPackageBuilder {
             'updatedAt': _ts(d.updatedAt),
             'convertedFromId': d.convertedFromId,
             'projectId': d.projectId,
+            'contactId': d.contactId,
             'isAdvancePayment': d.isAdvancePayment,
             'isFixedPrice': d.isFixedPrice,
             'stockBooked': d.stockBooked,

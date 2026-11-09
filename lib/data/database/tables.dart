@@ -243,9 +243,37 @@ class Customers extends Table {
   /// RechnungsFee nur als fachliche Anregung angeschaut, keine Übernahme
   /// von Code/Feldnamen/Texten).
   TextColumn get vatId => text().nullable()();
+
+  /// Altes Einzelfeld „Ansprechpartner“ — seit v35 als erste
+  /// [CustomerContacts]-Zeile übernommen und geleert.
   TextColumn get contactPerson => text().nullable()();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+
+  /// Rechnungs-E-Mail (Kay 2026-11-09): Vorrang beim Versand von
+  /// Rechnungsdokumenten und Mahnungen, siehe `documentRecipient()`.
+  TextColumn get invoiceEmail => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Kontaktpersonen eines Kunden (Kay 2026-11-09), z. B. Vincent →
+/// Betriebstechniker, Annika → Buchhaltung. Angebote/Aufträge/Rechnungen
+/// können einer davon zugewiesen werden ([Invoices.contactId]).
+class CustomerContacts extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get customerId =>
+      text().references(Customers, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+
+  /// Funktion beim Kunden, z. B. „Buchhaltung“.
+  TextColumn get role => text().nullable()();
+  TextColumn get email => text().nullable()();
+  TextColumn get phone => text().nullable()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -500,6 +528,12 @@ class Invoices extends Table {
   /// mitlöschen, nur die Zuordnung entfällt.
   TextColumn get projectId =>
       text().nullable().references(Projects, #id, onDelete: KeyAction.setNull)();
+
+  /// Kontaktperson des Kunden (Kay 2026-11-09) — Empfänger beim Versand,
+  /// sofern keine Rechnungs-E-Mail Vorrang hat. Eine gelöschte
+  /// Kontaktperson nimmt nur die Zuordnung mit.
+  TextColumn get contactId =>
+      text().nullable().references(CustomerContacts, #id, onDelete: KeyAction.setNull)();
 
   /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
   /// markiert eine Rechnung als Abschlags-/Anzahlungsrechnung statt einer
