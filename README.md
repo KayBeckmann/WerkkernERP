@@ -40,6 +40,13 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - Mehrere Firmen vollständig datenseitig getrennt, ohne Login/Konto.
 - Kunden, Lieferanten, Artikel/Artikelgruppen mit prozentualem Aufschlag
   auf den Einkaufspreis des Standardlieferanten.
+- Kunden mit mehreren **Kontaktpersonen** (Name, Funktion, E-Mail,
+  Telefon) und eigener **Rechnungs-E-Mail**; Telefonnummern lassen sich
+  aus der Kundenansicht direkt anrufen. Angebote, Aufträge und Rechnungen
+  können einer Kontaktperson zugewiesen werden. Beim Versand gilt:
+  Rechnungen, Gutschriften, Proforma-Rechnungen und Mahnungen gehen an
+  die Rechnungs-E-Mail, sonst an die Kontaktperson des Dokuments, sonst
+  an die allgemeine E-Mail des Kunden (offline und online gleich).
 - Geldbeträge durchgängig als Integer-Cent mit kaufmännischer Rundung
   (`package:decimal`), nie als Fließkommazahl.
 - Lokale, schema-versionierte SQLite-Datenbank mit automatischer
