@@ -26,6 +26,12 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
   /// referenzieren (wie offline `onDelete: restrict`).
   Future<bool> deleteCustomer(String companyId, String id);
 
+  /// Ersetzt die Kontaktpersonen eines Kunden: vorhandene IDs werden
+  /// aktualisiert, neue angelegt, fehlende gelöscht (Dokumente verlieren
+  /// dann nur die Zuordnung). Liste und Einzelabruf liefern Kunden immer
+  /// mit ihren Kontakten ([Customer.contacts]).
+  Future<void> replaceContacts(String companyId, String customerId, List<CustomerContact> contacts);
+
   // ---- Artikel ----------------------------------------------------------
   Future<List<Article>> listArticles(String companyId, {String? query, bool includeInactive = false});
   Future<Article?> findArticle(String companyId, String id);
@@ -67,6 +73,7 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
     bool? isFixedPrice,
     DateTime? Function()? dueDate,
     String? userId,
+    String? Function()? contactId,
   });
 
   Future<bool> deleteDraft(String companyId, String id);

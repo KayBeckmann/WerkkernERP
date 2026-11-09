@@ -16,6 +16,8 @@ class Customer {
     this.contactPerson,
     this.notes,
     required this.createdAt,
+    this.invoiceEmail,
+    this.contacts = const [],
   });
   final String id;
   final String companyId;
@@ -24,9 +26,36 @@ class Customer {
   final String? email;
   final String? phone;
   final String? vatId;
+
+  /// Altes Einzelfeld „Ansprechpartner“ — seit den Kontaktpersonen
+  /// (Migration 22) leer; nur noch für ältere App-Fassungen gelesen.
   final String? contactPerson;
   final String? notes;
   final DateTime createdAt;
+
+  /// Rechnungs-E-Mail (Kay 2026-11-09): hat beim Versand von
+  /// Rechnungsdokumenten Vorrang vor Kontaktperson und allgemeiner E-Mail.
+  final String? invoiceEmail;
+
+  /// Kontaktpersonen in Anzeigereihenfolge.
+  final List<CustomerContact> contacts;
+
+  CustomerContact? contact(String? id) => id == null ? null : contacts.where((c) => c.id == id).firstOrNull;
+
+  Customer withContacts(List<CustomerContact> contacts) => Customer(
+        id: id,
+        companyId: companyId,
+        name: name,
+        address: address,
+        email: email,
+        phone: phone,
+        vatId: vatId,
+        contactPerson: contactPerson,
+        notes: notes,
+        createdAt: createdAt,
+        invoiceEmail: invoiceEmail,
+        contacts: contacts,
+      );
 
   Map<String, Object?> toJson() => {
         'id': id,
@@ -38,7 +67,36 @@ class Customer {
         'contactPerson': contactPerson,
         'notes': notes,
         'createdAt': createdAt.toIso8601String(),
+        'invoiceEmail': invoiceEmail,
+        'contacts': [for (final c in contacts) c.toJson()],
       };
+}
+
+/// Kontaktperson eines Kunden (z. B. Vincent, Betriebstechniker) — kann
+/// Angeboten/Aufträgen/Rechnungen zugewiesen werden.
+class CustomerContact {
+  const CustomerContact({
+    required this.id,
+    required this.companyId,
+    required this.customerId,
+    required this.name,
+    this.role,
+    this.email,
+    this.phone,
+    this.sortOrder = 0,
+  });
+  final String id;
+  final String companyId;
+  final String customerId;
+  final String name;
+
+  /// Funktion beim Kunden, z. B. „Buchhaltung“.
+  final String? role;
+  final String? email;
+  final String? phone;
+  final int sortOrder;
+
+  Map<String, Object?> toJson() => {'id': id, 'name': name, 'role': role, 'email': email, 'phone': phone};
 }
 
 /// Artikel wie offline: [salePriceCents] ist der **manuelle** Netto-
@@ -172,6 +230,7 @@ class Document {
     this.footerTextSnapshot,
     this.smallBusinessExemptSnapshot = false,
     this.stockBooked = false,
+    this.contactId,
   });
   final String id;
   final String companyId;
@@ -229,6 +288,10 @@ class Document {
   /// Mengendifferenz nach.
   final bool stockBooked;
 
+  /// Kontaktperson des Kunden (optional, Kay 2026-11-09) — Empfänger beim
+  /// Versand, sofern keine Rechnungs-E-Mail Vorrang hat.
+  final String? contactId;
+
   bool get isDraft => status == 'draft';
 
   /// Kopie mit geänderten Feldern — verhindert, dass beim Aktualisieren
@@ -256,6 +319,7 @@ class Document {
     bool? isAdvancePayment,
     bool? isFixedPrice,
     bool? stockBooked,
+    String? Function()? contactId,
   }) =>
       Document(
         id: id,
@@ -294,6 +358,7 @@ class Document {
         footerTextSnapshot: company != null ? company.footerText : footerTextSnapshot,
         smallBusinessExemptSnapshot: company != null ? company.smallBusinessExempt : smallBusinessExemptSnapshot,
         stockBooked: stockBooked ?? this.stockBooked,
+        contactId: contactId != null ? contactId() : this.contactId,
       );
 
   Map<String, Object?> toJson() => {
@@ -328,6 +393,7 @@ class Document {
         'paidAt': paidAt?.toIso8601String(),
         'dueDate': dueDate == null ? null : _date(dueDate!),
         'projectId': projectId,
+        'contactId': contactId,
         'isAdvancePayment': isAdvancePayment,
         'isFixedPrice': isFixedPrice,
         'stockBooked': stockBooked,

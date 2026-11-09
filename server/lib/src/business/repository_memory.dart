@@ -166,23 +166,32 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
 
   // ---- Kunden -------------------------------------------------------------
 
+  final List<CustomerContact> _contacts = [];
+
+  Customer _withContacts(Customer c) => c.withContacts(
+        _contacts.where((x) => x.companyId == c.companyId && x.customerId == c.id).toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder)),
+      );
+
   @override
   Future<List<Customer>> listCustomers(String companyId, {String? query}) async =>
-      _customers.where((c) => c.companyId == companyId && _matches(c.name, query)).toList()
+      _customers.where((c) => c.companyId == companyId && _matches(c.name, query)).map(_withContacts).toList()
         ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
   @override
-  Future<Customer?> findCustomer(String companyId, String id) async =>
-      _customers.where((c) => c.companyId == companyId && c.id == id).firstOrNull;
+  Future<Customer?> findCustomer(String companyId, String id) async {
+    final customer = _customers.where((c) => c.companyId == companyId && c.id == id).firstOrNull;
+    return customer == null ? null : _withContacts(customer);
+  }
 
   @override
-  Future<void> createCustomer(Customer customer) async => _customers.add(customer);
+  Future<void> createCustomer(Customer customer) async => _customers.add(customer.withContacts(const []));
 
   @override
   Future<bool> updateCustomer(Customer customer) async {
     final index = _customers.indexWhere((c) => c.companyId == customer.companyId && c.id == customer.id);
     if (index == -1) return false;
-    _customers[index] = customer;
+    _customers[index] = customer.withContacts(const []);
     return true;
   }
 
@@ -193,7 +202,22 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       throw const BusinessConflict('Kunde ist noch Dokumenten zugeordnet und kann nicht gelöscht werden.');
     }
     _customers.removeWhere((c) => c.companyId == companyId && c.id == id);
+    _contacts.removeWhere((x) => x.companyId == companyId && x.customerId == id);
     return true;
+  }
+
+  @override
+  Future<void> replaceContacts(String companyId, String customerId, List<CustomerContact> contacts) async {
+    final keep = {for (final c in contacts) c.id};
+    final removed = {
+      for (final x in _contacts)
+        if (x.companyId == companyId && x.customerId == customerId && !keep.contains(x.id)) x.id,
+    };
+    _contacts.removeWhere((x) => x.companyId == companyId && x.customerId == customerId);
+    _contacts.addAll(contacts);
+    for (var i = 0; i < _documents.length; i++) {
+      if (removed.contains(_documents[i].contactId)) _documents[i] = _documents[i].copyWith(contactId: () => null);
+    }
   }
 
   // ---- Artikel --------------------------------------------------------------
@@ -274,6 +298,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     bool? isFixedPrice,
     DateTime? Function()? dueDate,
     String? userId,
+    String? Function()? contactId,
   }) async {
     // Bewusst ohne await zwischen Prüfung und Schreiben — damit ist der
     // Abschnitt in Dart (single-threaded) atomar, wie die
@@ -293,6 +318,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       isAdvancePayment: isAdvancePayment,
       isFixedPrice: isFixedPrice,
       dueDate: dueDate,
+      contactId: contactId,
     );
     _documents[index] = updated;
     if (existing.stockBooked) {
@@ -474,7 +500,10 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
   Future<void> importCompanyData(String companyId, CompanyImportData data) async {
     _staffRoles.removeWhere((r) => r.companyId == companyId);
     _expenseCategories.removeWhere((c) => c.companyId == companyId);
-    _customers.addAll(data.customers);
+    _customers.addAll([for (final c in data.customers) c.withContacts(const [])]);
+    for (final c in data.customers) {
+      _contacts.addAll(c.contacts);
+    }
     _suppliers.addAll(data.suppliers);
     _articleGroups.addAll(data.articleGroups);
     _articles.addAll(data.articles);

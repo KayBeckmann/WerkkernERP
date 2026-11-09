@@ -262,9 +262,26 @@ class _Parser {
     }
     for (final (i, c) in _list(p, 'customers')) {
       final r = _R(c, 'customers[$i]');
+      final customerId = _assign('customer', r.str('id'), r.path);
+      // Kontaktpersonen/Rechnungs-E-Mail (2026-11-09) sind optional —
+      // ältere Umzugsdateien kennen sie nicht.
+      final contacts = <CustomerContact>[];
+      for (final (j, x) in _listOf(c['contacts'], '${r.path}.contacts')) {
+        final xr = _R(x, '${r.path}.contacts[$j]');
+        contacts.add(CustomerContact(
+          id: _assign('contact', xr.str('id'), xr.path),
+          companyId: companyId,
+          customerId: customerId,
+          name: xr.str('name'),
+          role: xr.optStr('role'),
+          email: xr.optStr('email'),
+          phone: xr.optStr('phone'),
+          sortOrder: xr.optInt('sortOrder') ?? j,
+        ));
+      }
       data.customers.add(
         Customer(
-          id: _assign('customer', r.str('id'), r.path),
+          id: customerId,
           companyId: companyId,
           name: r.str('name'),
           address: r.optStr('address'),
@@ -274,6 +291,8 @@ class _Parser {
           contactPerson: r.optStr('contactPerson'),
           notes: r.optStr('notes'),
           createdAt: r.time('createdAt'),
+          invoiceEmail: r.optStr('invoiceEmail'),
+          contacts: contacts,
         ),
       );
     }
@@ -483,6 +502,7 @@ class _Parser {
           paidAt: r.optTime('paidAt'),
           dueDate: r.optDate('dueDate'),
           projectId: _ref('project', r.optStr('projectId'), r.path),
+          contactId: _ref('contact', r.optStr('contactId'), r.path),
           isAdvancePayment: r.boolean('isAdvancePayment', fallback: false),
           isFixedPrice: r.boolean('isFixedPrice', fallback: false),
           introTextSnapshot: r.optStr('introTextSnapshot'),

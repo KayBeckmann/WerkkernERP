@@ -124,36 +124,87 @@ class BusinessRoutes {
     return jsonOk(customer.toJson());
   }
 
-  Customer? _customerFromBody(Map<String, Object?> body, {required String id, required String companyId, required DateTime createdAt}) {
+  /// Kunde aus dem Request. Bei einer Änderung bleiben Felder, die der
+  /// Body nicht nennt, wie bisher ([existing]) — ältere App-Fassungen
+  /// kennen Rechnungs-E-Mail und Kontaktpersonen noch nicht und dürfen sie
+  /// nicht versehentlich löschen. Fehlertext statt Kunde bei ungültigen
+  /// Angaben.
+  ({Customer? customer, String? error}) _customerFromBody(
+    Map<String, Object?> body, {
+    required String id,
+    required String companyId,
+    required DateTime createdAt,
+    Customer? existing,
+  }) {
     final name = _trimmed(body['name']);
-    if (name == null) return null;
-    return Customer(
-      id: id,
-      companyId: companyId,
-      name: name,
-      address: _trimmed(body['address']),
-      email: _trimmed(body['email']),
-      phone: _trimmed(body['phone']),
-      vatId: _trimmed(body['vatId']),
-      contactPerson: _trimmed(body['contactPerson']),
-      notes: _trimmed(body['notes']),
-      createdAt: createdAt,
+    if (name == null) return (customer: null, error: 'name ist Pflicht.');
+    String? kept(String key, String? old) => body.containsKey(key) ? _trimmed(body[key]) : old;
+    final invoiceEmail = kept('invoiceEmail', existing?.invoiceEmail);
+    if (invoiceEmail != null && !invoiceEmail.contains('@')) {
+      return (customer: null, error: 'Rechnungs-E-Mail ist keine E-Mail-Adresse.');
+    }
+    var contacts = existing?.contacts ?? const <CustomerContact>[];
+    if (body.containsKey('contacts')) {
+      final raw = body['contacts'];
+      if (raw is! List) return (customer: null, error: 'contacts (Liste) erwartet.');
+      final known = {for (final c in existing?.contacts ?? const <CustomerContact>[]) c.id};
+      contacts = [];
+      for (final (index, entry) in raw.indexed) {
+        if (entry is! Map) return (customer: null, error: 'contacts[$index] (Objekt) erwartet.');
+        final contactName = _trimmed(entry['name']);
+        if (contactName == null) return (customer: null, error: 'Kontaktperson ${index + 1}: Name ist Pflicht.');
+        final email = _trimmed(entry['email']);
+        if (email != null && !email.contains('@')) {
+          return (customer: null, error: 'Kontaktperson $contactName: E-Mail ist keine E-Mail-Adresse.');
+        }
+        // Unbekannte IDs (fremde oder erfundene) werden neu vergeben.
+        final contactId = entry['id'] as String?;
+        contacts.add(CustomerContact(
+          id: contactId != null && known.contains(contactId) ? contactId : _uuid.v4(),
+          companyId: companyId,
+          customerId: id,
+          name: contactName,
+          role: _trimmed(entry['role']),
+          email: email,
+          phone: _trimmed(entry['phone']),
+          sortOrder: index,
+        ));
+      }
+    }
+    return (
+      customer: Customer(
+        id: id,
+        companyId: companyId,
+        name: name,
+        address: _trimmed(body['address']),
+        email: _trimmed(body['email']),
+        phone: _trimmed(body['phone']),
+        vatId: _trimmed(body['vatId']),
+        contactPerson: kept('contactPerson', existing?.contactPerson),
+        notes: _trimmed(body['notes']),
+        createdAt: createdAt,
+        invoiceEmail: invoiceEmail,
+        contacts: contacts,
+      ),
+      error: null,
     );
   }
 
   Future<Response> _createCustomer(Request request) async {
     final check = await auth.requirePermission(request, 'customers.write');
     if (check.error != null) return check.error!;
-    final customer = _customerFromBody(
+    final parsed = _customerFromBody(
       await _body(request),
       id: _uuid.v4(),
       companyId: check.auth!.session.companyId,
       createdAt: DateTime.now().toUtc(),
     );
-    if (customer == null) return jsonError('name ist Pflicht.');
+    final customer = parsed.customer;
+    if (customer == null) return jsonError(parsed.error!);
     await business.createCustomer(customer);
+    await business.replaceContacts(customer.companyId, customer.id, customer.contacts);
     await auth.audit(check.auth!, 'customer.create', 'customer', customer.id);
-    return jsonOk(customer.toJson(), status: 201);
+    return jsonOk((await business.findCustomer(customer.companyId, customer.id))!.toJson(), status: 201);
   }
 
   Future<Response> _updateCustomer(Request request, String id) async {
@@ -162,11 +213,19 @@ class BusinessRoutes {
     final companyId = check.auth!.session.companyId;
     final existing = await business.findCustomer(companyId, id);
     if (existing == null) return jsonError('Kunde nicht gefunden.', status: 404);
-    final customer = _customerFromBody(await _body(request), id: id, companyId: companyId, createdAt: existing.createdAt);
-    if (customer == null) return jsonError('name ist Pflicht.');
+    final parsed = _customerFromBody(
+      await _body(request),
+      id: id,
+      companyId: companyId,
+      createdAt: existing.createdAt,
+      existing: existing,
+    );
+    final customer = parsed.customer;
+    if (customer == null) return jsonError(parsed.error!);
     await business.updateCustomer(customer);
+    await business.replaceContacts(companyId, id, customer.contacts);
     await auth.audit(check.auth!, 'customer.update', 'customer', id);
-    return jsonOk(customer.toJson());
+    return jsonOk((await business.findCustomer(companyId, id))!.toJson());
   }
 
   Future<Response> _deleteCustomer(Request request, String id) async {
@@ -488,6 +547,17 @@ class BusinessRoutes {
     return (items: items, error: null);
   }
 
+  /// Fehlerantwort, wenn [contactId] keine Kontaktperson von [customerId]
+  /// ist; `null` = in Ordnung (auch ohne Kontaktperson).
+  Future<Response?> _checkContact(String companyId, String customerId, String? contactId) async {
+    if (contactId == null) return null;
+    final customer = await business.findCustomer(companyId, customerId);
+    if (customer?.contact(contactId) == null) {
+      return jsonError('Kontaktperson gehört nicht zu diesem Kunden.', status: 400);
+    }
+    return null;
+  }
+
   Future<Response> _createDocument(Request request) async {
     final body = await _body(request);
     final kind = body['kind'] as String? ?? 'invoice';
@@ -514,6 +584,9 @@ class BusinessRoutes {
       final projectError = await _checkProjectReference(check.auth!, projectId);
       if (projectError != null) return projectError;
     }
+    final contactId = body['contactId'] as String?;
+    final contactError = await _checkContact(companyId, customerId, contactId);
+    if (contactError != null) return contactError;
 
     final document = Document(
       id: id,
@@ -530,6 +603,7 @@ class BusinessRoutes {
       updatedAt: now,
       version: 1,
       projectId: projectId,
+      contactId: contactId,
     );
     await business.createDocument(document, parsed.items!);
     await auth.audit(check.auth!, 'document.create', document.kind, id);
@@ -553,8 +627,18 @@ class BusinessRoutes {
     if (!existing.isDraft && customerId != existing.customerId) {
       return jsonError('Der Kunde eines finalisierten Dokuments kann nicht gewechselt werden.', status: 409);
     }
-    if (await business.findCustomer(companyId, customerId) == null) {
-      return jsonError('Kunde nicht gefunden.', status: 404);
+    final customer = await business.findCustomer(companyId, customerId);
+    if (customer == null) return jsonError('Kunde nicht gefunden.', status: 404);
+    // Kontaktperson: nur ändern, wenn genannt; bei Kundenwechsel fällt eine
+    // Kontaktperson des alten Kunden weg.
+    String? Function()? contactId;
+    if (body.containsKey('contactId')) {
+      final requested = body['contactId'] as String?;
+      final contactError = await _checkContact(companyId, customerId, requested);
+      if (contactError != null) return contactError;
+      contactId = () => requested;
+    } else if (existing.contactId != null && customer.contact(existing.contactId) == null) {
+      contactId = () => null;
     }
     final issueDate = body['issueDate'] == null ? existing.issueDate : _parseDate(body['issueDate']);
     final serviceDate = body['serviceDate'] == null ? existing.serviceDate : _parseDate(body['serviceDate']);
@@ -599,6 +683,7 @@ class BusinessRoutes {
         isFixedPrice: isFixedPrice,
         dueDate: dueDate,
         userId: session.session.userId,
+        contactId: contactId,
       );
       if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
       await auth.audit(check.auth!, 'document.update', existing.kind, id);
@@ -834,9 +919,11 @@ class BusinessRoutes {
       updatedAt: now,
       version: 1,
       convertedFromId: source.id,
-      // Projektzuordnung und Festpreis wandern mit (wie offline convertTo()).
+      // Projektzuordnung, Festpreis und Kontaktperson wandern mit (wie
+      // offline convertTo()).
       projectId: source.projectId,
       isFixedPrice: source.isFixedPrice,
+      contactId: source.contactId,
     );
     try {
       await business.createDocument(draft, items, expectedSourceVersion: source.version);
@@ -1350,6 +1437,7 @@ class BusinessRoutes {
       version: 1,
       convertedFromId: source.id,
       projectId: source.projectId,
+      contactId: source.contactId,
     );
     await business.createDocument(draft, items);
     await auth.audit(ctx, 'document.creditNote', 'creditNote', newId);
@@ -1419,6 +1507,7 @@ class BusinessRoutes {
       version: 1,
       convertedFromId: source.id,
       projectId: source.projectId,
+      contactId: source.contactId,
       isAdvancePayment: true,
     );
     await business.createDocument(draft, items);

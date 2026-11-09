@@ -34,6 +34,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step19Platform,
   _step20StaffRolesProjectNotes,
   _step21HoursPerRole,
+  _step22CustomerContacts,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -559,4 +560,33 @@ Future<void> _step21HoursPerRole(Session db) async {
   await db.execute(
     'ALTER TABLE document_items ADD COLUMN IF NOT EXISTS staff_role_id TEXT REFERENCES staff_roles(id) ON DELETE SET NULL',
   );
+}
+
+/// Kontaktpersonen je Kunde (Kay 2026-11-09), Rechnungs-E-Mail am Kunden
+/// und Kontaktperson am Dokument. Das bisherige Einzelfeld
+/// „Ansprechpartner“ wird zur ersten Kontaktperson und danach geleert.
+Future<void> _step22CustomerContacts(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS customer_contacts (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      role TEXT,
+      email TEXT,
+      phone TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS customer_contacts_customer_idx ON customer_contacts (company_id, customer_id)');
+  await db.execute('ALTER TABLE customers ADD COLUMN IF NOT EXISTS invoice_email TEXT');
+  await db.execute(
+    'ALTER TABLE documents ADD COLUMN IF NOT EXISTS contact_id TEXT REFERENCES customer_contacts(id) ON DELETE SET NULL',
+  );
+  await db.execute(
+    'INSERT INTO customer_contacts (id, company_id, customer_id, name, sort_order) '
+    "SELECT gen_random_uuid()::text, company_id, id, trim(contact_person), 0 FROM customers "
+    "WHERE coalesce(trim(contact_person), '') <> ''",
+  );
+  await db.execute('UPDATE customers SET contact_person = NULL WHERE contact_person IS NOT NULL');
 }

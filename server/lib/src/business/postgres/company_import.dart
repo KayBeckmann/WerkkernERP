@@ -54,7 +54,20 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'contact_person': c.contactPerson,
         'notes': c.notes,
         'created_at': c.createdAt,
+        'invoice_email': c.invoiceEmail,
       });
+      for (final x in c.contacts) {
+        await insert('customer_contacts', {
+          'id': x.id,
+          'company_id': companyId,
+          'customer_id': c.id,
+          'name': x.name,
+          'role': x.role,
+          'email': x.email,
+          'phone': x.phone,
+          'sort_order': x.sortOrder,
+        });
+      }
     }
     for (final x in data.suppliers) {
       await insert('suppliers', {
@@ -167,6 +180,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'project_id': d.projectId,
         'is_advance_payment': d.isAdvancePayment,
         'is_fixed_price': d.isFixedPrice,
+        'contact_id': d.contactId,
         'intro_text_snapshot': d.introTextSnapshot,
         'closing_text_snapshot': d.closingTextSnapshot,
         'footer_text_snapshot': d.footerTextSnapshot,

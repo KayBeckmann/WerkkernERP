@@ -44,7 +44,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
 
   // ---- Kunden -------------------------------------------------------------
 
-  static const _customerColumns = 'id, company_id, name, address, email, phone, vat_id, contact_person, notes, created_at';
+  static const _customerColumns =
+      'id, company_id, name, address, email, phone, vat_id, contact_person, notes, created_at, invoice_email';
 
   Customer _toCustomer(ResultRow r) => Customer(
         id: r[0] as String,
@@ -57,7 +58,33 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         contactPerson: r[7] as String?,
         notes: r[8] as String?,
         createdAt: r[9] as DateTime,
+        invoiceEmail: r[10] as String?,
       );
+
+  /// Kontaktpersonen der Firma, optional nur eines Kunden, gruppiert nach
+  /// Kunde und in Anzeigereihenfolge.
+  Future<Map<String, List<CustomerContact>>> _contactsByCustomer(String companyId, {String? customerId}) async {
+    final result = await _q(
+      'SELECT id, customer_id, name, role, email, phone, sort_order FROM customer_contacts '
+      "WHERE company_id = @companyId AND (@customerId = '' OR customer_id = @customerId) "
+      'ORDER BY sort_order, lower(name)',
+      {'companyId': companyId, 'customerId': customerId ?? ''},
+    );
+    final grouped = <String, List<CustomerContact>>{};
+    for (final r in result) {
+      (grouped[r[1] as String] ??= []).add(CustomerContact(
+        id: r[0] as String,
+        companyId: companyId,
+        customerId: r[1] as String,
+        name: r[2] as String,
+        role: r[3] as String?,
+        email: r[4] as String?,
+        phone: r[5] as String?,
+        sortOrder: r[6] as int,
+      ));
+    }
+    return grouped;
+  }
 
   @override
   Future<List<Customer>> listCustomers(String companyId, {String? query}) async {
@@ -68,7 +95,11 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       "AND (@q = '' OR position(lower(@q) in lower(name)) > 0) ORDER BY lower(name)",
       {'companyId': companyId, 'q': query ?? ''},
     );
-    return [for (final r in result) _toCustomer(r)];
+    final contacts = await _contactsByCustomer(companyId);
+    return [
+      for (final r in result)
+        _toCustomer(r).withContacts(contacts[r[0] as String] ?? const []),
+    ];
   }
 
   @override
@@ -77,7 +108,9 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'SELECT $_customerColumns FROM customers WHERE company_id = @companyId AND id = @id',
       {'companyId': companyId, 'id': id},
     );
-    return result.isEmpty ? null : _toCustomer(result.first);
+    if (result.isEmpty) return null;
+    final contacts = await _contactsByCustomer(companyId, customerId: id);
+    return _toCustomer(result.first).withContacts(contacts[id] ?? const []);
   }
 
   Map<String, Object?> _customerParams(Customer c) => {
@@ -91,13 +124,14 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'contactPerson': c.contactPerson,
         'notes': c.notes,
         'createdAt': c.createdAt,
+        'invoiceEmail': c.invoiceEmail,
       };
 
   @override
   Future<void> createCustomer(Customer customer) async {
     await _q(
       'INSERT INTO customers ($_customerColumns) VALUES '
-      '(@id, @companyId, @name, @address, @email, @phone, @vatId, @contactPerson, @notes, @createdAt)',
+      '(@id, @companyId, @name, @address, @email, @phone, @vatId, @contactPerson, @notes, @createdAt, @invoiceEmail)',
       _customerParams(customer),
     );
   }
@@ -106,13 +140,54 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   Future<bool> updateCustomer(Customer customer) async {
     final result = await _q(
       'UPDATE customers SET name = @name, address = @address, email = @email, phone = @phone, vat_id = @vatId, '
-      'contact_person = @contactPerson, notes = @notes WHERE company_id = @companyId AND id = @id',
+      'contact_person = @contactPerson, notes = @notes, invoice_email = @invoiceEmail '
+      'WHERE company_id = @companyId AND id = @id',
       // createdAt ist unveränderlich — der Treiber lehnt überzählige
       // Parameter ab, daher explizit entfernen.
       _customerParams(customer)..remove('createdAt'),
     );
     return result.affectedRows > 0;
   }
+
+  @override
+  Future<void> replaceContacts(String companyId, String customerId, List<CustomerContact> contacts) =>
+      _db.runTx((s) async {
+        // Gelöschte Kontakte: Dokumente verlieren per ON DELETE SET NULL
+        // nur die Zuordnung.
+        await s.execute(
+          Sql.named(
+            'DELETE FROM customer_contacts WHERE company_id = @companyId AND customer_id = @customerId '
+            'AND NOT (id = ANY(@keep))',
+          ),
+          parameters: {
+            'companyId': companyId,
+            'customerId': customerId,
+            'keep': TypedValue(Type.textArray, [for (final c in contacts) c.id]),
+          },
+        );
+        for (final c in contacts) {
+          await s.execute(
+            Sql.named(
+              'INSERT INTO customer_contacts (id, company_id, customer_id, name, role, email, phone, sort_order) '
+              'VALUES (@id, @companyId, @customerId, @name, @role, @email, @phone, @sortOrder) '
+              'ON CONFLICT (id) DO UPDATE SET name = excluded.name, role = excluded.role, email = excluded.email, '
+              'phone = excluded.phone, sort_order = excluded.sort_order '
+              'WHERE customer_contacts.company_id = excluded.company_id '
+              'AND customer_contacts.customer_id = excluded.customer_id',
+            ),
+            parameters: {
+              'id': c.id,
+              'companyId': companyId,
+              'customerId': customerId,
+              'name': c.name,
+              'role': c.role,
+              'email': c.email,
+              'phone': c.phone,
+              'sortOrder': c.sortOrder,
+            },
+          );
+        }
+      });
 
   @override
   Future<bool> deleteCustomer(String companyId, String id) async {
@@ -213,7 +288,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'd.company_snapshot_name, d.created_by_user_id, d.created_at, d.updated_at, d.finalized_at, d.version, '
       'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban, '
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
-      'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked';
+      'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked, '
+      'd.contact_id';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -252,6 +328,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         footerTextSnapshot: r[33] as String?,
         smallBusinessExemptSnapshot: r[34] as bool,
         stockBooked: r[35] as bool,
+        contactId: r[36] as String?,
       );
 
   @override
@@ -357,9 +434,9 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       Sql.named(
         'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
         'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id, '
-        'is_advance_payment, is_fixed_price) VALUES (@id, @companyId, @customerId, @kind, @status, @issueDate, '
-        '@serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version, @convertedFromId, '
-        '@projectId, @advance, @fixed)',
+        'is_advance_payment, is_fixed_price, contact_id) VALUES (@id, @companyId, @customerId, @kind, @status, '
+        '@issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version, '
+        '@convertedFromId, @projectId, @advance, @fixed, @contactId)',
       ),
       parameters: {
         'id': d.id,
@@ -379,6 +456,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'projectId': d.projectId,
         'advance': d.isAdvancePayment,
         'fixed': d.isFixedPrice,
+        'contactId': d.contactId,
       },
     );
     await _insertItems(s, items);
@@ -440,6 +518,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
     bool? isFixedPrice,
     DateTime? Function()? dueDate,
     String? userId,
+    String? Function()? contactId,
   }) async {
     final updated = await _db.runTx((s) async {
       if (!await _lockEditable(s, companyId, id, expectedVersion)) return false;
@@ -479,11 +558,15 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'payment_terms = @paymentTerms, notes = @notes, updated_at = @now, version = version + 1, '
           'is_advance_payment = coalesce(@advance, is_advance_payment), '
           'is_fixed_price = coalesce(@fixed, is_fixed_price), '
-          'due_date = CASE WHEN @setDue THEN @due ELSE due_date END WHERE company_id = @companyId AND id = @id',
+          'due_date = CASE WHEN @setDue THEN @due ELSE due_date END, '
+          'contact_id = CASE WHEN @setContact THEN @contactId ELSE contact_id END '
+          'WHERE company_id = @companyId AND id = @id',
         ),
         parameters: {
           'setDue': TypedValue(Type.boolean, dueDate != null),
           'due': TypedValue(Type.date, dueDate?.call()),
+          'setContact': TypedValue(Type.boolean, contactId != null),
+          'contactId': TypedValue(Type.text, contactId?.call()),
           'customerId': customerId,
           'issueDate': TypedValue(Type.date, issueDate),
           'serviceDate': TypedValue(Type.date, serviceDate),
