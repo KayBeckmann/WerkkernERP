@@ -68,7 +68,13 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Gutschrift als eigenständige, pro Firma ein-/ausblendbare
   Dokumentarten mit eigenen Nummernkreisen (`R`/`An`/`A`/`LS`/`PF`/`G`,
   optional mit Projektnummer `R-JJPPxxx`), eigenem PDF-Titel und eigenem
-  Einleitungs-/Schlusstext; Kleinunternehmerregelung (§ 19 UStG).
+  Einleitungs-/Schlusstext. **Kleinunternehmerregelung (§ 19 UStG):**
+  Preise werden als Bruttopreise erfasst, und Umsatzsteuer taucht auf
+  keinem Beleg mehr auf (keine MwSt.-Spalte, keine Netto-/MwSt.-Zeilen,
+  keine Auswahl im Positions- und Belegformular); nur der gesetzliche
+  Hinweis bleibt auf dem PDF. Enthält ein Dokument trotz Schalter noch
+  eine Position mit Steuersatz, verweigert das PDF mit Hinweis, statt
+  die Steuer stillschweigend zu verstecken.
 - Entwurf frei editierbar; Finalisierung vergibt atomar die nächste
   Nummer im Firmen-/Typ-/Jahreskreis und ist danach unveränderlich —
   mit einer Ausnahme: ein finalisiertes Angebot/Auftrag/Proforma bleibt
@@ -275,7 +281,7 @@ flutter build apk --release          # build/app/outputs/flutter-apk/app-release
   build/app/outputs/flutter-apk/app-release.apk   # DN: CN=Kay Beckmann, SHA-256 8346cbaf…
 ```
 
-Version in `pubspec.yaml` (`0.10.1+4`): bis zur ersten echten
+Version in `pubspec.yaml` (`0.10.2+5`): bis zur ersten echten
 Veröffentlichung bleibt sie unter 1.0 (Kay 2026-11-07). Die Build-Nummer
 hinter dem `+` vor jeder weitergegebenen APK um eins erhöhen — Android
 installiert keine APK mit kleinerer Build-Nummer über eine vorhandene.

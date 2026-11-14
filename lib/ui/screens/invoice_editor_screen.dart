@@ -242,6 +242,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   // 0 % USt im Positions-Dialog, siehe `invoice_item_dialog.dart`.
   bool _isSmallBusinessExempt = false;
 
+
   // C7a SMTP-Versand (Kay-Nachfrage 2026-10-17): nur sichtbar, wenn die
   // Firma das Modul aktiviert hat — genau wie bei den übrigen
   // optionalen Bereichen.
@@ -1199,8 +1200,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
-                        '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
+                        _isSmallBusinessExempt
+                            ? '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} brutto'
+                            : '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
+                                '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),

@@ -303,11 +303,6 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
                   ),
                 ],
               ),
-              if (widget.forceZeroVat)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text('Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer.', style: TextStyle(fontSize: 12)),
-                ),
               // Vorschläge aus den Gruppen dieses Dokuments, neue Gruppe
               // weiterhin frei eintippbar.
               Autocomplete<String>(

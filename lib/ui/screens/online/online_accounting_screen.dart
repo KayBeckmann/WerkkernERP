@@ -196,7 +196,16 @@ class _OnlineExpensesScreenState extends State<OnlineExpensesScreen> {
   /// Projektnamen für die Listenzeile (wie offline).
   Map<String, String> _projectNames = const {};
 
+  /// § 19 UStG der Firma: Beleg ohne Steuersatz-Auswahl, gespeichert mit
+  /// 0 % (Kay-Feedback 2026-11-14, wie offline).
+  bool _smallBusiness = false;
+
   Future<(List<OnlineExpense>, int, List<OnlineExpenseCategory>)> _load() async {
+    try {
+      _smallBusiness = (await _client.companyProfile()).smallBusinessExempt;
+    } on Exception {
+      // Ohne Profil (z. B. fehlendes Recht) bleibt die Auswahl sichtbar.
+    }
     final categories = await _client.expenseCategories();
     final result = await _client.expenses(from: _period.from, to: _period.to);
     final session = widget.session;
@@ -226,14 +235,15 @@ class _OnlineExpensesScreenState extends State<OnlineExpensesScreen> {
         OnlineField('date', 'Belegdatum', type: OnlineFieldType.date, required: true, initial: existing?.date ?? DateTime.now()),
         OnlineField('description', 'Beschreibung', required: true, initial: existing?.description),
         OnlineField('amount', 'Betrag (brutto)', type: OnlineFieldType.money, required: true, initial: existing?.amountGrossCents),
-        OnlineField(
-          'vat',
-          'Steuersatz',
-          type: OnlineFieldType.choice,
-          required: true,
-          initial: (existing?.vatRatePercent ?? 19).toStringAsFixed(0),
-          options: const {'19': '19 %', '7': '7 %', '0': '0 %'},
-        ),
+        if (!_smallBusiness)
+          OnlineField(
+            'vat',
+            'Steuersatz',
+            type: OnlineFieldType.choice,
+            required: true,
+            initial: (existing?.vatRatePercent ?? 19).toStringAsFixed(0),
+            options: const {'19': '19 %', '7': '7 %', '0': '0 %'},
+          ),
         OnlineField(
           'categoryId',
           'Kategorie',
@@ -263,7 +273,7 @@ class _OnlineExpensesScreenState extends State<OnlineExpensesScreen> {
         date: values['date'] as DateTime,
         description: values['description'] as String,
         amountGrossCents: values['amount'] as int,
-        vatRatePercent: double.parse(values['vat'] as String),
+        vatRatePercent: _smallBusiness ? 0 : double.parse(values['vat'] as String),
         categoryId: values['categoryId'] as String?,
         supplierReference: values['supplierReference'] as String?,
         projectId: values.containsKey('projectId') ? values['projectId'] as String? : existing?.projectId,

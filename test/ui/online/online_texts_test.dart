@@ -62,11 +62,19 @@ void main() {
     await createDocument(tester, 'Neue Rechnung', 'Meyer');
     await tester.tap(find.text('Position hinzufügen'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('§ 19 UStG'), findsOneWidget);
+    // Kay-Feedback 2026-11-14: bei § 19 UStG kein Verweis auf Umsatzsteuer
+    // im Positions-Dialog — weder Auswahl noch Hinweistext.
+    expect(find.textContaining('MwSt.'), findsNothing);
+    expect(find.textContaining('§ 19 UStG'), findsNothing);
     await tester.enterText(find.byKey(const Key('online-item-description')), 'Montage');
     await tester.enterText(find.byKey(const Key('online-item-price')), '100');
     await tester.tap(find.text('Hinzufügen'));
     await tester.pumpAndSettle();
+    // Positionskarte und Summe ohne Steuerangaben.
+    expect(find.text('1 × 100,00 € brutto'), findsOneWidget);
+    expect(find.textContaining('MwSt.'), findsNothing);
+    expect(find.textContaining('Steuer:'), findsNothing);
+    expect(find.text('Gesamt (brutto): 100,00 €'), findsOneWidget);
     await tester.tap(find.byTooltip('Entwurf speichern'));
     await tester.pumpAndSettle();
     expect(find.text('Entwurf gespeichert.'), findsOneWidget, reason: 'Server akzeptiert die 0-%-Position');
