@@ -38,6 +38,13 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 
 **Grundgerüst**
 - Mehrere Firmen vollständig datenseitig getrennt, ohne Login/Konto.
+- **Navigation** (offline und online gleich): breit eine gruppierte
+  Sidebar, schmal eine Bottom-Bar mit **Schnellzugriff** plus „Mehr“.
+  Welche Bereiche fest in der Leiste stehen (1–4), legt jeder Nutzer
+  unter „Mehr“ per Stecknadel selbst fest — gespeichert je Gerät und
+  Firma, nicht in den Firmendaten. **Zurück** (Android-Taste/-Geste)
+  geht immer nur einen Schritt: erst eine offene Detailseite, dann die
+  zuvor besuchten Bereiche, erst vom Ausgangsbereich aus die Firma.
 - Kunden, Lieferanten, Artikel/Artikelgruppen mit prozentualem Aufschlag
   auf den Einkaufspreis des Standardlieferanten.
 - Kunden mit mehreren **Kontaktpersonen** (Name, Funktion, E-Mail,
@@ -268,7 +275,7 @@ flutter build apk --release          # build/app/outputs/flutter-apk/app-release
   build/app/outputs/flutter-apk/app-release.apk   # DN: CN=Kay Beckmann, SHA-256 8346cbaf…
 ```
 
-Version in `pubspec.yaml` (`0.9.0+2`): bis zur ersten echten
+Version in `pubspec.yaml` (`0.10.1+4`): bis zur ersten echten
 Veröffentlichung bleibt sie unter 1.0 (Kay 2026-11-07). Die Build-Nummer
 hinter dem `+` vor jeder weitergegebenen APK um eins erhöhen — Android
 installiert keine APK mit kleinerer Build-Nummer über eine vorhandene.

@@ -291,6 +291,8 @@ class _HomeShellState extends State<HomeShell> {
       companyName: company.name,
       tabs: _buildTabs(company),
       pinnedNarrowIds: _pinnedNarrowIds,
+      // Schnellzugriff je Gerät und lokaler Firma (siehe `QuickAccessStore`).
+      quickAccessScope: 'local:${company.id}',
       onSwitchCompany: () => Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const CompanySwitcherScreen()),
       ),
