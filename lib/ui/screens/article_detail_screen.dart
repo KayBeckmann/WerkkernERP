@@ -32,6 +32,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   late Future<_DetailData> _future;
   bool _busy = false;
   bool _lagerbestandEnabled = false;
+  bool _isSmallBusinessExempt = false;
 
   /// Bugfix 2026-10-19 (Kay: "Wenn ich den Bestand aus einer Bestellung
   /// buche, wird dieser nicht angezeigt") — siehe ausführlicher Doc-
@@ -59,6 +60,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     super.initState();
     _article = widget.article;
     _lagerbestandEnabled = context.read<ActiveCompanyService>().active!.lagerbestandEnabled;
+    _isSmallBusinessExempt = context.read<ActiveCompanyService>().active!.isSmallBusinessExempt;
     _future = _load();
     _stockChangeNotifier = context.read<StockChangeNotifier>()..addListener(_onStockChanged);
   }
@@ -229,7 +231,9 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                     Text(
                       data.salePrice == null
                           ? 'Verkaufspreis: unbekannt (kein Standardlieferant/Einkaufspreis)'
-                          : 'Kalkulierter Netto-Verkaufspreis: ${data.salePrice}',
+                          : _isSmallBusinessExempt
+                              ? 'Kalkulierter Verkaufspreis (brutto): ${data.salePrice}'
+                              : 'Kalkulierter Netto-Verkaufspreis: ${data.salePrice}',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     if (_lagerbestandEnabled) ...[

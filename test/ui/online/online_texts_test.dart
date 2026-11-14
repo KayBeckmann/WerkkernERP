@@ -71,10 +71,10 @@ void main() {
     await tester.tap(find.text('Hinzufügen'));
     await tester.pumpAndSettle();
     // Positionskarte und Summe ohne Steuerangaben.
-    expect(find.text('1 × 100,00 €'), findsOneWidget);
+    expect(find.text('1 × 100,00 € brutto'), findsOneWidget);
     expect(find.textContaining('MwSt.'), findsNothing);
     expect(find.textContaining('Steuer:'), findsNothing);
-    expect(find.text('Gesamt: 100,00 €'), findsOneWidget);
+    expect(find.text('Gesamt (brutto): 100,00 €'), findsOneWidget);
     await tester.tap(find.byTooltip('Entwurf speichern'));
     await tester.pumpAndSettle();
     expect(find.text('Entwurf gespeichert.'), findsOneWidget, reason: 'Server akzeptiert die 0-%-Position');

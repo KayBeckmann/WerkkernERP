@@ -944,7 +944,7 @@ class _ProfileTabState extends State<_ProfileTab> {
             child: SwitchListTile(
               key: const Key('online-profile-small-business'),
               title: const Text('Kleinunternehmerregelung (§ 19 UStG)'),
-              subtitle: const Text('Alle Positionen 0 % USt, fester Hinweis im PDF. Bitte mit dem Steuerberater klären.'),
+              subtitle: const Text('Verkaufspreise brutto, kein separater Steuerausweis; fester Hinweis im PDF. Bitte mit dem Steuerberater klären.'),
               value: _smallBusiness,
               onChanged: (v) => setState(() => _smallBusiness = v),
             ),

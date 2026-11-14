@@ -53,23 +53,22 @@ void main() {
       await tester.tap(find.text('Position hinzufügen'));
       await tester.pumpAndSettle();
 
-      // Kay-Feedback 2026-11-14: kein Verweis auf Umsatzsteuer — die
-      // MwSt.-Auswahl fehlt ganz (vorher stand hier ein gesperrtes Feld).
+      // Bei §19 erscheint kein gesondertes Steuerfeld; Eingabe ist ein Bruttopreis.
       expect(find.widgetWithText(DropdownButtonFormField<double>, 'MwSt.'), findsNothing);
       expect(find.widgetWithText(TextField, 'MwSt.'), findsNothing);
-      expect(find.widgetWithText(TextField, 'Rabatt %'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Einzelpreis brutto (€) *'), findsOneWidget);
 
       await tester.enterText(find.widgetWithText(TextField, 'Beschreibung *'), 'Beratung');
-      await tester.enterText(find.widgetWithText(TextField, 'Einzelpreis (€) *'), '100');
+      await tester.enterText(find.widgetWithText(TextField, 'Einzelpreis brutto (€) *'), '100');
       await tester.tap(find.text('Hinzufügen'));
       await tester.pumpAndSettle();
 
-      // 100 € netto bei 0 % USt -> 100,00 € brutto in der Positionszeile,
-      // ohne „0 % MwSt.“ und ohne Netto-/Steuer-Zeilen in der Summe.
-      expect(find.text('1 × 100,00 €'), findsOneWidget);
+      // 100 € Endpreis ohne separat ausgewiesene USt — Positionszeile ohne
+      // „0 % MwSt.“, Summe ohne Netto-/Steuer-Zeilen (Kay-Feedback 2026-11-14).
+      expect(find.text('1 × 100,00 € brutto'), findsOneWidget);
       expect(find.textContaining('MwSt.'), findsNothing);
       expect(find.textContaining('Steuer:'), findsNothing);
-      expect(find.text('Gesamt: 100,00 €'), findsOneWidget);
+      expect(find.text('Gesamt (brutto): 100,00 €'), findsOneWidget);
     },
   );
 

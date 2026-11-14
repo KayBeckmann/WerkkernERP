@@ -94,7 +94,7 @@ void main() {
     expect(find.text('Kalkulierter Netto-Verkaufspreis: 130,00 €'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('130,00 €'), findsOneWidget, reason: 'Preis rechts in der Zeile wie offline');
+    expect(find.text('130,00 € netto'), findsOneWidget, reason: 'Preisbasis rechts in der Zeile sichtbar');
 
     // Neue Rechnung: Artikel-Position übernimmt den kalkulierten Preis.
     await openTab(tester, 'Rechnungen');

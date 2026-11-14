@@ -219,6 +219,12 @@ Future<Uint8List> renderDocumentPdf(
 }) async {
   final invoice = data;
   final items = data.lines;
+  // Ein §19-Beleg darf vorhandene steuerpflichtige Positionen nicht als Bruttopreise tarnen.
+  if (data.isSmallBusinessExempt &&
+      data.kind != DocumentKind.deliveryNote &&
+      items.any((item) => item.vatRatePercent != 0)) {
+    throw StateError('Kleinunternehmerbeleg enthält einen Umsatzsteuersatz; Positionen prüfen.');
+  }
   final totals = calculateInvoiceTotals([
     for (final item in items)
       InvoiceLineInput(
@@ -228,14 +234,6 @@ Future<Uint8List> renderDocumentPdf(
         discountPercent: item.discountPercent,
       ),
   ]);
-
-  // Kay-Feedback 2026-11-14: Bei Kleinunternehmerregelung (§ 19 UStG)
-  // darf Umsatzsteuer auf keinem Beleg auftauchen — weder als Spalte
-  // noch in der Summenaufstellung. Nur der gesetzliche Hinweis bleibt
-  // (siehe unten). Trägt ein älteres Dokument trotzdem noch einen Satz
-  // ungleich 0 %, bleibt die Spalte sichtbar, statt eine ausgewiesene
-  // Steuer stillschweigend zu verstecken.
-  final showVat = !data.isSmallBusinessExempt || items.any((item) => item.vatRatePercent != 0);
 
   final groups = <String?, List<PdfLine>>{};
   for (final item in items) {
@@ -305,15 +303,14 @@ Future<Uint8List> renderDocumentPdf(
         ],
         pw.SizedBox(height: 16),
         for (final key in orderedKeys)
-          ..._buildGroup(
-            key,
-            groups[key]!,
-            showPrices: invoice.kind != DocumentKind.deliveryNote,
-            showVat: showVat,
-          ),
+          ..._buildGroup(key, groups[key]!,
+              showPrices: invoice.kind != DocumentKind.deliveryNote,
+              isSmallBusinessExempt: data.isSmallBusinessExempt),
         pw.SizedBox(height: 16),
         if (invoice.kind != DocumentKind.deliveryNote)
-          _buildTotals(totals, priorAdvancePayments: priorAdvancePayments, showVat: showVat),
+          _buildTotals(totals,
+              isSmallBusinessExempt: data.isSmallBusinessExempt,
+              priorAdvancePayments: priorAdvancePayments),
         // Nachtrag 2026-10-18: Kleinunternehmerregelung (§19 UStG) —
         // bewusst ein fester, nicht editierbarer Hinweis statt im frei
         // änderbaren Schlusstext, damit er beim Bearbeiten des
@@ -464,12 +461,8 @@ pw.Widget _buildHeader(
   );
 }
 
-List<pw.Widget> _buildGroup(
-  String? groupLabel,
-  List<PdfLine> items, {
-  required bool showPrices,
-  required bool showVat,
-}) {
+List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items,
+    {required bool showPrices, required bool isSmallBusinessExempt}) {
   return [
     if (groupLabel != null)
       pw.Padding(
@@ -482,13 +475,20 @@ List<pw.Widget> _buildGroup(
       // Preise/Steuersätze — nur Beschreibung und Menge, wie bei einem
       // Lieferschein üblich (Kunde bekommt keinen Preis auf dem Beleg,
       // mit dem die Ware/Leistung übergeben wird).
-      columnWidths: showPrices
-          ? {
-              0: const pw.FlexColumnWidth(4),
-              1: const pw.FlexColumnWidth(1.2),
-              2: const pw.FlexColumnWidth(1.5),
-              if (showVat) 3: const pw.FlexColumnWidth(1),
-              (showVat ? 4 : 3): const pw.FlexColumnWidth(1.5),
+      columnWidths: showPrices && isSmallBusinessExempt
+          ? const {
+              0: pw.FlexColumnWidth(4),
+              1: pw.FlexColumnWidth(1.2),
+              2: pw.FlexColumnWidth(1.5),
+              3: pw.FlexColumnWidth(1.5),
+            }
+          : showPrices
+          ? const {
+              0: pw.FlexColumnWidth(4),
+              1: pw.FlexColumnWidth(1.2),
+              2: pw.FlexColumnWidth(1.5),
+              3: pw.FlexColumnWidth(1),
+              4: pw.FlexColumnWidth(1.5),
             }
           : const {0: pw.FlexColumnWidth(5), 1: pw.FlexColumnWidth(1.2)},
       children: [
@@ -498,13 +498,14 @@ List<pw.Widget> _buildGroup(
               ? [
                   _cell('Beschreibung', bold: true),
                   _cell('Menge', bold: true, alignRight: true),
-                  _cell('Einzelpreis', bold: true, alignRight: true),
-                  if (showVat) _cell('MwSt.', bold: true, alignRight: true),
+                  _cell(isSmallBusinessExempt ? 'Bruttopreis' : 'Einzelpreis', bold: true, alignRight: true),
+                  if (!isSmallBusinessExempt) _cell('MwSt.', bold: true, alignRight: true),
                   _cell('Gesamt', bold: true, alignRight: true),
                 ]
               : [_cell('Beschreibung', bold: true), _cell('Menge', bold: true, alignRight: true)],
         ),
-        for (final item in items) ..._buildItemRows(item, showPrices: showPrices, showVat: showVat),
+        for (final item in items)
+          ..._buildItemRows(item, showPrices: showPrices, isSmallBusinessExempt: isSmallBusinessExempt),
       ],
     ),
     // Gruppensumme (Kay-Nachtrag 2026-10-16) — derselbe Rechenkern wie
@@ -529,7 +530,8 @@ List<pw.Widget> _buildGroup(
 /// keine Code-/Text-Übernahme). Menge und Einheit werden in einer
 /// Zelle zusammengefasst ("10 Stk"), um keine zusätzliche, auf A4 eng
 /// werdende Spalte zu brauchen.
-List<pw.TableRow> _buildItemRows(PdfLine item, {required bool showPrices, required bool showVat}) {
+List<pw.TableRow> _buildItemRows(PdfLine item,
+    {required bool showPrices, required bool isSmallBusinessExempt}) {
   final quantityLabel = item.unit == null ? item.quantity : '${item.quantity} ${item.unit}';
   final grossBeforeDiscount =
       Money.fromCents(item.unitPriceCents).multiplyByQuantity(Decimal.parse(item.quantity));
@@ -545,7 +547,7 @@ List<pw.TableRow> _buildItemRows(PdfLine item, {required bool showPrices, requir
               _cell(item.description),
               _cell(quantityLabel, alignRight: true),
               _cell(Money.fromCents(item.unitPriceCents).toString(), alignRight: true),
-              if (showVat) _cell('${item.vatRatePercent.toStringAsFixed(0)} %', alignRight: true),
+              if (!isSmallBusinessExempt) _cell('${item.vatRatePercent.toStringAsFixed(0)} %', alignRight: true),
               _cell(lineGrossWithTax.toString(), alignRight: true),
             ]
           : [_cell(item.description), _cell(quantityLabel, alignRight: true)],
@@ -564,7 +566,7 @@ List<pw.TableRow> _buildItemRows(PdfLine item, {required bool showPrices, requir
           ),
           pw.Container(),
           pw.Container(),
-          if (showVat) pw.Container(),
+          if (!isSmallBusinessExempt) pw.Container(),
           pw.Padding(
             padding: const pw.EdgeInsets.only(bottom: 3),
             child: pw.Text(
@@ -588,11 +590,8 @@ Money _groupTotal(List<PdfLine> items) => calculateInvoiceTotals([
         ),
     ]).totalGross;
 
-pw.Widget _buildTotals(
-  InvoiceTotals totals, {
-  List<AdvancePaymentEntry> priorAdvancePayments = const [],
-  required bool showVat,
-}) {
+pw.Widget _buildTotals(InvoiceTotals totals,
+    {required bool isSmallBusinessExempt, List<AdvancePaymentEntry> priorAdvancePayments = const []}) {
   // C13 Abschlagsrechnungen: nur Abzugszeilen zeigen, wenn tatsächlich
   // etwas abzuziehen ist — sonst bleibt das Layout wie bisher.
   final hasAdvancePayments = priorAdvancePayments.isNotEmpty;
@@ -607,34 +606,29 @@ pw.Widget _buildTotals(
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
-          // Ohne Umsatzsteuer (§ 19 UStG) steht nur der Gesamtbetrag —
-          // eine Netto-/MwSt.-Aufschlüsselung mit 0 % wäre ein Verweis
-          // auf die Steuer, der dort nichts zu suchen hat.
-          if (showVat) ...[
-            for (final rate in totals.sortedRates)
-              pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('Netto ${rate.toStringAsFixed(0)} %'),
-                    pw.Text(totals.netByRate[rate].toString()),
-                  ],
-                ),
+          if (!isSmallBusinessExempt) for (final rate in totals.sortedRates)
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 2),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('Netto ${rate.toStringAsFixed(0)} %'),
+                  pw.Text(totals.netByRate[rate].toString()),
+                ],
               ),
-            for (final rate in totals.sortedRates)
-              pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Text('MwSt. ${rate.toStringAsFixed(0)} %'),
-                    pw.Text(totals.taxByRate[rate].toString()),
-                  ],
-                ),
+            ),
+          if (!isSmallBusinessExempt) for (final rate in totals.sortedRates)
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 2),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('MwSt. ${rate.toStringAsFixed(0)} %'),
+                  pw.Text(totals.taxByRate[rate].toString()),
+                ],
               ),
-            pw.Divider(),
-          ],
+            ),
+          pw.Divider(),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [

@@ -242,12 +242,6 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   // 0 % USt im Positions-Dialog, siehe `invoice_item_dialog.dart`.
   bool _isSmallBusinessExempt = false;
 
-  /// Kay-Feedback 2026-11-14: Bei § 19 UStG darf Umsatzsteuer nirgends
-  /// auf dem Beleg erscheinen — weder je Position noch in der Summe.
-  /// Trägt ein älteres Dokument noch einen Satz ungleich 0 %, bleibt die
-  /// Angabe sichtbar, statt ausgewiesene Steuer zu verstecken (gleiche
-  /// Regel wie im PDF).
-  bool get _hideVat => _isSmallBusinessExempt && _items.every((item) => item.vatRatePercent == 0);
 
   // C7a SMTP-Versand (Kay-Nachfrage 2026-10-17): nur sichtbar, wenn die
   // Firma das Modul aktiviert hat — genau wie bei den übrigen
@@ -1206,8 +1200,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        _hideVat
-                            ? '$quantityLabel × ${Money.fromCents(item.unitPriceCents)}'
+                        _isSmallBusinessExempt
+                            ? '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} brutto'
                             : '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
                                 '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
                         style: Theme.of(context).textTheme.bodySmall,
@@ -1599,18 +1593,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Kleinunternehmer (§ 19 UStG): keine Netto-/Steuer-
-                  // Zeilen — siehe [_hideVat].
-                  if (!_hideVat) ...[
-                    for (final rate in totals.sortedRates)
-                      Text(
-                        'Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   '
-                        'Steuer: ${totals.taxByRate[rate]}',
-                      ),
-                    const Divider(),
-                  ],
+                  if (!_isSmallBusinessExempt) for (final rate in totals.sortedRates)
+                    Text(
+                      'Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   '
+                      'Steuer: ${totals.taxByRate[rate]}',
+                    ),
+                  const Divider(),
                   Text(
-                    'Gesamt: ${totals.totalGross}',
+                    '${_isSmallBusinessExempt ? 'Gesamt (brutto)' : 'Gesamt'}: ${totals.totalGross}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   // C13 Abschlagsrechnungen: Abzugszeilen nur, wenn diese

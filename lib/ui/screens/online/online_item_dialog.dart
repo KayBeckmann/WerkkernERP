@@ -273,29 +273,26 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
                 key: const Key('online-item-price'),
                 controller: _price,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Einzelpreis (€) *'),
+                decoration: InputDecoration(
+                    labelText: widget.forceZeroVat ? 'Einzelpreis brutto (€) *' : 'Einzelpreis (€) *'),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  // § 19 UStG: keine MwSt.-Auswahl, kein Verweis darauf
-                  // (Kay-Feedback 2026-11-14); `_vat` bleibt fest 0 %.
-                  if (!widget.forceZeroVat) ...[
-                    Expanded(
-                      child: DropdownButtonFormField<double>(
-                        isExpanded: true,
-                        initialValue: _vat,
-                        decoration: const InputDecoration(labelText: 'MwSt.'),
-                        items: const [
-                          DropdownMenuItem(value: 19.0, child: Text('19 %')),
-                          DropdownMenuItem(value: 7.0, child: Text('7 %')),
-                          DropdownMenuItem(value: 0.0, child: Text('0 %')),
-                        ],
-                        onChanged: (value) => setState(() => _vat = value ?? 19),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
+                  if (!widget.forceZeroVat) Expanded(
+                    child: DropdownButtonFormField<double>(
+                            isExpanded: true,
+                            initialValue: _vat,
+                            decoration: const InputDecoration(labelText: 'MwSt.'),
+                            items: const [
+                              DropdownMenuItem(value: 19.0, child: Text('19 %')),
+                              DropdownMenuItem(value: 7.0, child: Text('7 %')),
+                              DropdownMenuItem(value: 0.0, child: Text('0 %')),
+                            ],
+                            onChanged: (value) => setState(() => _vat = value ?? 19),
+                          ),
+                  ),
+                  if (!widget.forceZeroVat) const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
                       key: const Key('online-item-discount'),

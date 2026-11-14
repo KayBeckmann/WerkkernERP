@@ -69,11 +69,12 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Dokumentarten mit eigenen Nummernkreisen (`R`/`An`/`A`/`LS`/`PF`/`G`,
   optional mit Projektnummer `R-JJPPxxx`), eigenem PDF-Titel und eigenem
   Einleitungs-/Schlusstext. **Kleinunternehmerregelung (§ 19 UStG):**
-  Positionen fest 0 %, und Umsatzsteuer taucht auf keinem Beleg mehr auf
-  (keine MwSt.-Spalte, keine Netto-/MwSt.-Zeilen, keine Auswahl im
-  Positions- und Belegformular); nur der gesetzliche Hinweis bleibt auf
-  dem PDF. Ein Altdokument mit Satz ungleich 0 % zeigt die Steuer
-  weiterhin, statt sie zu verstecken.
+  Preise werden als Bruttopreise erfasst, und Umsatzsteuer taucht auf
+  keinem Beleg mehr auf (keine MwSt.-Spalte, keine Netto-/MwSt.-Zeilen,
+  keine Auswahl im Positions- und Belegformular); nur der gesetzliche
+  Hinweis bleibt auf dem PDF. Enthält ein Dokument trotz Schalter noch
+  eine Position mit Steuersatz, verweigert das PDF mit Hinweis, statt
+  die Steuer stillschweigend zu verstecken.
 - Entwurf frei editierbar; Finalisierung vergibt atomar die nächste
   Nummer im Firmen-/Typ-/Jahreskreis und ist danach unveränderlich —
   mit einer Ausnahme: ein finalisiertes Angebot/Auftrag/Proforma bleibt

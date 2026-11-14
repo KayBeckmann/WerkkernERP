@@ -66,11 +66,6 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
 
   /// § 19 UStG der Firma — neue Positionen dann fest 0 % USt.
   bool _smallBusiness = false;
-
-  /// Kay-Feedback 2026-11-14: Bei § 19 UStG keine Steuerangaben auf dem
-  /// Beleg; ein Altdokument mit Satz ungleich 0 % zeigt sie weiterhin
-  /// (gleiche Regel wie offline und im PDF).
-  bool get _hideVat => _smallBusiness && _items.every((item) => item.vatRatePercent == 0);
   String? _error;
 
   WerkkernApiClient get _client => widget.session.client;
@@ -102,7 +97,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     _reload();
     if (!widget.session.offlineOnly) {
       _client.companyProfile().then((p) {
-        if (mounted) setState(() => _smallBusiness = p.smallBusinessExempt);
+        if (mounted && (_document?.isDraft ?? true)) {
+          setState(() => _smallBusiness = p.smallBusinessExempt);
+        }
       }, onError: (Object _) {});
       final session = widget.session;
       if (session.modules.contains('timeTracking') &&
@@ -294,6 +291,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
 
   void _apply(OnlineDocument document) {
     _document = document;
+    if (!document.isDraft) _smallBusiness = document.smallBusinessExemptSnapshot;
     _items = [...document.items];
     _notes.text = document.notes ?? '';
     _paymentTerms.text = document.paymentTerms ?? '';
@@ -959,8 +957,8 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        _hideVat
-                            ? '$quantityLabel × ${Money.fromCents(item.unitPriceCents)}'
+                        _smallBusiness
+                            ? '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} brutto'
                             : '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
                                 '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
                         style: Theme.of(context).textTheme.bodySmall,
@@ -1288,13 +1286,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Kleinunternehmer (§ 19 UStG): keine Netto-/Steuer-Zeilen (wie offline).
-                if (!_hideVat) ...[
-                  for (final rate in totals.sortedRates)
-                    Text('Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   Steuer: ${totals.taxByRate[rate]}'),
-                  const Divider(),
-                ],
-                Text('Gesamt: ${totals.totalGross}', style: theme.textTheme.titleMedium),
+                if (!_smallBusiness) for (final rate in totals.sortedRates)
+                  Text('Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   Steuer: ${totals.taxByRate[rate]}'),
+                const Divider(),
+                Text('${_smallBusiness ? 'Gesamt (brutto)' : 'Gesamt'}: ${totals.totalGross}',
+                    style: theme.textTheme.titleMedium),
                 // Abschlagsrechnungen einzeln mit Nummer (wie offline).
                 if (document.advancePayments.isNotEmpty) ...[
                   const SizedBox(height: 4),
