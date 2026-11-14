@@ -306,24 +306,16 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
               const SizedBox(height: 8),
               TextField(
                 controller: _priceCtrl,
-                decoration: const InputDecoration(labelText: 'Einzelpreis (€) *'),
+                decoration: InputDecoration(
+                  labelText: widget.forceZeroVat ? 'Einzelpreis brutto (€) *' : 'Einzelpreis (€) *',
+                ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    // Kleinunternehmerregelung (§19 UStG, Nachtrag
-                    // 2026-10-18): Dropdown komplett gesperrt statt nur
-                    // versteckt — die Position bleibt sichtbar als
-                    // "0 %", damit nicht der Eindruck entsteht, hier
-                    // fehle etwas.
-                    child: widget.forceZeroVat
-                        ? const TextField(
-                            enabled: false,
-                            decoration: InputDecoration(labelText: 'MwSt.', hintText: '0 % (Kleinunternehmer)'),
-                          )
-                        : DropdownButtonFormField<double>(
+                  if (!widget.forceZeroVat) Expanded(
+                    child: DropdownButtonFormField<double>(
                             isExpanded: true,
                             initialValue: _vatRate,
                             decoration: const InputDecoration(labelText: 'MwSt.'),
@@ -335,7 +327,7 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
                             onChanged: (value) => setState(() => _vatRate = value ?? 19),
                           ),
                   ),
-                  const SizedBox(width: 12),
+                  if (!widget.forceZeroVat) const SizedBox(width: 12),
                   // Rabatt pro Position (Kay-Nachtrag 2026-10-16, analog
                   // zu RechnungsFees Positionsrabatt) — wirkt auf den
                   // Netto-Betrag vor der Steuerberechnung, siehe

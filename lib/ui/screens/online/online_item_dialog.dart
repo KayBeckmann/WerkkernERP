@@ -273,18 +273,14 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
                 key: const Key('online-item-price'),
                 controller: _price,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Einzelpreis (€) *'),
+                decoration: InputDecoration(
+                    labelText: widget.forceZeroVat ? 'Einzelpreis brutto (€) *' : 'Einzelpreis (€) *'),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    child: widget.forceZeroVat
-                        ? const TextField(
-                            enabled: false,
-                            decoration: InputDecoration(labelText: 'MwSt.', hintText: '0 % (Kleinunternehmer)'),
-                          )
-                        : DropdownButtonFormField<double>(
+                  if (!widget.forceZeroVat) Expanded(
+                    child: DropdownButtonFormField<double>(
                             isExpanded: true,
                             initialValue: _vat,
                             decoration: const InputDecoration(labelText: 'MwSt.'),
@@ -296,7 +292,7 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
                             onChanged: (value) => setState(() => _vat = value ?? 19),
                           ),
                   ),
-                  const SizedBox(width: 12),
+                  if (!widget.forceZeroVat) const SizedBox(width: 12),
                   Expanded(
                     child: TextField(
                       key: const Key('online-item-discount'),

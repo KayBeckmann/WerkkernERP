@@ -97,7 +97,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     _reload();
     if (!widget.session.offlineOnly) {
       _client.companyProfile().then((p) {
-        if (mounted) setState(() => _smallBusiness = p.smallBusinessExempt);
+        if (mounted && (_document?.isDraft ?? true)) {
+          setState(() => _smallBusiness = p.smallBusinessExempt);
+        }
       }, onError: (Object _) {});
       final session = widget.session;
       if (session.modules.contains('timeTracking') &&
@@ -289,6 +291,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
 
   void _apply(OnlineDocument document) {
     _document = document;
+    if (!document.isDraft) _smallBusiness = document.smallBusinessExemptSnapshot;
     _items = [...document.items];
     _notes.text = document.notes ?? '';
     _paymentTerms.text = document.paymentTerms ?? '';
@@ -954,8 +957,10 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
-                        '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
+                        _smallBusiness
+                            ? '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} brutto'
+                            : '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
+                                '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -1281,10 +1286,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final rate in totals.sortedRates)
+                if (!_smallBusiness) for (final rate in totals.sortedRates)
                   Text('Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   Steuer: ${totals.taxByRate[rate]}'),
                 const Divider(),
-                Text('Gesamt: ${totals.totalGross}', style: theme.textTheme.titleMedium),
+                Text('${_smallBusiness ? 'Gesamt (brutto)' : 'Gesamt'}: ${totals.totalGross}',
+                    style: theme.textTheme.titleMedium),
                 // Abschlagsrechnungen einzeln mit Nummer (wie offline).
                 if (document.advancePayments.isNotEmpty) ...[
                   const SizedBox(height: 4),

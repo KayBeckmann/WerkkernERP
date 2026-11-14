@@ -103,6 +103,7 @@ void main() {
     int price = 10000,
     String? unit,
     double discountPercent = 0,
+    double vatRatePercent = 19,
   }) =>
       InvoiceItem(
         id: 'item-1',
@@ -112,7 +113,7 @@ void main() {
         description: description,
         quantity: quantity,
         unitPriceCents: price,
-        vatRatePercent: 19,
+        vatRatePercent: vatRatePercent,
         unit: unit,
         discountPercent: discountPercent,
         groupLabel: null,
@@ -292,7 +293,7 @@ void main() {
       final invoice = draftInvoice(invoiceNumber: 'R-26007');
       final bytes = await buildInvoicePdf(
         invoice: invoice,
-        items: [item(description: 'Beratung', price: 10000)],
+        items: [item(description: 'Beratung', price: 10000, vatRatePercent: 0)],
         company: testCompany(isSmallBusinessExempt: true),
       );
       expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');

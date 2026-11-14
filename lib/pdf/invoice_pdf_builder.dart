@@ -219,6 +219,12 @@ Future<Uint8List> renderDocumentPdf(
 }) async {
   final invoice = data;
   final items = data.lines;
+  // Ein §19-Beleg darf vorhandene steuerpflichtige Positionen nicht als Bruttopreise tarnen.
+  if (data.isSmallBusinessExempt &&
+      data.kind != DocumentKind.deliveryNote &&
+      items.any((item) => item.vatRatePercent != 0)) {
+    throw StateError('Kleinunternehmerbeleg enthält einen Umsatzsteuersatz; Positionen prüfen.');
+  }
   final totals = calculateInvoiceTotals([
     for (final item in items)
       InvoiceLineInput(
@@ -297,10 +303,14 @@ Future<Uint8List> renderDocumentPdf(
         ],
         pw.SizedBox(height: 16),
         for (final key in orderedKeys)
-          ..._buildGroup(key, groups[key]!, showPrices: invoice.kind != DocumentKind.deliveryNote),
+          ..._buildGroup(key, groups[key]!,
+              showPrices: invoice.kind != DocumentKind.deliveryNote,
+              isSmallBusinessExempt: data.isSmallBusinessExempt),
         pw.SizedBox(height: 16),
         if (invoice.kind != DocumentKind.deliveryNote)
-          _buildTotals(totals, priorAdvancePayments: priorAdvancePayments),
+          _buildTotals(totals,
+              isSmallBusinessExempt: data.isSmallBusinessExempt,
+              priorAdvancePayments: priorAdvancePayments),
         // Nachtrag 2026-10-18: Kleinunternehmerregelung (§19 UStG) —
         // bewusst ein fester, nicht editierbarer Hinweis statt im frei
         // änderbaren Schlusstext, damit er beim Bearbeiten des
@@ -451,7 +461,8 @@ pw.Widget _buildHeader(
   );
 }
 
-List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items, {required bool showPrices}) {
+List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items,
+    {required bool showPrices, required bool isSmallBusinessExempt}) {
   return [
     if (groupLabel != null)
       pw.Padding(
@@ -464,7 +475,14 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items, {required b
       // Preise/Steuersätze — nur Beschreibung und Menge, wie bei einem
       // Lieferschein üblich (Kunde bekommt keinen Preis auf dem Beleg,
       // mit dem die Ware/Leistung übergeben wird).
-      columnWidths: showPrices
+      columnWidths: showPrices && isSmallBusinessExempt
+          ? const {
+              0: pw.FlexColumnWidth(4),
+              1: pw.FlexColumnWidth(1.2),
+              2: pw.FlexColumnWidth(1.5),
+              3: pw.FlexColumnWidth(1.5),
+            }
+          : showPrices
           ? const {
               0: pw.FlexColumnWidth(4),
               1: pw.FlexColumnWidth(1.2),
@@ -480,13 +498,14 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items, {required b
               ? [
                   _cell('Beschreibung', bold: true),
                   _cell('Menge', bold: true, alignRight: true),
-                  _cell('Einzelpreis', bold: true, alignRight: true),
-                  _cell('MwSt.', bold: true, alignRight: true),
+                  _cell(isSmallBusinessExempt ? 'Bruttopreis' : 'Einzelpreis', bold: true, alignRight: true),
+                  if (!isSmallBusinessExempt) _cell('MwSt.', bold: true, alignRight: true),
                   _cell('Gesamt', bold: true, alignRight: true),
                 ]
               : [_cell('Beschreibung', bold: true), _cell('Menge', bold: true, alignRight: true)],
         ),
-        for (final item in items) ..._buildItemRows(item, showPrices: showPrices),
+        for (final item in items)
+          ..._buildItemRows(item, showPrices: showPrices, isSmallBusinessExempt: isSmallBusinessExempt),
       ],
     ),
     // Gruppensumme (Kay-Nachtrag 2026-10-16) — derselbe Rechenkern wie
@@ -511,7 +530,8 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items, {required b
 /// keine Code-/Text-Übernahme). Menge und Einheit werden in einer
 /// Zelle zusammengefasst ("10 Stk"), um keine zusätzliche, auf A4 eng
 /// werdende Spalte zu brauchen.
-List<pw.TableRow> _buildItemRows(PdfLine item, {required bool showPrices}) {
+List<pw.TableRow> _buildItemRows(PdfLine item,
+    {required bool showPrices, required bool isSmallBusinessExempt}) {
   final quantityLabel = item.unit == null ? item.quantity : '${item.quantity} ${item.unit}';
   final grossBeforeDiscount =
       Money.fromCents(item.unitPriceCents).multiplyByQuantity(Decimal.parse(item.quantity));
@@ -527,7 +547,7 @@ List<pw.TableRow> _buildItemRows(PdfLine item, {required bool showPrices}) {
               _cell(item.description),
               _cell(quantityLabel, alignRight: true),
               _cell(Money.fromCents(item.unitPriceCents).toString(), alignRight: true),
-              _cell('${item.vatRatePercent.toStringAsFixed(0)} %', alignRight: true),
+              if (!isSmallBusinessExempt) _cell('${item.vatRatePercent.toStringAsFixed(0)} %', alignRight: true),
               _cell(lineGrossWithTax.toString(), alignRight: true),
             ]
           : [_cell(item.description), _cell(quantityLabel, alignRight: true)],
@@ -546,7 +566,7 @@ List<pw.TableRow> _buildItemRows(PdfLine item, {required bool showPrices}) {
           ),
           pw.Container(),
           pw.Container(),
-          pw.Container(),
+          if (!isSmallBusinessExempt) pw.Container(),
           pw.Padding(
             padding: const pw.EdgeInsets.only(bottom: 3),
             child: pw.Text(
@@ -570,7 +590,8 @@ Money _groupTotal(List<PdfLine> items) => calculateInvoiceTotals([
         ),
     ]).totalGross;
 
-pw.Widget _buildTotals(InvoiceTotals totals, {List<AdvancePaymentEntry> priorAdvancePayments = const []}) {
+pw.Widget _buildTotals(InvoiceTotals totals,
+    {required bool isSmallBusinessExempt, List<AdvancePaymentEntry> priorAdvancePayments = const []}) {
   // C13 Abschlagsrechnungen: nur Abzugszeilen zeigen, wenn tatsächlich
   // etwas abzuziehen ist — sonst bleibt das Layout wie bisher.
   final hasAdvancePayments = priorAdvancePayments.isNotEmpty;
@@ -585,7 +606,7 @@ pw.Widget _buildTotals(InvoiceTotals totals, {List<AdvancePaymentEntry> priorAdv
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
-          for (final rate in totals.sortedRates)
+          if (!isSmallBusinessExempt) for (final rate in totals.sortedRates)
             pw.Padding(
               padding: const pw.EdgeInsets.symmetric(vertical: 2),
               child: pw.Row(
@@ -596,7 +617,7 @@ pw.Widget _buildTotals(InvoiceTotals totals, {List<AdvancePaymentEntry> priorAdv
                 ],
               ),
             ),
-          for (final rate in totals.sortedRates)
+          if (!isSmallBusinessExempt) for (final rate in totals.sortedRates)
             pw.Padding(
               padding: const pw.EdgeInsets.symmetric(vertical: 2),
               child: pw.Row(

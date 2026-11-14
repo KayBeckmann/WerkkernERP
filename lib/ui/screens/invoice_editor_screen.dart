@@ -1590,14 +1590,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final rate in totals.sortedRates)
+                  if (!_isSmallBusinessExempt) for (final rate in totals.sortedRates)
                     Text(
                       'Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   '
                       'Steuer: ${totals.taxByRate[rate]}',
                     ),
                   const Divider(),
                   Text(
-                    'Gesamt: ${totals.totalGross}',
+                    '${_isSmallBusinessExempt ? 'Gesamt (brutto)' : 'Gesamt'}: ${totals.totalGross}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   // C13 Abschlagsrechnungen: Abzugszeilen nur, wenn diese

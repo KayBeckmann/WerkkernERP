@@ -10,12 +10,27 @@ import 'online_form.dart';
 /// „Artikelgruppen“; Lieferanten haben wie offline einen eigenen Bereich
 /// ([OnlineSuppliersScreen]). Lesen mit `articles.read`, Pflege mit
 /// `articles.write`.
-class OnlineArticlesScreen extends StatelessWidget {
+class OnlineArticlesScreen extends StatefulWidget {
   const OnlineArticlesScreen({super.key, required this.session});
   final OnlineSession session;
 
   @override
-  Widget build(BuildContext context) => _ArticleList(session: session);
+  State<OnlineArticlesScreen> createState() => _OnlineArticlesScreenState();
+}
+
+class _OnlineArticlesScreenState extends State<OnlineArticlesScreen> {
+  late final Future<bool> _smallBusiness = widget.session.client.companyProfile()
+      .then((profile) => profile.smallBusinessExempt);
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<bool>(
+    future: _smallBusiness,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) return Center(child: Text(describeOnlineError(snapshot.error!)));
+      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      return _ArticleList(session: widget.session, smallBusiness: snapshot.data!);
+    },
+  );
 }
 
 /// Lieferanten der Online-Firma — eigener Bereich wie offline.
@@ -40,7 +55,9 @@ class OnlineArticleGroupsScreen extends StatelessWidget {
       );
 }
 
-String _price(int? cents) => cents == null ? 'kein Preis' : '${Money.fromCents(cents)} netto';
+String _price(int? cents, {required bool smallBusiness}) => cents == null
+    ? 'kein Preis'
+    : '${Money.fromCents(cents)} ${smallBusiness ? 'brutto' : 'netto'}';
 
 /// Bestand unter dem Mindestbestand (Mengen als Dezimaltext).
 bool isBelowMinimum(OnlineArticle a) =>
@@ -56,7 +73,8 @@ const stockMovementTypeLabels = {
   'creditNoteReturn': 'Gutschrift-Rückbuchung',
 };
 
-Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession session, [OnlineArticle? existing]) async {
+Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession session,
+    [OnlineArticle? existing, bool smallBusiness = false]) async {
   final client = session.client;
   final groups = await client.articleGroups();
   final suppliers = await client.suppliers();
@@ -84,7 +102,7 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
       ),
       OnlineField(
         'salePriceCents',
-        'Manueller Verkaufspreis (netto)',
+        smallBusiness ? 'Manueller Verkaufspreis (brutto)' : 'Manueller Verkaufspreis (netto)',
         type: OnlineFieldType.money,
         initial: existing?.salePriceCents,
         helper: 'Leer lassen, um zu kalkulieren.',
@@ -113,8 +131,9 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
 }
 
 class _ArticleList extends StatelessWidget {
-  const _ArticleList({required this.session});
+  const _ArticleList({required this.session, required this.smallBusiness});
   final OnlineSession session;
+  final bool smallBusiness;
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +175,9 @@ class _ArticleList extends StatelessWidget {
               ].join(' · '),
               style: lowStock ? TextStyle(color: error) : null,
             ),
-            trailing: Text(a.effectiveSalePriceCents == null ? '–' : Money.fromCents(a.effectiveSalePriceCents!).toString()),
+            trailing: Text(a.effectiveSalePriceCents == null
+                ? '–'
+                : '${Money.fromCents(a.effectiveSalePriceCents!)} ${smallBusiness ? 'brutto' : 'netto'}'),
             onTap: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => OnlineArticleDetailScreen(session: session, articleId: a.id)),
@@ -171,7 +192,7 @@ class _ArticleList extends StatelessWidget {
                 builder: (context) => FloatingActionButton.extended(
                   heroTag: 'online-articles-fab',
                   onPressed: () async {
-                    if (await editOnlineArticle(context, session) != null) reload();
+                    if (await editOnlineArticle(context, session, null, smallBusiness) != null) reload();
                   },
                   icon: const Icon(Icons.add),
                   label: const Text('Artikel anlegen'),
@@ -194,6 +215,8 @@ class OnlineArticleDetailScreen extends StatefulWidget {
 
 class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
   late Future<(OnlineArticle, List<OnlineArticlePrice>, List<OnlineSupplier>)> _future = _load();
+  late final Future<bool> _smallBusiness = widget.session.client.companyProfile()
+      .then((profile) => profile.smallBusinessExempt);
 
   bool get _showStock => widget.session.modules.contains('lagerbestand') && widget.session.can('stock.read');
 
@@ -338,7 +361,9 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
                   tooltip: 'Bearbeiten',
                   icon: const Icon(Icons.edit_outlined),
                   onPressed: () async {
-                    if (await editOnlineArticle(context, widget.session, article) != null) _reload();
+                    final smallBusiness = await _smallBusiness;
+                    if (!context.mounted) return;
+                    if (await editOnlineArticle(context, widget.session, article, smallBusiness) != null) _reload();
                   },
                 ),
                 IconButton(
@@ -381,21 +406,31 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                article.effectiveSalePriceCents == null
-                    ? 'Verkaufspreis: unbekannt (kein Standardlieferant/Einkaufspreis)'
-                    : article.salePriceCents != null
-                        ? 'Netto-Verkaufspreis (manuell): ${Money.fromCents(article.salePriceCents!)}'
-                        : 'Kalkulierter Netto-Verkaufspreis: ${Money.fromCents(article.effectiveSalePriceCents!)}',
-                style: theme.textTheme.titleMedium,
+              FutureBuilder<bool>(
+                future: _smallBusiness,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) return Text(describeOnlineError(snapshot.error!));
+                  if (!snapshot.hasData) return const CircularProgressIndicator();
+                  final smallBusiness = snapshot.data!;
+                  final basis = smallBusiness ? 'Brutto' : 'Netto';
+                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(
+                      article.effectiveSalePriceCents == null
+                          ? 'Verkaufspreis: unbekannt (kein Standardlieferant/Einkaufspreis)'
+                          : article.salePriceCents != null
+                              ? '$basis-Verkaufspreis (manuell): ${Money.fromCents(article.salePriceCents!)}'
+                              : 'Kalkulierter $basis-Verkaufspreis: ${Money.fromCents(article.effectiveSalePriceCents!)}',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    if (article.salePriceCents != null)
+                      Text(
+                        'Kalkuliert: ${_price(article.calculatedSalePriceCents, smallBusiness: smallBusiness)}'
+                        '${article.articleGroupName == null ? '' : ' (Gruppe ${article.articleGroupName})'}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                  ]);
+                },
               ),
-              // Nur online: manueller Preis überschreibt die Kalkulation.
-              if (article.salePriceCents != null)
-                Text(
-                  'Kalkuliert: ${_price(article.calculatedSalePriceCents)}'
-                  '${article.articleGroupName == null ? '' : ' (Gruppe ${article.articleGroupName})'}',
-                  style: theme.textTheme.bodySmall,
-                ),
               if (_showStock) ...[
                 const SizedBox(height: 8),
                 Wrap(
