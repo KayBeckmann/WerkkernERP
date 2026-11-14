@@ -35,6 +35,7 @@ class _ExpensesData {
     required this.categories,
     required this.projects,
     required this.projectsEnabled,
+    required this.smallBusinessExempt,
   });
   final List<Expense> expenses;
   final List<ExpenseCategory> categories;
@@ -42,6 +43,10 @@ class _ExpensesData {
   /// Leer, wenn C1 Projekte nicht aktiviert ist (siehe [projectsEnabled]).
   final List<Project> projects;
   final bool projectsEnabled;
+
+  /// Kleinunternehmerregelung (§ 19 UStG) der Firma — dann ohne USt.-
+  /// Angabe am Beleg (Kay-Feedback 2026-11-14).
+  final bool smallBusinessExempt;
 }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
@@ -75,6 +80,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       categories: categories,
       projects: projects,
       projectsEnabled: company.projectsEnabled,
+      smallBusinessExempt: company.isSmallBusinessExempt,
     );
   }
 
@@ -91,6 +97,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         categories: data.categories,
         projects: data.projects,
         projectsEnabled: data.projectsEnabled,
+        smallBusinessExempt: data.smallBusinessExempt,
         existing: existing,
       ),
     );
@@ -257,11 +264,17 @@ class _ExpenseFormDialog extends StatefulWidget {
     required this.categories,
     required this.projects,
     required this.projectsEnabled,
+    required this.smallBusinessExempt,
     this.existing,
   });
   final List<ExpenseCategory> categories;
   final List<Project> projects;
   final bool projectsEnabled;
+
+  /// § 19 UStG: USt.-Auswahl entfällt, der Beleg wird mit 0 % gespeichert
+  /// (ein Kleinunternehmer hat keinen Vorsteuerabzug, der Bruttobetrag
+  /// ist die Ausgabe).
+  final bool smallBusinessExempt;
   final Expense? existing;
 
   @override
@@ -287,7 +300,7 @@ class _ExpenseFormDialogState extends State<_ExpenseFormDialog> {
     );
     _supplierCtrl = TextEditingController(text: existing?.supplierReference);
     _date = existing?.date ?? DateTime.now();
-    _vatRate = existing?.vatRatePercent ?? 19;
+    _vatRate = widget.smallBusinessExempt ? 0 : (existing?.vatRatePercent ?? 19);
     _categoryId = existing?.categoryId;
     _projectId = existing?.projectId;
   }
@@ -344,19 +357,23 @@ class _ExpenseFormDialogState extends State<_ExpenseFormDialog> {
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<double>(
-                      initialValue: _vatRate,
-                      decoration: const InputDecoration(labelText: 'USt.'),
-                      items: const [
-                        DropdownMenuItem(value: 19.0, child: Text('19 %')),
-                        DropdownMenuItem(value: 7.0, child: Text('7 %')),
-                        DropdownMenuItem(value: 0.0, child: Text('0 %')),
-                      ],
-                      onChanged: (value) => setState(() => _vatRate = value ?? 19),
+                  // Kleinunternehmer (§ 19 UStG): keine USt.-Angabe am
+                  // Beleg (Kay-Feedback 2026-11-14).
+                  if (!widget.smallBusinessExempt) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<double>(
+                        initialValue: _vatRate,
+                        decoration: const InputDecoration(labelText: 'USt.'),
+                        items: const [
+                          DropdownMenuItem(value: 19.0, child: Text('19 %')),
+                          DropdownMenuItem(value: 7.0, child: Text('7 %')),
+                          DropdownMenuItem(value: 0.0, child: Text('0 %')),
+                        ],
+                        onChanged: (value) => setState(() => _vatRate = value ?? 19),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),

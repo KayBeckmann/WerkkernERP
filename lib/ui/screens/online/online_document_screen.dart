@@ -66,6 +66,11 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
 
   /// § 19 UStG der Firma — neue Positionen dann fest 0 % USt.
   bool _smallBusiness = false;
+
+  /// Kay-Feedback 2026-11-14: Bei § 19 UStG keine Steuerangaben auf dem
+  /// Beleg; ein Altdokument mit Satz ungleich 0 % zeigt sie weiterhin
+  /// (gleiche Regel wie offline und im PDF).
+  bool get _hideVat => _smallBusiness && _items.every((item) => item.vatRatePercent == 0);
   String? _error;
 
   WerkkernApiClient get _client => widget.session.client;
@@ -954,8 +959,10 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
-                        '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
+                        _hideVat
+                            ? '$quantityLabel × ${Money.fromCents(item.unitPriceCents)}'
+                            : '$quantityLabel × ${Money.fromCents(item.unitPriceCents)} · '
+                                '${item.vatRatePercent.toStringAsFixed(0)} % MwSt.',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -1281,9 +1288,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final rate in totals.sortedRates)
-                  Text('Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   Steuer: ${totals.taxByRate[rate]}'),
-                const Divider(),
+                // Kleinunternehmer (§ 19 UStG): keine Netto-/Steuer-Zeilen (wie offline).
+                if (!_hideVat) ...[
+                  for (final rate in totals.sortedRates)
+                    Text('Netto ${rate.toStringAsFixed(0)} %: ${totals.netByRate[rate]}   Steuer: ${totals.taxByRate[rate]}'),
+                  const Divider(),
+                ],
                 Text('Gesamt: ${totals.totalGross}', style: theme.textTheme.titleMedium),
                 // Abschlagsrechnungen einzeln mit Nummer (wie offline).
                 if (document.advancePayments.isNotEmpty) ...[

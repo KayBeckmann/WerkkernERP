@@ -312,30 +312,26 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    // Kleinunternehmerregelung (§19 UStG, Nachtrag
-                    // 2026-10-18): Dropdown komplett gesperrt statt nur
-                    // versteckt — die Position bleibt sichtbar als
-                    // "0 %", damit nicht der Eindruck entsteht, hier
-                    // fehle etwas.
-                    child: widget.forceZeroVat
-                        ? const TextField(
-                            enabled: false,
-                            decoration: InputDecoration(labelText: 'MwSt.', hintText: '0 % (Kleinunternehmer)'),
-                          )
-                        : DropdownButtonFormField<double>(
-                            isExpanded: true,
-                            initialValue: _vatRate,
-                            decoration: const InputDecoration(labelText: 'MwSt.'),
-                            items: const [
-                              DropdownMenuItem(value: 19.0, child: Text('19 %')),
-                              DropdownMenuItem(value: 7.0, child: Text('7 %')),
-                              DropdownMenuItem(value: 0.0, child: Text('0 %')),
-                            ],
-                            onChanged: (value) => setState(() => _vatRate = value ?? 19),
-                          ),
-                  ),
-                  const SizedBox(width: 12),
+                  // Kleinunternehmerregelung (§19 UStG): die MwSt.-Auswahl
+                  // entfällt ganz (Kay-Feedback 2026-11-14: kein Verweis
+                  // auf Umsatzsteuer auf Belegen); `_vatRate` bleibt fest
+                  // 0 %. Vorher stand hier ein gesperrtes Feld „0 %“.
+                  if (!widget.forceZeroVat) ...[
+                    Expanded(
+                      child: DropdownButtonFormField<double>(
+                        isExpanded: true,
+                        initialValue: _vatRate,
+                        decoration: const InputDecoration(labelText: 'MwSt.'),
+                        items: const [
+                          DropdownMenuItem(value: 19.0, child: Text('19 %')),
+                          DropdownMenuItem(value: 7.0, child: Text('7 %')),
+                          DropdownMenuItem(value: 0.0, child: Text('0 %')),
+                        ],
+                        onChanged: (value) => setState(() => _vatRate = value ?? 19),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                   // Rabatt pro Position (Kay-Nachtrag 2026-10-16, analog
                   // zu RechnungsFees Positionsrabatt) — wirkt auf den
                   // Netto-Betrag vor der Steuerberechnung, siehe

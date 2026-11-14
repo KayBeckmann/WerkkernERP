@@ -278,25 +278,24 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Expanded(
-                    child: widget.forceZeroVat
-                        ? const TextField(
-                            enabled: false,
-                            decoration: InputDecoration(labelText: 'MwSt.', hintText: '0 % (Kleinunternehmer)'),
-                          )
-                        : DropdownButtonFormField<double>(
-                            isExpanded: true,
-                            initialValue: _vat,
-                            decoration: const InputDecoration(labelText: 'MwSt.'),
-                            items: const [
-                              DropdownMenuItem(value: 19.0, child: Text('19 %')),
-                              DropdownMenuItem(value: 7.0, child: Text('7 %')),
-                              DropdownMenuItem(value: 0.0, child: Text('0 %')),
-                            ],
-                            onChanged: (value) => setState(() => _vat = value ?? 19),
-                          ),
-                  ),
-                  const SizedBox(width: 12),
+                  // § 19 UStG: keine MwSt.-Auswahl, kein Verweis darauf
+                  // (Kay-Feedback 2026-11-14); `_vat` bleibt fest 0 %.
+                  if (!widget.forceZeroVat) ...[
+                    Expanded(
+                      child: DropdownButtonFormField<double>(
+                        isExpanded: true,
+                        initialValue: _vat,
+                        decoration: const InputDecoration(labelText: 'MwSt.'),
+                        items: const [
+                          DropdownMenuItem(value: 19.0, child: Text('19 %')),
+                          DropdownMenuItem(value: 7.0, child: Text('7 %')),
+                          DropdownMenuItem(value: 0.0, child: Text('0 %')),
+                        ],
+                        onChanged: (value) => setState(() => _vat = value ?? 19),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                   Expanded(
                     child: TextField(
                       key: const Key('online-item-discount'),
@@ -307,11 +306,6 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
                   ),
                 ],
               ),
-              if (widget.forceZeroVat)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Text('Kleinunternehmerregelung (§ 19 UStG): keine Umsatzsteuer.', style: TextStyle(fontSize: 12)),
-                ),
               // Vorschläge aus den Gruppen dieses Dokuments, neue Gruppe
               // weiterhin frei eintippbar.
               Autocomplete<String>(
