@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../domain/services/quick_access_store.dart';
 import '../theme/app_theme.dart';
 import 'section_label.dart';
 import 'sidebar_nav_item.dart';
@@ -24,6 +26,13 @@ class ShellTab {
   final String title;
   final Widget screen;
   final ShellSection section;
+
+  /// Stabiler Text-Schlüssel für die Ablage des Schnellzugriffs (Enum-Name
+  /// bzw. der String selbst) — unabhängig von Position und Titel.
+  String get key => switch (id) {
+        final Enum e => e.name,
+        final Object o => o.toString(),
+      };
 }
 
 /// Welche Überschrift/Trennlinie vor dem ersten Eintrag einer
@@ -51,16 +60,29 @@ Widget? _sectionHeaderFor(ShellSection section) {
 /// gleiche Layout verwenden“).
 ///
 /// Adaptiv: auf dem schmalen Smartphone eine feste Bottom-Navigation mit
-/// höchstens drei Einträgen plus „Mehr“ (Kay-Feedback 2026-10-19: „Das
-/// wird zu voll in der bottom Menüleiste“); „Mehr“ zeigt dieselbe
-/// gruppierte Übersicht wie die Sidebar. Auf breiten Fenstern eine
-/// gruppierte Sidebar im RechnungsFee-Layout-Muster (Sektionen,
-/// Indigo-Akzent, kompakte Zeilen) — eigenständig in Flutter nachgebaut.
+/// wenigen Einträgen plus „Mehr“ (Kay-Feedback 2026-10-19: „Das wird zu
+/// voll in der bottom Menüleiste“); „Mehr“ zeigt dieselbe gruppierte
+/// Übersicht wie die Sidebar. Welche Einträge fest in der Leiste stehen,
+/// legt jeder Nutzer dort selbst fest (Kay-Feedback 2026-11-14: „Nicht
+/// jeder User braucht die gleichen Module im Schnellzugriff“) —
+/// gespeichert je Gerät und Firma über [QuickAccessStore]. Auf breiten
+/// Fenstern eine gruppierte Sidebar im RechnungsFee-Layout-Muster
+/// (Sektionen, Indigo-Akzent, kompakte Zeilen) — eigenständig in Flutter
+/// nachgebaut.
 ///
 /// Der Inhaltsbereich im Breit-Layout hat einen eigenen, verschachtelten
 /// [Navigator] (Kay-Feedback 2026-10-16, „Menüleiste verschwindet“):
 /// `Navigator.of(context)` aus den Bereichen findet ihn zuerst, Details
 /// öffnen sich dadurch neben der Sidebar statt über der ganzen App.
+///
+/// **Zurück (Android-Geste/-Taste, Kay-Feedback 2026-11-14):** geht immer
+/// nur einen Schritt — erst eine offene Detailseite, dann der zuvor
+/// besuchte Bereich (Verlauf der Bereichswechsel), und erst auf dem
+/// Ausgangsbereich verlässt es die Firma. Ohne diesen [PopScope] hätte
+/// Android auf jedem Bereich sofort die ganze Shell geschlossen (offline:
+/// App zu, weil die Firmenauswahl per `pushReplacement` ersetzt ist;
+/// online: zurück zur Firmenauswahl) und im Breit-Layout sogar bei
+/// offener Detailseite im verschachtelten Navigator.
 class AppShell extends StatefulWidget {
   const AppShell({
     super.key,
@@ -74,7 +96,13 @@ class AppShell extends StatefulWidget {
     this.emptyBody,
     this.onTabSelected,
     this.contentNavigatorKey,
+    this.quickAccessScope,
+    this.quickAccessStore = const PrefsQuickAccessStore(),
   });
+
+  /// Höchstens so viele feste Einträge neben „Mehr“ — mehr passt auf ein
+  /// Smartphone nicht lesbar in eine Zeile.
+  static const maxQuickAccess = 4;
 
   final String companyName;
 
@@ -82,8 +110,9 @@ class AppShell extends StatefulWidget {
   final String? companyCaption;
   final List<ShellTab> tabs;
 
-  /// Bevorzugte feste Einträge der schmalen Bottom-Bar (bis zu drei).
-  /// Fehlt einer (Modul/Recht), rücken die nächsten Einträge nach.
+  /// Vorgabe der festen Einträge der schmalen Bottom-Bar (bis zu drei),
+  /// solange der Nutzer den Schnellzugriff noch nie angepasst hat. Fehlt
+  /// einer (Modul/Recht), rücken die nächsten Einträge nach.
   final List<Object> pinnedNarrowIds;
   final VoidCallback onSwitchCompany;
 
@@ -104,41 +133,69 @@ class AppShell extends StatefulWidget {
   /// damit Aktionen ihre Seiten ebenfalls neben der Sidebar öffnen.
   final GlobalKey<NavigatorState>? contentNavigatorKey;
 
+  /// Unter welchem Schlüssel der Schnellzugriff dieses Nutzers liegt
+  /// (lokale Firma bzw. Server + Konto + Online-Firma). `null` = nicht
+  /// speichern (Anpassungen gelten nur für die laufende Sitzung).
+  final String? quickAccessScope;
+  final QuickAccessStore quickAccessStore;
+
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> {
   // Kay-Anfrage 2026-10-17: Dashboard als Einstiegspunkt — der erste
-  // Eintrag ist der Standard.
-  Object? _narrowId;
-  late final _wideId = ValueNotifier<Object?>(widget.tabs.firstOrNull?.id);
-  // Die Tab-Liste muss ebenfalls über ein Listenable laufen: der
-  // Inhaltsbereich liegt in der ERSTEN Route eines verschachtelten
-  // Navigators, deren `builder` nur EINMAL läuft. Eine einfache Liste wäre
-  // darin für immer auf dem Stand des Erststarts eingefroren — ein später
-  // aktiviertes Modul wäre im Inhaltsbereich nie erschienen.
+  // Eintrag ist der Standard. Ein Notifier für beide Layouts: der
+  // Inhaltsbereich des Breit-Layouts liegt in der ERSTEN Route eines
+  // verschachtelten Navigators, deren `builder` nur EINMAL läuft — ein
+  // einfaches Feld wäre dort eingefroren. Ein Drehen des Geräts behält
+  // dadurch nebenbei den gewählten Bereich.
+  late final _currentId = ValueNotifier<Object?>(widget.tabs.firstOrNull?.id);
+
+  /// Zuvor besuchte Bereiche, der jüngste am Ende — für „Zurück“.
+  final _history = <Object>[];
+
+  /// Gespeicherte Schnellzugriff-Schlüssel; `null` = Vorgabe der Shell.
+  final _pinnedKeys = ValueNotifier<List<String>?>(null);
+
+  /// Ob im verschachtelten Inhalts-Navigator eine Detailseite offen ist
+  /// (dann gehört „Zurück“ ihr, nicht dem Bereichsverlauf).
+  bool _nestedCanPop = false;
+
+  // Die Tab-Liste muss ebenfalls über ein Listenable laufen (gleicher
+  // Grund wie bei [_currentId]) — ein später aktiviertes Modul wäre im
+  // Inhaltsbereich sonst nie erschienen.
   final _tabsNotifier = ValueNotifier<List<ShellTab>>(const []);
   late final _contentNavKey = widget.contentNavigatorKey ?? GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
-    _narrowId = widget.tabs.firstOrNull?.id;
     _tabsNotifier.value = widget.tabs;
+    _loadQuickAccess();
   }
 
   @override
   void didUpdateWidget(AppShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     _tabsNotifier.value = widget.tabs;
+    if (oldWidget.quickAccessScope != widget.quickAccessScope) _loadQuickAccess();
   }
 
   @override
   void dispose() {
-    _wideId.dispose();
+    _currentId.dispose();
+    _pinnedKeys.dispose();
     _tabsNotifier.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadQuickAccess() async {
+    final scope = widget.quickAccessScope;
+    if (scope == null) return;
+    final keys = await widget.quickAccessStore.load(scope);
+    if (!mounted || scope != widget.quickAccessScope) return;
+    setState(() => _pinnedKeys.value = keys);
   }
 
   /// Position von [id] in [tabs]; fehlt die ID gerade (Modul während-
@@ -148,41 +205,122 @@ class _AppShellState extends State<AppShell> {
     return index == -1 ? 0 : index;
   }
 
-  /// Feste Einträge der Bottom-Bar: bevorzugte, dann die nächsten bis
-  /// drei; bliebe für „Mehr“ nur ein einziger übrig, steht er direkt da.
-  List<ShellTab> _pinned(List<ShellTab> tabs) {
+  /// Vom Nutzer (oder der Vorgabe) gewählte feste Einträge der Bottom-Bar,
+  /// in der Reihenfolge der Navigation. Gespeicherte Schlüssel, deren
+  /// Bereich gerade fehlt (Modul/Recht), werden übersprungen; bleibt
+  /// davon nichts übrig, gilt die Vorgabe.
+  List<ShellTab> _quickAccess(List<ShellTab> tabs) {
+    final saved = _pinnedKeys.value;
+    if (saved != null) {
+      final chosen = [for (final tab in tabs) if (saved.contains(tab.key)) tab];
+      if (chosen.isNotEmpty) return chosen;
+    }
     final pinned = [for (final id in widget.pinnedNarrowIds) ...tabs.where((t) => t.id == id)];
     for (final tab in tabs) {
       if (pinned.length >= 3) break;
       if (!pinned.contains(tab)) pinned.add(tab);
     }
+    return pinned;
+  }
+
+  /// Feste Einträge der Bottom-Bar; bliebe für „Mehr“ nur ein einziger
+  /// übrig, steht er direkt da.
+  List<ShellTab> _pinned(List<ShellTab> tabs) {
+    final pinned = List.of(_quickAccess(tabs));
     if (tabs.length == pinned.length + 1) pinned.add(tabs.firstWhere((t) => !pinned.contains(t)));
     return pinned;
   }
 
-  void _select(Object id) {
+  /// Eintrag in den Schnellzugriff aufnehmen bzw. daraus entfernen.
+  /// Liefert `null` bei Erfolg, sonst den Hinweistext für den Nutzer.
+  String? _togglePin(ShellTab tab) {
+    final keys = [for (final t in _quickAccess(widget.tabs)) t.key];
+    if (keys.contains(tab.key)) {
+      if (keys.length <= 1) return 'Mindestens ein Bereich bleibt im Schnellzugriff.';
+      keys.remove(tab.key);
+    } else {
+      if (keys.length >= AppShell.maxQuickAccess) {
+        return 'Höchstens ${AppShell.maxQuickAccess} Bereiche im Schnellzugriff — erst einen anderen lösen.';
+      }
+      keys.add(tab.key);
+    }
+    setState(() => _pinnedKeys.value = keys);
+    final scope = widget.quickAccessScope;
+    if (scope != null) widget.quickAccessStore.save(scope, keys);
+    return null;
+  }
+
+  /// Bereich wechseln — der bisherige wandert in den Verlauf für „Zurück“.
+  /// Ein erneuter Tipp auf den aktuellen Bereich holt nur dessen Liste
+  /// zurück (Breit-Layout) und meldet die Wahl (Online: frisch laden).
+  void _goTo(Object id) {
+    // Beim Wechsel zuerst zurück auf die Liste, falls z. B. gerade eine
+    // Rechnung im Inhaltsbereich geöffnet ist — sonst bliebe der alte
+    // Push-Stack unter dem neuen Inhalt verborgen stehen.
+    _contentNavKey.currentState?.popUntil((route) => route.isFirst);
+    final current = _currentId.value;
+    if (current != null && current != id) {
+      // Keine Schleifen im Verlauf: ein erneut besuchter Bereich steht
+      // nur einmal darin.
+      _history
+        ..remove(id)
+        ..remove(current)
+        ..add(current);
+    }
     widget.onTabSelected?.call(id);
+    _currentId.value = id;
+    setState(() {});
+  }
+
+  /// „Zurück“ auf den zuvor besuchten Bereich; `false`, wenn der Verlauf
+  /// leer ist (dann darf die Route wirklich schließen).
+  bool _goBack() {
+    while (_history.isNotEmpty) {
+      final id = _history.removeLast();
+      // Inzwischen deaktivierte Bereiche (Modul/Recht) überspringen.
+      if (!widget.tabs.any((t) => t.id == id)) continue;
+      widget.onTabSelected?.call(id);
+      _currentId.value = id;
+      setState(() {});
+      return true;
+    }
+    return false;
   }
 
   Future<void> _openMoreOverview(List<ShellTab> tabs) async {
     final selected = await Navigator.of(context).push<Object>(
       MaterialPageRoute(
-        builder: (_) => _MoreOverviewScreen(tabs: tabs, currentId: _narrowId),
+        builder: (_) => _MoreOverviewScreen(
+          tabs: tabs,
+          currentId: _currentId.value,
+          pinnedKeys: _pinnedKeys,
+          quickAccessKeys: () => [for (final t in _quickAccess(tabs)) t.key],
+          onTogglePin: _togglePin,
+        ),
       ),
     );
-    if (selected != null && mounted) {
-      _select(selected);
-      setState(() => _narrowId = selected);
-    }
+    if (selected != null && mounted) _goTo(selected);
   }
 
-  void _selectWide(Object id) {
-    // Beim Wechsel zuerst zurück auf die Liste, falls z. B. gerade eine
-    // Rechnung im Inhaltsbereich geöffnet ist — sonst bliebe der alte
-    // Push-Stack unter dem neuen Inhalt verborgen stehen.
-    _contentNavKey.currentState?.popUntil((route) => route.isFirst);
-    _select(id);
-    _wideId.value = id;
+  /// Siehe Klassendoc „Zurück“: `canPop` nur, wenn weder eine Detailseite
+  /// im Inhaltsbereich offen ist noch ein Bereichsverlauf existiert.
+  Widget _popScope({required Widget child}) => PopScope(
+        canPop: !_nestedCanPop && _history.isEmpty,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          final nested = _contentNavKey.currentState;
+          if (nested != null && nested.canPop()) {
+            nested.maybePop();
+            return;
+          }
+          _goBack();
+        },
+        child: child,
+      );
+
+  void _onNestedCanPop(bool canPop) {
+    if (canPop == _nestedCanPop) return;
+    setState(() => _nestedCanPop = canPop);
   }
 
   @override
@@ -191,62 +329,67 @@ class _AppShellState extends State<AppShell> {
     final isWide = MediaQuery.sizeOf(context).width >= AppMetrics.wideLayoutBreakpoint;
 
     if (isWide) {
-      return _WideShell(
-        companyName: widget.companyName,
-        companyCaption: widget.companyCaption,
-        currentId: _wideId,
-        tabsNotifier: _tabsNotifier,
-        contentNavKey: _contentNavKey,
-        onSelect: _selectWide,
-        onSwitchCompany: widget.onSwitchCompany,
-        tabs: tabs,
-        actions: widget.actions,
-        banner: widget.banner,
-        emptyBody: widget.emptyBody,
+      return _popScope(
+        child: _WideShell(
+          companyName: widget.companyName,
+          companyCaption: widget.companyCaption,
+          currentId: _currentId,
+          tabsNotifier: _tabsNotifier,
+          contentNavKey: _contentNavKey,
+          onSelect: _goTo,
+          onNestedCanPop: _onNestedCanPop,
+          onSwitchCompany: widget.onSwitchCompany,
+          tabs: tabs,
+          actions: widget.actions,
+          banner: widget.banner,
+          emptyBody: widget.emptyBody,
+        ),
       );
     }
 
-    final narrowIndex = _positionOf(_narrowId, tabs);
+    final narrowId = _currentId.value;
+    final narrowIndex = _positionOf(narrowId, tabs);
     final pinned = _pinned(tabs);
     final hasMore = pinned.length < tabs.length;
-    final pinnedIndex = pinned.indexWhere((t) => t.id == _narrowId);
+    final pinnedIndex = pinned.indexWhere((t) => t.id == narrowId);
     final destinationCount = pinned.length + (hasMore ? 1 : 0);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(tabs.isEmpty ? widget.companyName : '${widget.companyName} — ${tabs[narrowIndex].title}'),
-        actions: [
-          ...widget.actions,
-          IconButton(icon: const Icon(Icons.swap_horiz), tooltip: 'Firma wechseln', onPressed: widget.onSwitchCompany),
-        ],
-      ),
-      body: Column(
-        children: [
-          ?widget.banner,
-          Expanded(
-            child: tabs.isEmpty
-                ? (widget.emptyBody ?? const SizedBox.shrink())
-                : IndexedStack(index: narrowIndex, children: [for (final tab in tabs) tab.screen]),
-          ),
-        ],
-      ),
-      bottomNavigationBar: destinationCount < 2
-          ? null
-          : NavigationBar(
-              selectedIndex: pinnedIndex == -1 ? pinned.length : pinnedIndex,
-              onDestinationSelected: (index) {
-                if (index < pinned.length) {
-                  _select(pinned[index].id);
-                  setState(() => _narrowId = pinned[index].id);
-                } else {
-                  _openMoreOverview(tabs);
-                }
-              },
-              destinations: [
-                for (final tab in pinned) NavigationDestination(icon: Icon(tab.icon), label: tab.title),
-                if (hasMore) const NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mehr'),
-              ],
+    return _popScope(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(tabs.isEmpty ? widget.companyName : '${widget.companyName} — ${tabs[narrowIndex].title}'),
+          actions: [
+            ...widget.actions,
+            IconButton(icon: const Icon(Icons.swap_horiz), tooltip: 'Firma wechseln', onPressed: widget.onSwitchCompany),
+          ],
+        ),
+        body: Column(
+          children: [
+            ?widget.banner,
+            Expanded(
+              child: tabs.isEmpty
+                  ? (widget.emptyBody ?? const SizedBox.shrink())
+                  : IndexedStack(index: narrowIndex, children: [for (final tab in tabs) tab.screen]),
             ),
+          ],
+        ),
+        bottomNavigationBar: destinationCount < 2
+            ? null
+            : NavigationBar(
+                selectedIndex: pinnedIndex == -1 ? pinned.length : pinnedIndex,
+                onDestinationSelected: (index) {
+                  if (index < pinned.length) {
+                    _goTo(pinned[index].id);
+                  } else {
+                    _openMoreOverview(tabs);
+                  }
+                },
+                destinations: [
+                  for (final tab in pinned) NavigationDestination(icon: Icon(tab.icon), label: tab.title),
+                  if (hasMore) const NavigationDestination(icon: Icon(Icons.more_horiz), label: 'Mehr'),
+                ],
+              ),
+      ),
     );
   }
 }
@@ -254,34 +397,76 @@ class _AppShellState extends State<AppShell> {
 /// „Mehr“-Übersicht für die schmale Bottom-Bar — zeigt ALLE Einträge
 /// gruppiert nach Sektion, exakt wie die breite Sidebar. Ein Tipp gibt
 /// die ID zurück und schließt die Seite; die eigentliche Umschaltung
-/// bleibt Sache von [_AppShellState].
+/// bleibt Sache von [_AppShellState]. Die Stecknadel je Zeile nimmt den
+/// Bereich in den Schnellzugriff (feste Einträge der Bottom-Bar) auf
+/// bzw. entfernt ihn wieder — die Seite bleibt dabei offen.
 class _MoreOverviewScreen extends StatelessWidget {
-  const _MoreOverviewScreen({required this.tabs, required this.currentId});
+  const _MoreOverviewScreen({
+    required this.tabs,
+    required this.currentId,
+    required this.pinnedKeys,
+    required this.quickAccessKeys,
+    required this.onTogglePin,
+  });
   final List<ShellTab> tabs;
   final Object? currentId;
 
+  /// Nur zum Neuzeichnen nach einer Änderung; die wirksame Auswahl
+  /// (inkl. Vorgabe) liefert [quickAccessKeys].
+  final ValueListenable<List<String>?> pinnedKeys;
+  final List<String> Function() quickAccessKeys;
+  final String? Function(ShellTab tab) onTogglePin;
+
   @override
   Widget build(BuildContext context) {
-    final children = <Widget>[];
-    ShellSection? lastSection;
-    for (final tab in tabs) {
-      if (tab.section != lastSection) {
-        final header = _sectionHeaderFor(tab.section);
-        if (header != null) children.add(header);
-        lastSection = tab.section;
-      }
-      children.add(
-        ListTile(
-          leading: Icon(tab.icon),
-          title: Text(tab.title),
-          selected: tab.id == currentId,
-          onTap: () => Navigator.of(context).pop(tab.id),
-        ),
-      );
-    }
     return Scaffold(
       appBar: AppBar(title: const Text('Mehr')),
-      body: ListView(children: children),
+      body: ValueListenableBuilder<List<String>?>(
+        valueListenable: pinnedKeys,
+        builder: (context, _, _) {
+          final pinned = quickAccessKeys().toSet();
+          final children = <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Text(
+                'Schnellzugriff: Mit der Stecknadel legst du bis zu ${AppShell.maxQuickAccess} Bereiche '
+                'fest in die untere Leiste — je Gerät und Firma.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ];
+          ShellSection? lastSection;
+          for (final tab in tabs) {
+            if (tab.section != lastSection) {
+              final header = _sectionHeaderFor(tab.section);
+              if (header != null) children.add(header);
+              lastSection = tab.section;
+            }
+            final isPinned = pinned.contains(tab.key);
+            children.add(
+              ListTile(
+                leading: Icon(tab.icon),
+                title: Text(tab.title),
+                selected: tab.id == currentId,
+                onTap: () => Navigator.of(context).pop(tab.id),
+                trailing: IconButton(
+                  icon: Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+                  tooltip: isPinned ? 'Aus dem Schnellzugriff entfernen' : 'In den Schnellzugriff aufnehmen',
+                  onPressed: () {
+                    final hint = onTogglePin(tab);
+                    if (hint != null) {
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(SnackBar(content: Text(hint)));
+                    }
+                  },
+                ),
+              ),
+            );
+          }
+          return ListView(children: children);
+        },
+      ),
     );
   }
 }
@@ -295,6 +480,7 @@ class _WideShell extends StatelessWidget {
     required this.tabsNotifier,
     required this.contentNavKey,
     required this.onSelect,
+    required this.onNestedCanPop,
     required this.onSwitchCompany,
     required this.tabs,
     required this.actions,
@@ -308,6 +494,10 @@ class _WideShell extends StatelessWidget {
   final ValueNotifier<List<ShellTab>> tabsNotifier;
   final GlobalKey<NavigatorState> contentNavKey;
   final ValueChanged<Object> onSelect;
+
+  /// Meldet, ob der Inhalts-Navigator gerade eine Detailseite schließen
+  /// könnte (für „Zurück“ der Shell).
+  final ValueChanged<bool> onNestedCanPop;
   final VoidCallback onSwitchCompany;
   final List<Widget> actions;
   final Widget? banner;
@@ -466,23 +656,34 @@ class _WideShell extends StatelessWidget {
                       // Eigener ScaffoldMessenger: Hinweise aus einer hier
                       // geöffneten Seite erscheinen über deren Knopfleiste,
                       // statt sie im Fenster-Scaffold zu verdecken.
-                      : ScaffoldMessenger(
-                          child: Navigator(
-                            key: contentNavKey,
-                            onGenerateRoute: (settings) => MaterialPageRoute(
-                              settings: settings,
-                              builder: (context) => ListenableBuilder(
-                                // Auf BEIDE hören: ein neu aktiviertes Modul
-                                // ändert die Liste selbst, nicht nur die Auswahl.
-                                listenable: Listenable.merge([tabsNotifier, currentId]),
-                                builder: (context, _) {
-                                  final currentTabs = tabsNotifier.value;
-                                  final index = currentTabs.indexWhere((t) => t.id == currentId.value);
-                                  return IndexedStack(
-                                    index: index < 0 ? 0 : index,
-                                    children: [for (final tab in currentTabs) tab.screen],
-                                  );
-                                },
+                      // NotificationListener: der Navigator meldet, ob er
+                      // eine Seite schließen könnte — dann gehört „Zurück“
+                      // ihm (siehe [AppShell]-Klassendoc). `false` lässt
+                      // die Meldung weiter zur App-Wurzel steigen (sie
+                      // steuert dort die Android-Zurück-Geste).
+                      : NotificationListener<NavigationNotification>(
+                          onNotification: (notification) {
+                            onNestedCanPop(notification.canHandlePop);
+                            return false;
+                          },
+                          child: ScaffoldMessenger(
+                            child: Navigator(
+                              key: contentNavKey,
+                              onGenerateRoute: (settings) => MaterialPageRoute(
+                                settings: settings,
+                                builder: (context) => ListenableBuilder(
+                                  // Auf BEIDE hören: ein neu aktiviertes Modul
+                                  // ändert die Liste selbst, nicht nur die Auswahl.
+                                  listenable: Listenable.merge([tabsNotifier, currentId]),
+                                  builder: (context, _) {
+                                    final currentTabs = tabsNotifier.value;
+                                    final index = currentTabs.indexWhere((t) => t.id == currentId.value);
+                                    return IndexedStack(
+                                      index: index < 0 ? 0 : index,
+                                      children: [for (final tab in currentTabs) tab.screen],
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ),

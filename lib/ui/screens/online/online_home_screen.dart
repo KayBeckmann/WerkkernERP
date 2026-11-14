@@ -271,6 +271,9 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
           companyCaption: online ? 'online' : 'offline',
           tabs: tabs,
           pinnedNarrowIds: const ['Dashboard', 'Rechnungen', 'Kunden'],
+          // Schnellzugriff je Gerät, Konto und Online-Firma — nicht auf dem
+          // Server, damit Kollegen derselben Firma einander nichts verstellen.
+          quickAccessScope: 'online:${session.serverUrl.host}:${session.email}:${session.companyId}',
           contentNavigatorKey: _contentNavKey,
           onSwitchCompany: _switchCompany,
           onTabSelected: (id) => setState(() => _visits.update(id as String, (v) => v + 1, ifAbsent: () => 1)),
