@@ -496,7 +496,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
         builder: (_) => Scaffold(
           appBar: AppBar(title: Text(document.isDraft ? 'Vorschau (Entwurf, nicht final)' : document.number!)),
           body: PdfPreview(
-            build: (_) => buildOnlineDocumentPdf(document, liveCompany: company, liveCustomer: customer),
+            build: (_) => buildOnlineDocumentPdf(document, liveCompany: company, liveCustomer: customer, eInvoiceEnabled: widget.session.modules.contains('eInvoice')),
             canChangeOrientation: false,
             canChangePageFormat: false,
             allowSharing: !document.isDraft,
@@ -826,7 +826,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                     title: '${onlineDocumentKindLabels[document.kind] ?? 'Dokument'} ${document.number} senden',
                     defaultRecipientHint: _recipientHint(billing: billingDocumentKinds.contains(document.kind)),
                     customText: true,
-                    buildPdf: () => buildOnlineDocumentPdf(document),
+                    buildPdf: () => buildOnlineDocumentPdf(document, eInvoiceEnabled: widget.session.modules.contains('eInvoice')),
                     send: (pdf, {to, subject, body}) =>
                         _client.sendDocumentMail(document.id, pdf, to: to, subject: subject, body: body),
                   ),

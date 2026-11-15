@@ -952,6 +952,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         company: company,
         priorAdvancePayments: _priorAdvancePayments,
         referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
+        customer: _liveCustomer ?? widget.customer,
       );
       await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
     } catch (_) {
@@ -1012,6 +1013,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           company: company,
           priorAdvancePayments: _priorAdvancePayments,
           referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
+          customer: _liveCustomer ?? widget.customer,
         );
       },
     );

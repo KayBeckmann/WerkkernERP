@@ -4,12 +4,15 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:werkkern_core/werkkern_core.dart'
+    show EInvoiceData, EInvoiceProfile, buildEInvoiceXml, eInvoiceProblems, facturXAttachmentName;
 
 import '../data/database/database.dart';
 import '../data/database/tables.dart';
 import '../data/repositories/invoice_repository.dart' show AdvancePaymentEntry;
 import '../domain/models/money.dart';
 import '../domain/services/document_text_resolver.dart';
+import '../domain/services/einvoice_builder.dart';
 import '../domain/services/invoice_totals_service.dart';
 
 /// Eigenständig gestaltetes Rechnungs-PDF — an RechnungsFee orientiert
@@ -42,6 +45,10 @@ Future<Uint8List> buildInvoicePdf({
   // die sich eine Gutschrift bezieht — `null` bei allen übrigen
   // Dokumentarten. Reiner Anzeigetext, keine eigene Berechnung.
   String? referencedDocumentNumber,
+  // C15 E-Rechnung: Datum der korrigierten Rechnung (BT-26) und der Kunde
+  // als Fallback für Dokumente ohne Parteien-Schnappschuss (vor v36).
+  DateTime? referencedDocumentDate,
+  Customer? customer,
 }) async {
   if (invoice.status != InvoiceStatus.finalized || invoice.invoiceNumber == null) {
     throw StateError('PDF kann nur für eine finalisierte Rechnung erzeugt werden.');
@@ -53,6 +60,8 @@ Future<Uint8List> buildInvoicePdf({
     isPreview: false,
     priorAdvancePayments: priorAdvancePayments,
     referencedDocumentNumber: referencedDocumentNumber,
+    referencedDocumentDate: referencedDocumentDate,
+    customer: customer,
   );
 }
 
@@ -111,6 +120,7 @@ class PdfDocumentData {
     this.footerText,
     this.isSmallBusinessExempt = false,
     required this.lines,
+    this.eInvoice,
   });
 
   final DocumentKind kind;
@@ -133,6 +143,19 @@ class PdfDocumentData {
   final String? footerText;
   final bool isSmallBusinessExempt;
   final List<PdfLine> lines;
+
+  /// C15 E-Rechnung: liegt hier eine vollständige [EInvoiceData] (Modul
+  /// aktiv, Rechnung/Gutschrift, finalisiert), wird das PDF als
+  /// ZUGFeRD-Hybrid (PDF/A-3b mit `factur-x.xml`) erzeugt. Entwürfe und
+  /// unvollständige Daten ergeben weiterhin ein reines PDF.
+  final EInvoiceData? eInvoice;
+}
+
+/// Ob [renderDocumentPdf] für [data] eine XML einbettet (für die
+/// Anzeige „E-Rechnung“ und die Dateinamen in der Bedienoberfläche).
+bool pdfEmbedsEInvoice(PdfDocumentData data, {required bool isPreview}) {
+  final e = data.eInvoice;
+  return e != null && !isPreview && eInvoiceProblems(e).isEmpty;
 }
 
 /// Eine Position im PDF (Feldnamen wie [InvoiceItem]).
@@ -173,6 +196,8 @@ Future<Uint8List> _buildPdf({
   required bool isPreview,
   List<AdvancePaymentEntry> priorAdvancePayments = const [],
   String? referencedDocumentNumber,
+  DateTime? referencedDocumentDate,
+  Customer? customer,
 }) {
   // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.1): Für ein
   // bereits finalisiertes Dokument wird NIE aus den aktuellen (live)
@@ -203,6 +228,18 @@ Future<Uint8List> _buildPdf({
       footerText: isPreview ? company.pdfFooterText : invoice.pdfFooterTextSnapshot,
       isSmallBusinessExempt: company.isSmallBusinessExempt,
       lines: [for (final item in items) PdfLine.fromItem(item)],
+      // C15: nur finalisierte Rechnungen/Gutschriften werden Hybrid-PDF.
+      eInvoice: isPreview
+          ? null
+          : eInvoiceDataForInvoice(
+              invoice: invoice,
+              items: items,
+              company: company,
+              customer: customer,
+              priorAdvancePayments: priorAdvancePayments,
+              referencedInvoiceNumber: referencedDocumentNumber,
+              referencedInvoiceDate: referencedDocumentDate,
+            ),
     ),
     isPreview: isPreview,
     priorAdvancePayments: priorAdvancePayments,
@@ -258,7 +295,44 @@ Future<Uint8List> renderDocumentPdf(
   final closingText = data.closingText;
   final footerText = data.footerText;
 
-  final doc = pw.Document(theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont));
+  // C15 E-Rechnung: ZUGFeRD-Hybrid = PDF/A-3b (XMP-Metadaten mit
+  // Factur-X-Schema, sRGB-Ausgabeprofil, eingebettete Schriften) plus
+  // eingebettete `factur-x.xml`. Die XML entsteht VOR dem Dokument, weil
+  // die Metadaten im Konstruktor mitgegeben werden.
+  final eInvoice = data.eInvoice;
+  final embed = pdfEmbedsEInvoice(data, isPreview: isPreview);
+  final eInvoiceXml = embed ? buildEInvoiceXml(eInvoice!) : null;
+  final title = '${invoice.isAdvancePayment ? 'Abschlagsrechnung' : _title(invoice.kind)} ${invoice.invoiceNumber ?? ''}'.trim();
+  final author = invoice.companySnapshotName ?? 'WerkkernERP';
+  final doc = pw.Document(
+    theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+    title: title,
+    author: author,
+    creator: 'WerkkernERP',
+    producer: 'WerkkernERP',
+    metadata: embed
+        ? PdfaRdf(
+            title: title,
+            author: author,
+            creator: 'WerkkernERP',
+            producer: 'WerkkernERP',
+            subject: title,
+            keywords: eInvoice!.profile == EInvoiceProfile.xrechnung ? 'XRechnung, EN 16931' : 'ZUGFeRD, EN 16931',
+            invoiceRdf: PdfaFacturxRdf().create(
+              filename: facturXAttachmentName,
+              namespace: 'urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#',
+              conformanceLevel: 'EN 16931',
+              version: '1.0',
+            ),
+          ).create()
+        : null,
+  );
+  if (embed) {
+    PdfaColorProfile(doc.document, (await rootBundle.load('assets/sRGB2014.icc')).buffer.asUint8List());
+    PdfaAttachedFiles(doc.document, [
+      PdfaAttachedFile(name: facturXAttachmentName, data: eInvoiceXml!, afRelationship: '/Alternative'),
+    ]);
+  }
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,

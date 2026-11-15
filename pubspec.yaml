@@ -134,6 +134,8 @@ flutter:
   assets:
     - assets/fonts/DejaVuSans.ttf
     - assets/fonts/DejaVuSans-Bold.ttf
+    # C15 E-Rechnung: sRGB-Ausgabeprofil für PDF/A-3 (ZUGFeRD), ICC 2015, frei verteilbar.
+    - assets/sRGB2014.icc
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
