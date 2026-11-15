@@ -49,7 +49,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 35;
+  int get schemaVersion => 36;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -378,6 +378,33 @@ class AppDatabase extends _$AppDatabase {
               "WHERE trim(coalesce(contact_person, '')) <> ''",
             );
             await customStatement('UPDATE customers SET contact_person = NULL WHERE contact_person IS NOT NULL');
+          }
+          if (from < 36) {
+            // C15.1 E-Rechnung (Kay 2026-11-15): strukturierte Anschriften,
+            // BIC, Leitweg-ID, Format je Kunde, Modul-Schalter und der
+            // Parteien-Schnappschuss am Dokument. Bestandsdaten bleiben im
+            // Freitext — der Fallback-Parser zerlegt sie bei Bedarf.
+            for (final column in [
+              companies.street,
+              companies.postalCode,
+              companies.city,
+              companies.countryCode,
+              companies.bic,
+              companies.eInvoiceEnabled,
+            ]) {
+              await migrator.addColumn(companies, column);
+            }
+            for (final column in [
+              customers.street,
+              customers.postalCode,
+              customers.city,
+              customers.countryCode,
+              customers.leitwegId,
+              customers.eInvoiceFormat,
+            ]) {
+              await migrator.addColumn(customers, column);
+            }
+            await migrator.addColumn(invoices, invoices.eInvoiceSnapshot);
           }
         },
       );

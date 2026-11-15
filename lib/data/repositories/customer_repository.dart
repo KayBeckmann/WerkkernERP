@@ -35,6 +35,12 @@ class CustomerRepository {
     String? contactPerson,
     String? notes,
     String? invoiceEmail,
+    String? street,
+    String? postalCode,
+    String? city,
+    String? countryCode,
+    String? leitwegId,
+    String? eInvoiceFormat,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.customers).insert(
@@ -49,6 +55,12 @@ class CustomerRepository {
             contactPerson: Value(contactPerson),
             notes: Value(notes),
             invoiceEmail: Value(invoiceEmail),
+            street: Value(street),
+            postalCode: Value(postalCode),
+            city: Value(city),
+            countryCode: Value(countryCode ?? 'DE'),
+            leitwegId: Value(leitwegId),
+            eInvoiceFormat: Value(eInvoiceFormat ?? 'zugferd'),
             createdAt: DateTime.now(),
           ),
         );

@@ -4,6 +4,10 @@
 /// Jede Entität führt `companyId` direkt (ADR-0001 B0.5).
 library;
 
+import 'dart:convert';
+
+import 'package:werkkern_core/werkkern_core.dart';
+
 class Customer {
   const Customer({
     required this.id,
@@ -18,6 +22,12 @@ class Customer {
     required this.createdAt,
     this.invoiceEmail,
     this.contacts = const [],
+    this.street,
+    this.postalCode,
+    this.city,
+    this.countryCode = 'DE',
+    this.leitwegId,
+    this.eInvoiceFormat = 'zugferd',
   });
   final String id;
   final String companyId;
@@ -26,6 +36,15 @@ class Customer {
   final String? email;
   final String? phone;
   final String? vatId;
+
+  /// C15 E-Rechnung: strukturierte Anschrift (BG-8), Leitweg-ID (BT-10),
+  /// Format `zugferd`/`xrechnung`.
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? leitwegId;
+  final String eInvoiceFormat;
 
   /// Altes Einzelfeld „Ansprechpartner“ — seit den Kontaktpersonen
   /// (Migration 22) leer; nur noch für ältere App-Fassungen gelesen.
@@ -55,6 +74,12 @@ class Customer {
         createdAt: createdAt,
         invoiceEmail: invoiceEmail,
         contacts: contacts,
+        street: street,
+        postalCode: postalCode,
+        city: city,
+        countryCode: countryCode,
+        leitwegId: leitwegId,
+        eInvoiceFormat: eInvoiceFormat,
       );
 
   Map<String, Object?> toJson() => {
@@ -69,6 +94,12 @@ class Customer {
         'createdAt': createdAt.toIso8601String(),
         'invoiceEmail': invoiceEmail,
         'contacts': [for (final c in contacts) c.toJson()],
+        'street': street,
+        'postalCode': postalCode,
+        'city': city,
+        'countryCode': countryCode,
+        'leitwegId': leitwegId,
+        'eInvoiceFormat': eInvoiceFormat,
       };
 }
 
@@ -231,6 +262,7 @@ class Document {
     this.smallBusinessExemptSnapshot = false,
     this.stockBooked = false,
     this.contactId,
+    this.eInvoiceSnapshot,
   });
   final String id;
   final String companyId;
@@ -292,6 +324,10 @@ class Document {
   /// Versand, sofern keine Rechnungs-E-Mail Vorrang hat.
   final String? contactId;
 
+  /// C15 E-Rechnung: beim Finalisieren eingefrorene Parteien als JSON
+  /// (`EInvoiceSnapshot` aus `werkkern_core`), nur bei Rechnung/Gutschrift.
+  final String? eInvoiceSnapshot;
+
   bool get isDraft => status == 'draft';
 
   /// Kopie mit geänderten Feldern — verhindert, dass beim Aktualisieren
@@ -320,6 +356,7 @@ class Document {
     bool? isFixedPrice,
     bool? stockBooked,
     String? Function()? contactId,
+    String? eInvoiceSnapshot,
   }) =>
       Document(
         id: id,
@@ -359,6 +396,7 @@ class Document {
         smallBusinessExemptSnapshot: company != null ? company.smallBusinessExempt : smallBusinessExemptSnapshot,
         stockBooked: stockBooked ?? this.stockBooked,
         contactId: contactId != null ? contactId() : this.contactId,
+        eInvoiceSnapshot: eInvoiceSnapshot ?? this.eInvoiceSnapshot,
       );
 
   Map<String, Object?> toJson() => {
@@ -394,6 +432,7 @@ class Document {
         'dueDate': dueDate == null ? null : _date(dueDate!),
         'projectId': projectId,
         'contactId': contactId,
+        'eInvoiceSnapshot': eInvoiceSnapshot == null ? null : jsonDecode(eInvoiceSnapshot!),
         'isAdvancePayment': isAdvancePayment,
         'isFixedPrice': isFixedPrice,
         'stockBooked': stockBooked,
@@ -472,12 +511,28 @@ class CompanySnapshot {
     this.closingText,
     this.footerText,
     this.smallBusinessExempt = false,
+    this.street,
+    this.postalCode,
+    this.city,
+    this.countryCode = 'DE',
+    this.bic,
+    this.email,
+    this.phone,
   });
   final String name;
   final String? address;
   final String? taxNumber;
   final String? vatId;
   final String? iban;
+
+  /// C15 E-Rechnung: strukturierte Verkäuferdaten für den Schnappschuss.
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? bic;
+  final String? email;
+  final String? phone;
 
   /// Texte der Dokumentart + Fußzeile + § 19 zum Finalisierungszeitpunkt
   /// (spätere Änderungen verändern das PDF nicht — Audit-Befund 2.1).
@@ -590,4 +645,51 @@ class BusinessConflict implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+/// C15: Parteien-Schnappschuss fürs Finalisieren (JSON) — `null` für
+/// Dokumentarten, die keine E-Rechnung sind.
+String? buildEInvoiceSnapshotJson({
+  required String kind,
+  required CompanySnapshot company,
+  required Customer customer,
+  CustomerContact? contact,
+}) {
+  if (!isEInvoiceDocumentKind(kind)) return null;
+  return jsonEncode(
+    EInvoiceSnapshot(
+      seller: EInvoiceParty(
+        name: company.name,
+        address: addressFromFields(
+          street: company.street,
+          postalCode: company.postalCode,
+          city: company.city,
+          countryCode: company.countryCode,
+          freeText: company.address,
+        ),
+        vatId: company.vatId,
+        taxNumber: company.taxNumber,
+        email: company.email,
+        phone: company.phone,
+        iban: company.iban,
+        bic: company.bic,
+      ),
+      buyer: EInvoiceParty(
+        name: customer.name,
+        address: addressFromFields(
+          street: customer.street,
+          postalCode: customer.postalCode,
+          city: customer.city,
+          countryCode: customer.countryCode,
+          freeText: customer.address,
+        ),
+        vatId: customer.vatId,
+        email: customer.invoiceEmail ?? contact?.email ?? customer.email,
+        phone: customer.phone,
+        contactName: contact?.name,
+        leitwegId: customer.leitwegId,
+      ),
+      format: EInvoiceFormat.parse(customer.eInvoiceFormat),
+    ).toJson(),
+  );
 }

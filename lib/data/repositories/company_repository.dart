@@ -77,6 +77,7 @@ class CompanyRepository {
     required bool lagerbestandEnabled,
     required bool bestellwesenEnabled,
     required bool timeTrackingEnabled,
+    bool? eInvoiceEnabled,
   }) async {
     final company = await findById(companyId);
     if (company == null) {
@@ -98,6 +99,8 @@ class CompanyRepository {
       lagerbestandEnabled: lagerbestandEnabled,
       bestellwesenEnabled: bestellwesenEnabled,
       timeTrackingEnabled: timeTrackingEnabled,
+      // C15 E-Rechnung — optional, damit bestehende Aufrufer unverändert bleiben.
+      eInvoiceEnabled: eInvoiceEnabled ?? company.eInvoiceEnabled,
     );
     await update(updated);
     return updated;

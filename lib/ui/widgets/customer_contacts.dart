@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:werkkern_core/werkkern_core.dart' show EInvoiceFormat, parsePostalAddress;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'section_label.dart';
@@ -34,9 +35,24 @@ class CustomerFormResult {
     this.vatId,
     this.notes,
     this.contacts = const [],
+    this.street,
+    this.postalCode,
+    this.city,
+    this.countryCode = 'DE',
+    this.leitwegId,
+    this.eInvoiceFormat = 'zugferd',
   });
   final String name;
   final String? address;
+
+  /// C15 E-Rechnung: strukturierte Anschrift (BG-8), Leitweg-ID (BT-10)
+  /// und das Format (`zugferd`/`xrechnung`), das dieser Kunde erhält.
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? leitwegId;
+  final String eInvoiceFormat;
 
   /// Allgemeine E-Mail des Kunden — letzter Fallback beim Versand.
   final String? email;
@@ -93,6 +109,12 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
   late final _phone = TextEditingController(text: widget.existing?.phone);
   late final _vatId = TextEditingController(text: widget.existing?.vatId);
   late final _notes = TextEditingController(text: widget.existing?.notes);
+  late final _street = TextEditingController(text: widget.existing?.street);
+  late final _postalCode = TextEditingController(text: widget.existing?.postalCode);
+  late final _city = TextEditingController(text: widget.existing?.city);
+  late final _countryCode = TextEditingController(text: widget.existing?.countryCode ?? 'DE');
+  late final _leitwegId = TextEditingController(text: widget.existing?.leitwegId);
+  late String _eInvoiceFormat = widget.existing?.eInvoiceFormat ?? 'zugferd';
   late final List<ContactData> _contacts = [...?widget.existing?.contacts];
   String? _error;
 
@@ -100,7 +122,7 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
 
   @override
   void dispose() {
-    for (final c in [_name, _address, _email, _invoiceEmail, _phone, _vatId, _notes]) {
+    for (final c in [_name, _address, _email, _invoiceEmail, _phone, _vatId, _notes, _street, _postalCode, _city, _countryCode, _leitwegId]) {
       c.dispose();
     }
     super.dispose();
@@ -133,8 +155,26 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
         vatId: _trimmedOrNull(_vatId),
         notes: _trimmedOrNull(_notes),
         contacts: _contacts,
+        street: _trimmedOrNull(_street),
+        postalCode: _trimmedOrNull(_postalCode),
+        city: _trimmedOrNull(_city),
+        countryCode: (_trimmedOrNull(_countryCode) ?? 'DE').toUpperCase(),
+        leitwegId: _trimmedOrNull(_leitwegId),
+        eInvoiceFormat: _eInvoiceFormat,
       ),
     );
+  }
+
+  /// Freitext-Anschrift in die strukturierten Felder übernehmen (nur
+  /// leere Felder) — spart das Abtippen bei Bestandskunden.
+  void _splitAddress() {
+    final parsed = parsePostalAddress(_address.text);
+    setState(() {
+      if (_street.text.trim().isEmpty && parsed.street != null) _street.text = parsed.street!;
+      if (_postalCode.text.trim().isEmpty && parsed.postalCode != null) _postalCode.text = parsed.postalCode!;
+      if (_city.text.trim().isEmpty && parsed.city != null) _city.text = parsed.city!;
+      if (_countryCode.text.trim().isEmpty || _countryCode.text.trim() == 'DE') _countryCode.text = parsed.countryCode;
+    });
   }
 
   @override
@@ -177,6 +217,60 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
               ),
               TextField(controller: _vatId, decoration: const InputDecoration(labelText: 'USt-IdNr.')),
               TextField(controller: _notes, maxLines: 2, decoration: const InputDecoration(labelText: 'Notizen')),
+              const SizedBox(height: 8),
+              // C15 E-Rechnung: EN 16931 braucht Straße/PLZ/Ort/Land getrennt
+              // (BG-8); der Freitext oben bleibt fürs PDF.
+              const SectionLabel('E-Rechnung'),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _street,
+                      decoration: const InputDecoration(labelText: 'Straße und Hausnummer'),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Aus der Anschrift übernehmen',
+                    icon: const Icon(Icons.call_split),
+                    onPressed: _splitAddress,
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 110,
+                    child: TextField(controller: _postalCode, decoration: const InputDecoration(labelText: 'PLZ')),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: TextField(controller: _city, decoration: const InputDecoration(labelText: 'Ort'))),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 70,
+                    child: TextField(
+                      controller: _countryCode,
+                      maxLength: 2,
+                      decoration: const InputDecoration(labelText: 'Land', counterText: ''),
+                    ),
+                  ),
+                ],
+              ),
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: _eInvoiceFormat,
+                decoration: const InputDecoration(labelText: 'E-Rechnungsformat'),
+                items: [
+                  for (final f in EInvoiceFormat.values) DropdownMenuItem(value: f.name, child: Text(f.label)),
+                ],
+                onChanged: (value) => setState(() => _eInvoiceFormat = value ?? 'zugferd'),
+              ),
+              TextField(
+                controller: _leitwegId,
+                decoration: const InputDecoration(
+                  labelText: 'Leitweg-ID / Käuferreferenz',
+                  helperText: 'Pflicht bei XRechnung (öffentliche Auftraggeber).',
+                ),
+              ),
               const SizedBox(height: 8),
               const SectionLabel('Kontaktpersonen'),
               for (final (index, contact) in _contacts.indexed)

@@ -165,6 +165,7 @@ const onlineModuleLabels = <String, String>{
   'lagerbestand': 'Lagerbestand',
   'bestellwesen': 'Bestellwesen',
   'timeTracking': 'Zeiterfassung',
+  'eInvoice': 'E-Rechnung (ZUGFeRD / XRechnung)',
   'aiAgents': 'KI-Agenten (MCP/API)',
 };
 

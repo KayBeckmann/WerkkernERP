@@ -41,6 +41,12 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
         contacts: [
           for (final x in c.contacts) ContactData(id: x.id, name: x.name, role: x.role, email: x.email, phone: x.phone),
         ],
+        street: c.street,
+        postalCode: c.postalCode,
+        city: c.city,
+        countryCode: c.countryCode,
+        leitwegId: c.leitwegId,
+        eInvoiceFormat: c.eInvoiceFormat,
       );
 
   static OnlineCustomer _customer(String id, CustomerFormResult r) => OnlineCustomer(
@@ -55,6 +61,12 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
         contacts: [
           for (final x in r.contacts) OnlineContact(id: x.id, name: x.name, role: x.role, email: x.email, phone: x.phone),
         ],
+        street: r.street,
+        postalCode: r.postalCode,
+        city: r.city,
+        countryCode: r.countryCode,
+        leitwegId: r.leitwegId,
+        eInvoiceFormat: r.eInvoiceFormat,
       );
 
   /// Formular öffnen und speichern; liefert den gespeicherten Stand.

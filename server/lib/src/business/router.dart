@@ -185,6 +185,13 @@ class BusinessRoutes {
         createdAt: createdAt,
         invoiceEmail: invoiceEmail,
         contacts: contacts,
+        // C15: ältere Clients kennen die Felder nicht — dann bleiben sie.
+        street: kept('street', existing?.street),
+        postalCode: kept('postalCode', existing?.postalCode),
+        city: kept('city', existing?.city),
+        countryCode: (kept('countryCode', existing?.countryCode) ?? 'DE').toUpperCase(),
+        leitwegId: kept('leitwegId', existing?.leitwegId),
+        eInvoiceFormat: kept('eInvoiceFormat', existing?.eInvoiceFormat) == 'xrechnung' ? 'xrechnung' : 'zugferd',
       ),
       error: null,
     );
@@ -794,6 +801,13 @@ class BusinessRoutes {
           closingText: profile.documentTexts[existing.kind]?.closing,
           footerText: profile.footerText,
           smallBusinessExempt: profile.smallBusinessExempt,
+          street: profile.street,
+          postalCode: profile.postalCode,
+          city: profile.city,
+          countryCode: profile.countryCode,
+          bic: profile.bic,
+          email: profile.email,
+          phone: profile.phone,
         ),
         now: DateTime.now().toUtc(),
       );

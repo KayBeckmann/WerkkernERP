@@ -45,7 +45,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   // ---- Kunden -------------------------------------------------------------
 
   static const _customerColumns =
-      'id, company_id, name, address, email, phone, vat_id, contact_person, notes, created_at, invoice_email';
+      'id, company_id, name, address, email, phone, vat_id, contact_person, notes, created_at, invoice_email, '
+      'street, postal_code, city, country_code, leitweg_id, e_invoice_format';
 
   Customer _toCustomer(ResultRow r) => Customer(
         id: r[0] as String,
@@ -59,6 +60,12 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         notes: r[8] as String?,
         createdAt: r[9] as DateTime,
         invoiceEmail: r[10] as String?,
+        street: r[11] as String?,
+        postalCode: r[12] as String?,
+        city: r[13] as String?,
+        countryCode: r[14] as String? ?? 'DE',
+        leitwegId: r[15] as String?,
+        eInvoiceFormat: r[16] as String? ?? 'zugferd',
       );
 
   /// Kontaktpersonen der Firma, optional nur eines Kunden, gruppiert nach
@@ -125,13 +132,20 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'notes': c.notes,
         'createdAt': c.createdAt,
         'invoiceEmail': c.invoiceEmail,
+        'street': c.street,
+        'postalCode': c.postalCode,
+        'city': c.city,
+        'countryCode': c.countryCode,
+        'leitwegId': c.leitwegId,
+        'eInvoiceFormat': c.eInvoiceFormat,
       };
 
   @override
   Future<void> createCustomer(Customer customer) async {
     await _q(
       'INSERT INTO customers ($_customerColumns) VALUES '
-      '(@id, @companyId, @name, @address, @email, @phone, @vatId, @contactPerson, @notes, @createdAt, @invoiceEmail)',
+      '(@id, @companyId, @name, @address, @email, @phone, @vatId, @contactPerson, @notes, @createdAt, @invoiceEmail, '
+      '@street, @postalCode, @city, @countryCode, @leitwegId, @eInvoiceFormat)',
       _customerParams(customer),
     );
   }
@@ -140,8 +154,9 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   Future<bool> updateCustomer(Customer customer) async {
     final result = await _q(
       'UPDATE customers SET name = @name, address = @address, email = @email, phone = @phone, vat_id = @vatId, '
-      'contact_person = @contactPerson, notes = @notes, invoice_email = @invoiceEmail '
-      'WHERE company_id = @companyId AND id = @id',
+      'contact_person = @contactPerson, notes = @notes, invoice_email = @invoiceEmail, street = @street, '
+      'postal_code = @postalCode, city = @city, country_code = @countryCode, leitweg_id = @leitwegId, '
+      'e_invoice_format = @eInvoiceFormat WHERE company_id = @companyId AND id = @id',
       // createdAt ist unveränderlich — der Treiber lehnt überzählige
       // Parameter ab, daher explizit entfernen.
       _customerParams(customer)..remove('createdAt'),
@@ -289,7 +304,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban, '
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
       'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked, '
-      'd.contact_id';
+      'd.contact_id, d.e_invoice_snapshot';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -329,6 +344,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         smallBusinessExemptSnapshot: r[34] as bool,
         stockBooked: r[35] as bool,
         contactId: r[36] as String?,
+        eInvoiceSnapshot: r[37] as String?,
       );
 
   @override
@@ -617,6 +633,38 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       final row = await _lockDraft(s, companyId, id, expectedVersion);
       if (row == null) return false;
       final kind = row[2] as String;
+      // C15 E-Rechnung: Parteien (Kunde + Kontaktperson des Dokuments)
+      // für den Schnappschuss — in derselben Transaktion gelesen.
+      final customerRow = await s.execute(
+        Sql.named('SELECT $_customerColumns FROM customers WHERE id = @id'),
+        parameters: {'id': row[3] as String},
+      );
+      final contactRow = await s.execute(
+        Sql.named(
+          'SELECT x.id, x.customer_id, x.name, x.role, x.email, x.phone, x.sort_order FROM customer_contacts x '
+          'JOIN documents d ON d.contact_id = x.id WHERE d.id = @id',
+        ),
+        parameters: {'id': id},
+      );
+      final eInvoiceSnapshot = customerRow.isEmpty
+          ? null
+          : buildEInvoiceSnapshotJson(
+              kind: kind,
+              company: company,
+              customer: _toCustomer(customerRow.first),
+              contact: contactRow.isEmpty
+                  ? null
+                  : CustomerContact(
+                      id: contactRow.first[0] as String,
+                      companyId: companyId,
+                      customerId: contactRow.first[1] as String,
+                      name: contactRow.first[2] as String,
+                      role: contactRow.first[3] as String?,
+                      email: contactRow.first[4] as String?,
+                      phone: contactRow.first[5] as String?,
+                      sortOrder: contactRow.first[6] as int,
+                    ),
+            );
       // C2: projektbezogen -> JJ = Gründungsjahr + PP (wie offline).
       final projectRow = await s.execute(
         Sql.named(
@@ -648,11 +696,12 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'company_snapshot_address = @companyAddress, company_snapshot_tax_number = @companyTaxNumber, '
           'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, '
           'intro_text_snapshot = @intro, closing_text_snapshot = @closing, footer_text_snapshot = @footer, '
-          'small_business_exempt_snapshot = @exempt, '
+          'small_business_exempt_snapshot = @exempt, e_invoice_snapshot = @eInvoice, '
           'customer_snapshot_name = c.name, customer_snapshot_address = c.address, customer_snapshot_vat_id = c.vat_id '
           'FROM customers c WHERE c.id = d.customer_id AND d.company_id = @companyId AND d.id = @id',
         ),
         parameters: {
+          'eInvoice': eInvoiceSnapshot,
           'number': number,
           'year': year,
           'now': now,

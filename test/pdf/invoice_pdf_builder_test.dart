@@ -62,6 +62,8 @@ void main() {
         iban: 'DE12 3456 7890 1234 5678 90',
         email: null,
         phone: null,
+        countryCode: 'DE',
+        eInvoiceEnabled: false,
         createdAt: DateTime.now(),
         quotesEnabled: false,
         ordersEnabled: false,

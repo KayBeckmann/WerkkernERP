@@ -96,6 +96,71 @@ class $CompaniesTable extends Companies
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _streetMeta = const VerificationMeta('street');
+  @override
+  late final GeneratedColumn<String> street = GeneratedColumn<String>(
+    'street',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _postalCodeMeta = const VerificationMeta(
+    'postalCode',
+  );
+  @override
+  late final GeneratedColumn<String> postalCode = GeneratedColumn<String>(
+    'postal_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cityMeta = const VerificationMeta('city');
+  @override
+  late final GeneratedColumn<String> city = GeneratedColumn<String>(
+    'city',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _countryCodeMeta = const VerificationMeta(
+    'countryCode',
+  );
+  @override
+  late final GeneratedColumn<String> countryCode = GeneratedColumn<String>(
+    'country_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('DE'),
+  );
+  static const VerificationMeta _bicMeta = const VerificationMeta('bic');
+  @override
+  late final GeneratedColumn<String> bic = GeneratedColumn<String>(
+    'bic',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _eInvoiceEnabledMeta = const VerificationMeta(
+    'eInvoiceEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> eInvoiceEnabled = GeneratedColumn<bool>(
+    'e_invoice_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("e_invoice_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _quotesEnabledMeta = const VerificationMeta(
     'quotesEnabled',
   );
@@ -865,6 +930,12 @@ class $CompaniesTable extends Companies
     email,
     phone,
     createdAt,
+    street,
+    postalCode,
+    city,
+    countryCode,
+    bic,
+    eInvoiceEnabled,
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
@@ -996,6 +1067,48 @@ class $CompaniesTable extends Companies
       );
     } else if (isInserting) {
       context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('street')) {
+      context.handle(
+        _streetMeta,
+        street.isAcceptableOrUnknown(data['street']!, _streetMeta),
+      );
+    }
+    if (data.containsKey('postal_code')) {
+      context.handle(
+        _postalCodeMeta,
+        postalCode.isAcceptableOrUnknown(data['postal_code']!, _postalCodeMeta),
+      );
+    }
+    if (data.containsKey('city')) {
+      context.handle(
+        _cityMeta,
+        city.isAcceptableOrUnknown(data['city']!, _cityMeta),
+      );
+    }
+    if (data.containsKey('country_code')) {
+      context.handle(
+        _countryCodeMeta,
+        countryCode.isAcceptableOrUnknown(
+          data['country_code']!,
+          _countryCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('bic')) {
+      context.handle(
+        _bicMeta,
+        bic.isAcceptableOrUnknown(data['bic']!, _bicMeta),
+      );
+    }
+    if (data.containsKey('e_invoice_enabled')) {
+      context.handle(
+        _eInvoiceEnabledMeta,
+        eInvoiceEnabled.isAcceptableOrUnknown(
+          data['e_invoice_enabled']!,
+          _eInvoiceEnabledMeta,
+        ),
+      );
     }
     if (data.containsKey('quotes_enabled')) {
       context.handle(
@@ -1591,6 +1704,30 @@ class $CompaniesTable extends Companies
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      street: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}street'],
+      ),
+      postalCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}postal_code'],
+      ),
+      city: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}city'],
+      ),
+      countryCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}country_code'],
+      )!,
+      bic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bic'],
+      ),
+      eInvoiceEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}e_invoice_enabled'],
+      )!,
       quotesEnabled: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}quotes_enabled'],
@@ -1859,6 +1996,17 @@ class Company extends DataClass implements Insertable<Company> {
   final String? phone;
   final DateTime createdAt;
 
+  /// C15.1 E-Rechnung (Kay 2026-11-15): strukturierte Anschrift (BG-5)
+  /// neben dem Freitext [address] (bleibt fürs PDF), BIC zum Konto
+  /// (BT-86) und der Modul-Schalter. Leere Felder werden beim Erzeugen
+  /// per `parsePostalAddress()` aus dem Freitext ergänzt.
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? bic;
+  final bool eInvoiceEnabled;
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -2077,6 +2225,12 @@ class Company extends DataClass implements Insertable<Company> {
     this.email,
     this.phone,
     required this.createdAt,
+    this.street,
+    this.postalCode,
+    this.city,
+    required this.countryCode,
+    this.bic,
+    required this.eInvoiceEnabled,
     required this.quotesEnabled,
     required this.ordersEnabled,
     required this.deliveryNotesEnabled,
@@ -2164,6 +2318,20 @@ class Company extends DataClass implements Insertable<Company> {
       map['phone'] = Variable<String>(phone);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || street != null) {
+      map['street'] = Variable<String>(street);
+    }
+    if (!nullToAbsent || postalCode != null) {
+      map['postal_code'] = Variable<String>(postalCode);
+    }
+    if (!nullToAbsent || city != null) {
+      map['city'] = Variable<String>(city);
+    }
+    map['country_code'] = Variable<String>(countryCode);
+    if (!nullToAbsent || bic != null) {
+      map['bic'] = Variable<String>(bic);
+    }
+    map['e_invoice_enabled'] = Variable<bool>(eInvoiceEnabled);
     map['quotes_enabled'] = Variable<bool>(quotesEnabled);
     map['orders_enabled'] = Variable<bool>(ordersEnabled);
     map['delivery_notes_enabled'] = Variable<bool>(deliveryNotesEnabled);
@@ -2348,6 +2516,16 @@ class Company extends DataClass implements Insertable<Company> {
           ? const Value.absent()
           : Value(phone),
       createdAt: Value(createdAt),
+      street: street == null && nullToAbsent
+          ? const Value.absent()
+          : Value(street),
+      postalCode: postalCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(postalCode),
+      city: city == null && nullToAbsent ? const Value.absent() : Value(city),
+      countryCode: Value(countryCode),
+      bic: bic == null && nullToAbsent ? const Value.absent() : Value(bic),
+      eInvoiceEnabled: Value(eInvoiceEnabled),
       quotesEnabled: Value(quotesEnabled),
       ordersEnabled: Value(ordersEnabled),
       deliveryNotesEnabled: Value(deliveryNotesEnabled),
@@ -2498,6 +2676,12 @@ class Company extends DataClass implements Insertable<Company> {
       email: serializer.fromJson<String?>(json['email']),
       phone: serializer.fromJson<String?>(json['phone']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      street: serializer.fromJson<String?>(json['street']),
+      postalCode: serializer.fromJson<String?>(json['postalCode']),
+      city: serializer.fromJson<String?>(json['city']),
+      countryCode: serializer.fromJson<String>(json['countryCode']),
+      bic: serializer.fromJson<String?>(json['bic']),
+      eInvoiceEnabled: serializer.fromJson<bool>(json['eInvoiceEnabled']),
       quotesEnabled: serializer.fromJson<bool>(json['quotesEnabled']),
       ordersEnabled: serializer.fromJson<bool>(json['ordersEnabled']),
       deliveryNotesEnabled: serializer.fromJson<bool>(
@@ -2655,6 +2839,12 @@ class Company extends DataClass implements Insertable<Company> {
       'email': serializer.toJson<String?>(email),
       'phone': serializer.toJson<String?>(phone),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'street': serializer.toJson<String?>(street),
+      'postalCode': serializer.toJson<String?>(postalCode),
+      'city': serializer.toJson<String?>(city),
+      'countryCode': serializer.toJson<String>(countryCode),
+      'bic': serializer.toJson<String?>(bic),
+      'eInvoiceEnabled': serializer.toJson<bool>(eInvoiceEnabled),
       'quotesEnabled': serializer.toJson<bool>(quotesEnabled),
       'ordersEnabled': serializer.toJson<bool>(ordersEnabled),
       'deliveryNotesEnabled': serializer.toJson<bool>(deliveryNotesEnabled),
@@ -2766,6 +2956,12 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> email = const Value.absent(),
     Value<String?> phone = const Value.absent(),
     DateTime? createdAt,
+    Value<String?> street = const Value.absent(),
+    Value<String?> postalCode = const Value.absent(),
+    Value<String?> city = const Value.absent(),
+    String? countryCode,
+    Value<String?> bic = const Value.absent(),
+    bool? eInvoiceEnabled,
     bool? quotesEnabled,
     bool? ordersEnabled,
     bool? deliveryNotesEnabled,
@@ -2838,6 +3034,12 @@ class Company extends DataClass implements Insertable<Company> {
     email: email.present ? email.value : this.email,
     phone: phone.present ? phone.value : this.phone,
     createdAt: createdAt ?? this.createdAt,
+    street: street.present ? street.value : this.street,
+    postalCode: postalCode.present ? postalCode.value : this.postalCode,
+    city: city.present ? city.value : this.city,
+    countryCode: countryCode ?? this.countryCode,
+    bic: bic.present ? bic.value : this.bic,
+    eInvoiceEnabled: eInvoiceEnabled ?? this.eInvoiceEnabled,
     quotesEnabled: quotesEnabled ?? this.quotesEnabled,
     ordersEnabled: ordersEnabled ?? this.ordersEnabled,
     deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
@@ -2974,6 +3176,18 @@ class Company extends DataClass implements Insertable<Company> {
       email: data.email.present ? data.email.value : this.email,
       phone: data.phone.present ? data.phone.value : this.phone,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      street: data.street.present ? data.street.value : this.street,
+      postalCode: data.postalCode.present
+          ? data.postalCode.value
+          : this.postalCode,
+      city: data.city.present ? data.city.value : this.city,
+      countryCode: data.countryCode.present
+          ? data.countryCode.value
+          : this.countryCode,
+      bic: data.bic.present ? data.bic.value : this.bic,
+      eInvoiceEnabled: data.eInvoiceEnabled.present
+          ? data.eInvoiceEnabled.value
+          : this.eInvoiceEnabled,
       quotesEnabled: data.quotesEnabled.present
           ? data.quotesEnabled.value
           : this.quotesEnabled,
@@ -3171,6 +3385,12 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('email: $email, ')
           ..write('phone: $phone, ')
           ..write('createdAt: $createdAt, ')
+          ..write('street: $street, ')
+          ..write('postalCode: $postalCode, ')
+          ..write('city: $city, ')
+          ..write('countryCode: $countryCode, ')
+          ..write('bic: $bic, ')
+          ..write('eInvoiceEnabled: $eInvoiceEnabled, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
@@ -3250,6 +3470,12 @@ class Company extends DataClass implements Insertable<Company> {
     email,
     phone,
     createdAt,
+    street,
+    postalCode,
+    city,
+    countryCode,
+    bic,
+    eInvoiceEnabled,
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
@@ -3326,6 +3552,12 @@ class Company extends DataClass implements Insertable<Company> {
           other.email == this.email &&
           other.phone == this.phone &&
           other.createdAt == this.createdAt &&
+          other.street == this.street &&
+          other.postalCode == this.postalCode &&
+          other.city == this.city &&
+          other.countryCode == this.countryCode &&
+          other.bic == this.bic &&
+          other.eInvoiceEnabled == this.eInvoiceEnabled &&
           other.quotesEnabled == this.quotesEnabled &&
           other.ordersEnabled == this.ordersEnabled &&
           other.deliveryNotesEnabled == this.deliveryNotesEnabled &&
@@ -3401,6 +3633,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> email;
   final Value<String?> phone;
   final Value<DateTime> createdAt;
+  final Value<String?> street;
+  final Value<String?> postalCode;
+  final Value<String?> city;
+  final Value<String> countryCode;
+  final Value<String?> bic;
+  final Value<bool> eInvoiceEnabled;
   final Value<bool> quotesEnabled;
   final Value<bool> ordersEnabled;
   final Value<bool> deliveryNotesEnabled;
@@ -3474,6 +3712,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.email = const Value.absent(),
     this.phone = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.street = const Value.absent(),
+    this.postalCode = const Value.absent(),
+    this.city = const Value.absent(),
+    this.countryCode = const Value.absent(),
+    this.bic = const Value.absent(),
+    this.eInvoiceEnabled = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
@@ -3548,6 +3792,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.email = const Value.absent(),
     this.phone = const Value.absent(),
     required DateTime createdAt,
+    this.street = const Value.absent(),
+    this.postalCode = const Value.absent(),
+    this.city = const Value.absent(),
+    this.countryCode = const Value.absent(),
+    this.bic = const Value.absent(),
+    this.eInvoiceEnabled = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
@@ -3624,6 +3874,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? email,
     Expression<String>? phone,
     Expression<DateTime>? createdAt,
+    Expression<String>? street,
+    Expression<String>? postalCode,
+    Expression<String>? city,
+    Expression<String>? countryCode,
+    Expression<String>? bic,
+    Expression<bool>? eInvoiceEnabled,
     Expression<bool>? quotesEnabled,
     Expression<bool>? ordersEnabled,
     Expression<bool>? deliveryNotesEnabled,
@@ -3698,6 +3954,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (email != null) 'email': email,
       if (phone != null) 'phone': phone,
       if (createdAt != null) 'created_at': createdAt,
+      if (street != null) 'street': street,
+      if (postalCode != null) 'postal_code': postalCode,
+      if (city != null) 'city': city,
+      if (countryCode != null) 'country_code': countryCode,
+      if (bic != null) 'bic': bic,
+      if (eInvoiceEnabled != null) 'e_invoice_enabled': eInvoiceEnabled,
       if (quotesEnabled != null) 'quotes_enabled': quotesEnabled,
       if (ordersEnabled != null) 'orders_enabled': ordersEnabled,
       if (deliveryNotesEnabled != null)
@@ -3812,6 +4074,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? email,
     Value<String?>? phone,
     Value<DateTime>? createdAt,
+    Value<String?>? street,
+    Value<String?>? postalCode,
+    Value<String?>? city,
+    Value<String>? countryCode,
+    Value<String?>? bic,
+    Value<bool>? eInvoiceEnabled,
     Value<bool>? quotesEnabled,
     Value<bool>? ordersEnabled,
     Value<bool>? deliveryNotesEnabled,
@@ -3886,6 +4154,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       createdAt: createdAt ?? this.createdAt,
+      street: street ?? this.street,
+      postalCode: postalCode ?? this.postalCode,
+      city: city ?? this.city,
+      countryCode: countryCode ?? this.countryCode,
+      bic: bic ?? this.bic,
+      eInvoiceEnabled: eInvoiceEnabled ?? this.eInvoiceEnabled,
       quotesEnabled: quotesEnabled ?? this.quotesEnabled,
       ordersEnabled: ordersEnabled ?? this.ordersEnabled,
       deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
@@ -4004,6 +4278,24 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (street.present) {
+      map['street'] = Variable<String>(street.value);
+    }
+    if (postalCode.present) {
+      map['postal_code'] = Variable<String>(postalCode.value);
+    }
+    if (city.present) {
+      map['city'] = Variable<String>(city.value);
+    }
+    if (countryCode.present) {
+      map['country_code'] = Variable<String>(countryCode.value);
+    }
+    if (bic.present) {
+      map['bic'] = Variable<String>(bic.value);
+    }
+    if (eInvoiceEnabled.present) {
+      map['e_invoice_enabled'] = Variable<bool>(eInvoiceEnabled.value);
     }
     if (quotesEnabled.present) {
       map['quotes_enabled'] = Variable<bool>(quotesEnabled.value);
@@ -4273,6 +4565,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('email: $email, ')
           ..write('phone: $phone, ')
           ..write('createdAt: $createdAt, ')
+          ..write('street: $street, ')
+          ..write('postalCode: $postalCode, ')
+          ..write('city: $city, ')
+          ..write('countryCode: $countryCode, ')
+          ..write('bic: $bic, ')
+          ..write('eInvoiceEnabled: $eInvoiceEnabled, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
@@ -4461,6 +4759,70 @@ class $CustomersTable extends Customers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _streetMeta = const VerificationMeta('street');
+  @override
+  late final GeneratedColumn<String> street = GeneratedColumn<String>(
+    'street',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _postalCodeMeta = const VerificationMeta(
+    'postalCode',
+  );
+  @override
+  late final GeneratedColumn<String> postalCode = GeneratedColumn<String>(
+    'postal_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cityMeta = const VerificationMeta('city');
+  @override
+  late final GeneratedColumn<String> city = GeneratedColumn<String>(
+    'city',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _countryCodeMeta = const VerificationMeta(
+    'countryCode',
+  );
+  @override
+  late final GeneratedColumn<String> countryCode = GeneratedColumn<String>(
+    'country_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('DE'),
+  );
+  static const VerificationMeta _leitwegIdMeta = const VerificationMeta(
+    'leitwegId',
+  );
+  @override
+  late final GeneratedColumn<String> leitwegId = GeneratedColumn<String>(
+    'leitweg_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _eInvoiceFormatMeta = const VerificationMeta(
+    'eInvoiceFormat',
+  );
+  @override
+  late final GeneratedColumn<String> eInvoiceFormat = GeneratedColumn<String>(
+    'e_invoice_format',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('zugferd'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -4474,6 +4836,12 @@ class $CustomersTable extends Customers
     notes,
     createdAt,
     invoiceEmail,
+    street,
+    postalCode,
+    city,
+    countryCode,
+    leitwegId,
+    eInvoiceFormat,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4564,6 +4932,48 @@ class $CustomersTable extends Customers
         ),
       );
     }
+    if (data.containsKey('street')) {
+      context.handle(
+        _streetMeta,
+        street.isAcceptableOrUnknown(data['street']!, _streetMeta),
+      );
+    }
+    if (data.containsKey('postal_code')) {
+      context.handle(
+        _postalCodeMeta,
+        postalCode.isAcceptableOrUnknown(data['postal_code']!, _postalCodeMeta),
+      );
+    }
+    if (data.containsKey('city')) {
+      context.handle(
+        _cityMeta,
+        city.isAcceptableOrUnknown(data['city']!, _cityMeta),
+      );
+    }
+    if (data.containsKey('country_code')) {
+      context.handle(
+        _countryCodeMeta,
+        countryCode.isAcceptableOrUnknown(
+          data['country_code']!,
+          _countryCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('leitweg_id')) {
+      context.handle(
+        _leitwegIdMeta,
+        leitwegId.isAcceptableOrUnknown(data['leitweg_id']!, _leitwegIdMeta),
+      );
+    }
+    if (data.containsKey('e_invoice_format')) {
+      context.handle(
+        _eInvoiceFormatMeta,
+        eInvoiceFormat.isAcceptableOrUnknown(
+          data['e_invoice_format']!,
+          _eInvoiceFormatMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -4617,6 +5027,30 @@ class $CustomersTable extends Customers
         DriftSqlType.string,
         data['${effectivePrefix}invoice_email'],
       ),
+      street: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}street'],
+      ),
+      postalCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}postal_code'],
+      ),
+      city: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}city'],
+      ),
+      countryCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}country_code'],
+      )!,
+      leitwegId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}leitweg_id'],
+      ),
+      eInvoiceFormat: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}e_invoice_format'],
+      )!,
     );
   }
 
@@ -4649,6 +5083,16 @@ class Customer extends DataClass implements Insertable<Customer> {
   /// Rechnungs-E-Mail (Kay 2026-11-09): Vorrang beim Versand von
   /// Rechnungsdokumenten und Mahnungen, siehe `documentRecipient()`.
   final String? invoiceEmail;
+
+  /// C15.1 E-Rechnung: strukturierte Anschrift (BG-8), Leitweg-ID als
+  /// Käuferreferenz (BT-10, Pflicht bei XRechnung) und das Format, das
+  /// dieser Kunde bekommt (`zugferd` Vorgabe / `xrechnung`).
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? leitwegId;
+  final String eInvoiceFormat;
   const Customer({
     required this.id,
     required this.companyId,
@@ -4661,6 +5105,12 @@ class Customer extends DataClass implements Insertable<Customer> {
     this.notes,
     required this.createdAt,
     this.invoiceEmail,
+    this.street,
+    this.postalCode,
+    this.city,
+    required this.countryCode,
+    this.leitwegId,
+    required this.eInvoiceFormat,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4690,6 +5140,20 @@ class Customer extends DataClass implements Insertable<Customer> {
     if (!nullToAbsent || invoiceEmail != null) {
       map['invoice_email'] = Variable<String>(invoiceEmail);
     }
+    if (!nullToAbsent || street != null) {
+      map['street'] = Variable<String>(street);
+    }
+    if (!nullToAbsent || postalCode != null) {
+      map['postal_code'] = Variable<String>(postalCode);
+    }
+    if (!nullToAbsent || city != null) {
+      map['city'] = Variable<String>(city);
+    }
+    map['country_code'] = Variable<String>(countryCode);
+    if (!nullToAbsent || leitwegId != null) {
+      map['leitweg_id'] = Variable<String>(leitwegId);
+    }
+    map['e_invoice_format'] = Variable<String>(eInvoiceFormat);
     return map;
   }
 
@@ -4720,6 +5184,18 @@ class Customer extends DataClass implements Insertable<Customer> {
       invoiceEmail: invoiceEmail == null && nullToAbsent
           ? const Value.absent()
           : Value(invoiceEmail),
+      street: street == null && nullToAbsent
+          ? const Value.absent()
+          : Value(street),
+      postalCode: postalCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(postalCode),
+      city: city == null && nullToAbsent ? const Value.absent() : Value(city),
+      countryCode: Value(countryCode),
+      leitwegId: leitwegId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(leitwegId),
+      eInvoiceFormat: Value(eInvoiceFormat),
     );
   }
 
@@ -4740,6 +5216,12 @@ class Customer extends DataClass implements Insertable<Customer> {
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       invoiceEmail: serializer.fromJson<String?>(json['invoiceEmail']),
+      street: serializer.fromJson<String?>(json['street']),
+      postalCode: serializer.fromJson<String?>(json['postalCode']),
+      city: serializer.fromJson<String?>(json['city']),
+      countryCode: serializer.fromJson<String>(json['countryCode']),
+      leitwegId: serializer.fromJson<String?>(json['leitwegId']),
+      eInvoiceFormat: serializer.fromJson<String>(json['eInvoiceFormat']),
     );
   }
   @override
@@ -4757,6 +5239,12 @@ class Customer extends DataClass implements Insertable<Customer> {
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'invoiceEmail': serializer.toJson<String?>(invoiceEmail),
+      'street': serializer.toJson<String?>(street),
+      'postalCode': serializer.toJson<String?>(postalCode),
+      'city': serializer.toJson<String?>(city),
+      'countryCode': serializer.toJson<String>(countryCode),
+      'leitwegId': serializer.toJson<String?>(leitwegId),
+      'eInvoiceFormat': serializer.toJson<String>(eInvoiceFormat),
     };
   }
 
@@ -4772,6 +5260,12 @@ class Customer extends DataClass implements Insertable<Customer> {
     Value<String?> notes = const Value.absent(),
     DateTime? createdAt,
     Value<String?> invoiceEmail = const Value.absent(),
+    Value<String?> street = const Value.absent(),
+    Value<String?> postalCode = const Value.absent(),
+    Value<String?> city = const Value.absent(),
+    String? countryCode,
+    Value<String?> leitwegId = const Value.absent(),
+    String? eInvoiceFormat,
   }) => Customer(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -4786,6 +5280,12 @@ class Customer extends DataClass implements Insertable<Customer> {
     notes: notes.present ? notes.value : this.notes,
     createdAt: createdAt ?? this.createdAt,
     invoiceEmail: invoiceEmail.present ? invoiceEmail.value : this.invoiceEmail,
+    street: street.present ? street.value : this.street,
+    postalCode: postalCode.present ? postalCode.value : this.postalCode,
+    city: city.present ? city.value : this.city,
+    countryCode: countryCode ?? this.countryCode,
+    leitwegId: leitwegId.present ? leitwegId.value : this.leitwegId,
+    eInvoiceFormat: eInvoiceFormat ?? this.eInvoiceFormat,
   );
   Customer copyWithCompanion(CustomersCompanion data) {
     return Customer(
@@ -4804,6 +5304,18 @@ class Customer extends DataClass implements Insertable<Customer> {
       invoiceEmail: data.invoiceEmail.present
           ? data.invoiceEmail.value
           : this.invoiceEmail,
+      street: data.street.present ? data.street.value : this.street,
+      postalCode: data.postalCode.present
+          ? data.postalCode.value
+          : this.postalCode,
+      city: data.city.present ? data.city.value : this.city,
+      countryCode: data.countryCode.present
+          ? data.countryCode.value
+          : this.countryCode,
+      leitwegId: data.leitwegId.present ? data.leitwegId.value : this.leitwegId,
+      eInvoiceFormat: data.eInvoiceFormat.present
+          ? data.eInvoiceFormat.value
+          : this.eInvoiceFormat,
     );
   }
 
@@ -4820,7 +5332,13 @@ class Customer extends DataClass implements Insertable<Customer> {
           ..write('contactPerson: $contactPerson, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
-          ..write('invoiceEmail: $invoiceEmail')
+          ..write('invoiceEmail: $invoiceEmail, ')
+          ..write('street: $street, ')
+          ..write('postalCode: $postalCode, ')
+          ..write('city: $city, ')
+          ..write('countryCode: $countryCode, ')
+          ..write('leitwegId: $leitwegId, ')
+          ..write('eInvoiceFormat: $eInvoiceFormat')
           ..write(')'))
         .toString();
   }
@@ -4838,6 +5356,12 @@ class Customer extends DataClass implements Insertable<Customer> {
     notes,
     createdAt,
     invoiceEmail,
+    street,
+    postalCode,
+    city,
+    countryCode,
+    leitwegId,
+    eInvoiceFormat,
   );
   @override
   bool operator ==(Object other) =>
@@ -4853,7 +5377,13 @@ class Customer extends DataClass implements Insertable<Customer> {
           other.contactPerson == this.contactPerson &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
-          other.invoiceEmail == this.invoiceEmail);
+          other.invoiceEmail == this.invoiceEmail &&
+          other.street == this.street &&
+          other.postalCode == this.postalCode &&
+          other.city == this.city &&
+          other.countryCode == this.countryCode &&
+          other.leitwegId == this.leitwegId &&
+          other.eInvoiceFormat == this.eInvoiceFormat);
 }
 
 class CustomersCompanion extends UpdateCompanion<Customer> {
@@ -4868,6 +5398,12 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
   final Value<String?> notes;
   final Value<DateTime> createdAt;
   final Value<String?> invoiceEmail;
+  final Value<String?> street;
+  final Value<String?> postalCode;
+  final Value<String?> city;
+  final Value<String> countryCode;
+  final Value<String?> leitwegId;
+  final Value<String> eInvoiceFormat;
   final Value<int> rowid;
   const CustomersCompanion({
     this.id = const Value.absent(),
@@ -4881,6 +5417,12 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.invoiceEmail = const Value.absent(),
+    this.street = const Value.absent(),
+    this.postalCode = const Value.absent(),
+    this.city = const Value.absent(),
+    this.countryCode = const Value.absent(),
+    this.leitwegId = const Value.absent(),
+    this.eInvoiceFormat = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CustomersCompanion.insert({
@@ -4895,6 +5437,12 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.notes = const Value.absent(),
     required DateTime createdAt,
     this.invoiceEmail = const Value.absent(),
+    this.street = const Value.absent(),
+    this.postalCode = const Value.absent(),
+    this.city = const Value.absent(),
+    this.countryCode = const Value.absent(),
+    this.leitwegId = const Value.absent(),
+    this.eInvoiceFormat = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -4912,6 +5460,12 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
     Expression<String>? invoiceEmail,
+    Expression<String>? street,
+    Expression<String>? postalCode,
+    Expression<String>? city,
+    Expression<String>? countryCode,
+    Expression<String>? leitwegId,
+    Expression<String>? eInvoiceFormat,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4926,6 +5480,12 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
       if (invoiceEmail != null) 'invoice_email': invoiceEmail,
+      if (street != null) 'street': street,
+      if (postalCode != null) 'postal_code': postalCode,
+      if (city != null) 'city': city,
+      if (countryCode != null) 'country_code': countryCode,
+      if (leitwegId != null) 'leitweg_id': leitwegId,
+      if (eInvoiceFormat != null) 'e_invoice_format': eInvoiceFormat,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4942,6 +5502,12 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Value<String?>? notes,
     Value<DateTime>? createdAt,
     Value<String?>? invoiceEmail,
+    Value<String?>? street,
+    Value<String?>? postalCode,
+    Value<String?>? city,
+    Value<String>? countryCode,
+    Value<String?>? leitwegId,
+    Value<String>? eInvoiceFormat,
     Value<int>? rowid,
   }) {
     return CustomersCompanion(
@@ -4956,6 +5522,12 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       invoiceEmail: invoiceEmail ?? this.invoiceEmail,
+      street: street ?? this.street,
+      postalCode: postalCode ?? this.postalCode,
+      city: city ?? this.city,
+      countryCode: countryCode ?? this.countryCode,
+      leitwegId: leitwegId ?? this.leitwegId,
+      eInvoiceFormat: eInvoiceFormat ?? this.eInvoiceFormat,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4996,6 +5568,24 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     if (invoiceEmail.present) {
       map['invoice_email'] = Variable<String>(invoiceEmail.value);
     }
+    if (street.present) {
+      map['street'] = Variable<String>(street.value);
+    }
+    if (postalCode.present) {
+      map['postal_code'] = Variable<String>(postalCode.value);
+    }
+    if (city.present) {
+      map['city'] = Variable<String>(city.value);
+    }
+    if (countryCode.present) {
+      map['country_code'] = Variable<String>(countryCode.value);
+    }
+    if (leitwegId.present) {
+      map['leitweg_id'] = Variable<String>(leitwegId.value);
+    }
+    if (eInvoiceFormat.present) {
+      map['e_invoice_format'] = Variable<String>(eInvoiceFormat.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5016,6 +5606,12 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('invoiceEmail: $invoiceEmail, ')
+          ..write('street: $street, ')
+          ..write('postalCode: $postalCode, ')
+          ..write('city: $city, ')
+          ..write('countryCode: $countryCode, ')
+          ..write('leitwegId: $leitwegId, ')
+          ..write('eInvoiceFormat: $eInvoiceFormat, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8580,6 +9176,17 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _eInvoiceSnapshotMeta = const VerificationMeta(
+    'eInvoiceSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> eInvoiceSnapshot = GeneratedColumn<String>(
+    'e_invoice_snapshot',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _pdfIntroTextSnapshotMeta =
       const VerificationMeta('pdfIntroTextSnapshot');
   @override
@@ -8784,6 +9391,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     companySnapshotTaxNumber,
     companySnapshotVatId,
     companySnapshotIban,
+    eInvoiceSnapshot,
     pdfIntroTextSnapshot,
     pdfClosingTextSnapshot,
     pdfFooterTextSnapshot,
@@ -8951,6 +9559,15 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         companySnapshotIban.isAcceptableOrUnknown(
           data['company_snapshot_iban']!,
           _companySnapshotIbanMeta,
+        ),
+      );
+    }
+    if (data.containsKey('e_invoice_snapshot')) {
+      context.handle(
+        _eInvoiceSnapshotMeta,
+        eInvoiceSnapshot.isAcceptableOrUnknown(
+          data['e_invoice_snapshot']!,
+          _eInvoiceSnapshotMeta,
         ),
       );
     }
@@ -9155,6 +9772,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.string,
         data['${effectivePrefix}company_snapshot_iban'],
       ),
+      eInvoiceSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}e_invoice_snapshot'],
+      ),
       pdfIntroTextSnapshot: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_intro_text_snapshot'],
@@ -9275,6 +9896,13 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final String? companySnapshotVatId;
   final String? companySnapshotIban;
 
+  /// C15.1 E-Rechnung: beim Finalisieren eingefrorene Verkäufer-/Käufer-
+  /// Daten als JSON (`EInvoiceSnapshot` aus `werkkern_core`) — die
+  /// XML-Erzeugung liest nur daraus. `null` bei Entwürfen und bei
+  /// Dokumenten, die vor v36 finalisiert wurden (dann Fallback auf die
+  /// aktuellen Stammdaten mit Hinweis).
+  final String? eInvoiceSnapshot;
+
   /// PDF-Text-Schnappschuss zum Finalisierungszeitpunkt (Audit-Befund
   /// 2026-10-17, `Abweichungen.md` Abschnitt 2.1: "Ein später geänderter
   /// Text kann bei erneutem Teilen eine andere PDF-Fassung derselben
@@ -9383,6 +10011,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.companySnapshotTaxNumber,
     this.companySnapshotVatId,
     this.companySnapshotIban,
+    this.eInvoiceSnapshot,
     this.pdfIntroTextSnapshot,
     this.pdfClosingTextSnapshot,
     this.pdfFooterTextSnapshot,
@@ -9456,6 +10085,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     }
     if (!nullToAbsent || companySnapshotIban != null) {
       map['company_snapshot_iban'] = Variable<String>(companySnapshotIban);
+    }
+    if (!nullToAbsent || eInvoiceSnapshot != null) {
+      map['e_invoice_snapshot'] = Variable<String>(eInvoiceSnapshot);
     }
     if (!nullToAbsent || pdfIntroTextSnapshot != null) {
       map['pdf_intro_text_snapshot'] = Variable<String>(pdfIntroTextSnapshot);
@@ -9544,6 +10176,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       companySnapshotIban: companySnapshotIban == null && nullToAbsent
           ? const Value.absent()
           : Value(companySnapshotIban),
+      eInvoiceSnapshot: eInvoiceSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(eInvoiceSnapshot),
       pdfIntroTextSnapshot: pdfIntroTextSnapshot == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfIntroTextSnapshot),
@@ -9625,6 +10260,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       companySnapshotIban: serializer.fromJson<String?>(
         json['companySnapshotIban'],
       ),
+      eInvoiceSnapshot: serializer.fromJson<String?>(json['eInvoiceSnapshot']),
       pdfIntroTextSnapshot: serializer.fromJson<String?>(
         json['pdfIntroTextSnapshot'],
       ),
@@ -9685,6 +10321,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       ),
       'companySnapshotVatId': serializer.toJson<String?>(companySnapshotVatId),
       'companySnapshotIban': serializer.toJson<String?>(companySnapshotIban),
+      'eInvoiceSnapshot': serializer.toJson<String?>(eInvoiceSnapshot),
       'pdfIntroTextSnapshot': serializer.toJson<String?>(pdfIntroTextSnapshot),
       'pdfClosingTextSnapshot': serializer.toJson<String?>(
         pdfClosingTextSnapshot,
@@ -9729,6 +10366,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<String?> companySnapshotTaxNumber = const Value.absent(),
     Value<String?> companySnapshotVatId = const Value.absent(),
     Value<String?> companySnapshotIban = const Value.absent(),
+    Value<String?> eInvoiceSnapshot = const Value.absent(),
     Value<String?> pdfIntroTextSnapshot = const Value.absent(),
     Value<String?> pdfClosingTextSnapshot = const Value.absent(),
     Value<String?> pdfFooterTextSnapshot = const Value.absent(),
@@ -9782,6 +10420,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     companySnapshotIban: companySnapshotIban.present
         ? companySnapshotIban.value
         : this.companySnapshotIban,
+    eInvoiceSnapshot: eInvoiceSnapshot.present
+        ? eInvoiceSnapshot.value
+        : this.eInvoiceSnapshot,
     pdfIntroTextSnapshot: pdfIntroTextSnapshot.present
         ? pdfIntroTextSnapshot.value
         : this.pdfIntroTextSnapshot,
@@ -9853,6 +10494,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       companySnapshotIban: data.companySnapshotIban.present
           ? data.companySnapshotIban.value
           : this.companySnapshotIban,
+      eInvoiceSnapshot: data.eInvoiceSnapshot.present
+          ? data.eInvoiceSnapshot.value
+          : this.eInvoiceSnapshot,
       pdfIntroTextSnapshot: data.pdfIntroTextSnapshot.present
           ? data.pdfIntroTextSnapshot.value
           : this.pdfIntroTextSnapshot,
@@ -9911,6 +10555,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('companySnapshotTaxNumber: $companySnapshotTaxNumber, ')
           ..write('companySnapshotVatId: $companySnapshotVatId, ')
           ..write('companySnapshotIban: $companySnapshotIban, ')
+          ..write('eInvoiceSnapshot: $eInvoiceSnapshot, ')
           ..write('pdfIntroTextSnapshot: $pdfIntroTextSnapshot, ')
           ..write('pdfClosingTextSnapshot: $pdfClosingTextSnapshot, ')
           ..write('pdfFooterTextSnapshot: $pdfFooterTextSnapshot, ')
@@ -9951,6 +10596,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     companySnapshotTaxNumber,
     companySnapshotVatId,
     companySnapshotIban,
+    eInvoiceSnapshot,
     pdfIntroTextSnapshot,
     pdfClosingTextSnapshot,
     pdfFooterTextSnapshot,
@@ -9990,6 +10636,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.companySnapshotTaxNumber == this.companySnapshotTaxNumber &&
           other.companySnapshotVatId == this.companySnapshotVatId &&
           other.companySnapshotIban == this.companySnapshotIban &&
+          other.eInvoiceSnapshot == this.eInvoiceSnapshot &&
           other.pdfIntroTextSnapshot == this.pdfIntroTextSnapshot &&
           other.pdfClosingTextSnapshot == this.pdfClosingTextSnapshot &&
           other.pdfFooterTextSnapshot == this.pdfFooterTextSnapshot &&
@@ -10027,6 +10674,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String?> companySnapshotTaxNumber;
   final Value<String?> companySnapshotVatId;
   final Value<String?> companySnapshotIban;
+  final Value<String?> eInvoiceSnapshot;
   final Value<String?> pdfIntroTextSnapshot;
   final Value<String?> pdfClosingTextSnapshot;
   final Value<String?> pdfFooterTextSnapshot;
@@ -10063,6 +10711,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.companySnapshotTaxNumber = const Value.absent(),
     this.companySnapshotVatId = const Value.absent(),
     this.companySnapshotIban = const Value.absent(),
+    this.eInvoiceSnapshot = const Value.absent(),
     this.pdfIntroTextSnapshot = const Value.absent(),
     this.pdfClosingTextSnapshot = const Value.absent(),
     this.pdfFooterTextSnapshot = const Value.absent(),
@@ -10100,6 +10749,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.companySnapshotTaxNumber = const Value.absent(),
     this.companySnapshotVatId = const Value.absent(),
     this.companySnapshotIban = const Value.absent(),
+    this.eInvoiceSnapshot = const Value.absent(),
     this.pdfIntroTextSnapshot = const Value.absent(),
     this.pdfClosingTextSnapshot = const Value.absent(),
     this.pdfFooterTextSnapshot = const Value.absent(),
@@ -10144,6 +10794,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? companySnapshotTaxNumber,
     Expression<String>? companySnapshotVatId,
     Expression<String>? companySnapshotIban,
+    Expression<String>? eInvoiceSnapshot,
     Expression<String>? pdfIntroTextSnapshot,
     Expression<String>? pdfClosingTextSnapshot,
     Expression<String>? pdfFooterTextSnapshot,
@@ -10189,6 +10840,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         'company_snapshot_vat_id': companySnapshotVatId,
       if (companySnapshotIban != null)
         'company_snapshot_iban': companySnapshotIban,
+      if (eInvoiceSnapshot != null) 'e_invoice_snapshot': eInvoiceSnapshot,
       if (pdfIntroTextSnapshot != null)
         'pdf_intro_text_snapshot': pdfIntroTextSnapshot,
       if (pdfClosingTextSnapshot != null)
@@ -10231,6 +10883,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String?>? companySnapshotTaxNumber,
     Value<String?>? companySnapshotVatId,
     Value<String?>? companySnapshotIban,
+    Value<String?>? eInvoiceSnapshot,
     Value<String?>? pdfIntroTextSnapshot,
     Value<String?>? pdfClosingTextSnapshot,
     Value<String?>? pdfFooterTextSnapshot,
@@ -10272,6 +10925,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           companySnapshotTaxNumber ?? this.companySnapshotTaxNumber,
       companySnapshotVatId: companySnapshotVatId ?? this.companySnapshotVatId,
       companySnapshotIban: companySnapshotIban ?? this.companySnapshotIban,
+      eInvoiceSnapshot: eInvoiceSnapshot ?? this.eInvoiceSnapshot,
       pdfIntroTextSnapshot: pdfIntroTextSnapshot ?? this.pdfIntroTextSnapshot,
       pdfClosingTextSnapshot:
           pdfClosingTextSnapshot ?? this.pdfClosingTextSnapshot,
@@ -10373,6 +11027,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         companySnapshotIban.value,
       );
     }
+    if (eInvoiceSnapshot.present) {
+      map['e_invoice_snapshot'] = Variable<String>(eInvoiceSnapshot.value);
+    }
     if (pdfIntroTextSnapshot.present) {
       map['pdf_intro_text_snapshot'] = Variable<String>(
         pdfIntroTextSnapshot.value,
@@ -10454,6 +11111,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('companySnapshotTaxNumber: $companySnapshotTaxNumber, ')
           ..write('companySnapshotVatId: $companySnapshotVatId, ')
           ..write('companySnapshotIban: $companySnapshotIban, ')
+          ..write('eInvoiceSnapshot: $eInvoiceSnapshot, ')
           ..write('pdfIntroTextSnapshot: $pdfIntroTextSnapshot, ')
           ..write('pdfClosingTextSnapshot: $pdfClosingTextSnapshot, ')
           ..write('pdfFooterTextSnapshot: $pdfFooterTextSnapshot, ')
@@ -21242,6 +21900,12 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String?> email,
       Value<String?> phone,
       required DateTime createdAt,
+      Value<String?> street,
+      Value<String?> postalCode,
+      Value<String?> city,
+      Value<String> countryCode,
+      Value<String?> bic,
+      Value<bool> eInvoiceEnabled,
       Value<bool> quotesEnabled,
       Value<bool> ordersEnabled,
       Value<bool> deliveryNotesEnabled,
@@ -21317,6 +21981,12 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String?> email,
       Value<String?> phone,
       Value<DateTime> createdAt,
+      Value<String?> street,
+      Value<String?> postalCode,
+      Value<String?> city,
+      Value<String> countryCode,
+      Value<String?> bic,
+      Value<bool> eInvoiceEnabled,
       Value<bool> quotesEnabled,
       Value<bool> ordersEnabled,
       Value<bool> deliveryNotesEnabled,
@@ -21824,6 +22494,36 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get street => $composableBuilder(
+    column: $table.street,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get postalCode => $composableBuilder(
+    column: $table.postalCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get city => $composableBuilder(
+    column: $table.city,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get countryCode => $composableBuilder(
+    column: $table.countryCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get bic => $composableBuilder(
+    column: $table.bic,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get eInvoiceEnabled => $composableBuilder(
+    column: $table.eInvoiceEnabled,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -22694,6 +23394,36 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get street => $composableBuilder(
+    column: $table.street,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get postalCode => $composableBuilder(
+    column: $table.postalCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get city => $composableBuilder(
+    column: $table.city,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get countryCode => $composableBuilder(
+    column: $table.countryCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get bic => $composableBuilder(
+    column: $table.bic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get eInvoiceEnabled => $composableBuilder(
+    column: $table.eInvoiceEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get quotesEnabled => $composableBuilder(
     column: $table.quotesEnabled,
     builder: (column) => ColumnOrderings(column),
@@ -23040,6 +23770,30 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get street =>
+      $composableBuilder(column: $table.street, builder: (column) => column);
+
+  GeneratedColumn<String> get postalCode => $composableBuilder(
+    column: $table.postalCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get city =>
+      $composableBuilder(column: $table.city, builder: (column) => column);
+
+  GeneratedColumn<String> get countryCode => $composableBuilder(
+    column: $table.countryCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get bic =>
+      $composableBuilder(column: $table.bic, builder: (column) => column);
+
+  GeneratedColumn<bool> get eInvoiceEnabled => $composableBuilder(
+    column: $table.eInvoiceEnabled,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get quotesEnabled => $composableBuilder(
     column: $table.quotesEnabled,
@@ -23910,6 +24664,12 @@ class $$CompaniesTableTableManager
                 Value<String?> email = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> street = const Value.absent(),
+                Value<String?> postalCode = const Value.absent(),
+                Value<String?> city = const Value.absent(),
+                Value<String> countryCode = const Value.absent(),
+                Value<String?> bic = const Value.absent(),
+                Value<bool> eInvoiceEnabled = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
@@ -23987,6 +24747,12 @@ class $$CompaniesTableTableManager
                 email: email,
                 phone: phone,
                 createdAt: createdAt,
+                street: street,
+                postalCode: postalCode,
+                city: city,
+                countryCode: countryCode,
+                bic: bic,
+                eInvoiceEnabled: eInvoiceEnabled,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
@@ -24062,6 +24828,12 @@ class $$CompaniesTableTableManager
                 Value<String?> email = const Value.absent(),
                 Value<String?> phone = const Value.absent(),
                 required DateTime createdAt,
+                Value<String?> street = const Value.absent(),
+                Value<String?> postalCode = const Value.absent(),
+                Value<String?> city = const Value.absent(),
+                Value<String> countryCode = const Value.absent(),
+                Value<String?> bic = const Value.absent(),
+                Value<bool> eInvoiceEnabled = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
@@ -24139,6 +24911,12 @@ class $$CompaniesTableTableManager
                 email: email,
                 phone: phone,
                 createdAt: createdAt,
+                street: street,
+                postalCode: postalCode,
+                city: city,
+                countryCode: countryCode,
+                bic: bic,
+                eInvoiceEnabled: eInvoiceEnabled,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
@@ -24738,6 +25516,12 @@ typedef $$CustomersTableCreateCompanionBuilder =
       Value<String?> notes,
       required DateTime createdAt,
       Value<String?> invoiceEmail,
+      Value<String?> street,
+      Value<String?> postalCode,
+      Value<String?> city,
+      Value<String> countryCode,
+      Value<String?> leitwegId,
+      Value<String> eInvoiceFormat,
       Value<int> rowid,
     });
 typedef $$CustomersTableUpdateCompanionBuilder =
@@ -24753,6 +25537,12 @@ typedef $$CustomersTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<DateTime> createdAt,
       Value<String?> invoiceEmail,
+      Value<String?> street,
+      Value<String?> postalCode,
+      Value<String?> city,
+      Value<String> countryCode,
+      Value<String?> leitwegId,
+      Value<String> eInvoiceFormat,
       Value<int> rowid,
     });
 
@@ -24917,6 +25707,36 @@ class $$CustomersTableFilterComposer
 
   ColumnFilters<String> get invoiceEmail => $composableBuilder(
     column: $table.invoiceEmail,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get street => $composableBuilder(
+    column: $table.street,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get postalCode => $composableBuilder(
+    column: $table.postalCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get city => $composableBuilder(
+    column: $table.city,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get countryCode => $composableBuilder(
+    column: $table.countryCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get leitwegId => $composableBuilder(
+    column: $table.leitwegId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eInvoiceFormat => $composableBuilder(
+    column: $table.eInvoiceFormat,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -25105,6 +25925,36 @@ class $$CustomersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get street => $composableBuilder(
+    column: $table.street,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get postalCode => $composableBuilder(
+    column: $table.postalCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get city => $composableBuilder(
+    column: $table.city,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get countryCode => $composableBuilder(
+    column: $table.countryCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get leitwegId => $composableBuilder(
+    column: $table.leitwegId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eInvoiceFormat => $composableBuilder(
+    column: $table.eInvoiceFormat,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CompaniesTableOrderingComposer get companyId {
     final $$CompaniesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -25169,6 +26019,30 @@ class $$CustomersTableAnnotationComposer
 
   GeneratedColumn<String> get invoiceEmail => $composableBuilder(
     column: $table.invoiceEmail,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get street =>
+      $composableBuilder(column: $table.street, builder: (column) => column);
+
+  GeneratedColumn<String> get postalCode => $composableBuilder(
+    column: $table.postalCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get city =>
+      $composableBuilder(column: $table.city, builder: (column) => column);
+
+  GeneratedColumn<String> get countryCode => $composableBuilder(
+    column: $table.countryCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get leitwegId =>
+      $composableBuilder(column: $table.leitwegId, builder: (column) => column);
+
+  GeneratedColumn<String> get eInvoiceFormat => $composableBuilder(
+    column: $table.eInvoiceFormat,
     builder: (column) => column,
   );
 
@@ -25343,6 +26217,12 @@ class $$CustomersTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> invoiceEmail = const Value.absent(),
+                Value<String?> street = const Value.absent(),
+                Value<String?> postalCode = const Value.absent(),
+                Value<String?> city = const Value.absent(),
+                Value<String> countryCode = const Value.absent(),
+                Value<String?> leitwegId = const Value.absent(),
+                Value<String> eInvoiceFormat = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CustomersCompanion(
                 id: id,
@@ -25356,6 +26236,12 @@ class $$CustomersTableTableManager
                 notes: notes,
                 createdAt: createdAt,
                 invoiceEmail: invoiceEmail,
+                street: street,
+                postalCode: postalCode,
+                city: city,
+                countryCode: countryCode,
+                leitwegId: leitwegId,
+                eInvoiceFormat: eInvoiceFormat,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -25371,6 +26257,12 @@ class $$CustomersTableTableManager
                 Value<String?> notes = const Value.absent(),
                 required DateTime createdAt,
                 Value<String?> invoiceEmail = const Value.absent(),
+                Value<String?> street = const Value.absent(),
+                Value<String?> postalCode = const Value.absent(),
+                Value<String?> city = const Value.absent(),
+                Value<String> countryCode = const Value.absent(),
+                Value<String?> leitwegId = const Value.absent(),
+                Value<String> eInvoiceFormat = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CustomersCompanion.insert(
                 id: id,
@@ -25384,6 +26276,12 @@ class $$CustomersTableTableManager
                 notes: notes,
                 createdAt: createdAt,
                 invoiceEmail: invoiceEmail,
+                street: street,
+                postalCode: postalCode,
+                city: city,
+                countryCode: countryCode,
+                leitwegId: leitwegId,
+                eInvoiceFormat: eInvoiceFormat,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -30027,6 +30925,7 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       Value<String?> companySnapshotTaxNumber,
       Value<String?> companySnapshotVatId,
       Value<String?> companySnapshotIban,
+      Value<String?> eInvoiceSnapshot,
       Value<String?> pdfIntroTextSnapshot,
       Value<String?> pdfClosingTextSnapshot,
       Value<String?> pdfFooterTextSnapshot,
@@ -30065,6 +30964,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<String?> companySnapshotTaxNumber,
       Value<String?> companySnapshotVatId,
       Value<String?> companySnapshotIban,
+      Value<String?> eInvoiceSnapshot,
       Value<String?> pdfIntroTextSnapshot,
       Value<String?> pdfClosingTextSnapshot,
       Value<String?> pdfFooterTextSnapshot,
@@ -30359,6 +31259,11 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<String> get companySnapshotIban => $composableBuilder(
     column: $table.companySnapshotIban,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eInvoiceSnapshot => $composableBuilder(
+    column: $table.eInvoiceSnapshot,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -30758,6 +31663,11 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get eInvoiceSnapshot => $composableBuilder(
+    column: $table.eInvoiceSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get pdfIntroTextSnapshot => $composableBuilder(
     column: $table.pdfIntroTextSnapshot,
     builder: (column) => ColumnOrderings(column),
@@ -31015,6 +31925,11 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<String> get companySnapshotIban => $composableBuilder(
     column: $table.companySnapshotIban,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get eInvoiceSnapshot => $composableBuilder(
+    column: $table.eInvoiceSnapshot,
     builder: (column) => column,
   );
 
@@ -31370,6 +32285,7 @@ class $$InvoicesTableTableManager
                 Value<String?> companySnapshotTaxNumber = const Value.absent(),
                 Value<String?> companySnapshotVatId = const Value.absent(),
                 Value<String?> companySnapshotIban = const Value.absent(),
+                Value<String?> eInvoiceSnapshot = const Value.absent(),
                 Value<String?> pdfIntroTextSnapshot = const Value.absent(),
                 Value<String?> pdfClosingTextSnapshot = const Value.absent(),
                 Value<String?> pdfFooterTextSnapshot = const Value.absent(),
@@ -31406,6 +32322,7 @@ class $$InvoicesTableTableManager
                 companySnapshotTaxNumber: companySnapshotTaxNumber,
                 companySnapshotVatId: companySnapshotVatId,
                 companySnapshotIban: companySnapshotIban,
+                eInvoiceSnapshot: eInvoiceSnapshot,
                 pdfIntroTextSnapshot: pdfIntroTextSnapshot,
                 pdfClosingTextSnapshot: pdfClosingTextSnapshot,
                 pdfFooterTextSnapshot: pdfFooterTextSnapshot,
@@ -31444,6 +32361,7 @@ class $$InvoicesTableTableManager
                 Value<String?> companySnapshotTaxNumber = const Value.absent(),
                 Value<String?> companySnapshotVatId = const Value.absent(),
                 Value<String?> companySnapshotIban = const Value.absent(),
+                Value<String?> eInvoiceSnapshot = const Value.absent(),
                 Value<String?> pdfIntroTextSnapshot = const Value.absent(),
                 Value<String?> pdfClosingTextSnapshot = const Value.absent(),
                 Value<String?> pdfFooterTextSnapshot = const Value.absent(),
@@ -31480,6 +32398,7 @@ class $$InvoicesTableTableManager
                 companySnapshotTaxNumber: companySnapshotTaxNumber,
                 companySnapshotVatId: companySnapshotVatId,
                 companySnapshotIban: companySnapshotIban,
+                eInvoiceSnapshot: eInvoiceSnapshot,
                 pdfIntroTextSnapshot: pdfIntroTextSnapshot,
                 pdfClosingTextSnapshot: pdfClosingTextSnapshot,
                 pdfFooterTextSnapshot: pdfFooterTextSnapshot,

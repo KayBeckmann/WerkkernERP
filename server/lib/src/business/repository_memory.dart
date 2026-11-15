@@ -402,6 +402,13 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       finalizedAt: now,
       version: existing.version + 1,
       stockBooked: stockBooking?.mode == StockBookingMode.issue,
+      // C15 E-Rechnung: Parteien einfrieren (nur Rechnung/Gutschrift).
+      eInvoiceSnapshot: buildEInvoiceSnapshotJson(
+        kind: existing.kind,
+        company: company,
+        customer: customer,
+        contact: existing.contactId == null ? null : _contacts.where((x) => x.id == existing.contactId).firstOrNull,
+      ),
     );
     _documents[index] = finalized;
     if (stockBooking != null) {

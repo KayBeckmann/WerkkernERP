@@ -31,6 +31,8 @@ const knownModules = <String>{
   'lagerbestand',
   'bestellwesen',
   'timeTracking',
+  // C15: E-Rechnung (ZUGFeRD/XRechnung) für Rechnungen und Gutschriften.
+  'eInvoice',
   // C8: LLM-Agenten (MCP/API) — die Firma entscheidet ausdrücklich, ob
   // Agent-Token überhaupt wirken (Roadmap C8: "Vor Aktivierung
   // Anbieterfreigabe ... klären").

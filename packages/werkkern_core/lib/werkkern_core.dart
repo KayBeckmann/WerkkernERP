@@ -13,3 +13,4 @@ export 'src/recurrence.dart';
 export 'src/migration_package.dart';
 export 'src/hourly_billing.dart';
 export 'src/recipient.dart';
+export 'src/einvoice_party.dart';

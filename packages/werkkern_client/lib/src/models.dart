@@ -45,6 +45,12 @@ class OnlineCustomer {
     this.notes,
     this.invoiceEmail,
     this.contacts = const [],
+    this.street,
+    this.postalCode,
+    this.city,
+    this.countryCode = 'DE',
+    this.leitwegId,
+    this.eInvoiceFormat = 'zugferd',
   });
   factory OnlineCustomer.fromJson(Map<String, Object?> j) => OnlineCustomer(
         id: j['id'] as String,
@@ -59,10 +65,24 @@ class OnlineCustomer {
         contacts: [
           for (final c in (j['contacts'] as List? ?? const [])) OnlineContact.fromJson(c as Map<String, Object?>),
         ],
+        street: j['street'] as String?,
+        postalCode: j['postalCode'] as String?,
+        city: j['city'] as String?,
+        countryCode: j['countryCode'] as String? ?? 'DE',
+        leitwegId: j['leitwegId'] as String?,
+        eInvoiceFormat: j['eInvoiceFormat'] as String? ?? 'zugferd',
       );
   final String id;
   final String name;
   final String? address;
+
+  /// C15 E-Rechnung: strukturierte Anschrift, Leitweg-ID, Format.
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? leitwegId;
+  final String eInvoiceFormat;
   final String? email;
   final String? phone;
   final String? vatId;
@@ -86,6 +106,12 @@ class OnlineCustomer {
         'notes': notes,
         'invoiceEmail': invoiceEmail,
         'contacts': [for (final c in contacts) c.toWriteJson()],
+        'street': street,
+        'postalCode': postalCode,
+        'city': city,
+        'countryCode': countryCode,
+        'leitwegId': leitwegId,
+        'eInvoiceFormat': eInvoiceFormat,
       };
 }
 
@@ -279,6 +305,7 @@ class OnlineDocument {
     this.grossCents,
     this.taxLines = const [],
     this.rawJson = const {},
+    this.eInvoiceSnapshot,
     bool? editable,
   }) : editable = editable ?? status == 'draft';
 
@@ -343,11 +370,16 @@ class OnlineDocument {
           ),
       ],
       rawJson: j,
+      eInvoiceSnapshot: j['eInvoiceSnapshot'] as Map<String, Object?>?,
     );
   }
 
   /// Unveränderte Serverantwort — wird so in den Offline-Bestand gelegt.
   final Map<String, Object?> rawJson;
+
+  /// C15 E-Rechnung: eingefrorene Parteien (nur finalisierte Rechnungen/
+  /// Gutschriften), siehe `EInvoiceSnapshot` in `werkkern_core`.
+  final Map<String, Object?>? eInvoiceSnapshot;
 
   final String id;
   final String customerId;
@@ -507,6 +539,11 @@ class OnlineCompanyProfile {
     this.footerText,
     this.documentTexts = const {},
     this.smallBusinessExempt = false,
+    this.street,
+    this.postalCode,
+    this.city,
+    this.countryCode = 'DE',
+    this.bic,
   });
   factory OnlineCompanyProfile.fromJson(Map<String, Object?> j) => OnlineCompanyProfile(
         name: j['name'] as String?,
@@ -525,8 +562,20 @@ class OnlineCompanyProfile {
             ),
         },
         smallBusinessExempt: j['smallBusinessExempt'] as bool? ?? false,
+        street: j['street'] as String?,
+        postalCode: j['postalCode'] as String?,
+        city: j['city'] as String?,
+        countryCode: j['countryCode'] as String? ?? 'DE',
+        bic: j['bic'] as String?,
       );
   final String? name;
+
+  /// C15 E-Rechnung: strukturierte Anschrift und BIC.
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? bic;
   final String? address;
   final String? taxNumber;
   final String? vatId;
@@ -553,6 +602,11 @@ class OnlineCompanyProfile {
           for (final e in documentTexts.entries) e.key: {'intro': e.value.intro, 'closing': e.value.closing},
         },
         'smallBusinessExempt': smallBusinessExempt,
+        'street': street,
+        'postalCode': postalCode,
+        'city': city,
+        'countryCode': countryCode,
+        'bic': bic,
       };
 }
 
