@@ -183,6 +183,18 @@ class $CompaniesTable extends Companies
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _quoteValidityDaysMeta = const VerificationMeta(
+    'quoteValidityDays',
+  );
+  @override
+  late final GeneratedColumn<int> quoteValidityDays = GeneratedColumn<int>(
+    'quote_validity_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(14),
+  );
   static const VerificationMeta _quotesEnabledMeta = const VerificationMeta(
     'quotesEnabled',
   );
@@ -960,6 +972,7 @@ class $CompaniesTable extends Companies
     eInvoiceEnabled,
     skontoPercent,
     skontoDays,
+    quoteValidityDays,
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
@@ -1147,6 +1160,15 @@ class $CompaniesTable extends Companies
       context.handle(
         _skontoDaysMeta,
         skontoDays.isAcceptableOrUnknown(data['skonto_days']!, _skontoDaysMeta),
+      );
+    }
+    if (data.containsKey('quote_validity_days')) {
+      context.handle(
+        _quoteValidityDaysMeta,
+        quoteValidityDays.isAcceptableOrUnknown(
+          data['quote_validity_days']!,
+          _quoteValidityDaysMeta,
+        ),
       );
     }
     if (data.containsKey('quotes_enabled')) {
@@ -1775,6 +1797,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.int,
         data['${effectivePrefix}skonto_days'],
       ),
+      quoteValidityDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quote_validity_days'],
+      ),
       quotesEnabled: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}quotes_enabled'],
@@ -2059,6 +2085,10 @@ class Company extends DataClass implements Insertable<Company> {
   final double? skontoPercent;
   final int? skontoDays;
 
+  /// A5-Nachtrag (Kay, 16.11.2026): Standard-Bindefrist neuer Angebote in
+  /// Tagen (Vorbelegung, `null` = keine). Ändert bestehende Angebote nie.
+  final int? quoteValidityDays;
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -2285,6 +2315,7 @@ class Company extends DataClass implements Insertable<Company> {
     required this.eInvoiceEnabled,
     this.skontoPercent,
     this.skontoDays,
+    this.quoteValidityDays,
     required this.quotesEnabled,
     required this.ordersEnabled,
     required this.deliveryNotesEnabled,
@@ -2391,6 +2422,9 @@ class Company extends DataClass implements Insertable<Company> {
     }
     if (!nullToAbsent || skontoDays != null) {
       map['skonto_days'] = Variable<int>(skontoDays);
+    }
+    if (!nullToAbsent || quoteValidityDays != null) {
+      map['quote_validity_days'] = Variable<int>(quoteValidityDays);
     }
     map['quotes_enabled'] = Variable<bool>(quotesEnabled);
     map['orders_enabled'] = Variable<bool>(ordersEnabled);
@@ -2592,6 +2626,9 @@ class Company extends DataClass implements Insertable<Company> {
       skontoDays: skontoDays == null && nullToAbsent
           ? const Value.absent()
           : Value(skontoDays),
+      quoteValidityDays: quoteValidityDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quoteValidityDays),
       quotesEnabled: Value(quotesEnabled),
       ordersEnabled: Value(ordersEnabled),
       deliveryNotesEnabled: Value(deliveryNotesEnabled),
@@ -2750,6 +2787,7 @@ class Company extends DataClass implements Insertable<Company> {
       eInvoiceEnabled: serializer.fromJson<bool>(json['eInvoiceEnabled']),
       skontoPercent: serializer.fromJson<double?>(json['skontoPercent']),
       skontoDays: serializer.fromJson<int?>(json['skontoDays']),
+      quoteValidityDays: serializer.fromJson<int?>(json['quoteValidityDays']),
       quotesEnabled: serializer.fromJson<bool>(json['quotesEnabled']),
       ordersEnabled: serializer.fromJson<bool>(json['ordersEnabled']),
       deliveryNotesEnabled: serializer.fromJson<bool>(
@@ -2915,6 +2953,7 @@ class Company extends DataClass implements Insertable<Company> {
       'eInvoiceEnabled': serializer.toJson<bool>(eInvoiceEnabled),
       'skontoPercent': serializer.toJson<double?>(skontoPercent),
       'skontoDays': serializer.toJson<int?>(skontoDays),
+      'quoteValidityDays': serializer.toJson<int?>(quoteValidityDays),
       'quotesEnabled': serializer.toJson<bool>(quotesEnabled),
       'ordersEnabled': serializer.toJson<bool>(ordersEnabled),
       'deliveryNotesEnabled': serializer.toJson<bool>(deliveryNotesEnabled),
@@ -3034,6 +3073,7 @@ class Company extends DataClass implements Insertable<Company> {
     bool? eInvoiceEnabled,
     Value<double?> skontoPercent = const Value.absent(),
     Value<int?> skontoDays = const Value.absent(),
+    Value<int?> quoteValidityDays = const Value.absent(),
     bool? quotesEnabled,
     bool? ordersEnabled,
     bool? deliveryNotesEnabled,
@@ -3116,6 +3156,9 @@ class Company extends DataClass implements Insertable<Company> {
         ? skontoPercent.value
         : this.skontoPercent,
     skontoDays: skontoDays.present ? skontoDays.value : this.skontoDays,
+    quoteValidityDays: quoteValidityDays.present
+        ? quoteValidityDays.value
+        : this.quoteValidityDays,
     quotesEnabled: quotesEnabled ?? this.quotesEnabled,
     ordersEnabled: ordersEnabled ?? this.ordersEnabled,
     deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
@@ -3270,6 +3313,9 @@ class Company extends DataClass implements Insertable<Company> {
       skontoDays: data.skontoDays.present
           ? data.skontoDays.value
           : this.skontoDays,
+      quoteValidityDays: data.quoteValidityDays.present
+          ? data.quoteValidityDays.value
+          : this.quoteValidityDays,
       quotesEnabled: data.quotesEnabled.present
           ? data.quotesEnabled.value
           : this.quotesEnabled,
@@ -3475,6 +3521,7 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('eInvoiceEnabled: $eInvoiceEnabled, ')
           ..write('skontoPercent: $skontoPercent, ')
           ..write('skontoDays: $skontoDays, ')
+          ..write('quoteValidityDays: $quoteValidityDays, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
@@ -3562,6 +3609,7 @@ class Company extends DataClass implements Insertable<Company> {
     eInvoiceEnabled,
     skontoPercent,
     skontoDays,
+    quoteValidityDays,
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
@@ -3646,6 +3694,7 @@ class Company extends DataClass implements Insertable<Company> {
           other.eInvoiceEnabled == this.eInvoiceEnabled &&
           other.skontoPercent == this.skontoPercent &&
           other.skontoDays == this.skontoDays &&
+          other.quoteValidityDays == this.quoteValidityDays &&
           other.quotesEnabled == this.quotesEnabled &&
           other.ordersEnabled == this.ordersEnabled &&
           other.deliveryNotesEnabled == this.deliveryNotesEnabled &&
@@ -3729,6 +3778,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<bool> eInvoiceEnabled;
   final Value<double?> skontoPercent;
   final Value<int?> skontoDays;
+  final Value<int?> quoteValidityDays;
   final Value<bool> quotesEnabled;
   final Value<bool> ordersEnabled;
   final Value<bool> deliveryNotesEnabled;
@@ -3810,6 +3860,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.eInvoiceEnabled = const Value.absent(),
     this.skontoPercent = const Value.absent(),
     this.skontoDays = const Value.absent(),
+    this.quoteValidityDays = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
@@ -3892,6 +3943,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.eInvoiceEnabled = const Value.absent(),
     this.skontoPercent = const Value.absent(),
     this.skontoDays = const Value.absent(),
+    this.quoteValidityDays = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
@@ -3976,6 +4028,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<bool>? eInvoiceEnabled,
     Expression<double>? skontoPercent,
     Expression<int>? skontoDays,
+    Expression<int>? quoteValidityDays,
     Expression<bool>? quotesEnabled,
     Expression<bool>? ordersEnabled,
     Expression<bool>? deliveryNotesEnabled,
@@ -4058,6 +4111,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (eInvoiceEnabled != null) 'e_invoice_enabled': eInvoiceEnabled,
       if (skontoPercent != null) 'skonto_percent': skontoPercent,
       if (skontoDays != null) 'skonto_days': skontoDays,
+      if (quoteValidityDays != null) 'quote_validity_days': quoteValidityDays,
       if (quotesEnabled != null) 'quotes_enabled': quotesEnabled,
       if (ordersEnabled != null) 'orders_enabled': ordersEnabled,
       if (deliveryNotesEnabled != null)
@@ -4180,6 +4234,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<bool>? eInvoiceEnabled,
     Value<double?>? skontoPercent,
     Value<int?>? skontoDays,
+    Value<int?>? quoteValidityDays,
     Value<bool>? quotesEnabled,
     Value<bool>? ordersEnabled,
     Value<bool>? deliveryNotesEnabled,
@@ -4262,6 +4317,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       eInvoiceEnabled: eInvoiceEnabled ?? this.eInvoiceEnabled,
       skontoPercent: skontoPercent ?? this.skontoPercent,
       skontoDays: skontoDays ?? this.skontoDays,
+      quoteValidityDays: quoteValidityDays ?? this.quoteValidityDays,
       quotesEnabled: quotesEnabled ?? this.quotesEnabled,
       ordersEnabled: ordersEnabled ?? this.ordersEnabled,
       deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
@@ -4404,6 +4460,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     }
     if (skontoDays.present) {
       map['skonto_days'] = Variable<int>(skontoDays.value);
+    }
+    if (quoteValidityDays.present) {
+      map['quote_validity_days'] = Variable<int>(quoteValidityDays.value);
     }
     if (quotesEnabled.present) {
       map['quotes_enabled'] = Variable<bool>(quotesEnabled.value);
@@ -4681,6 +4740,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('eInvoiceEnabled: $eInvoiceEnabled, ')
           ..write('skontoPercent: $skontoPercent, ')
           ..write('skontoDays: $skontoDays, ')
+          ..write('quoteValidityDays: $quoteValidityDays, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
@@ -10338,6 +10398,41 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _quoteValidityDaysMeta = const VerificationMeta(
+    'quoteValidityDays',
+  );
+  @override
+  late final GeneratedColumn<int> quoteValidityDays = GeneratedColumn<int>(
+    'quote_validity_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _quoteValidFromMeta = const VerificationMeta(
+    'quoteValidFrom',
+  );
+  @override
+  late final GeneratedColumn<DateTime> quoteValidFrom =
+      GeneratedColumn<DateTime>(
+        'quote_valid_from',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _quoteValidUntilMeta = const VerificationMeta(
+    'quoteValidUntil',
+  );
+  @override
+  late final GeneratedColumn<DateTime> quoteValidUntil =
+      GeneratedColumn<DateTime>(
+        'quote_valid_until',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _isAdvancePaymentMeta = const VerificationMeta(
     'isAdvancePayment',
   );
@@ -10449,6 +10544,9 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     paymentNetDays,
     skontoPercent,
     skontoDays,
+    quoteValidityDays,
+    quoteValidFrom,
+    quoteValidUntil,
     isAdvancePayment,
     isFixedPrice,
     stockBooked,
@@ -10734,6 +10832,33 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         skontoDays.isAcceptableOrUnknown(data['skonto_days']!, _skontoDaysMeta),
       );
     }
+    if (data.containsKey('quote_validity_days')) {
+      context.handle(
+        _quoteValidityDaysMeta,
+        quoteValidityDays.isAcceptableOrUnknown(
+          data['quote_validity_days']!,
+          _quoteValidityDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quote_valid_from')) {
+      context.handle(
+        _quoteValidFromMeta,
+        quoteValidFrom.isAcceptableOrUnknown(
+          data['quote_valid_from']!,
+          _quoteValidFromMeta,
+        ),
+      );
+    }
+    if (data.containsKey('quote_valid_until')) {
+      context.handle(
+        _quoteValidUntilMeta,
+        quoteValidUntil.isAcceptableOrUnknown(
+          data['quote_valid_until']!,
+          _quoteValidUntilMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_advance_payment')) {
       context.handle(
         _isAdvancePaymentMeta,
@@ -10922,6 +11047,18 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.int,
         data['${effectivePrefix}skonto_days'],
       ),
+      quoteValidityDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quote_validity_days'],
+      ),
+      quoteValidFrom: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}quote_valid_from'],
+      ),
+      quoteValidUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}quote_valid_until'],
+      ),
       isAdvancePayment: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_advance_payment'],
@@ -11063,6 +11200,13 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final double? skontoPercent;
   final int? skontoDays;
 
+  /// A5-Nachtrag (Kay, 16.11.2026): Bindefrist eines Angebots — Dauer im
+  /// Entwurf (vorbelegt aus der Firma, änderbar), beim Finalisieren
+  /// Fristbeginn (Finalisierungsdatum) und „bindend bis“ festgehalten.
+  final int? quoteValidityDays;
+  final DateTime? quoteValidFrom;
+  final DateTime? quoteValidUntil;
+
   /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
   /// markiert eine Rechnung als Abschlags-/Anzahlungsrechnung statt einer
   /// regulären (Schluss-)Rechnung. **Arbeitsvorgabe, keine Rechtsprüfung**
@@ -11145,6 +11289,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.paymentNetDays,
     this.skontoPercent,
     this.skontoDays,
+    this.quoteValidityDays,
+    this.quoteValidFrom,
+    this.quoteValidUntil,
     required this.isAdvancePayment,
     required this.isFixedPrice,
     required this.stockBooked,
@@ -11253,6 +11400,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     if (!nullToAbsent || skontoDays != null) {
       map['skonto_days'] = Variable<int>(skontoDays);
     }
+    if (!nullToAbsent || quoteValidityDays != null) {
+      map['quote_validity_days'] = Variable<int>(quoteValidityDays);
+    }
+    if (!nullToAbsent || quoteValidFrom != null) {
+      map['quote_valid_from'] = Variable<DateTime>(quoteValidFrom);
+    }
+    if (!nullToAbsent || quoteValidUntil != null) {
+      map['quote_valid_until'] = Variable<DateTime>(quoteValidUntil);
+    }
     map['is_advance_payment'] = Variable<bool>(isAdvancePayment);
     map['is_fixed_price'] = Variable<bool>(isFixedPrice);
     map['stock_booked'] = Variable<bool>(stockBooked);
@@ -11356,6 +11512,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       skontoDays: skontoDays == null && nullToAbsent
           ? const Value.absent()
           : Value(skontoDays),
+      quoteValidityDays: quoteValidityDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quoteValidityDays),
+      quoteValidFrom: quoteValidFrom == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quoteValidFrom),
+      quoteValidUntil: quoteValidUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quoteValidUntil),
       isAdvancePayment: Value(isAdvancePayment),
       isFixedPrice: Value(isFixedPrice),
       stockBooked: Value(stockBooked),
@@ -11435,6 +11600,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       paymentNetDays: serializer.fromJson<int?>(json['paymentNetDays']),
       skontoPercent: serializer.fromJson<double?>(json['skontoPercent']),
       skontoDays: serializer.fromJson<int?>(json['skontoDays']),
+      quoteValidityDays: serializer.fromJson<int?>(json['quoteValidityDays']),
+      quoteValidFrom: serializer.fromJson<DateTime?>(json['quoteValidFrom']),
+      quoteValidUntil: serializer.fromJson<DateTime?>(json['quoteValidUntil']),
       isAdvancePayment: serializer.fromJson<bool>(json['isAdvancePayment']),
       isFixedPrice: serializer.fromJson<bool>(json['isFixedPrice']),
       stockBooked: serializer.fromJson<bool>(json['stockBooked']),
@@ -11499,6 +11667,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'paymentNetDays': serializer.toJson<int?>(paymentNetDays),
       'skontoPercent': serializer.toJson<double?>(skontoPercent),
       'skontoDays': serializer.toJson<int?>(skontoDays),
+      'quoteValidityDays': serializer.toJson<int?>(quoteValidityDays),
+      'quoteValidFrom': serializer.toJson<DateTime?>(quoteValidFrom),
+      'quoteValidUntil': serializer.toJson<DateTime?>(quoteValidUntil),
       'isAdvancePayment': serializer.toJson<bool>(isAdvancePayment),
       'isFixedPrice': serializer.toJson<bool>(isFixedPrice),
       'stockBooked': serializer.toJson<bool>(stockBooked),
@@ -11545,6 +11716,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<int?> paymentNetDays = const Value.absent(),
     Value<double?> skontoPercent = const Value.absent(),
     Value<int?> skontoDays = const Value.absent(),
+    Value<int?> quoteValidityDays = const Value.absent(),
+    Value<DateTime?> quoteValidFrom = const Value.absent(),
+    Value<DateTime?> quoteValidUntil = const Value.absent(),
     bool? isAdvancePayment,
     bool? isFixedPrice,
     bool? stockBooked,
@@ -11622,6 +11796,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
         ? skontoPercent.value
         : this.skontoPercent,
     skontoDays: skontoDays.present ? skontoDays.value : this.skontoDays,
+    quoteValidityDays: quoteValidityDays.present
+        ? quoteValidityDays.value
+        : this.quoteValidityDays,
+    quoteValidFrom: quoteValidFrom.present
+        ? quoteValidFrom.value
+        : this.quoteValidFrom,
+    quoteValidUntil: quoteValidUntil.present
+        ? quoteValidUntil.value
+        : this.quoteValidUntil,
     isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
     isFixedPrice: isFixedPrice ?? this.isFixedPrice,
     stockBooked: stockBooked ?? this.stockBooked,
@@ -11713,6 +11896,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       skontoDays: data.skontoDays.present
           ? data.skontoDays.value
           : this.skontoDays,
+      quoteValidityDays: data.quoteValidityDays.present
+          ? data.quoteValidityDays.value
+          : this.quoteValidityDays,
+      quoteValidFrom: data.quoteValidFrom.present
+          ? data.quoteValidFrom.value
+          : this.quoteValidFrom,
+      quoteValidUntil: data.quoteValidUntil.present
+          ? data.quoteValidUntil.value
+          : this.quoteValidUntil,
       isAdvancePayment: data.isAdvancePayment.present
           ? data.isAdvancePayment.value
           : this.isAdvancePayment,
@@ -11767,6 +11959,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('paymentNetDays: $paymentNetDays, ')
           ..write('skontoPercent: $skontoPercent, ')
           ..write('skontoDays: $skontoDays, ')
+          ..write('quoteValidityDays: $quoteValidityDays, ')
+          ..write('quoteValidFrom: $quoteValidFrom, ')
+          ..write('quoteValidUntil: $quoteValidUntil, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
           ..write('stockBooked: $stockBooked, ')
@@ -11813,6 +12008,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     paymentNetDays,
     skontoPercent,
     skontoDays,
+    quoteValidityDays,
+    quoteValidFrom,
+    quoteValidUntil,
     isAdvancePayment,
     isFixedPrice,
     stockBooked,
@@ -11858,6 +12056,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.paymentNetDays == this.paymentNetDays &&
           other.skontoPercent == this.skontoPercent &&
           other.skontoDays == this.skontoDays &&
+          other.quoteValidityDays == this.quoteValidityDays &&
+          other.quoteValidFrom == this.quoteValidFrom &&
+          other.quoteValidUntil == this.quoteValidUntil &&
           other.isAdvancePayment == this.isAdvancePayment &&
           other.isFixedPrice == this.isFixedPrice &&
           other.stockBooked == this.stockBooked &&
@@ -11901,6 +12102,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<int?> paymentNetDays;
   final Value<double?> skontoPercent;
   final Value<int?> skontoDays;
+  final Value<int?> quoteValidityDays;
+  final Value<DateTime?> quoteValidFrom;
+  final Value<DateTime?> quoteValidUntil;
   final Value<bool> isAdvancePayment;
   final Value<bool> isFixedPrice;
   final Value<bool> stockBooked;
@@ -11943,6 +12147,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.paymentNetDays = const Value.absent(),
     this.skontoPercent = const Value.absent(),
     this.skontoDays = const Value.absent(),
+    this.quoteValidityDays = const Value.absent(),
+    this.quoteValidFrom = const Value.absent(),
+    this.quoteValidUntil = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
     this.stockBooked = const Value.absent(),
@@ -11986,6 +12193,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.paymentNetDays = const Value.absent(),
     this.skontoPercent = const Value.absent(),
     this.skontoDays = const Value.absent(),
+    this.quoteValidityDays = const Value.absent(),
+    this.quoteValidFrom = const Value.absent(),
+    this.quoteValidUntil = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
     this.stockBooked = const Value.absent(),
@@ -12036,6 +12246,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<int>? paymentNetDays,
     Expression<double>? skontoPercent,
     Expression<int>? skontoDays,
+    Expression<int>? quoteValidityDays,
+    Expression<DateTime>? quoteValidFrom,
+    Expression<DateTime>? quoteValidUntil,
     Expression<bool>? isAdvancePayment,
     Expression<bool>? isFixedPrice,
     Expression<bool>? stockBooked,
@@ -12090,6 +12303,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (paymentNetDays != null) 'payment_net_days': paymentNetDays,
       if (skontoPercent != null) 'skonto_percent': skontoPercent,
       if (skontoDays != null) 'skonto_days': skontoDays,
+      if (quoteValidityDays != null) 'quote_validity_days': quoteValidityDays,
+      if (quoteValidFrom != null) 'quote_valid_from': quoteValidFrom,
+      if (quoteValidUntil != null) 'quote_valid_until': quoteValidUntil,
       if (isAdvancePayment != null) 'is_advance_payment': isAdvancePayment,
       if (isFixedPrice != null) 'is_fixed_price': isFixedPrice,
       if (stockBooked != null) 'stock_booked': stockBooked,
@@ -12135,6 +12351,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<int?>? paymentNetDays,
     Value<double?>? skontoPercent,
     Value<int?>? skontoDays,
+    Value<int?>? quoteValidityDays,
+    Value<DateTime?>? quoteValidFrom,
+    Value<DateTime?>? quoteValidUntil,
     Value<bool>? isAdvancePayment,
     Value<bool>? isFixedPrice,
     Value<bool>? stockBooked,
@@ -12184,6 +12403,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       paymentNetDays: paymentNetDays ?? this.paymentNetDays,
       skontoPercent: skontoPercent ?? this.skontoPercent,
       skontoDays: skontoDays ?? this.skontoDays,
+      quoteValidityDays: quoteValidityDays ?? this.quoteValidityDays,
+      quoteValidFrom: quoteValidFrom ?? this.quoteValidFrom,
+      quoteValidUntil: quoteValidUntil ?? this.quoteValidUntil,
       isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
       isFixedPrice: isFixedPrice ?? this.isFixedPrice,
       stockBooked: stockBooked ?? this.stockBooked,
@@ -12325,6 +12547,15 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (skontoDays.present) {
       map['skonto_days'] = Variable<int>(skontoDays.value);
     }
+    if (quoteValidityDays.present) {
+      map['quote_validity_days'] = Variable<int>(quoteValidityDays.value);
+    }
+    if (quoteValidFrom.present) {
+      map['quote_valid_from'] = Variable<DateTime>(quoteValidFrom.value);
+    }
+    if (quoteValidUntil.present) {
+      map['quote_valid_until'] = Variable<DateTime>(quoteValidUntil.value);
+    }
     if (isAdvancePayment.present) {
       map['is_advance_payment'] = Variable<bool>(isAdvancePayment.value);
     }
@@ -12388,6 +12619,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('paymentNetDays: $paymentNetDays, ')
           ..write('skontoPercent: $skontoPercent, ')
           ..write('skontoDays: $skontoDays, ')
+          ..write('quoteValidityDays: $quoteValidityDays, ')
+          ..write('quoteValidFrom: $quoteValidFrom, ')
+          ..write('quoteValidUntil: $quoteValidUntil, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
           ..write('stockBooked: $stockBooked, ')
@@ -24679,6 +24913,7 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<bool> eInvoiceEnabled,
       Value<double?> skontoPercent,
       Value<int?> skontoDays,
+      Value<int?> quoteValidityDays,
       Value<bool> quotesEnabled,
       Value<bool> ordersEnabled,
       Value<bool> deliveryNotesEnabled,
@@ -24762,6 +24997,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<bool> eInvoiceEnabled,
       Value<double?> skontoPercent,
       Value<int?> skontoDays,
+      Value<int?> quoteValidityDays,
       Value<bool> quotesEnabled,
       Value<bool> ordersEnabled,
       Value<bool> deliveryNotesEnabled,
@@ -25385,6 +25621,11 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<int> get skontoDays => $composableBuilder(
     column: $table.skontoDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quoteValidityDays => $composableBuilder(
+    column: $table.quoteValidityDays,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -26395,6 +26636,11 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get quoteValidityDays => $composableBuilder(
+    column: $table.quoteValidityDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get quotesEnabled => $composableBuilder(
     column: $table.quotesEnabled,
     builder: (column) => ColumnOrderings(column),
@@ -26773,6 +27019,11 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<int> get skontoDays => $composableBuilder(
     column: $table.skontoDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quoteValidityDays => $composableBuilder(
+    column: $table.quoteValidityDays,
     builder: (column) => column,
   );
 
@@ -27757,6 +28008,7 @@ class $$CompaniesTableTableManager
                 Value<bool> eInvoiceEnabled = const Value.absent(),
                 Value<double?> skontoPercent = const Value.absent(),
                 Value<int?> skontoDays = const Value.absent(),
+                Value<int?> quoteValidityDays = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
@@ -27842,6 +28094,7 @@ class $$CompaniesTableTableManager
                 eInvoiceEnabled: eInvoiceEnabled,
                 skontoPercent: skontoPercent,
                 skontoDays: skontoDays,
+                quoteValidityDays: quoteValidityDays,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
@@ -27925,6 +28178,7 @@ class $$CompaniesTableTableManager
                 Value<bool> eInvoiceEnabled = const Value.absent(),
                 Value<double?> skontoPercent = const Value.absent(),
                 Value<int?> skontoDays = const Value.absent(),
+                Value<int?> quoteValidityDays = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
@@ -28010,6 +28264,7 @@ class $$CompaniesTableTableManager
                 eInvoiceEnabled: eInvoiceEnabled,
                 skontoPercent: skontoPercent,
                 skontoDays: skontoDays,
+                quoteValidityDays: quoteValidityDays,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
@@ -34726,6 +34981,9 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       Value<int?> paymentNetDays,
       Value<double?> skontoPercent,
       Value<int?> skontoDays,
+      Value<int?> quoteValidityDays,
+      Value<DateTime?> quoteValidFrom,
+      Value<DateTime?> quoteValidUntil,
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
       Value<bool> stockBooked,
@@ -34770,6 +35028,9 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<int?> paymentNetDays,
       Value<double?> skontoPercent,
       Value<int?> skontoDays,
+      Value<int?> quoteValidityDays,
+      Value<DateTime?> quoteValidFrom,
+      Value<DateTime?> quoteValidUntil,
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
       Value<bool> stockBooked,
@@ -35115,6 +35376,21 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<int> get skontoDays => $composableBuilder(
     column: $table.skontoDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quoteValidityDays => $composableBuilder(
+    column: $table.quoteValidityDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get quoteValidFrom => $composableBuilder(
+    column: $table.quoteValidFrom,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get quoteValidUntil => $composableBuilder(
+    column: $table.quoteValidUntil,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -35544,6 +35820,21 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get quoteValidityDays => $composableBuilder(
+    column: $table.quoteValidityDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get quoteValidFrom => $composableBuilder(
+    column: $table.quoteValidFrom,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get quoteValidUntil => $composableBuilder(
+    column: $table.quoteValidUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isAdvancePayment => $composableBuilder(
     column: $table.isAdvancePayment,
     builder: (column) => ColumnOrderings(column),
@@ -35827,6 +36118,21 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<int> get skontoDays => $composableBuilder(
     column: $table.skontoDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get quoteValidityDays => $composableBuilder(
+    column: $table.quoteValidityDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get quoteValidFrom => $composableBuilder(
+    column: $table.quoteValidFrom,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get quoteValidUntil => $composableBuilder(
+    column: $table.quoteValidUntil,
     builder: (column) => column,
   );
 
@@ -36171,6 +36477,9 @@ class $$InvoicesTableTableManager
                 Value<int?> paymentNetDays = const Value.absent(),
                 Value<double?> skontoPercent = const Value.absent(),
                 Value<int?> skontoDays = const Value.absent(),
+                Value<int?> quoteValidityDays = const Value.absent(),
+                Value<DateTime?> quoteValidFrom = const Value.absent(),
+                Value<DateTime?> quoteValidUntil = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
                 Value<bool> stockBooked = const Value.absent(),
@@ -36213,6 +36522,9 @@ class $$InvoicesTableTableManager
                 paymentNetDays: paymentNetDays,
                 skontoPercent: skontoPercent,
                 skontoDays: skontoDays,
+                quoteValidityDays: quoteValidityDays,
+                quoteValidFrom: quoteValidFrom,
+                quoteValidUntil: quoteValidUntil,
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
                 stockBooked: stockBooked,
@@ -36257,6 +36569,9 @@ class $$InvoicesTableTableManager
                 Value<int?> paymentNetDays = const Value.absent(),
                 Value<double?> skontoPercent = const Value.absent(),
                 Value<int?> skontoDays = const Value.absent(),
+                Value<int?> quoteValidityDays = const Value.absent(),
+                Value<DateTime?> quoteValidFrom = const Value.absent(),
+                Value<DateTime?> quoteValidUntil = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
                 Value<bool> stockBooked = const Value.absent(),
@@ -36299,6 +36614,9 @@ class $$InvoicesTableTableManager
                 paymentNetDays: paymentNetDays,
                 skontoPercent: skontoPercent,
                 skontoDays: skontoDays,
+                quoteValidityDays: quoteValidityDays,
+                quoteValidFrom: quoteValidFrom,
+                quoteValidUntil: quoteValidUntil,
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
                 stockBooked: stockBooked,

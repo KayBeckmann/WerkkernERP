@@ -2,7 +2,7 @@ import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart'
-    show BillingRole, PlannedHoursItem, billBookedHoursByRole, documentConversionTargets, documentKindUsesPaymentTerms, resolvePaymentDefaults;
+    show BillingRole, PlannedHoursItem, billBookedHoursByRole, documentConversionTargets, documentKindUsesPaymentTerms, resolvePaymentDefaults, isValidQuoteValidityDays, quoteValidityDaysBetween, quoteValidUntil;
 
 import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
@@ -209,8 +209,18 @@ class InvoiceRepository {
     // A2-Nachtrag: ausdrückliche Bedingung; ohne Angabe gelten bei
     // Rechnung/Auftrag Kunden- vor Firmenstandard.
     DocumentTermsInput? terms,
+    // A5-Nachtrag: Bindefrist eines Angebots in Tagen; absent = Firmenstandard.
+    Value<int?> quoteValidityDays = const Value.absent(),
   }) async {
     _validateItemsForKind(kind, items);
+    int? validityDays;
+    if (kind == DocumentKind.quote) {
+      validityDays = quoteValidityDays.present
+          ? quoteValidityDays.value
+          : (await (_db.select(_db.companies)..where((c) => c.id.equals(companyId))).getSingleOrNull())
+              ?.quoteValidityDays;
+      if (!isValidQuoteValidityDays(validityDays)) throw ArgumentError('Bindefrist muss 0 bis 3650 Tage sein.');
+    }
     final resolvedTerms = terms ??
         (documentKindUsesPaymentTerms(kind.name) ? await defaultTermsFor(companyId: companyId, customerId: customerId) : null);
     final resolvedDue = dueDate ??
@@ -241,6 +251,7 @@ class InvoiceRepository {
               paymentNetDays: Value(resolvedTerms?.netDays),
               skontoPercent: Value(resolvedTerms?.skontoPercent),
               skontoDays: Value(resolvedTerms?.skontoDays),
+              quoteValidityDays: Value(validityDays),
               createdAt: now,
               updatedAt: now,
             ),
@@ -328,11 +339,49 @@ class InvoiceRepository {
     List<InvoiceItemInput>? items,
     // A2-Nachtrag: absent = unverändert, Value(null) = keine Bedingung.
     Value<DocumentTermsInput?> terms = const Value.absent(),
+    // A5-Nachtrag: Bindefrist. Entwurf: [quoteValidityDays] (Dauer).
+    // Finalisiertes, noch editierbares Angebot: nur ein ausdrücklich
+    // bestätigtes neues [quoteValidUntil] — Fristbeginn bleibt, die Dauer
+    // folgt daraus. Absent = unverändert (Antwort „Nein“).
+    Value<int?> quoteValidityDays = const Value.absent(),
+    Value<DateTime?> quoteValidUntil = const Value.absent(),
   }) async {
     return _db.transaction(() async {
       final existing = await findById(companyId: companyId, id: id);
       if (existing == null || !(await isEditable(existing))) return null;
       if (items != null) _validateItemsForKind(existing.kind, items);
+      var validityCompanion = const InvoicesCompanion();
+      if (existing.kind == DocumentKind.quote) {
+        if (existing.status == InvoiceStatus.draft && quoteValidityDays.present) {
+          if (!isValidQuoteValidityDays(quoteValidityDays.value)) {
+            throw ArgumentError('Bindefrist muss 0 bis 3650 Tage sein.');
+          }
+          validityCompanion = InvoicesCompanion(quoteValidityDays: quoteValidityDays);
+        } else if (existing.status != InvoiceStatus.draft && quoteValidUntil.present) {
+          final until = quoteValidUntil.value;
+          if (until == null) {
+            validityCompanion = const InvoicesCompanion(
+              quoteValidityDays: Value(null),
+              quoteValidFrom: Value(null),
+              quoteValidUntil: Value(null),
+            );
+          } else {
+            final from = existing.quoteValidFrom ?? existing.finalizedAt ?? existing.issueDate;
+            final day = DateTime(until.year, until.month, until.day);
+            if (day.isBefore(DateTime(from.year, from.month, from.day))) {
+              throw ArgumentError('„Bindend bis“ darf nicht vor dem Fristbeginn liegen.');
+            }
+            validityCompanion = InvoicesCompanion(
+              quoteValidFrom: Value(DateTime(from.year, from.month, from.day)),
+              quoteValidUntil: Value(day),
+              quoteValidityDays: Value(quoteValidityDaysBetween(from, day)),
+            );
+          }
+        }
+      }
+      if (validityCompanion != const InvoicesCompanion()) {
+        await (_db.update(_db.invoices)..where((i) => i.id.equals(id))).write(validityCompanion);
+      }
 
       await (_db.update(_db.invoices)..where((i) => i.id.equals(id)))
           .write(
@@ -506,6 +555,13 @@ class InvoiceRepository {
           companySnapshotTaxNumber: Value(company.taxNumber),
           companySnapshotVatId: Value(company.vatId),
           companySnapshotIban: Value(company.iban),
+          // A5-Nachtrag: Bindefrist ab Finalisierung festhalten.
+          quoteValidFrom: invoice.kind == DocumentKind.quote && invoice.quoteValidityDays != null
+              ? Value(DateTime(now.year, now.month, now.day))
+              : const Value.absent(),
+          quoteValidUntil: invoice.kind == DocumentKind.quote && invoice.quoteValidityDays != null
+              ? Value(quoteValidUntil(now, invoice.quoteValidityDays!))
+              : const Value.absent(),
           // A2-Nachtrag: Fälligkeit konsistent aus Belegdatum + Zahlungsziel.
           dueDate: invoice.kind == DocumentKind.invoice && invoice.paymentNetDays != null
               ? Value(DateTime(

@@ -47,6 +47,7 @@ import '../../domain/services/einvoice_builder.dart';
 import '../../domain/services/einvoice_parties.dart' show isEInvoiceKind;
 import '../../domain/services/email_sender.dart' show EmailExtraAttachment;
 import '../../data/repositories/stock_ledger.dart';
+import '../widgets/quote_validity_dialog.dart';
 import '../widgets/storage_bin_picker.dart';
 import '../widgets/barcode_scanner.dart';
 import '../widgets/einvoice_actions.dart';
@@ -185,6 +186,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   late DateTime _serviceDate;
   final _notesCtrl = TextEditingController();
   final _paymentTermsCtrl = TextEditingController();
+
+  /// A5-Nachtrag: Bindefrist eines Angebotsentwurfs in Tagen.
+  final _quoteValidityCtrl = TextEditingController();
   bool _loading = true;
   bool _saving = false;
   bool _finalizing = false;
@@ -392,6 +396,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _timeTrackingEnabled = company.timeTrackingEnabled;
 
     final invoice = widget.invoice;
+    // A5-Nachtrag: neues Angebot mit Firmenstandard vorbelegen.
+    _quoteValidityCtrl.text = (invoice == null ? company.quoteValidityDays : invoice.quoteValidityDays)?.toString() ?? '';
     if (documentKindUsesPaymentTerms((invoice?.kind ?? widget.kind).name)) {
       _paymentTermList = await paymentTermRepo.listForCompany(companyId);
       if (invoice == null) {
@@ -463,6 +469,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   void dispose() {
     _notesCtrl.dispose();
     _paymentTermsCtrl.dispose();
+    _quoteValidityCtrl.dispose();
     _skontoPercentCtrl.dispose();
     _skontoDaysCtrl.dispose();
     super.dispose();
@@ -648,6 +655,26 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   }
 
   Future<void> _save() async {
+    // A5-Nachtrag: Bindefrist prüfen bzw. beim finalisierten Angebot
+    // ausdrücklich nachfragen — vor jeder Speicherung.
+    final validity = parseQuoteValidityDays(_quoteValidityCtrl.text);
+    if (_kind == DocumentKind.quote && !_isFinalized && !validity.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bindefrist: ganze Tage von 0 bis 3650 oder leer lassen.')),
+      );
+      return;
+    }
+    var validUntilChange = const Value<DateTime?>.absent();
+    final current = _currentInvoice;
+    if (_kind == DocumentKind.quote && _isFinalized && current != null) {
+      final decision = await askQuoteValidityChange(
+        context,
+        validFrom: current.quoteValidFrom ?? current.finalizedAt ?? current.issueDate,
+        validUntil: current.quoteValidUntil,
+      );
+      if (decision == null || !mounted) return;
+      if (!decision.keep) validUntilChange = Value(decision.newUntil);
+    }
     setState(() => _saving = true);
     try {
       final companyId = context.read<ActiveCompanyService>().active!.id;
@@ -671,6 +698,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           contactId: _contactId,
           items: items,
           terms: _usesPaymentTerms ? _termSelection : null,
+          quoteValidityDays: widget.kind == DocumentKind.quote ? Value(validity.days) : const Value.absent(),
         );
       } else {
         saved = await repo.update(
@@ -687,6 +715,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           contactId: Value(_contactId),
           items: items,
           terms: _usesPaymentTerms ? Value(_termSelection) : const Value.absent(),
+          quoteValidityDays: _kind == DocumentKind.quote && !_isFinalized ? Value(validity.days) : const Value.absent(),
+          quoteValidUntil: validUntilChange,
         );
       }
       if (mounted) {
@@ -1429,6 +1459,36 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
   /// A2-Nachtrag: Zahlungsziel-Auswahl, Skonto je Beleg und Vorschau des
   /// Zahlungstexts (wie auf dem PDF).
+  /// A5-Nachtrag (Kay, 16.11.2026): Bindefrist — im Entwurf als Dauer
+  /// (ab Finalisierung), danach das festgehaltene „bindend bis“.
+  Widget _buildQuoteValiditySection(bool isLocked) {
+    final invoice = _currentInvoice;
+    if (_isFinalized && invoice != null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          quoteValidityStatus(
+            validFrom: invoice.quoteValidFrom,
+            validUntil: invoice.quoteValidUntil,
+            days: invoice.quoteValidityDays,
+          ),
+          key: const Key('quote-validity-status'),
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+    return TextField(
+      key: const Key('quote-validity-days'),
+      controller: _quoteValidityCtrl,
+      readOnly: isLocked,
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(
+        labelText: 'Bindefrist (Tage)',
+        helperText: 'Beginnt mit der Finalisierung. Leer = keine Bindefrist.',
+      ),
+    );
+  }
+
   Widget _buildPaymentTermsSection(bool isLocked) {
     final selection = _termSelection;
     final ids = {for (final t in _paymentTermList) t.id};
@@ -1726,6 +1786,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 style: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
             ),
+          if (_kind == DocumentKind.quote) _buildQuoteValiditySection(isLocked),
           if (_usesPaymentTerms) _buildPaymentTermsSection(isLocked),
           TextField(
             controller: _paymentTermsCtrl,

@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 41;
+  int get schemaVersion => 42;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -473,6 +473,15 @@ class AppDatabase extends _$AppDatabase {
             if (from >= 25) {
               await migrator.addColumn(purchaseOrderItems, purchaseOrderItems.supplierArticleNumber);
             }
+          }
+          if (from < 42) {
+            // A5-Nachtrag (Kay, 16.11.2026): Angebotsbindefrist. Firmen
+            // bekommen 14 Tage als Vorbelegung; bestehende Angebote bleiben
+            // ohne Frist (kein rückwirkender Eingriff).
+            await migrator.addColumn(companies, companies.quoteValidityDays);
+            await migrator.addColumn(invoices, invoices.quoteValidityDays);
+            await migrator.addColumn(invoices, invoices.quoteValidFrom);
+            await migrator.addColumn(invoices, invoices.quoteValidUntil);
           }
         },
       );

@@ -57,6 +57,11 @@ void main() {
     // v37 -> v38 (A1-Nachtrag: Barcode je Artikel).
     raw.execute('DROP INDEX IF EXISTS articles_company_barcode_idx;');
     raw.execute('ALTER TABLE articles DROP COLUMN barcode;');
+    // v41 -> v42 (A5-Nachtrag: Angebotsbindefrist).
+    raw.execute('ALTER TABLE companies DROP COLUMN quote_validity_days;');
+    for (final c in ['quote_validity_days', 'quote_valid_from', 'quote_valid_until']) {
+      raw.execute('ALTER TABLE invoices DROP COLUMN $c;');
+    }
     // v40 -> v41 (C5.2-Nachtrag: Lieferantenartikelnummer).
     raw.execute('ALTER TABLE article_supplier_prices DROP COLUMN supplier_article_number;');
     raw.execute('ALTER TABLE purchase_order_items DROP COLUMN supplier_article_number;');

@@ -16,3 +16,4 @@ export 'src/recipient.dart';
 export 'src/einvoice_party.dart';
 export 'src/einvoice.dart';
 export 'src/payment_terms.dart';
+export 'src/quote_validity.dart';

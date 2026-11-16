@@ -32,6 +32,10 @@ class Companies extends Table {
   RealColumn get skontoPercent => real().nullable()();
   IntColumn get skontoDays => integer().nullable()();
 
+  /// A5-Nachtrag (Kay, 16.11.2026): Standard-Bindefrist neuer Angebote in
+  /// Tagen (Vorbelegung, `null` = keine). Ändert bestehende Angebote nie.
+  IntColumn get quoteValidityDays => integer().nullable().withDefault(const Constant(14))();
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -625,6 +629,13 @@ class Invoices extends Table {
   IntColumn get paymentNetDays => integer().nullable()();
   RealColumn get skontoPercent => real().nullable()();
   IntColumn get skontoDays => integer().nullable()();
+
+  /// A5-Nachtrag (Kay, 16.11.2026): Bindefrist eines Angebots — Dauer im
+  /// Entwurf (vorbelegt aus der Firma, änderbar), beim Finalisieren
+  /// Fristbeginn (Finalisierungsdatum) und „bindend bis“ festgehalten.
+  IntColumn get quoteValidityDays => integer().nullable()();
+  DateTimeColumn get quoteValidFrom => dateTime().nullable()();
+  DateTimeColumn get quoteValidUntil => dateTime().nullable()();
 
   /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
   /// markiert eine Rechnung als Abschlags-/Anzahlungsrechnung statt einer
