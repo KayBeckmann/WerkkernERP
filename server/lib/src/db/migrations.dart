@@ -35,6 +35,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step20StaffRolesProjectNotes,
   _step21HoursPerRole,
   _step22CustomerContacts,
+  _step23EInvoice,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -589,4 +590,21 @@ Future<void> _step22CustomerContacts(Session db) async {
     "WHERE coalesce(trim(contact_person), '') <> ''",
   );
   await db.execute('UPDATE customers SET contact_person = NULL WHERE contact_person IS NOT NULL');
+}
+
+/// C15.1 E-Rechnung (Kay 2026-11-15): strukturierte Anschriften (BG-5/
+/// BG-8), BIC, Leitweg-ID und Format je Kunde, Parteien-Schnappschuss am
+/// Dokument. Freitext-Anschriften bleiben; die XML-Erzeugung zerlegt sie
+/// bei leeren Feldern (`parsePostalAddress` in `werkkern_core`).
+Future<void> _step23EInvoice(Session db) async {
+  for (final column in ['street', 'postal_code', 'city', 'bic']) {
+    await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS $column TEXT');
+  }
+  await db.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS country_code TEXT NOT NULL DEFAULT 'DE'");
+  for (final column in ['street', 'postal_code', 'city', 'leitweg_id']) {
+    await db.execute('ALTER TABLE customers ADD COLUMN IF NOT EXISTS $column TEXT');
+  }
+  await db.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS country_code TEXT NOT NULL DEFAULT 'DE'");
+  await db.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS e_invoice_format TEXT NOT NULL DEFAULT 'zugferd'");
+  await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS e_invoice_snapshot TEXT');
 }

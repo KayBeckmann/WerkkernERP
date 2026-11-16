@@ -64,6 +64,11 @@ class MigrationPackageBuilder {
         'iban': company.iban,
         'email': company.email,
         'phone': company.phone,
+        'street': company.street,
+        'postalCode': company.postalCode,
+        'city': company.city,
+        'countryCode': company.countryCode,
+        'bic': company.bic,
         'footerText': company.pdfFooterText,
         'smallBusinessExempt': exempt,
         'documentTexts': {
@@ -128,6 +133,12 @@ class MigrationPackageBuilder {
             'contactPerson': c.contactPerson,
             'notes': c.notes,
             'createdAt': _ts(c.createdAt),
+            'street': c.street,
+            'postalCode': c.postalCode,
+            'city': c.city,
+            'countryCode': c.countryCode,
+            'leitwegId': c.leitwegId,
+            'eInvoiceFormat': c.eInvoiceFormat,
           },
       ],
       'suppliers': [
@@ -445,6 +456,7 @@ List<String> offlineModulesOf(Company c) => [
       if (c.lagerbestandEnabled) 'lagerbestand',
       if (c.bestellwesenEnabled) 'bestellwesen',
       if (c.timeTrackingEnabled) 'timeTracking',
+      if (c.eInvoiceEnabled) 'eInvoice',
     ];
 
 String? _ts(DateTime? t) => t?.toUtc().toIso8601String();

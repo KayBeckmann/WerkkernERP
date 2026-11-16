@@ -107,8 +107,20 @@ class CompanyImportProfile {
     this.documentTexts = const {},
     this.smallBusinessExempt = false,
     this.modules = const {},
+    this.street,
+    this.postalCode,
+    this.city,
+    this.countryCode = 'DE',
+    this.bic,
   });
   final String? address;
+
+  /// C15 E-Rechnung.
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? bic;
   final String? taxNumber;
   final String? vatId;
   final String? iban;
@@ -180,6 +192,7 @@ const _importableModules = {
   'lagerbestand',
   'bestellwesen',
   'timeTracking',
+  'eInvoice',
 };
 
 /// Liest [package] für [companyId] ein. [roleAssignments]: Offline-Rollen-ID
@@ -293,6 +306,12 @@ class _Parser {
           createdAt: r.time('createdAt'),
           invoiceEmail: r.optStr('invoiceEmail'),
           contacts: contacts,
+          street: r.optStr('street'),
+          postalCode: r.optStr('postalCode'),
+          city: r.optStr('city'),
+          countryCode: r.optStr('countryCode') ?? 'DE',
+          leitwegId: r.optStr('leitwegId'),
+          eInvoiceFormat: r.optStr('eInvoiceFormat') == 'xrechnung' ? 'xrechnung' : 'zugferd',
         ),
       );
     }
@@ -410,6 +429,11 @@ class _Parser {
         footerText: r.optStr('footerText'),
         documentTexts: texts,
         smallBusinessExempt: r.boolean('smallBusinessExempt', fallback: false),
+        street: r.optStr('street'),
+        postalCode: r.optStr('postalCode'),
+        city: r.optStr('city'),
+        countryCode: r.optStr('countryCode') ?? 'DE',
+        bic: r.optStr('bic'),
         modules: modules,
       ),
     )..warnings.addAll(result.warnings);

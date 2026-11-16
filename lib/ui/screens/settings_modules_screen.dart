@@ -33,6 +33,7 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
     bool? lagerbestandEnabled,
     bool? bestellwesenEnabled,
     bool? timeTrackingEnabled,
+    bool? eInvoiceEnabled,
   }) async {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
@@ -63,6 +64,7 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
             bestellwesenEnabled:
                 newLagerbestandEnabled ? (bestellwesenEnabled ?? company.bestellwesenEnabled) : false,
             timeTrackingEnabled: timeTrackingEnabled ?? company.timeTrackingEnabled,
+            eInvoiceEnabled: eInvoiceEnabled ?? company.eInvoiceEnabled,
           );
       await service.refreshActive();
     } finally {
@@ -187,6 +189,15 @@ class _SettingsModulesScreenState extends State<SettingsModulesScreen> {
                     title: const Text('Zeiterfassung'),
                     value: company.timeTrackingEnabled,
                     onChanged: _busy ? null : (value) => _setModule(timeTrackingEnabled: value),
+                  ),
+                  // C15 E-Rechnung (Kay 2026-11-15): Rechnungen und
+                  // Gutschriften zusätzlich als ZUGFeRD-PDF bzw. XRechnung.
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('E-Rechnung (ZUGFeRD / XRechnung)'),
+                    subtitle: const Text('Rechnungen und Gutschriften nach EN 16931; Firmendaten und Kundenanschriften müssen vollständig sein.'),
+                    value: company.eInvoiceEnabled,
+                    onChanged: _busy ? null : (value) => _setModule(eInvoiceEnabled: value),
                   ),
                 ],
               ),

@@ -68,6 +68,9 @@ class BusinessRoutes {
     router.get('/documents', _listDocuments);
     router.post('/documents', _createDocument);
     router.get('/documents/<id>', _getDocument);
+    // C15: E-Rechnung (XRechnung/ZUGFeRD-XML) eines finalisierten Dokuments.
+    router.get('/documents/<id>/einvoice.xml', _getDocumentEInvoiceXml);
+    router.get('/documents/<id>/einvoice', _getDocumentEInvoiceStatus);
     router.put('/documents/<id>', _updateDocument);
     router.delete('/documents/<id>', _deleteDocument);
     router.post('/documents/<id>/finalize', _finalizeDocument);
@@ -185,6 +188,13 @@ class BusinessRoutes {
         createdAt: createdAt,
         invoiceEmail: invoiceEmail,
         contacts: contacts,
+        // C15: ältere Clients kennen die Felder nicht — dann bleiben sie.
+        street: kept('street', existing?.street),
+        postalCode: kept('postalCode', existing?.postalCode),
+        city: kept('city', existing?.city),
+        countryCode: (kept('countryCode', existing?.countryCode) ?? 'DE').toUpperCase(),
+        leitwegId: kept('leitwegId', existing?.leitwegId),
+        eInvoiceFormat: kept('eInvoiceFormat', existing?.eInvoiceFormat) == 'xrechnung' ? 'xrechnung' : 'zugferd',
       ),
       error: null,
     );
@@ -455,6 +465,142 @@ class BusinessRoutes {
       if (advancePayments.isNotEmpty) 'remainingCents': totals.totalGross.cents - advanceSum,
       'creditNotes': creditNotes,
     }, status: status);
+  }
+
+  /// C15: [EInvoiceData] eines Dokuments aus dem Schnappschuss (finalisiert)
+  /// bzw. aus den Live-Stammdaten (Entwurf, nur zur Prüfung).
+  Future<({EInvoiceData data, Document document})?> _eInvoiceFor(String companyId, String id) async {
+    final document = await business.findDocument(companyId, id);
+    if (document == null || !isEInvoiceDocumentKind(document.kind)) return null;
+    final items = await business.itemsFor(companyId, id);
+    final customer = await business.findCustomer(companyId, document.customerId);
+    final company = await repository.findCompanyById(companyId);
+    final profile = await repository.getCompanyProfile(companyId);
+    final snapshotJson = document.eInvoiceSnapshot;
+    final snapshot = snapshotJson == null ? null : EInvoiceSnapshot.fromJson((jsonDecode(snapshotJson) as Map).cast());
+    final live = snapshot ??
+        (customer == null
+            ? null
+            : EInvoiceSnapshot.fromJson((jsonDecode(buildEInvoiceSnapshotJson(
+                kind: document.kind,
+                company: CompanySnapshot(
+                  name: company?.name ?? '',
+                  address: profile.address,
+                  taxNumber: profile.taxNumber,
+                  vatId: profile.vatId,
+                  iban: profile.iban,
+                  street: profile.street,
+                  postalCode: profile.postalCode,
+                  city: profile.city,
+                  countryCode: profile.countryCode,
+                  bic: profile.bic,
+                  email: profile.email,
+                  phone: profile.phone,
+                ),
+                customer: customer,
+                contact: customer.contact(document.contactId),
+              )!) as Map)
+                .cast()));
+    if (live == null) return null;
+    final exempt = document.isDraft ? profile.smallBusinessExempt : document.smallBusinessExemptSnapshot;
+    // C13/C15: Abschläge wie in `_documentResponse` — finalisierte
+    // Abschlagsrechnungen aus demselben Auftrag.
+    final advances = document.kind == 'invoice' && !document.isAdvancePayment && document.convertedFromId != null
+        ? (await business.listConvertedFrom(companyId, document.convertedFromId!))
+            .where((d) => d.kind == 'invoice' && d.isAdvancePayment && d.id != document.id && !d.isDraft)
+            .toList()
+        : const <Document>[];
+    final referenced = document.kind == 'creditNote' && document.convertedFromId != null
+        ? await business.findDocument(companyId, document.convertedFromId!)
+        : null;
+    final data = EInvoiceData(
+      profile: EInvoiceProfile.forFormat(live.format),
+      kind: document.kind,
+      number: document.number,
+      issueDate: document.issueDate,
+      serviceDate: document.serviceDate,
+      dueDate: document.dueDate,
+      paymentTerms: document.paymentTerms,
+      notes: document.notes,
+      seller: live.seller,
+      buyer: live.buyer,
+      smallBusinessExempt: exempt && items.every((i) => i.vatRatePercent == 0),
+      isAdvancePayment: document.isAdvancePayment,
+      priorPayments: [
+        for (final a in advances)
+          EInvoicePriorPayment(
+            invoiceNumber: a.number ?? '',
+            grossCents: _totals(await business.itemsFor(companyId, a.id)).totalGross.cents,
+            issueDate: a.issueDate,
+          ),
+      ],
+      referencedInvoiceNumber: referenced?.number,
+      referencedInvoiceDate: referenced?.issueDate,
+      lines: [
+        for (final i in items)
+          EInvoiceLine(
+            description: i.description,
+            quantity: Decimal.parse(i.quantity),
+            unit: i.unit,
+            unitPriceCents: i.unitPriceCents,
+            vatRatePercent: i.vatRatePercent,
+            discountPercent: i.discountPercent,
+            groupLabel: i.groupLabel,
+          ),
+      ],
+    );
+    return (data: data, document: document);
+  }
+
+  /// `GET /documents/<id>/einvoice`: Format, Profil und fehlende Pflichtangaben.
+  Future<Response> _getDocumentEInvoiceStatus(Request request, String id) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return jsonError('Nicht angemeldet.', status: 401);
+    final companyId = session.session.companyId;
+    final document = await business.findDocument(companyId, id);
+    if (document == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final check = await _requireDocumentPermission(request, 'invoices.read', document.kind);
+    if (check.error != null) return check.error!;
+    if (!(await _enabledModules(check.auth!)).contains('eInvoice')) {
+      return jsonError('Modul E-Rechnung ist nicht aktiviert.', status: 409);
+    }
+    final e = await _eInvoiceFor(companyId, id);
+    if (e == null) return jsonError('Nur Rechnungen und Gutschriften sind E-Rechnungen.', status: 409);
+    return jsonOk({
+      'profile': e.data.profile.name,
+      'format': e.data.profile == EInvoiceProfile.xrechnung ? 'xrechnung' : 'zugferd',
+      'problems': eInvoiceProblems(e.data),
+      'fileName': eInvoiceXmlFileName(document.number),
+    });
+  }
+
+  /// `GET /documents/<id>/einvoice.xml`: die XML (XRechnung bzw. ZUGFeRD-
+  /// Inhalt) eines finalisierten Dokuments — Rechte wie PDF/Lesen.
+  Future<Response> _getDocumentEInvoiceXml(Request request, String id) async {
+    final session = await auth.requireSession(request);
+    if (session == null) return jsonError('Nicht angemeldet.', status: 401);
+    final companyId = session.session.companyId;
+    final document = await business.findDocument(companyId, id);
+    if (document == null) return jsonError('Dokument nicht gefunden.', status: 404);
+    final check = await _requireDocumentPermission(request, 'invoices.read', document.kind);
+    if (check.error != null) return check.error!;
+    if (!(await _enabledModules(check.auth!)).contains('eInvoice')) {
+      return jsonError('Modul E-Rechnung ist nicht aktiviert.', status: 409);
+    }
+    if (document.isDraft) return jsonError('Nur finalisierte Dokumente haben eine E-Rechnung.', status: 409);
+    final e = await _eInvoiceFor(companyId, id);
+    if (e == null) return jsonError('Nur Rechnungen und Gutschriften sind E-Rechnungen.', status: 409);
+    final problems = eInvoiceProblems(e.data);
+    if (problems.isNotEmpty) {
+      return jsonError('E-Rechnung unvollständig: ${problems.join(' ')}', status: 422);
+    }
+    return Response.ok(
+      buildEInvoiceXml(e.data),
+      headers: {
+        'content-type': 'application/xml; charset=utf-8',
+        'content-disposition': 'attachment; filename="${eInvoiceXmlFileName(document.number)}"',
+      },
+    );
   }
 
   Future<Response> _getDocument(Request request, String id) async {
@@ -794,6 +940,13 @@ class BusinessRoutes {
           closingText: profile.documentTexts[existing.kind]?.closing,
           footerText: profile.footerText,
           smallBusinessExempt: profile.smallBusinessExempt,
+          street: profile.street,
+          postalCode: profile.postalCode,
+          city: profile.city,
+          countryCode: profile.countryCode,
+          bic: profile.bic,
+          email: profile.email,
+          phone: profile.phone,
         ),
         now: DateTime.now().toUtc(),
       );

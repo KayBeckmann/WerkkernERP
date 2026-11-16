@@ -5,6 +5,7 @@ import 'package:werkkern_client/werkkern_client.dart';
 import '../data/database/tables.dart' show DocumentKind;
 import '../data/repositories/invoice_repository.dart' show AdvancePaymentEntry;
 import '../domain/models/money.dart';
+import '../domain/services/einvoice_builder.dart';
 import 'invoice_pdf_builder.dart';
 
 /// PDF eines Online-Dokuments (Phase B) — derselbe Generator wie
@@ -19,11 +20,15 @@ Future<Uint8List> buildOnlineDocumentPdf(
   OnlineDocument document, {
   OnlineCompanyProfile? liveCompany,
   OnlineCustomer? liveCustomer,
+  // C15: Firmenmodul „E-Rechnung“ aktiv → finalisierte Rechnungen/
+  // Gutschriften als ZUGFeRD-Hybrid-PDF.
+  bool eInvoiceEnabled = false,
 }) => renderDocumentPdf(
   onlineDocumentPdfData(
     document,
     liveCompany: liveCompany,
     liveCustomer: liveCustomer,
+    eInvoiceEnabled: eInvoiceEnabled,
   ),
   isPreview: document.isDraft,
   // C13: Schlussrechnung listet jede Abschlagsrechnung einzeln (wie offline).
@@ -41,6 +46,7 @@ PdfDocumentData onlineDocumentPdfData(
   OnlineDocument document, {
   OnlineCompanyProfile? liveCompany,
   OnlineCustomer? liveCustomer,
+  bool eInvoiceEnabled = false,
 }) {
   final isPreview = document.isDraft;
   final company = isPreview ? liveCompany : document.companySnapshot;
@@ -83,5 +89,8 @@ PdfDocumentData onlineDocumentPdfData(
           groupLabel: item.groupLabel,
         ),
     ],
+    eInvoice: isPreview
+        ? null
+        : eInvoiceDataForOnlineDocument(document, enabled: eInvoiceEnabled, liveCompany: liveCompany, liveCustomer: liveCustomer),
   );
 }

@@ -86,6 +86,19 @@ void runMailTests(RepositoryFactory create) {
     expect(transport.sent.last.mail.to, 'buchhaltung@meyer.example');
     expect(transport.sent.last.mail.subject, 'Eigener Betreff');
 
+    // C15: XRechnung-XML als zweiter Anhang; kein XML wird abgewiesen.
+    final xml = base64Encode(utf8.encode('<?xml version="1.0" encoding="UTF-8"?>\n<rsm:CrossIndustryInvoice/>'));
+    await c.post('/documents/${invoice['id']}/send', {'pdfBase64': _pdf, 'xmlBase64': xml});
+    expect(
+      [for (final a in transport.sent.last.mail.attachments) (a.fileName, a.contentType)],
+      [('${invoice['number']}.pdf', 'application/pdf'), ('${invoice['number']}.xml', 'application/xml')],
+    );
+    await expectLater(
+      c.post('/documents/${invoice['id']}/send', {'pdfBase64': _pdf, 'xmlBase64': base64Encode(utf8.encode('kein xml'))}),
+      throwsStatus(400),
+    );
+    transport.sent.removeLast();
+
     await expectLater(c.post('/documents/${invoice['id']}/send', {'pdfBase64': base64Encode(utf8.encode('kein pdf'))}), throwsStatus(400));
     final customer = await c.post('/customers', {'name': 'Ohne Mail'});
     final draft = await c.post('/documents', {'kind': 'invoice', 'customerId': customer['id'], 'items': []});
@@ -96,7 +109,7 @@ void runMailTests(RepositoryFactory create) {
     transport.failWith = 'Verbindung abgelehnt';
     await expectLater(c.post('/documents/${invoice['id']}/send', {'pdfBase64': _pdf}), throwsStatus(502));
     final audit = await c.client.audit();
-    expect(audit.where((a) => a.action == 'mail.document'), hasLength(2));
+    expect(audit.where((a) => a.action == 'mail.document'), hasLength(3), reason: 'PDF, eigener Empfänger, PDF+XML');
   });
 
   test('Mahnung versenden markiert sie als versendet; Bestellung geht an den Lieferanten', () async {

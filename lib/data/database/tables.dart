@@ -16,6 +16,17 @@ class Companies extends Table {
   TextColumn get phone => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
+  /// C15.1 E-Rechnung (Kay 2026-11-15): strukturierte Anschrift (BG-5)
+  /// neben dem Freitext [address] (bleibt fürs PDF), BIC zum Konto
+  /// (BT-86) und der Modul-Schalter. Leere Felder werden beim Erzeugen
+  /// per `parsePostalAddress()` aus dem Freitext ergänzt.
+  TextColumn get street => text().nullable()();
+  TextColumn get postalCode => text().nullable()();
+  TextColumn get city => text().nullable()();
+  TextColumn get countryCode => text().withDefault(const Constant('DE'))();
+  TextColumn get bic => text().nullable()();
+  BoolColumn get eInvoiceEnabled => boolean().withDefault(const Constant(false))();
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -254,6 +265,16 @@ class Customers extends Table {
   /// Rechnungsdokumenten und Mahnungen, siehe `documentRecipient()`.
   TextColumn get invoiceEmail => text().nullable()();
 
+  /// C15.1 E-Rechnung: strukturierte Anschrift (BG-8), Leitweg-ID als
+  /// Käuferreferenz (BT-10, Pflicht bei XRechnung) und das Format, das
+  /// dieser Kunde bekommt (`zugferd` Vorgabe / `xrechnung`).
+  TextColumn get street => text().nullable()();
+  TextColumn get postalCode => text().nullable()();
+  TextColumn get city => text().nullable()();
+  TextColumn get countryCode => text().withDefault(const Constant('DE'))();
+  TextColumn get leitwegId => text().nullable()();
+  TextColumn get eInvoiceFormat => text().withDefault(const Constant('zugferd'))();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -489,6 +510,13 @@ class Invoices extends Table {
   TextColumn get companySnapshotTaxNumber => text().nullable()();
   TextColumn get companySnapshotVatId => text().nullable()();
   TextColumn get companySnapshotIban => text().nullable()();
+
+  /// C15.1 E-Rechnung: beim Finalisieren eingefrorene Verkäufer-/Käufer-
+  /// Daten als JSON (`EInvoiceSnapshot` aus `werkkern_core`) — die
+  /// XML-Erzeugung liest nur daraus. `null` bei Entwürfen und bei
+  /// Dokumenten, die vor v36 finalisiert wurden (dann Fallback auf die
+  /// aktuellen Stammdaten mit Hinweis).
+  TextColumn get eInvoiceSnapshot => text().nullable()();
 
   /// PDF-Text-Schnappschuss zum Finalisierungszeitpunkt (Audit-Befund
   /// 2026-10-17, `Abweichungen.md` Abschnitt 2.1: "Ein später geänderter

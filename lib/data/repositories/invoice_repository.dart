@@ -6,6 +6,7 @@ import 'package:werkkern_core/werkkern_core.dart'
 
 import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
+import '../../domain/services/einvoice_parties.dart';
 import '../../domain/services/invoice_totals_service.dart';
 import '../../domain/services/stock_booking_service.dart';
 import '../database/database.dart';
@@ -356,6 +357,10 @@ class InvoiceRepository {
       final customer = await (_db.select(_db.customers)
             ..where((c) => c.id.equals(invoice.customerId)))
           .getSingle();
+      // C15 E-Rechnung: Kontaktperson des Dokuments als Käufer-Ansprechpartner.
+      final contact = invoice.contactId == null
+          ? null
+          : await (_db.select(_db.customerContacts)..where((c) => c.id.equals(invoice.contactId!))).getSingleOrNull();
 
       final now = DateTime.now();
 
@@ -409,6 +414,11 @@ class InvoiceRepository {
           companySnapshotTaxNumber: Value(company.taxNumber),
           companySnapshotVatId: Value(company.vatId),
           companySnapshotIban: Value(company.iban),
+          // C15 E-Rechnung: strukturierte Parteien einfrieren (nur bei
+          // E-Rechnungs-Dokumentarten; Angebote & Co. brauchen sie nicht).
+          eInvoiceSnapshot: Value(
+            isEInvoiceKind(invoice.kind) ? encodeEInvoiceSnapshot(company, customer, contact: contact) : null,
+          ),
           // Audit-Befund 2026-10-17 (Abweichungen.md Abschnitt 2.1):
           // Texte zum Finalisierungszeitpunkt einfrieren, damit eine
           // spätere Änderung an den Firmeneinstellungen das PDF dieser

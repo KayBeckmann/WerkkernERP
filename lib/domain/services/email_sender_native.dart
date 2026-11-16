@@ -5,6 +5,9 @@ import 'package:mailer/smtp_server.dart';
 
 import 'smtp_config.dart';
 
+/// Zusätzlicher Anhang (C15: XRechnung-XML neben dem PDF).
+typedef EmailExtraAttachment = ({String filename, String contentType, Uint8List bytes});
+
 bool get emailSendingSupported => true;
 
 /// Ergebnis eines Versandversuchs — nie als Exception nach außen
@@ -27,6 +30,8 @@ Future<EmailSendResult> sendEmail({
   required String body,
   required String attachmentFilename,
   required Uint8List attachmentBytes,
+  // C15: weitere Anhänge, z. B. die XRechnung-XML.
+  List<EmailExtraAttachment> extraAttachments = const [],
 }) async {
   if (!config.isComplete) {
     return const EmailSendResult.failure(
@@ -52,6 +57,8 @@ Future<EmailSendResult> sendEmail({
         'application/pdf',
         fileName: attachmentFilename,
       ),
+      for (final extra in extraAttachments)
+        StreamAttachment(Stream.fromIterable([extra.bytes]), extra.contentType, fileName: extra.filename),
     ];
   try {
     await send(message, smtpServer);

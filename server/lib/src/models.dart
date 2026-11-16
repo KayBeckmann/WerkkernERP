@@ -179,9 +179,21 @@ class CompanyProfile {
     this.footerText,
     this.documentTexts = const {},
     this.smallBusinessExempt = false,
+    this.street,
+    this.postalCode,
+    this.city,
+    this.countryCode = 'DE',
+    this.bic,
   });
   final String companyId;
   final String? address;
+
+  /// C15 E-Rechnung: strukturierte Anschrift (BG-5) und BIC (BT-86).
+  final String? street;
+  final String? postalCode;
+  final String? city;
+  final String countryCode;
+  final String? bic;
   final String? taxNumber;
   final String? vatId;
   final String? iban;
@@ -211,6 +223,11 @@ class CompanyProfile {
           for (final e in documentTexts.entries) e.key: {'intro': e.value.intro, 'closing': e.value.closing},
         },
         'smallBusinessExempt': smallBusinessExempt,
+        'street': street,
+        'postalCode': postalCode,
+        'city': city,
+        'countryCode': countryCode,
+        'bic': bic,
       };
 }
 

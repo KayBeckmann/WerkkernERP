@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:werkkern_client/werkkern_client.dart';
-import 'package:werkkern_core/werkkern_core.dart' show Money;
+import 'package:werkkern_core/werkkern_core.dart' show Money, parsePostalAddress;
 
 import '../../../domain/services/online_session.dart';
 import 'online_form.dart';
@@ -841,6 +841,11 @@ class _ProfileTabState extends State<_ProfileTab> {
   final _iban = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+  final _street = TextEditingController();
+  final _postalCode = TextEditingController();
+  final _city = TextEditingController();
+  final _countryCode = TextEditingController();
+  final _bic = TextEditingController();
   final _footer = TextEditingController();
   final Map<String, ({TextEditingController intro, TextEditingController closing})> _texts = {};
   bool _smallBusiness = false;
@@ -861,7 +866,7 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   @override
   void dispose() {
-    for (final c in [_address, _taxNumber, _vatId, _iban, _email, _phone, _footer]) {
+    for (final c in [_address, _taxNumber, _vatId, _iban, _email, _phone, _footer, _street, _postalCode, _city, _countryCode, _bic]) {
       c.dispose();
     }
     for (final t in _texts.values) {
@@ -881,6 +886,11 @@ class _ProfileTabState extends State<_ProfileTab> {
       _iban.text = p.iban ?? '';
       _email.text = p.email ?? '';
       _phone.text = p.phone ?? '';
+      _street.text = p.street ?? '';
+      _postalCode.text = p.postalCode ?? '';
+      _city.text = p.city ?? '';
+      _countryCode.text = p.countryCode;
+      _bic.text = p.bic ?? '';
       _footer.text = p.footerText ?? '';
       _smallBusiness = p.smallBusinessExempt;
       // Auch Texte inaktiver Arten behalten (werden unverändert zurückgeschickt).
@@ -914,6 +924,11 @@ class _ProfileTabState extends State<_ProfileTab> {
           for (final e in _texts.entries) e.key: (intro: _v(e.value.intro), closing: _v(e.value.closing)),
         },
         smallBusinessExempt: _smallBusiness,
+        street: _v(_street),
+        postalCode: _v(_postalCode),
+        city: _v(_city),
+        countryCode: (_v(_countryCode) ?? 'DE').toUpperCase(),
+        bic: _v(_bic),
       ));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.section.title} gespeichert.')));
     } on Exception catch (e) {
@@ -933,9 +948,47 @@ class _ProfileTabState extends State<_ProfileTab> {
         if (section == OnlineAdminSection.company) ...[
           const Text('Wird beim Finalisieren unveränderlich in jedes Dokument übernommen.'),
           TextField(controller: _address, maxLines: 3, decoration: const InputDecoration(labelText: 'Anschrift')),
+          // C15 E-Rechnung: strukturierte Anschrift (BG-5) und BIC.
+          Row(
+            children: [
+              Expanded(
+                child: TextField(controller: _street, decoration: const InputDecoration(labelText: 'Straße und Hausnummer')),
+              ),
+              IconButton(
+                tooltip: 'Aus der Anschrift übernehmen',
+                icon: const Icon(Icons.call_split),
+                onPressed: () {
+                  final parsed = parsePostalAddress(_address.text);
+                  setState(() {
+                    if (_street.text.trim().isEmpty && parsed.street != null) _street.text = parsed.street!;
+                    if (_postalCode.text.trim().isEmpty && parsed.postalCode != null) _postalCode.text = parsed.postalCode!;
+                    if (_city.text.trim().isEmpty && parsed.city != null) _city.text = parsed.city!;
+                    _countryCode.text = parsed.countryCode;
+                  });
+                },
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              SizedBox(width: 110, child: TextField(controller: _postalCode, decoration: const InputDecoration(labelText: 'PLZ'))),
+              const SizedBox(width: 12),
+              Expanded(child: TextField(controller: _city, decoration: const InputDecoration(labelText: 'Ort'))),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 70,
+                child: TextField(
+                  controller: _countryCode,
+                  maxLength: 2,
+                  decoration: const InputDecoration(labelText: 'Land', counterText: ''),
+                ),
+              ),
+            ],
+          ),
           TextField(controller: _taxNumber, decoration: const InputDecoration(labelText: 'Steuernummer')),
           TextField(controller: _vatId, decoration: const InputDecoration(labelText: 'USt-IdNr.')),
           TextField(controller: _iban, decoration: const InputDecoration(labelText: 'IBAN')),
+          TextField(controller: _bic, decoration: const InputDecoration(labelText: 'BIC')),
           TextField(controller: _email, decoration: const InputDecoration(labelText: 'E-Mail')),
           TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Telefon')),
         ],

@@ -14,3 +14,5 @@ dependencies:
 
 dev_dependencies:
   test: ^1.26.2
+  # Zum Parsen der erzeugten E-Rechnungs-XML in Tests (C15.2).
+  xml: ^6.5.0

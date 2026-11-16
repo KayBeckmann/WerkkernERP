@@ -126,6 +126,30 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   BU-Schlüssel-Feld bewusst immer leer bleibt und dein Steuerberater
   es ergänzt.
 
+**E-Rechnung (EN 16931, Modul „E-Rechnung“)**
+- Rechnungen und Gutschriften (auch Abschlags- und Schlussrechnungen)
+  als **ZUGFeRD-Hybrid-PDF** (PDF/A-3b mit eingebetteter
+  `factur-x.xml`, Profil EN 16931) oder als **XRechnung 3.0** (reines
+  XML, CII-Syntax, Leitweg-ID als Käuferreferenz) — das Format wird je
+  Kunde gewählt. Offline und online derselbe Generator
+  (`packages/werkkern_core`), Beträge aus demselben Rechenkern wie PDF
+  und Server.
+- Strukturierte Anschriften (Straße, PLZ, Ort, Land) für Firma und
+  Kunde, BIC, Leitweg-ID; Bestandsanschriften im Freitext werden
+  automatisch zerlegt. Offline neue Einstellungsseite „Firmendaten“.
+- Beim Finalisieren werden Verkäufer- und Käuferdaten eingefroren.
+  „E-Rechnung prüfen“ zeigt fehlende Pflichtangaben, vor dem
+  Finalisieren gibt es eine nicht blockierende Warnung. XML speichern;
+  beim Mailversand an XRechnung-Kunden geht die XML zusätzlich mit.
+- Kleinunternehmer (§ 19 UStG): Steuerkategorie `E` mit
+  Befreiungsgrund; 0 % ohne § 19: Kategorie `Z`.
+- Geprüft mit dem **KoSIT-Validator** (XRechnung 3.0.2) und
+  **Mustang** (PDF/A-3 + ZUGFeRD): `tool/validate-einvoice.sh`
+  (lädt die Werkzeuge einmalig, braucht Java). **Keine Rechtsprüfung:**
+  syntaktisch gültig nach den amtlichen Regeln, die fachliche Abnahme
+  bleibt beim Steuerberater. Nicht enthalten: Empfang/Import fremder
+  E-Rechnungen, Peppol-Versand, weitere ZUGFeRD-Profile, UBL-Syntax.
+
 **Backup & Sicherheit**
 - Transaktional konsistentes Backup (SQLite `VACUUM INTO`, nicht die
   laufende Datei kopieren) als Zip mit Manifest, optional mit
@@ -195,8 +219,9 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 
 ## Bewusst nicht umgesetzt / offen
 
-- **E-Rechnung (XRechnung/ZUGFeRD)** und **DATEV-Export für Rechnungen/
-  Einnahmen** — brauchen eine eigene fachliche/rechtliche Prüfung.
+- **DATEV-Export für Rechnungen/Einnahmen** — braucht eine eigene
+  fachliche/rechtliche Prüfung. E-Rechnung: siehe oben; Empfang fremder
+  E-Rechnungen und Peppol-Versand sind offen.
 - Konfigurierbare Steuersätze, Nummernmuster und PDF-Layouts mit
   Migration vorhandener Dokumente.
 - Personal-/Einsatzplanung (Disposition, Urlaub, Überstunden).
@@ -247,6 +272,7 @@ flutter test
 (cd server && dart analyze && dart test -x postgres -j 6)   # + echtes Postgres: siehe server/README.md
 (cd packages/werkkern_core && dart test)
 (cd packages/werkkern_client && dart test)
+tool/validate-einvoice.sh   # E-Rechnungen gegen KoSIT/Mustang prüfen (Netz + Java)
 ```
 
 Online-Server lokal starten:
@@ -281,7 +307,7 @@ flutter build apk --release          # build/app/outputs/flutter-apk/app-release
   build/app/outputs/flutter-apk/app-release.apk   # DN: CN=Kay Beckmann, SHA-256 8346cbaf…
 ```
 
-Version in `pubspec.yaml` (`0.10.2+5`): bis zur ersten echten
+Version in `pubspec.yaml` (`0.11.0+6`): bis zur ersten echten
 Veröffentlichung bleibt sie unter 1.0 (Kay 2026-11-07). Die Build-Nummer
 hinter dem `+` vor jeder weitergegebenen APK um eins erhöhen — Android
 installiert keine APK mit kleinerer Build-Nummer über eine vorhandene.

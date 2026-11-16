@@ -293,6 +293,14 @@ void main() {
       raw.execute('ALTER TABLE invoices DROP COLUMN contact_id;');
       raw.execute('DROP TABLE customer_contacts;');
       raw.execute('ALTER TABLE customers DROP COLUMN invoice_email;');
+      // v35 -> v36 (C15 E-Rechnung: strukturierte Anschriften, BIC, Leitweg-ID, Schnappschuss).
+      for (final column in ['street', 'postal_code', 'city', 'country_code', 'bic', 'e_invoice_enabled']) {
+        raw.execute('ALTER TABLE companies DROP COLUMN $column;');
+      }
+      for (final column in ['street', 'postal_code', 'city', 'country_code', 'leitweg_id', 'e_invoice_format']) {
+        raw.execute('ALTER TABLE customers DROP COLUMN $column;');
+      }
+      raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -726,6 +734,14 @@ void main() {
     raw.execute('ALTER TABLE invoices DROP COLUMN contact_id;');
     raw.execute('DROP TABLE customer_contacts;');
     raw.execute('ALTER TABLE customers DROP COLUMN invoice_email;');
+    // v35 -> v36 (C15 E-Rechnung: strukturierte Anschriften, BIC, Leitweg-ID, Schnappschuss).
+    for (final column in ['street', 'postal_code', 'city', 'country_code', 'bic', 'e_invoice_enabled']) {
+      raw.execute('ALTER TABLE companies DROP COLUMN $column;');
+    }
+    for (final column in ['street', 'postal_code', 'city', 'country_code', 'leitweg_id', 'e_invoice_format']) {
+      raw.execute('ALTER TABLE customers DROP COLUMN $column;');
+    }
+    raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
     raw.execute('PRAGMA user_version = 33;');
     raw.close();
 
@@ -759,6 +775,14 @@ void main() {
     raw.execute('ALTER TABLE invoices DROP COLUMN contact_id;');
     raw.execute('DROP TABLE customer_contacts;');
     raw.execute('ALTER TABLE customers DROP COLUMN invoice_email;');
+    // v35 -> v36 (C15 E-Rechnung: strukturierte Anschriften, BIC, Leitweg-ID, Schnappschuss).
+    for (final column in ['street', 'postal_code', 'city', 'country_code', 'bic', 'e_invoice_enabled']) {
+      raw.execute('ALTER TABLE companies DROP COLUMN $column;');
+    }
+    for (final column in ['street', 'postal_code', 'city', 'country_code', 'leitweg_id', 'e_invoice_format']) {
+      raw.execute('ALTER TABLE customers DROP COLUMN $column;');
+    }
+    raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
     raw.execute('PRAGMA user_version = 34;');
     raw.close();
 

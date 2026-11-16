@@ -27,6 +27,9 @@ Future<void> showEmailSendDialog({
   required String initialBody,
   required String attachmentFilename,
   required Future<Uint8List> Function() buildAttachment,
+  // C15: optional weitere Anhänge (XRechnung-XML), erst beim Versand gebaut.
+  Future<List<EmailExtraAttachment>> Function()? buildExtraAttachments,
+  String? extraAttachmentHint,
 }) {
   return showDialog<void>(
     context: context,
@@ -39,6 +42,8 @@ Future<void> showEmailSendDialog({
       initialBody: initialBody,
       attachmentFilename: attachmentFilename,
       buildAttachment: buildAttachment,
+      buildExtraAttachments: buildExtraAttachments,
+      extraAttachmentHint: extraAttachmentHint,
     ),
   );
 }
@@ -53,6 +58,8 @@ class _EmailSendDialog extends StatefulWidget {
     required this.initialBody,
     required this.attachmentFilename,
     required this.buildAttachment,
+    this.buildExtraAttachments,
+    this.extraAttachmentHint,
   });
 
   final SmtpConfig config;
@@ -63,6 +70,8 @@ class _EmailSendDialog extends StatefulWidget {
   final String initialBody;
   final String attachmentFilename;
   final Future<Uint8List> Function() buildAttachment;
+  final Future<List<EmailExtraAttachment>> Function()? buildExtraAttachments;
+  final String? extraAttachmentHint;
 
   @override
   State<_EmailSendDialog> createState() => _EmailSendDialogState();
@@ -126,6 +135,7 @@ class _EmailSendDialogState extends State<_EmailSendDialog> {
         body: _bodyCtrl.text,
         attachmentFilename: widget.attachmentFilename,
         attachmentBytes: bytes,
+        extraAttachments: await widget.buildExtraAttachments?.call() ?? const [],
       );
       if (!mounted) return;
       if (result.isSuccess) {
@@ -186,7 +196,7 @@ class _EmailSendDialogState extends State<_EmailSendDialog> {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Anhang: ${widget.attachmentFilename}',
+                  'Anhang: ${widget.attachmentFilename}${widget.extraAttachmentHint == null ? '' : ', ${widget.extraAttachmentHint}'}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),

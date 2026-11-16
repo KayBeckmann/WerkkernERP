@@ -53,6 +53,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
           vatId: result.vatId,
           notes: result.notes,
           invoiceEmail: result.invoiceEmail,
+          street: result.street,
+          postalCode: result.postalCode,
+          city: result.city,
+          countryCode: result.countryCode,
+          leitwegId: result.leitwegId,
+          eInvoiceFormat: result.eInvoiceFormat,
         );
     await contactRepository.replaceForCustomer(
       companyId: companyId,
@@ -80,6 +86,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
       vatId: customer.vatId,
       notes: customer.notes,
       contacts: [for (final c in contacts) _data(c)],
+      street: customer.street,
+      postalCode: customer.postalCode,
+      city: customer.city,
+      countryCode: customer.countryCode,
+      leitwegId: customer.leitwegId,
+      eInvoiceFormat: customer.eInvoiceFormat,
     );
   }
 
@@ -104,6 +116,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
         vatId: Value(result.vatId),
         notes: Value(result.notes),
         invoiceEmail: Value(result.invoiceEmail),
+        street: Value(result.street),
+        postalCode: Value(result.postalCode),
+        city: Value(result.city),
+        countryCode: result.countryCode,
+        leitwegId: Value(result.leitwegId),
+        eInvoiceFormat: result.eInvoiceFormat,
       ),
     );
     final contacts = await contactRepository.replaceForCustomer(
@@ -121,6 +139,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
       vatId: result.vatId,
       notes: result.notes,
       contacts: [for (final c in contacts) _data(c)],
+      street: result.street,
+      postalCode: result.postalCode,
+      city: result.city,
+      countryCode: result.countryCode,
+      leitwegId: result.leitwegId,
+      eInvoiceFormat: result.eInvoiceFormat,
     );
   }
 

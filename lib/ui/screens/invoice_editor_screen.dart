@@ -1,10 +1,22 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:werkkern_core/werkkern_core.dart'
-    show billingDocumentKinds, compareHoursByRole, documentRecipient, formatHours;
+    show
+        EInvoiceData,
+        EInvoiceProfile,
+        billingDocumentKinds,
+        buildEInvoiceXml,
+        compareHoursByRole,
+        documentRecipient,
+        eInvoiceProblems,
+        eInvoiceXmlFileName,
+        formatHours;
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
@@ -25,6 +37,10 @@ import '../../domain/services/smtp_credential_store.dart';
 import '../../domain/services/stock_change_notifier.dart';
 import '../../pdf/dunning_letter_pdf_builder.dart';
 import '../../pdf/invoice_pdf_builder.dart';
+import '../../domain/services/einvoice_builder.dart';
+import '../../domain/services/einvoice_parties.dart' show isEInvoiceKind;
+import '../../domain/services/email_sender.dart' show EmailExtraAttachment;
+import '../widgets/einvoice_actions.dart';
 import '../widgets/email_send_dialog.dart';
 import '../widgets/invoice_item_dialog.dart';
 import 'invoices_screen.dart' show DocumentLabels;
@@ -231,6 +247,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   // Gutschriften (Kay-Entscheidung 2026-10-19): nur bei kind == invoice
   // relevant und nur sichtbar, wenn die Firma das Modul aktiviert hat.
   bool _creditNotesEnabled = false;
+
+  /// C15 Modul E-Rechnung der Firma.
+  bool _eInvoiceEnabled = false;
   List<Invoice> _creditNotes = [];
 
   // C5.2 Bestellwesen (Nachtrag 2026-10-19): nur bei kind == order
@@ -297,6 +316,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _smtpEnabled = company.smtpEnabled;
     _smtpConfig = SmtpConfig.fromCompany(company);
     _creditNotesEnabled = company.creditNotesEnabled;
+    _eInvoiceEnabled = company.eInvoiceEnabled;
     _bestellwesenEnabled = company.bestellwesenEnabled;
     _isSmallBusinessExempt = company.isSmallBusinessExempt;
     _timeTrackingEnabled = company.timeTrackingEnabled;
@@ -897,6 +917,15 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       if (proceedDespiteWarning != true || !mounted) return;
     }
 
+    // C15: fehlende E-Rechnungsangaben anzeigen, nicht blockieren.
+    final eInvoice = await _eInvoiceData();
+    if (!mounted) return;
+    if (eInvoice != null &&
+        !await confirmFinalizeDespiteEInvoiceProblems(context, problemsBeforeFinalize(eInvoiceProblems(eInvoice)))) {
+      return;
+    }
+    if (!mounted) return;
+
     setState(() => _finalizing = true);
     try {
       final finalized = await repo.finalize(companyId: companyId, id: invoice.id);
@@ -938,6 +967,49 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     return source?.invoiceNumber;
   }
 
+  /// C15: E-Rechnungsdaten des gespeicherten Stands (finalisiert aus dem
+  /// Schnappschuss, Entwurf aus den aktuellen Stammdaten).
+  Future<EInvoiceData?> _eInvoiceData() async {
+    final invoice = _currentInvoice;
+    if (invoice == null || !_eInvoiceEnabled || !isEInvoiceKind(invoice.kind)) return null;
+    final repo = context.read<InvoiceRepository>();
+    final company = context.read<ActiveCompanyService>().active!;
+    final items = await repo.itemsFor(invoice.id);
+    Invoice? source;
+    if (invoice.kind == DocumentKind.creditNote && invoice.convertedFromId != null) {
+      source = await repo.findById(companyId: company.id, id: invoice.convertedFromId!);
+    }
+    return eInvoiceDataForInvoice(
+      invoice: invoice,
+      items: items,
+      company: company,
+      customer: _liveCustomer ?? widget.customer,
+      priorAdvancePayments: _priorAdvancePayments,
+      referencedInvoiceNumber: source?.invoiceNumber,
+      referencedInvoiceDate: source?.issueDate,
+    );
+  }
+
+  static String _formatLabel(EInvoiceData data) =>
+      data.profile == EInvoiceProfile.xrechnung ? 'XRechnung (XML)' : 'ZUGFeRD (PDF mit eingebetteter XML)';
+
+  Future<void> _checkEInvoice() async {
+    final data = await _eInvoiceData();
+    if (data == null || !mounted) return;
+    await showEInvoiceCheckDialog(context, formatLabel: _formatLabel(data), problems: eInvoiceProblems(data));
+  }
+
+  Future<void> _saveEInvoiceXml() async {
+    final data = await _eInvoiceData();
+    if (data == null || !mounted) return;
+    final problems = eInvoiceProblems(data);
+    if (problems.isNotEmpty) {
+      await showEInvoiceCheckDialog(context, formatLabel: _formatLabel(data), problems: problems);
+      return;
+    }
+    await saveEInvoiceXml(context, Uint8List.fromList(utf8.encode(buildEInvoiceXml(data))), eInvoiceXmlFileName(data.number));
+  }
+
   Future<void> _sharePdf() async {
     final invoice = _currentInvoice;
     if (invoice == null || invoice.status != InvoiceStatus.finalized) return;
@@ -952,6 +1024,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         company: company,
         priorAdvancePayments: _priorAdvancePayments,
         referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
+        customer: _liveCustomer ?? widget.customer,
       );
       await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
     } catch (_) {
@@ -981,6 +1054,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final company = context.read<ActiveCompanyService>().active!;
     final repo = context.read<InvoiceRepository>();
     final credentialStore = context.read<SmtpCredentialStore>();
+    // C15: Kunden mit Format XRechnung bekommen die XML zusätzlich zum PDF.
+    final xrechnungMail = _eInvoiceEnabled &&
+        isEInvoiceKind(invoice.kind) &&
+        (await _eInvoiceData())?.profile == EInvoiceProfile.xrechnung;
+    if (!mounted) return;
     final subjectTemplate = company.smtpInvoiceSubjectTemplate ?? '{{firma}}: {{nummer}}';
     final bodyTemplate = company.smtpInvoiceBodyTemplate ??
         'Guten Tag {{kunde}},\n\nanbei erhalten Sie das Dokument {{nummer}}.\n\n'
@@ -1004,6 +1082,20 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         companyName: company.name,
       ),
       attachmentFilename: '${invoice.invoiceNumber}.pdf',
+      extraAttachmentHint: xrechnungMail ? eInvoiceXmlFileName(invoice.invoiceNumber) : null,
+      buildExtraAttachments: !xrechnungMail
+          ? null
+          : () async {
+              final data = await _eInvoiceData();
+              if (data == null || eInvoiceProblems(data).isNotEmpty) return const <EmailExtraAttachment>[];
+              return [
+                (
+                  filename: eInvoiceXmlFileName(data.number),
+                  contentType: 'application/xml',
+                  bytes: Uint8List.fromList(utf8.encode(buildEInvoiceXml(data))),
+                ),
+              ];
+            },
       buildAttachment: () async {
         final items = await repo.itemsFor(invoice.id);
         return buildInvoicePdf(
@@ -1012,6 +1104,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           company: company,
           priorAdvancePayments: _priorAdvancePayments,
           referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
+          customer: _liveCustomer ?? widget.customer,
         );
       },
     );
@@ -1268,6 +1361,16 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               icon: const Icon(Icons.picture_as_pdf_outlined),
               tooltip: 'PDF teilen',
               onPressed: _sharePdf,
+            ),
+          if (_eInvoiceEnabled && isEInvoiceKind(_kind) && _currentInvoice != null)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.receipt_outlined),
+              tooltip: 'E-Rechnung',
+              onSelected: (value) => value == 'check' ? _checkEInvoice() : _saveEInvoiceXml(),
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'check', child: Text('E-Rechnung prüfen')),
+                if (isFinalized) const PopupMenuItem(value: 'xml', child: Text('E-Rechnung (XML) speichern')),
+              ],
             ),
           if (isFinalized && _smtpEnabled)
             IconButton(

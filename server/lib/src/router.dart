@@ -937,6 +937,13 @@ class PhaseBRouter {
       footerText: body.containsKey('footerText') ? field('footerText') : current.footerText,
       documentTexts: documentTexts,
       smallBusinessExempt: body['smallBusinessExempt'] as bool? ?? current.smallBusinessExempt,
+      // C15: strukturierte Anschrift/BIC — ältere Clients kennen sie nicht
+      // und dürfen sie nicht leeren.
+      street: body.containsKey('street') ? field('street') : current.street,
+      postalCode: body.containsKey('postalCode') ? field('postalCode') : current.postalCode,
+      city: body.containsKey('city') ? field('city') : current.city,
+      countryCode: (body.containsKey('countryCode') ? field('countryCode') : null)?.toUpperCase() ?? current.countryCode,
+      bic: body.containsKey('bic') ? field('bic') : current.bic,
     );
     await repository.saveCompanyProfile(profile);
     await _auth.audit(auth, 'company.profile', 'company', auth.session.companyId);

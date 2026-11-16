@@ -123,6 +123,11 @@ class CompanyImportRoutes {
         footerText: p.footerText,
         documentTexts: p.documentTexts,
         smallBusinessExempt: p.smallBusinessExempt,
+        street: p.street,
+        postalCode: p.postalCode,
+        city: p.city,
+        countryCode: p.countryCode,
+        bic: p.bic,
       ),
     );
     await repository.setCompanyModules(

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../domain/services/active_company_service.dart';
 import 'settings_appearance_screen.dart';
 import 'settings_backup_screen.dart';
+import 'settings_company_screen.dart';
 import 'settings_document_texts_screen.dart';
 import 'settings_dunning_screen.dart';
 import 'settings_encryption_screen.dart';
@@ -35,6 +36,14 @@ class SettingsScreen extends StatelessWidget {
           title: 'Darstellung',
           subtitle: 'Hell/Dunkel/System',
           onTap: () => _push(context, const SettingsAppearanceScreen()),
+        ),
+        // C15 (Kay 2026-11-15): bisher gab es offline keine Maske für die
+        // eigenen Firmendaten — die E-Rechnung braucht sie vollständig.
+        _MenuTile(
+          icon: Icons.business_outlined,
+          title: 'Firmendaten',
+          subtitle: 'Anschrift, Steuernummer, USt-IdNr., Bankverbindung',
+          onTap: () => _push(context, const SettingsCompanyScreen()),
         ),
         _MenuTile(
           icon: Icons.extension_outlined,
