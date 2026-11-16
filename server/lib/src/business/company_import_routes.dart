@@ -130,6 +130,7 @@ class CompanyImportRoutes {
         bic: p.bic,
         skontoPercent: p.skontoPercent,
         skontoDays: p.skontoDays,
+        quoteValidityDays: p.quoteValidityDays,
       ),
     );
     await repository.setCompanyModules(

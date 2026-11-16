@@ -303,6 +303,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     String? userId,
     String? Function()? contactId,
     DocTerms? Function()? terms,
+    QuoteValidity? Function()? quoteValidity,
   }) async {
     // Bewusst ohne await zwischen Prüfung und Schreiben — damit ist der
     // Abschnitt in Dart (single-threaded) atomar, wie die
@@ -324,6 +325,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       dueDate: dueDate,
       contactId: contactId,
       terms: terms,
+      quoteValidity: quoteValidity,
     );
     _documents[index] = updated;
     if (existing.stockBooked) {
@@ -419,6 +421,14 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
         customer: customer,
         contact: existing.contactId == null ? null : _contacts.where((x) => x.id == existing.contactId).firstOrNull,
       ),
+      // A5-Nachtrag: Bindefrist ab Finalisierung festhalten.
+      quoteValidity: existing.kind == 'quote' && existing.quoteValidityDays != null
+          ? () => (
+                days: existing.quoteValidityDays,
+                from: DateTime.utc(now.year, now.month, now.day),
+                until: quoteValidUntil(DateTime.utc(now.year, now.month, now.day), existing.quoteValidityDays!),
+              )
+          : null,
     );
     _documents[index] = finalized;
     if (stockBooking != null) {

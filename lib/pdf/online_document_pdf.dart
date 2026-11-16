@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:werkkern_client/werkkern_client.dart';
-import 'package:werkkern_core/werkkern_core.dart' show DocumentPaymentTerms;
+import 'package:werkkern_core/werkkern_core.dart' show DocumentPaymentTerms, quoteValidityText;
 
 import '../data/database/tables.dart' show DocumentKind;
 import '../data/repositories/invoice_repository.dart' show AdvancePaymentEntry;
@@ -90,6 +90,9 @@ PdfDocumentData onlineDocumentPdfData(
           groupLabel: item.groupLabel,
         ),
     ],
+    quoteValidity: document.kind == 'quote'
+        ? quoteValidityText(days: document.quoteValidityDays, validUntil: document.quoteValidUntil)
+        : null,
     terms: document.paymentTerm == null || document.kind == 'creditNote'
         ? null
         : DocumentPaymentTerms(

@@ -123,10 +123,14 @@ class CompanyImportProfile {
     this.bic,
     this.skontoPercent,
     this.skontoDays,
+    this.quoteValidityDays = 14,
   });
   final String? address;
   final double? skontoPercent;
   final int? skontoDays;
+
+  /// A5-Nachtrag: Standard-Bindefrist (ältere Pakete: 14 Tage).
+  final int? quoteValidityDays;
 
   /// C15 E-Rechnung.
   final String? street;
@@ -468,6 +472,7 @@ class _Parser {
         bic: r.optStr('bic'),
         skontoPercent: r.optNumber('skontoPercent'),
         skontoDays: r.optInt('skontoDays'),
+        quoteValidityDays: r.m.containsKey('quoteValidityDays') ? r.optInt('quoteValidityDays') : 14,
         modules: modules,
       ),
     )..warnings.addAll(result.warnings);
@@ -575,6 +580,9 @@ class _Parser {
           paymentNetDays: r.optInt('paymentNetDays'),
           skontoPercent: r.optNumber('skontoPercent'),
           skontoDays: r.optInt('skontoDays'),
+          quoteValidityDays: r.optInt('quoteValidityDays'),
+          quoteValidFrom: r.optDate('quoteValidFrom'),
+          quoteValidUntil: r.optDate('quoteValidUntil'),
         ),
       );
       data.documentItems.addAll(_items(d['items'], '${r.path}.items', id));

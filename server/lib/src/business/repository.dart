@@ -76,6 +76,7 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
     String? userId,
     String? Function()? contactId,
     DocTerms? Function()? terms,
+    QuoteValidity? Function()? quoteValidity,
   });
 
   Future<bool> deleteDraft(String companyId, String id);

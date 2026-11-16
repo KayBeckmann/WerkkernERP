@@ -94,6 +94,14 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Nummer im Firmen-/Typ-/Jahreskreis und ist danach unveränderlich —
   mit einer Ausnahme: ein finalisiertes Angebot/Auftrag/Proforma bleibt
   editierbar, bis daraus tatsächlich ein Folgedokument entstanden ist.
+- **Angebotsbindefrist**: je Firma eine Standard-Bindefrist in Tagen
+  (Vorgabe 14), im Angebotsentwurf änderbar. Die Frist beginnt mit der
+  Finalisierung; „bindend bis“ wird festgehalten und steht im PDF
+  („Dieses Angebot ist gültig bis …“). Eine spätere Änderung des
+  Firmenstandards ändert alte Angebote nicht. Wird ein finalisiertes,
+  noch nicht umgewandeltes Angebot geändert, fragt die App, ob die Frist
+  angepasst werden soll: „Nein“ behält sie, „Ja“ übernimmt nur ein
+  ausdrücklich bestätigtes neues Enddatum.
 - Umwandlung Angebot → Auftrag → Lieferschein/Rechnung; Abschlags-
   rechnungen mit automatischem Abzug bereits gestellter Abschläge
   (inkl. USt.) in der Schlussrechnung.

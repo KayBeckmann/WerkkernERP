@@ -276,6 +276,9 @@ const itemKinds = {'article', 'hours', 'text'};
 /// write wins"): ein Update mit veralteter Version wird mit 409
 /// abgewiesen statt still zu überschreiben.
 /// A2-Nachtrag: Zahlungsbedingung eines Belegs (Schnappschuss).
+/// A5-Nachtrag: Bindefrist eines Angebots.
+typedef QuoteValidity = ({int? days, DateTime? from, DateTime? until});
+
 typedef DocTerms = ({String? termId, String label, int netDays, double? skontoPercent, int? skontoDays});
 
 class Document {
@@ -323,11 +326,20 @@ class Document {
     this.paymentNetDays,
     this.skontoPercent,
     this.skontoDays,
+    this.quoteValidityDays,
+    this.quoteValidFrom,
+    this.quoteValidUntil,
   });
   final String id;
   final String companyId;
   final String customerId;
   final String kind;
+
+  /// A5-Nachtrag: Bindefrist eines Angebots — Dauer (Entwurf), beim
+  /// Finalisieren Fristbeginn und „bindend bis“.
+  final int? quoteValidityDays;
+  final DateTime? quoteValidFrom;
+  final DateTime? quoteValidUntil;
   final String status;
   final String? number;
   final int? numberYear;
@@ -429,6 +441,7 @@ class Document {
     String? Function()? contactId,
     String? eInvoiceSnapshot,
     DocTerms? Function()? terms,
+    QuoteValidity? Function()? quoteValidity,
   }) =>
       Document(
         id: id,
@@ -474,6 +487,9 @@ class Document {
         paymentNetDays: terms != null ? terms()?.netDays : paymentNetDays,
         skontoPercent: terms != null ? terms()?.skontoPercent : skontoPercent,
         skontoDays: terms != null ? terms()?.skontoDays : skontoDays,
+        quoteValidityDays: quoteValidity != null ? quoteValidity()?.days : quoteValidityDays,
+        quoteValidFrom: quoteValidity != null ? quoteValidity()?.from : quoteValidFrom,
+        quoteValidUntil: quoteValidity != null ? quoteValidity()?.until : quoteValidUntil,
       );
 
   Map<String, Object?> toJson() => {
@@ -522,6 +538,9 @@ class Document {
         'isAdvancePayment': isAdvancePayment,
         'isFixedPrice': isFixedPrice,
         'stockBooked': stockBooked,
+        'quoteValidityDays': quoteValidityDays,
+        'quoteValidFrom': quoteValidFrom == null ? null : _date(quoteValidFrom!),
+        'quoteValidUntil': quoteValidUntil == null ? null : _date(quoteValidUntil!),
         'textSnapshot': isDraft
             ? null
             : {

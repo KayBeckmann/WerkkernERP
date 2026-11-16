@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:werkkern_core/werkkern_core.dart'
     show
         DocumentPaymentTerms,
+        quoteValidityText,
         EInvoiceData,
         EInvoiceProfile,
         buildEInvoiceXml,
@@ -130,6 +131,7 @@ class PdfDocumentData {
     required this.lines,
     this.eInvoice,
     this.terms,
+    this.quoteValidity,
   });
 
   final DocumentKind kind;
@@ -162,6 +164,10 @@ class PdfDocumentData {
   /// A2-Nachtrag: Zahlungsbedingung mit optionalem Skonto (Schnappschuss
   /// am Beleg) — ergibt den Zahlungstext über dem Freitext.
   final DocumentPaymentTerms? terms;
+
+  /// A5-Nachtrag: Bindefrist-Satz eines Angebots (siehe
+  /// `quoteValidityText`), `null` = keine Zeile.
+  final String? quoteValidity;
 }
 
 /// Zahlungsbedingung eines Offline-Belegs (`null` ohne Auswahl oder bei
@@ -254,6 +260,9 @@ Future<Uint8List> _buildPdf({
       isSmallBusinessExempt: company.isSmallBusinessExempt,
       lines: [for (final item in items) PdfLine.fromItem(item)],
       terms: documentTermsOf(invoice),
+      quoteValidity: invoice.kind == DocumentKind.quote
+          ? quoteValidityText(days: invoice.quoteValidityDays, validUntil: invoice.quoteValidUntil)
+          : null,
       // C15: nur finalisierte Rechnungen/Gutschriften werden Hybrid-PDF.
       eInvoice: isPreview
           ? null
@@ -442,6 +451,11 @@ Future<Uint8List> renderDocumentPdf(
             'Gemäß § 19 Abs. 1 UStG wird keine Umsatzsteuer berechnet.',
             style: const pw.TextStyle(fontSize: 9),
           ),
+        ],
+        // A5-Nachtrag: Bindefrist des Angebots.
+        if (data.quoteValidity != null) ...[
+          pw.SizedBox(height: 16),
+          pw.Text(data.quoteValidity!, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
         ],
         // A2-Nachtrag: Zahlungsbedingung/Skonto (nicht beim Lieferschein).
         if (paymentText != null) ...[

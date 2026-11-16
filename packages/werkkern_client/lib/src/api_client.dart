@@ -260,8 +260,11 @@ class WerkkernApiClient {
     String? contactId,
     // A2-Nachtrag: ohne Angabe belegt der Server Kunden-/Firmenstandard vor.
     OnlineDocumentTerms? Function()? paymentTerm,
+    // A5-Nachtrag: ohne Angabe Firmenstandard (nur Angebote).
+    int? Function()? quoteValidityDays,
   }) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents', body: {
+        if (quoteValidityDays != null) 'quoteValidityDays': quoteValidityDays(),
         'kind': kind,
         'customerId': customerId,
         'items': [for (final i in items) i.toJson()],
@@ -293,8 +296,13 @@ class WerkkernApiClient {
     String? Function()? contactId,
     // A2-Nachtrag: ohne Angabe unverändert, `() => null` entfernt sie.
     OnlineDocumentTerms? Function()? paymentTerm,
+    // A5-Nachtrag: Entwurf = Dauer; finalisiertes Angebot nur ein
+    // ausdrücklich bestätigtes neues „bindend bis“. Ohne Angabe unverändert.
+    int? Function()? quoteValidityDays,
+    DateTime? Function()? quoteValidUntil,
   }) async {
     final due = dueDate?.call();
+    final validUntil = quoteValidUntil?.call();
     return OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', idempotencyKey: idempotencyKey, body: {
       'version': version,
       'items': [for (final i in items) i.toJson()],
@@ -306,6 +314,8 @@ class WerkkernApiClient {
       if (dueDate != null) 'dueDate': due == null ? null : _isoDate(due),
       if (contactId != null) 'contactId': contactId(),
       if (paymentTerm != null) 'paymentTerm': paymentTerm()?.toJson(),
+      if (quoteValidityDays != null) 'quoteValidityDays': quoteValidityDays(),
+      if (quoteValidUntil != null) 'quoteValidUntil': validUntil == null ? null : _isoDate(validUntil),
     })));
   }
 

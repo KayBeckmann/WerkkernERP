@@ -141,6 +141,7 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     final company = export['company']! as Map<String, Object?>;
     expect(company['iban'], 'DE02120300000000202051');
     expect(company['footerText'], 'Danke für Ihren Auftrag.');
+    expect(company['quoteValidityDays'], 21, reason: 'A5-Nachtrag: Bindefrist-Standard zieht mit um');
     expect((company['documentTexts']! as Map)['invoice'], {'intro': 'Wir berechnen:', 'closing': 'Zahlbar sofort.'});
     expect(company['modules'], containsAll(['orders', 'projects', 'timeTracking', 'lagerbestand']));
     expect(company['modules'], isNot(contains('smtp')));

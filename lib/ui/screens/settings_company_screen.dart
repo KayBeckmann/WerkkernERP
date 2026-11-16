@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:werkkern_core/werkkern_core.dart' show parsePostalAddress;
 
 import '../../data/repositories/company_repository.dart';
+import '../widgets/quote_validity_dialog.dart' show parseQuoteValidityDays;
 import '../../domain/services/active_company_service.dart';
 
 /// Einstellungen → Firmendaten (C15.1, Kay 2026-11-15). Bis dahin gab es
@@ -32,11 +33,14 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
   final _bic = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
+
+  /// A5-Nachtrag: Standard-Bindefrist neuer Angebote (Tage).
+  final _quoteValidity = TextEditingController();
   bool _busy = false;
   bool _loaded = false;
 
   List<TextEditingController> get _all =>
-      [_name, _address, _street, _postalCode, _city, _countryCode, _taxNumber, _vatId, _iban, _bic, _email, _phone];
+      [_name, _address, _street, _postalCode, _city, _countryCode, _taxNumber, _vatId, _iban, _bic, _email, _phone, _quoteValidity];
 
   @override
   void didChangeDependencies() {
@@ -56,6 +60,7 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
     _bic.text = company.bic ?? '';
     _email.text = company.email ?? '';
     _phone.text = company.phone ?? '';
+    _quoteValidity.text = company.quoteValidityDays?.toString() ?? '';
     _loaded = true;
   }
 
@@ -84,6 +89,13 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
     final service = context.read<ActiveCompanyService>();
     final company = service.active;
     if (company == null || _name.text.trim().isEmpty) return;
+    final validity = parseQuoteValidityDays(_quoteValidity.text);
+    if (!validity.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bindefrist: ganze Tage von 0 bis 3650 oder leer lassen.')),
+      );
+      return;
+    }
     setState(() => _busy = true);
     try {
       await context.read<CompanyRepository>().update(
@@ -100,6 +112,7 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
               bic: Value(_v(_bic)),
               email: Value(_v(_email)),
               phone: Value(_v(_phone)),
+              quoteValidityDays: Value(validity.days),
             ),
           );
       await service.refreshActive();
@@ -178,6 +191,15 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
             controller: _phone,
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(labelText: 'Telefon'),
+          ),
+          TextField(
+            key: const Key('company-quote-validity'),
+            controller: _quoteValidity,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Standard-Bindefrist für Angebote (Tage)',
+              helperText: 'Vorbelegung für neue Angebote, gilt ab Finalisierung. Leer = keine.',
+            ),
           ),
           const SizedBox(height: 16),
           FilledButton(

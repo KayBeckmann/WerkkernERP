@@ -5,6 +5,7 @@ import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart' show Money, parsePostalAddress;
 
 import '../../../domain/services/online_session.dart';
+import '../../widgets/quote_validity_dialog.dart' show parseQuoteValidityDays;
 import 'online_form.dart';
 import 'online_text_prompt.dart';
 
@@ -846,6 +847,7 @@ class _ProfileTabState extends State<_ProfileTab> {
   final _city = TextEditingController();
   final _countryCode = TextEditingController();
   final _bic = TextEditingController();
+  final _quoteValidity = TextEditingController();
   final _footer = TextEditingController();
   final Map<String, ({TextEditingController intro, TextEditingController closing})> _texts = {};
   bool _smallBusiness = false;
@@ -869,7 +871,7 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   @override
   void dispose() {
-    for (final c in [_address, _taxNumber, _vatId, _iban, _email, _phone, _footer, _street, _postalCode, _city, _countryCode, _bic]) {
+    for (final c in [_address, _taxNumber, _vatId, _iban, _email, _phone, _footer, _street, _postalCode, _city, _countryCode, _bic, _quoteValidity]) {
       c.dispose();
     }
     for (final t in _texts.values) {
@@ -898,6 +900,7 @@ class _ProfileTabState extends State<_ProfileTab> {
       _smallBusiness = p.smallBusinessExempt;
       _skontoPercent = p.skontoPercent;
       _skontoDays = p.skontoDays;
+      _quoteValidity.text = p.quoteValidityDays?.toString() ?? '';
       // Auch Texte inaktiver Arten behalten (werden unverändert zurückgeschickt).
       for (final kind in {..._kinds, ...p.documentTexts.keys}) {
         _texts[kind] = (
@@ -915,9 +918,17 @@ class _ProfileTabState extends State<_ProfileTab> {
   String? _v(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
 
   Future<void> _save() async {
+    final validity = parseQuoteValidityDays(_quoteValidity.text);
+    if (!validity.ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bindefrist: ganze Tage von 0 bis 3650 oder leer lassen.')),
+      );
+      return;
+    }
     setState(() => _busy = true);
     try {
       await widget.session.client.saveCompanyProfile(OnlineCompanyProfile(
+        quoteValidityDays: validity.days,
         address: _v(_address),
         taxNumber: _v(_taxNumber),
         vatId: _v(_vatId),
@@ -998,6 +1009,15 @@ class _ProfileTabState extends State<_ProfileTab> {
           TextField(controller: _bic, decoration: const InputDecoration(labelText: 'BIC')),
           TextField(controller: _email, decoration: const InputDecoration(labelText: 'E-Mail')),
           TextField(controller: _phone, decoration: const InputDecoration(labelText: 'Telefon')),
+          TextField(
+            key: const Key('online-company-quote-validity'),
+            controller: _quoteValidity,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Standard-Bindefrist für Angebote (Tage)',
+              helperText: 'Vorbelegung für neue Angebote, gilt ab Finalisierung. Leer = keine.',
+            ),
+          ),
         ],
         if (section == OnlineAdminSection.tax)
           Card(

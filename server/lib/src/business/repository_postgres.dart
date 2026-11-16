@@ -319,7 +319,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
       'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked, '
       'd.contact_id, d.e_invoice_snapshot, d.payment_term_id, d.payment_term_label, d.payment_net_days, '
-      'd.skonto_percent, d.skonto_days';
+      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -365,6 +365,9 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         paymentNetDays: r[40] as int?,
         skontoPercent: (r[41] as num?)?.toDouble(),
         skontoDays: r[42] as int?,
+        quoteValidityDays: r[43] as int?,
+        quoteValidFrom: r[44] as DateTime?,
+        quoteValidUntil: r[45] as DateTime?,
       );
 
   @override
@@ -471,10 +474,10 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
         'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id, '
         'is_advance_payment, is_fixed_price, contact_id, due_date, payment_term_id, payment_term_label, payment_net_days, '
-        'skonto_percent, skonto_days) VALUES (@id, @companyId, @customerId, @kind, @status, '
+        'skonto_percent, skonto_days, quote_validity_days) VALUES (@id, @companyId, @customerId, @kind, @status, '
         '@issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version, '
         '@convertedFromId, @projectId, @advance, @fixed, @contactId, @due, @termId, @termLabel, @termDays, '
-        '@skontoPercent, @skontoDays)',
+        '@skontoPercent, @skontoDays, @quoteValidityDays)',
       ),
       parameters: {
         'id': d.id,
@@ -501,6 +504,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'termDays': TypedValue(Type.integer, d.paymentNetDays),
         'skontoPercent': TypedValue(Type.double, d.skontoPercent),
         'skontoDays': TypedValue(Type.integer, d.skontoDays),
+        'quoteValidityDays': TypedValue(Type.integer, d.quoteValidityDays),
       },
     );
     await _insertItems(s, items);
@@ -564,6 +568,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
     String? userId,
     String? Function()? contactId,
     DocTerms? Function()? terms,
+    QuoteValidity? Function()? quoteValidity,
   }) async {
     final updated = await _db.runTx((s) async {
       if (!await _lockEditable(s, companyId, id, expectedVersion)) return false;
@@ -609,10 +614,17 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'payment_term_label = CASE WHEN @setTerms THEN @termLabel ELSE payment_term_label END, '
           'payment_net_days = CASE WHEN @setTerms THEN @termDays ELSE payment_net_days END, '
           'skonto_percent = CASE WHEN @setTerms THEN @skontoPercent ELSE skonto_percent END, '
-          'skonto_days = CASE WHEN @setTerms THEN @skontoDays ELSE skonto_days END '
+          'skonto_days = CASE WHEN @setTerms THEN @skontoDays ELSE skonto_days END, '
+          'quote_validity_days = CASE WHEN @setValidity THEN @validityDays ELSE quote_validity_days END, '
+          'quote_valid_from = CASE WHEN @setValidity THEN @validFrom ELSE quote_valid_from END, '
+          'quote_valid_until = CASE WHEN @setValidity THEN @validUntil ELSE quote_valid_until END '
           'WHERE company_id = @companyId AND id = @id',
         ),
         parameters: {
+          'setValidity': TypedValue(Type.boolean, quoteValidity != null),
+          'validityDays': TypedValue(Type.integer, quoteValidity?.call()?.days),
+          'validFrom': TypedValue(Type.date, quoteValidity?.call()?.from),
+          'validUntil': TypedValue(Type.date, quoteValidity?.call()?.until),
           'setTerms': TypedValue(Type.boolean, terms != null),
           'termId': TypedValue(Type.text, terms?.call()?.termId),
           'termLabel': TypedValue(Type.text, terms?.call()?.label),
@@ -738,6 +750,9 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, '
           'intro_text_snapshot = @intro, closing_text_snapshot = @closing, footer_text_snapshot = @footer, '
           'small_business_exempt_snapshot = @exempt, e_invoice_snapshot = @eInvoice, '
+          "quote_valid_from = CASE WHEN d.kind = 'quote' AND d.quote_validity_days IS NOT NULL THEN @today ELSE d.quote_valid_from END, "
+          "quote_valid_until = CASE WHEN d.kind = 'quote' AND d.quote_validity_days IS NOT NULL "
+          'THEN @today + d.quote_validity_days ELSE d.quote_valid_until END, '
           "due_date = CASE WHEN d.kind = 'invoice' AND d.payment_net_days IS NOT NULL "
           'THEN d.issue_date + d.payment_net_days ELSE d.due_date END, '
           'customer_snapshot_name = c.name, customer_snapshot_address = c.address, customer_snapshot_vat_id = c.vat_id '
@@ -745,6 +760,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         ),
         parameters: {
           'eInvoice': eInvoiceSnapshot,
+          'today': TypedValue(Type.date, DateTime.utc(now.year, now.month, now.day)),
           'number': number,
           'year': year,
           'now': now,

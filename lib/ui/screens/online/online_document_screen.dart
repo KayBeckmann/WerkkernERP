@@ -19,6 +19,7 @@ import 'online_item_dialog.dart';
 import 'online_mail.dart';
 import 'online_purchasing_screen.dart' show createPurchaseOrdersFromDocument;
 import 'online_storage_screen.dart' show askOnlineWithdrawalBins;
+import '../../widgets/quote_validity_dialog.dart';
 
 /// Detail/Bearbeitung eines Online-Dokuments — Aufbau wie der Offline-
 /// Editor (`invoice_editor_screen.dart`): Aktionen in der Titelleiste,
@@ -54,6 +55,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   List<OnlineStaffRole> _staffRoles = const [];
   late final _notes = TextEditingController();
   late final _paymentTerms = TextEditingController();
+
+  /// A5-Nachtrag: Bindefrist eines Angebotsentwurfs in Tagen.
+  late final _quoteValidity = TextEditingController();
   String? _projectId;
   List<OnlineProject> _projects = const [];
 
@@ -179,6 +183,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   @override
   void dispose() {
     _notes.dispose();
+    _quoteValidity.dispose();
     _paymentTerms.dispose();
     _skontoPercentCtrl.dispose();
     _skontoDaysCtrl.dispose();
@@ -339,6 +344,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     if (!document.isDraft) _smallBusiness = document.smallBusinessExemptSnapshot;
     _items = [...document.items];
     _notes.text = document.notes ?? '';
+    _quoteValidity.text = document.quoteValidityDays?.toString() ?? '';
     _paymentTerms.text = document.paymentTerms ?? '';
     _applyTerms(document.paymentTerm);
     _projectId = document.projectId;
@@ -427,10 +433,37 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     final contactId = _contactId;
     final contactChanged = contactId != document.contactId;
     final termSelection = _termSelection;
+    // A5-Nachtrag: Bindefrist — Entwurf prüfen, finalisiertes Angebot
+    // ausdrücklich nachfragen (kein stilles Verlängern/Verkürzen).
+    final validity = parseQuoteValidityDays(_quoteValidity.text);
+    int? Function()? validityDays;
+    DateTime? Function()? validUntil;
+    if (document.kind == 'quote') {
+      if (document.isDraft) {
+        if (!validity.ok) {
+          _snack('Bindefrist: ganze Tage von 0 bis 3650 oder leer lassen.');
+          return;
+        }
+        validityDays = () => validity.days;
+      } else {
+        final decision = await askQuoteValidityChange(
+          context,
+          validFrom: document.quoteValidFrom ?? document.finalizedAt ?? document.issueDate,
+          validUntil: document.quoteValidUntil,
+        );
+        if (decision == null || !mounted) return;
+        if (!decision.keep) {
+          final until = decision.newUntil;
+          validUntil = () => until;
+        }
+      }
+    }
     try {
       await _run(
         () async {
           var saved = await _client.updateDocument(
+            quoteValidityDays: validityDays,
+            quoteValidUntil: validUntil,
             id: widget.documentId,
             version: version,
             items: _items,
@@ -454,6 +487,36 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     } on ApiUnreachable {
       await _saveOffline(sentOpId: opId, sentVersion: version);
     }
+  }
+
+  /// A5-Nachtrag (Kay, 16.11.2026): Bindefrist — im Entwurf als Dauer,
+  /// danach das festgehaltene „bindend bis“ (wie offline).
+  Widget _quoteValiditySection(OnlineDocument document, bool editable) {
+    if (!document.isDraft) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          quoteValidityStatus(
+            validFrom: document.quoteValidFrom,
+            validUntil: document.quoteValidUntil,
+            days: document.quoteValidityDays,
+          ),
+          key: const Key('online-quote-validity-status'),
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      );
+    }
+    return TextField(
+      key: const Key('online-quote-validity-days'),
+      controller: _quoteValidity,
+      readOnly: !editable,
+      onChanged: (_) => setState(() => _dirty = true),
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(
+        labelText: 'Bindefrist (Tage)',
+        helperText: 'Beginnt mit der Finalisierung. Leer = keine Bindefrist.',
+      ),
+    );
   }
 
   Future<void> _finalize() async {
@@ -1380,6 +1443,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text('Gutschrift zu ${document.convertedFromNumber}'),
           ),
+        if (document.kind == 'quote') _quoteValiditySection(document, editable && !_offlineView),
         if (documentKindUsesPaymentTerms(document.kind)) _paymentTermsSection(document, editable && !_offlineView),
         TextField(
           controller: _paymentTerms,
