@@ -9,6 +9,7 @@ import 'settings_document_texts_screen.dart';
 import 'settings_dunning_screen.dart';
 import 'settings_encryption_screen.dart';
 import 'settings_modules_screen.dart';
+import 'settings_payment_terms_screen.dart';
 import 'settings_smtp_screen.dart';
 import 'settings_staff_roles_screen.dart';
 import 'settings_tax_screen.dart';
@@ -50,6 +51,12 @@ class SettingsScreen extends StatelessWidget {
           title: 'Module',
           subtitle: 'Angebote, Aufträge, Buchhaltung, Gutschriften …',
           onTap: () => _push(context, const SettingsModulesScreen()),
+        ),
+        _MenuTile(
+          icon: Icons.payments_outlined,
+          title: 'Zahlungsbedingungen',
+          subtitle: 'Sofort, 7/14/30 Tage, Standard, Skonto',
+          onTap: () => _push(context, const SettingsPaymentTermsScreen()),
         ),
         _MenuTile(
           icon: Icons.receipt_long_outlined,

@@ -13,6 +13,7 @@ part 'database.g.dart';
   tables: [
     Companies,
     Customers,
+    PaymentTerms,
     CustomerContacts,
     Suppliers,
     ArticleGroups,
@@ -32,6 +33,9 @@ part 'database.g.dart';
     PurchaseOrders,
     PurchaseOrderItems,
     StockMovements,
+    StorageLocations,
+    StorageBins,
+    ArticleBinStocks,
     InventoryCounts,
     InventoryCountItems,
     StaffRoles,
@@ -49,12 +53,13 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 40;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (migrator) async {
           await migrator.createAll();
+          await _createArticleBarcodeIndex();
         },
         // Niemals eine bestehende Stufe nachträglich ändern, nur neue
         // anhängen (A0: "schema-versionierte Migrationen").
@@ -406,6 +411,68 @@ class AppDatabase extends _$AppDatabase {
             }
             await migrator.addColumn(invoices, invoices.eInvoiceSnapshot);
           }
+          if (from < 37) {
+            // C5.2-Nachtrag (Kay, 15.11.2026): eigene Kundennummer beim
+            // Lieferanten, Schnappschuss an der Bestellung. `purchase_orders`
+            // gibt es erst seit v25 — davor legt `createTable` die Spalte an.
+            await migrator.addColumn(suppliers, suppliers.ourCustomerNumber);
+            if (from >= 25) {
+              await migrator.addColumn(purchaseOrders, purchaseOrders.supplierSnapshotCustomerNumber);
+            }
+          }
+          if (from < 38) {
+            // A1-Nachtrag (Kay, 16.11.2026): Barcode je Artikel, je Firma eindeutig.
+            await migrator.addColumn(articles, articles.barcode);
+            await _createArticleBarcodeIndex();
+          }
+          if (from < 39) {
+            // A2-Nachtrag (Kay, 15./16.11.2026): Zahlungsbedingungen und
+            // Skonto. Vorgaben (Sofort/7/14/30) entstehen beim ersten Lesen
+            // je Firma, nicht hier.
+            await migrator.createTable(paymentTerms);
+            await migrator.addColumn(companies, companies.skontoPercent);
+            await migrator.addColumn(companies, companies.skontoDays);
+            for (final column in [customers.paymentTermId, customers.skontoMode, customers.skontoPercent, customers.skontoDays]) {
+              await migrator.addColumn(customers, column);
+            }
+            for (final column in [
+              invoices.paymentTermId,
+              invoices.paymentTermLabel,
+              invoices.paymentNetDays,
+              invoices.skontoPercent,
+              invoices.skontoDays,
+            ]) {
+              await migrator.addColumn(invoices, column);
+            }
+          }
+          if (from < 40) {
+            // C5.4-Nachtrag (Kay, 16.11.2026): Lagerorte/Plätze. Bisherige
+            // Bestände haben keinen belegten Platz → „noch nicht zugeordnet“
+            // (keinen Regalplatz erfinden). Der Unique-Schlüssel der
+            // Inventurpositionen entfällt (jetzt je Artikel und Platz).
+            await migrator.createTable(storageLocations);
+            await migrator.createTable(storageBins);
+            await migrator.createTable(articleBinStocks);
+            await migrator.addColumn(articles, articles.defaultBinId);
+            // Ab v26 angelegte Lagertabellen haben die Spalten schon
+            // (createTable nutzt das aktuelle Schema).
+            if (from >= 26) {
+              await migrator.addColumn(stockMovements, stockMovements.binKey);
+              await migrator.addColumn(inventoryCounts, inventoryCounts.locationId);
+              await migrator.alterTable(TableMigration(inventoryCountItems, newColumns: [inventoryCountItems.binKey]));
+            }
+            await customStatement(
+              "INSERT INTO article_bin_stocks (company_id, article_id, bin_key, quantity) "
+              "SELECT company_id, id, '', stock_quantity FROM articles WHERE stock_quantity <> 0",
+            );
+          }
         },
       );
+
+  /// Barcode je Firma eindeutig; leere Barcodes (NULL) beliebig oft.
+  Future<void> _createArticleBarcodeIndex() => customStatement(
+        'CREATE UNIQUE INDEX IF NOT EXISTS articles_company_barcode_idx '
+        'ON articles (company_id, barcode) WHERE barcode IS NOT NULL',
+      );
+
 }

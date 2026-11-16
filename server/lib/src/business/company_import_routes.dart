@@ -128,6 +128,8 @@ class CompanyImportRoutes {
         city: p.city,
         countryCode: p.countryCode,
         bic: p.bic,
+        skontoPercent: p.skontoPercent,
+        skontoDays: p.skontoDays,
       ),
     );
     await repository.setCompanyModules(

@@ -10,12 +10,15 @@ import 'package:werkkern_core/werkkern_core.dart';
 import '../../../domain/services/online_session.dart';
 import '../../../pdf/dunning_letter_pdf_builder.dart';
 import '../../../pdf/online_document_pdf.dart';
+import '../../widgets/barcode_scanner.dart';
 import '../../widgets/einvoice_actions.dart';
+import '../../widgets/scan_position_dialog.dart';
 import 'online_documents_screen.dart' show onlineEditorTitle;
 import 'online_dunning_screen.dart';
 import 'online_item_dialog.dart';
 import 'online_mail.dart';
 import 'online_purchasing_screen.dart' show createPurchaseOrdersFromDocument;
+import 'online_storage_screen.dart' show askOnlineWithdrawalBins;
 
 /// Detail/Bearbeitung eines Online-Dokuments — Aufbau wie der Offline-
 /// Editor (`invoice_editor_screen.dart`): Aktionen in der Titelleiste,
@@ -69,6 +72,40 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
 
   /// § 19 UStG der Firma — neue Positionen dann fest 0 % USt.
   bool _smallBusiness = false;
+
+  /// A2-Nachtrag (Kay, 15./16.11.2026): Zahlungsziel und Skonto je Beleg.
+  List<OnlinePaymentTerm> _paymentTermList = const [];
+  OnlineDocumentTerms? _terms;
+  bool _skontoOn = false;
+  final _skontoPercentCtrl = TextEditingController();
+  final _skontoDaysCtrl = TextEditingController();
+
+  void _applyTerms(OnlineDocumentTerms? t) {
+    _terms = t;
+    _skontoOn = t?.skontoPercent != null && t?.skontoDays != null;
+    _skontoPercentCtrl.text = t?.skontoPercent == null
+        ? ''
+        : (t!.skontoPercent! == t.skontoPercent!.roundToDouble()
+            ? t.skontoPercent!.toStringAsFixed(0)
+            : t.skontoPercent!.toString().replaceAll('.', ','));
+    _skontoDaysCtrl.text = t?.skontoDays?.toString() ?? '';
+  }
+
+  /// Aktuelle Auswahl; ungültiges Skonto zählt als keins.
+  OnlineDocumentTerms? get _termSelection {
+    final t = _terms;
+    if (t == null) return null;
+    final percent = double.tryParse(_skontoPercentCtrl.text.trim().replaceAll(',', '.'));
+    final days = int.tryParse(_skontoDaysCtrl.text.trim());
+    final skonto = _skontoOn && percent != null && percent > 0 && percent < 100 && days != null && days >= 0;
+    return OnlineDocumentTerms(
+      termId: t.termId,
+      label: t.label,
+      netDays: t.netDays,
+      skontoPercent: skonto ? percent : null,
+      skontoDays: skonto ? days : null,
+    );
+  }
   String? _error;
 
   WerkkernApiClient get _client => widget.session.client;
@@ -99,6 +136,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     super.initState();
     _reload();
     if (!widget.session.offlineOnly) {
+      _client.paymentTerms().then((t) {
+        if (mounted) setState(() => _paymentTermList = t);
+      }, onError: (Object _) {});
       _client.companyProfile().then((p) {
         if (mounted && (_document?.isDraft ?? true)) {
           setState(() => _smallBusiness = p.smallBusinessExempt);
@@ -140,6 +180,8 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
   void dispose() {
     _notes.dispose();
     _paymentTerms.dispose();
+    _skontoPercentCtrl.dispose();
+    _skontoDaysCtrl.dispose();
     super.dispose();
   }
 
@@ -298,6 +340,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     _items = [...document.items];
     _notes.text = document.notes ?? '';
     _paymentTerms.text = document.paymentTerms ?? '';
+    _applyTerms(document.paymentTerm);
     _projectId = document.projectId;
     _contactId = document.contactId;
     _dueDate = document.dueDate;
@@ -383,6 +426,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     final projectChanged = document.isDraft && _projectsEnabled && projectId != document.projectId;
     final contactId = _contactId;
     final contactChanged = contactId != document.contactId;
+    final termSelection = _termSelection;
     try {
       await _run(
         () async {
@@ -397,6 +441,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             isAdvancePayment: document.kind == 'invoice' ? _isAdvancePayment : null,
             isFixedPrice: {'quote', 'order'}.contains(document.kind) ? _isFixedPrice : null,
             contactId: contactChanged ? () => contactId : null,
+            paymentTerm: documentKindUsesPaymentTerms(document.kind) ? () => termSelection : null,
           );
           if (projectChanged) {
             saved = await _client.setDocumentProject(saved.id, version: saved.version, projectId: projectId);
@@ -415,9 +460,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     final label = onlineDocumentKindLabels[_document!.kind] ?? 'Dokument';
     // C5.1: nicht blockierender Hinweis auf zu geringen Bestand.
     var warnings = const <OnlineStockWarning>[];
+    var withdrawals = const <OnlineWithdrawal>[];
     if (widget.session.modules.contains('lagerbestand')) {
       try {
-        warnings = (await _client.stockCheck(widget.documentId)).warnings;
+        final check = await _client.stockCheck(widget.documentId);
+        warnings = check.warnings;
+        withdrawals = check.withdrawals;
       } on Exception {
         // Hinweis ist optional — Finalisieren bleibt möglich.
       }
@@ -460,7 +508,25 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       }
       if (!mounted || !await confirmFinalizeDespiteEInvoiceProblems(context, problems)) return;
     }
-    await _run(() => _client.finalizeDocument(widget.documentId, version: _document!.version), 'Finalisiert.');
+    // C5.4 (Kay, 16.11.2026): Entnahmeplatz vorschlagen, wenn Plätze angelegt sind.
+    Map<String, String>? withdrawalBins;
+    if (withdrawals.isNotEmpty) {
+      var locations = const <OnlineStorageLocation>[];
+      try {
+        locations = (await _client.storageLocations()).locations;
+      } on Exception {
+        // Ohne Liste bucht der Server nach seinem Vorschlag.
+      }
+      if (!mounted) return;
+      if (locations.isNotEmpty) {
+        withdrawalBins = await askOnlineWithdrawalBins(context, withdrawals, locations);
+        if (withdrawalBins == null) return;
+      }
+    }
+    await _run(
+      () => _client.finalizeDocument(widget.documentId, version: _document!.version, withdrawalBins: withdrawalBins),
+      'Finalisiert.',
+    );
   }
 
   /// C15: Modul aktiv, Rechnung/Gutschrift, Server erreichbar.
@@ -726,6 +792,73 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     });
   }
 
+  /// C5.5-Nachtrag (Kay, 16.11.2026): Barcode scannen → Artikel der
+  /// aktiven Firma (Serverliste) → Menge und Positionsgruppe → Position,
+  /// wie offline. Keine Lagerbuchung hier.
+  Future<void> _scanArticle() async {
+    final code = await barcodeScanner(context);
+    if (code == null || !mounted) return;
+    final normalized = code.replaceAll(RegExp(r'\s'), '');
+    final article = (await _loadArticles()).where((a) => a.barcode != null && a.barcode == normalized).firstOrNull;
+    if (!mounted) return;
+    if (article == null || !article.active) {
+      _snack(article == null
+          ? 'Kein Artikel mit Barcode $code in dieser Firma — bitte manuell auswählen.'
+          : 'Artikel „${article.name}“ ist deaktiviert — bitte manuell auswählen.');
+      await _addItem();
+      return;
+    }
+    Decimal? existingIn(String? group) {
+      final match = _items.where((i) => i.articleId == article.id && i.groupLabel == group).firstOrNull;
+      return match == null ? null : Decimal.parse(match.quantity);
+    }
+
+    final result = await showScannedArticleDialog(
+      context,
+      articleName: article.name,
+      unit: article.unit,
+      groupLabels: onlineGroupLabels(_items),
+      existingQuantityInGroup: existingIn,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      final index = result.addToExisting
+          ? _items.indexWhere((i) => i.articleId == article.id && i.groupLabel == result.groupLabel)
+          : -1;
+      if (index >= 0) {
+        final old = _items[index];
+        _items = [..._items]
+          ..[index] = OnlineDocumentItem(
+            kind: old.kind,
+            articleId: old.articleId,
+            description: old.description,
+            quantity: (Decimal.parse(old.quantity) + result.quantity).toString(),
+            unitPriceCents: old.unitPriceCents,
+            vatRatePercent: old.vatRatePercent,
+            unit: old.unit,
+            discountPercent: old.discountPercent,
+            groupLabel: old.groupLabel,
+            staffRoleId: old.staffRoleId,
+          );
+      } else {
+        _items = [
+          ..._items,
+          OnlineDocumentItem(
+            kind: OnlineItemKind.article,
+            articleId: article.id,
+            description: article.name,
+            quantity: result.quantity.toString(),
+            unitPriceCents: article.effectiveSalePriceCents ?? 0,
+            vatRatePercent: _smallBusiness ? 0 : 19,
+            unit: article.unit,
+            groupLabel: result.groupLabel,
+          ),
+        ];
+      }
+      _dirty = true;
+    });
+  }
+
   /// Bestehende Position bearbeiten statt nur löschen + neu anlegen (wie
   /// offline).
   Future<void> _editItem(int index) async {
@@ -795,6 +928,114 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       ]);
 
   InvoiceTotals get _totals => _totalsOf(_items);
+
+  /// A2-Nachtrag: Zahlungsziel-Auswahl, Skonto und Vorschau wie offline.
+  Widget _paymentTermsSection(OnlineDocument document, bool editable) {
+    final selection = _termSelection;
+    final ids = {for (final t in _paymentTermList) t.id};
+    final value = _terms == null ? null : (_terms!.termId != null && ids.contains(_terms!.termId) ? _terms!.termId : '__snapshot__');
+    String? preview;
+    if (selection != null) {
+      final terms = DocumentPaymentTerms(
+        label: selection.label,
+        netDays: selection.netDays,
+        skontoPercent: selection.skontoPercent,
+        skontoDays: selection.skontoDays,
+      );
+      final totals = _totals;
+      final advances = document.advancePayments.fold<int>(0, (s, a) => s + a.grossCents);
+      preview = paymentTermsText(
+        terms,
+        summarizePaymentTerms(
+          terms: terms,
+          issueDate: document.issueDate,
+          net: totals.totalNet,
+          gross: totals.totalGross,
+          payable: Money.fromCents(totals.totalGross.cents - advances),
+          smallBusinessExempt: _smallBusiness,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String?>(
+          key: const Key('online-document-payment-term'),
+          isExpanded: true,
+          initialValue: value,
+          decoration: const InputDecoration(labelText: 'Zahlungsziel'),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Keine Zahlungsbedingung')),
+            for (final t in _paymentTermList) DropdownMenuItem(value: t.id, child: Text(t.label)),
+            if (value == '__snapshot__') DropdownMenuItem(value: '__snapshot__', child: Text('${_terms!.label} (gespeichert)')),
+          ],
+          onChanged: !editable
+              ? null
+              : (id) {
+                  if (id == '__snapshot__') return;
+                  final term = _paymentTermList.where((t) => t.id == id).firstOrNull;
+                  setState(() {
+                    _terms = term == null
+                        ? null
+                        : OnlineDocumentTerms(termId: term.id, label: term.label, netDays: term.netDays);
+                    if (term != null && document.kind == 'invoice') {
+                      final d = document.issueDate;
+                      _dueDate = DateTime(d.year, d.month, d.day + term.netDays);
+                    }
+                    _dirty = true;
+                  });
+                },
+        ),
+        if (_terms != null)
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: CheckboxListTile(
+                  key: const Key('online-document-skonto'),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(_smallBusiness ? 'Skonto (auf Rechnungsbetrag)' : 'Skonto (auf Nettobetrag)'),
+                  value: _skontoOn,
+                  onChanged: !editable ? null : (v) => setState(() {
+                        _skontoOn = v ?? false;
+                        _dirty = true;
+                      }),
+                ),
+              ),
+              if (_skontoOn) ...[
+                Expanded(
+                  child: TextField(
+                    key: const Key('online-document-skonto-percent'),
+                    controller: _skontoPercentCtrl,
+                    readOnly: !editable,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: '%'),
+                    onChanged: (_) => setState(() => _dirty = true),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    key: const Key('online-document-skonto-days'),
+                    controller: _skontoDaysCtrl,
+                    readOnly: !editable,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Tage'),
+                    onChanged: (_) => setState(() => _dirty = true),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        if (preview != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(preview, style: Theme.of(context).textTheme.bodySmall),
+          ),
+      ],
+    );
+  }
 
   Future<bool> _confirmDiscard() async {
     final discard = await showDialog<bool>(
@@ -870,6 +1111,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           icon: const Icon(Icons.picture_as_pdf_outlined),
           tooltip: 'PDF teilen',
           onPressed: _busy || _dirty ? null : _showPdf,
+        ),
+      if (_editable && document.kind != 'creditNote' && session.can('articles.read') && !session.offlineOnly)
+        IconButton(
+          icon: const Icon(Icons.qr_code_scanner),
+          tooltip: 'Barcode scannen',
+          onPressed: _busy ? null : _scanArticle,
         ),
       if (_eInvoiceAvailable)
         PopupMenuButton<String>(
@@ -1133,6 +1380,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text('Gutschrift zu ${document.convertedFromNumber}'),
           ),
+        if (documentKindUsesPaymentTerms(document.kind)) _paymentTermsSection(document, editable && !_offlineView),
         TextField(
           controller: _paymentTerms,
           readOnly: !editable || _offlineView,

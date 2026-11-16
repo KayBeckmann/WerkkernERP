@@ -2,7 +2,7 @@ import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart'
-    show BillingRole, PlannedHoursItem, billBookedHoursByRole, documentConversionTargets;
+    show BillingRole, PlannedHoursItem, billBookedHoursByRole, documentConversionTargets, documentKindUsesPaymentTerms, resolvePaymentDefaults;
 
 import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
@@ -12,6 +12,8 @@ import '../../domain/services/stock_booking_service.dart';
 import '../database/database.dart';
 import '../database/tables.dart';
 import 'number_sequence_repository.dart';
+import 'payment_term_repository.dart';
+import 'stock_ledger.dart';
 import 'time_entry_repository.dart';
 
 /// Eine einzugebende Rechnungsposition (noch ohne ID — die vergibt das
@@ -62,6 +64,11 @@ class AdvancePaymentEntry {
   final Money amountGross;
 }
 
+/// A2-Nachtrag (Kay, 15.11.2026): Zahlungsbedingung eines Belegs —
+/// Bezeichnung, Ziel und optionales Skonto werden am Beleg gespeichert
+/// (Schnappschuss); [termId] dient nur der Vorauswahl.
+typedef DocumentTermsInput = ({String? termId, String label, int netDays, double? skontoPercent, int? skontoDays});
+
 /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — ein Artikel, der beim
 /// Finalisieren unter 0 Lagerbestand fallen würde. Reine Anzeige-
 /// Information für einen Warnhinweis, kein Blocker (siehe
@@ -99,6 +106,22 @@ final allowedConversionTargets = <DocumentKind, Set<DocumentKind>>{
 /// Rechnungen als Entwurf (A2) — Finalisierung/Nummernvergabe kommt erst
 /// mit A3. Jede Methode verlangt companyId und prüft sie (gleiche
 /// Isolation wie die übrigen A0/A1-Repositories).
+/// Entnahme-Vorschlag eines Artikels beim Finalisieren (C5.4).
+class WithdrawalSuggestion {
+  const WithdrawalSuggestion({
+    required this.article,
+    required this.quantity,
+    required this.suggestedBinKey,
+    required this.stocks,
+  });
+  final Article article;
+  final double quantity;
+
+  /// `''` = „Platz noch nicht zugeordnet“.
+  final String suggestedBinKey;
+  final List<BinStock> stocks;
+}
+
 class InvoiceRepository {
   InvoiceRepository(this._db, this._numberSequences);
 
@@ -183,8 +206,17 @@ class InvoiceRepository {
     // Kontaktperson des Kunden (Kay 2026-11-09), optional.
     String? contactId,
     List<InvoiceItemInput> items = const [],
+    // A2-Nachtrag: ausdrückliche Bedingung; ohne Angabe gelten bei
+    // Rechnung/Auftrag Kunden- vor Firmenstandard.
+    DocumentTermsInput? terms,
   }) async {
     _validateItemsForKind(kind, items);
+    final resolvedTerms = terms ??
+        (documentKindUsesPaymentTerms(kind.name) ? await defaultTermsFor(companyId: companyId, customerId: customerId) : null);
+    final resolvedDue = dueDate ??
+        (kind == DocumentKind.invoice && resolvedTerms != null
+            ? DateTime(issueDate.year, issueDate.month, issueDate.day + resolvedTerms.netDays)
+            : null);
     final id = _uuid.v4();
     final now = DateTime.now();
     return _db.transaction(() async {
@@ -201,9 +233,14 @@ class InvoiceRepository {
               notes: Value(notes),
               projectId: Value(projectId),
               isAdvancePayment: Value(isAdvancePayment),
-              dueDate: Value(dueDate),
+              dueDate: Value(resolvedDue),
               isFixedPrice: Value(isFixedPrice),
               contactId: Value(contactId),
+              paymentTermId: Value(resolvedTerms?.termId),
+              paymentTermLabel: Value(resolvedTerms?.label),
+              paymentNetDays: Value(resolvedTerms?.netDays),
+              skontoPercent: Value(resolvedTerms?.skontoPercent),
+              skontoDays: Value(resolvedTerms?.skontoDays),
               createdAt: now,
               updatedAt: now,
             ),
@@ -211,6 +248,38 @@ class InvoiceRepository {
       await _replaceItems(id, items);
       return (await findById(companyId: companyId, id: id))!;
     });
+  }
+
+  /// A2-Nachtrag: Vorbelegung — Kundenstandard vor Firmenstandard, Skonto
+  /// nach Kundenmodus (Firmenvorgabe/keins/eigen). `null`, wenn die Firma
+  /// keine Bedingung hat.
+  Future<DocumentTermsInput?> defaultTermsFor({required String companyId, required String customerId}) async {
+    final company = await (_db.select(_db.companies)..where((c) => c.id.equals(companyId))).getSingleOrNull();
+    final customer = await (_db.select(_db.customers)
+          ..where((c) => c.id.equals(customerId) & c.companyId.equals(companyId)))
+        .getSingleOrNull();
+    if (company == null) return null;
+    final termsRepo = PaymentTermRepository(_db);
+    final all = await termsRepo.listForCompany(companyId);
+    final resolved = resolvePaymentDefaults(
+      customerTermId: all.any((t) => t.id == customer?.paymentTermId) ? customer?.paymentTermId : null,
+      companyDefaultTermId: all.where((t) => t.isDefault).firstOrNull?.id,
+      customerSkontoMode: customer?.skontoMode ?? 'company',
+      customerSkontoPercent: customer?.skontoPercent,
+      customerSkontoDays: customer?.skontoDays,
+      companySkontoPercent: company.skontoPercent,
+      companySkontoDays: company.skontoDays,
+    );
+    final term = all.where((t) => t.id == resolved.termId).firstOrNull;
+    if (term == null) return null;
+    final hasSkonto = resolved.skontoPercent != null && resolved.skontoDays != null;
+    return (
+      termId: term.id,
+      label: term.label,
+      netDays: term.netDays,
+      skontoPercent: hasSkonto ? resolved.skontoPercent : null,
+      skontoDays: hasSkonto ? resolved.skontoDays : null,
+    );
   }
 
   /// Ob ein Dokument noch über [update] bearbeitet werden darf.
@@ -257,6 +326,8 @@ class InvoiceRepository {
     // Kontaktperson: wie projectId absent/null/id.
     Value<String?> contactId = const Value.absent(),
     List<InvoiceItemInput>? items,
+    // A2-Nachtrag: absent = unverändert, Value(null) = keine Bedingung.
+    Value<DocumentTermsInput?> terms = const Value.absent(),
   }) async {
     return _db.transaction(() async {
       final existing = await findById(companyId: companyId, id: id);
@@ -275,6 +346,11 @@ class InvoiceRepository {
           dueDate: dueDate,
           isFixedPrice: Value(isFixedPrice ?? existing.isFixedPrice),
           contactId: contactId,
+          paymentTermId: terms.present ? Value(terms.value?.termId) : const Value.absent(),
+          paymentTermLabel: terms.present ? Value(terms.value?.label) : const Value.absent(),
+          paymentNetDays: terms.present ? Value(terms.value?.netDays) : const Value.absent(),
+          skontoPercent: terms.present ? Value(terms.value?.skontoPercent) : const Value.absent(),
+          skontoDays: terms.present ? Value(terms.value?.skontoDays) : const Value.absent(),
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -306,24 +382,36 @@ class InvoiceRepository {
     for (final articleId in {...before.keys, ...after.keys}) {
       final delta = ((before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero)).toDouble();
       if (delta == 0) continue;
-      final article = await (_db.select(_db.articles)..where((a) => a.id.equals(articleId))).getSingleOrNull();
-      if (article == null) continue;
-      final newStock = article.stockQuantity + delta;
-      await (_db.update(_db.articles)..where((a) => a.id.equals(articleId)))
-          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
-      await _db.into(_db.stockMovements).insert(
-            StockMovementsCompanion.insert(
-              id: _uuid.v4(),
-              companyId: companyId,
-              articleId: articleId,
-              type: StockMovementType.documentBooking,
-              quantityDelta: delta,
-              resultingQuantity: newStock,
-              referenceLabel: Value(invoice.invoiceNumber),
-              note: const Value('Korrektur nach Bearbeitung'),
-              createdAt: DateTime.now(),
-            ),
-          );
+      final ledger = StockLedger(_db);
+      if (delta < 0) {
+        await ledger.withdraw(
+          companyId: companyId,
+          articleId: articleId,
+          quantity: -delta,
+          type: StockMovementType.documentBooking,
+          referenceLabel: invoice.invoiceNumber,
+          note: 'Korrektur nach Bearbeitung',
+        );
+      } else {
+        // Zurück an den Platz, von dem dieses Dokument entnommen hat.
+        final last = await (_db.select(_db.stockMovements)
+              ..where((m) =>
+                  m.articleId.equals(articleId) &
+                  m.referenceLabel.equalsNullable(invoice.invoiceNumber) &
+                  m.quantityDelta.isSmallerThanValue(0))
+              ..orderBy([(m) => OrderingTerm.desc(m.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
+        await ledger.book(
+          companyId: companyId,
+          articleId: articleId,
+          delta: delta,
+          type: StockMovementType.documentBooking,
+          binKey: last?.binKey ?? await ledger.defaultReceiptBin(companyId: companyId, articleId: articleId),
+          referenceLabel: invoice.invoiceNumber,
+          note: 'Korrektur nach Bearbeitung',
+        );
+      }
     }
   }
 
@@ -342,7 +430,11 @@ class InvoiceRepository {
   /// `null`, wenn die Rechnung nicht existiert oder bereits finalisiert
   /// ist (kein Fehler — Aufrufer behandeln das wie "nichts zu tun").
   /// Wirft [StateError], wenn der Entwurf keine Positionen hat.
-  Future<Invoice?> finalize({required String companyId, required String id}) async {
+  Future<Invoice?> finalize({
+    required String companyId,
+    required String id,
+    Map<String, String> withdrawalBins = const {},
+  }) async {
     return _db.transaction(() async {
       final invoice = await findById(companyId: companyId, id: id);
       if (invoice == null || invoice.status != InvoiceStatus.draft) return null;
@@ -414,6 +506,11 @@ class InvoiceRepository {
           companySnapshotTaxNumber: Value(company.taxNumber),
           companySnapshotVatId: Value(company.vatId),
           companySnapshotIban: Value(company.iban),
+          // A2-Nachtrag: Fälligkeit konsistent aus Belegdatum + Zahlungsziel.
+          dueDate: invoice.kind == DocumentKind.invoice && invoice.paymentNetDays != null
+              ? Value(DateTime(
+                  invoice.issueDate.year, invoice.issueDate.month, invoice.issueDate.day + invoice.paymentNetDays!))
+              : const Value.absent(),
           // C15 E-Rechnung: strukturierte Parteien einfrieren (nur bei
           // E-Rechnungs-Dokumentarten; Angebote & Co. brauchen sie nicht).
           eInvoiceSnapshot: Value(
@@ -442,6 +539,7 @@ class InvoiceRepository {
             invoice: invoice,
             items: items,
             referenceLabel: invoiceNumber,
+            withdrawalBins: withdrawalBins,
           );
         }
       }
@@ -485,6 +583,7 @@ class InvoiceRepository {
     required Invoice invoice,
     required List<InvoiceItem> items,
     required String referenceLabel,
+    Map<String, String> withdrawalBins = const {},
   }) async {
     final predecessorKind = await _predecessorKind(invoice);
     if (!shouldBookStockOnFinalize(kind: invoice.kind, predecessorKind: predecessorKind)) {
@@ -493,26 +592,16 @@ class InvoiceRepository {
     await (_db.update(_db.invoices)..where((i) => i.id.equals(invoice.id)))
         .write(const InvoicesCompanion(stockBooked: Value(true)));
 
+    final ledger = StockLedger(_db);
     for (final entry in _aggregateArticleQuantities(items).entries) {
-      final article =
-          await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
-      if (article == null) continue;
-      final delta = -entry.value.toDouble();
-      final newStock = article.stockQuantity + delta;
-      await (_db.update(_db.articles)..where((a) => a.id.equals(entry.key)))
-          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
-      await _db.into(_db.stockMovements).insert(
-            StockMovementsCompanion.insert(
-              id: _uuid.v4(),
-              companyId: companyId,
-              articleId: entry.key,
-              type: StockMovementType.documentBooking,
-              quantityDelta: delta,
-              resultingQuantity: newStock,
-              referenceLabel: Value(referenceLabel),
-              createdAt: DateTime.now(),
-            ),
-          );
+      await ledger.withdraw(
+        companyId: companyId,
+        articleId: entry.key,
+        quantity: entry.value.toDouble(),
+        type: StockMovementType.documentBooking,
+        preferredBinKey: withdrawalBins[entry.key],
+        referenceLabel: referenceLabel,
+      );
     }
   }
 
@@ -528,27 +617,51 @@ class InvoiceRepository {
     required List<InvoiceItem> items,
     required String referenceLabel,
   }) async {
+    final ledger = StockLedger(_db);
     for (final entry in _aggregateArticleQuantities(items).entries) {
-      final article =
-          await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
-      if (article == null) continue;
-      final delta = entry.value.toDouble();
-      final newStock = article.stockQuantity + delta;
-      await (_db.update(_db.articles)..where((a) => a.id.equals(entry.key)))
-          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
-      await _db.into(_db.stockMovements).insert(
-            StockMovementsCompanion.insert(
-              id: _uuid.v4(),
-              companyId: companyId,
-              articleId: entry.key,
-              type: StockMovementType.creditNoteReturn,
-              quantityDelta: delta,
-              resultingQuantity: newStock,
-              referenceLabel: Value(referenceLabel),
-              createdAt: DateTime.now(),
-            ),
-          );
+      // C5.4: Rückgabe an den Standardplatz, sonst „nicht zugeordnet“.
+      await ledger.book(
+        companyId: companyId,
+        articleId: entry.key,
+        delta: entry.value.toDouble(),
+        type: StockMovementType.creditNoteReturn,
+        binKey: await ledger.defaultReceiptBin(companyId: companyId, articleId: entry.key),
+        referenceLabel: referenceLabel,
+      );
     }
+  }
+
+  /// C5.4-Nachtrag (Kay, 16.11.2026: „Bei Entnahme auch einen Lagerplatz
+  /// vorschlagen, wenn einer hinterlegt ist“): je zu entnehmendem Artikel
+  /// der vorgeschlagene Platz und alle Plätze mit Bestand. Leer, wenn
+  /// nicht gebucht wird oder die Firma noch keine Plätze angelegt hat.
+  Future<List<WithdrawalSuggestion>> withdrawalSuggestions({
+    required String companyId,
+    required String id,
+  }) async {
+    final company = await (_db.select(_db.companies)..where((c) => c.id.equals(companyId))).getSingleOrNull();
+    if (company == null || !company.lagerbestandEnabled) return const [];
+    final hasBins = await (_db.select(_db.storageBins)..where((b) => b.companyId.equals(companyId))..limit(1))
+        .getSingleOrNull();
+    if (hasBins == null) return const [];
+    final invoice = await findById(companyId: companyId, id: id);
+    if (invoice == null || invoice.status != InvoiceStatus.draft) return const [];
+    if (!shouldBookStockOnFinalize(kind: invoice.kind, predecessorKind: await _predecessorKind(invoice))) {
+      return const [];
+    }
+    final ledger = StockLedger(_db);
+    final result = <WithdrawalSuggestion>[];
+    for (final entry in _aggregateArticleQuantities(await itemsFor(id)).entries) {
+      final article = await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
+      if (article == null) continue;
+      result.add(WithdrawalSuggestion(
+        article: article,
+        quantity: entry.value.toDouble(),
+        suggestedBinKey: await ledger.suggestWithdrawalBin(companyId: companyId, articleId: article.id),
+        stocks: await ledger.stocksFor(companyId: companyId, articleId: article.id),
+      ));
+    }
+    return result;
   }
 
   /// Prüft **ohne zu buchen**, ob das Finalisieren von [id] einen oder
@@ -723,6 +836,12 @@ class InvoiceRepository {
               issueDate: now,
               serviceDate: source.serviceDate,
               paymentTerms: Value(source.paymentTerms),
+              // A2-Nachtrag: Auftrag → Rechnung übernimmt die Bedingung sichtbar.
+              paymentTermId: Value(source.paymentTermId),
+              paymentTermLabel: Value(source.paymentTermLabel),
+              paymentNetDays: Value(source.paymentNetDays),
+              skontoPercent: Value(source.skontoPercent),
+              skontoDays: Value(source.skontoDays),
               notes: Value(source.notes),
               // C1 Projekte: Umwandlung bleibt im selben Projektkontext —
               // der Nutzer kann die Zuordnung danach wie jedes andere

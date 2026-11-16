@@ -4,7 +4,10 @@ import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../widgets/article_group_filter.dart';
+import '../../widgets/barcode_scanner.dart';
 import 'online_form.dart';
+import 'online_storage_screen.dart' show onlineBinOptions;
 
 /// Artikel der Online-Firma (wie offline A1): Liste mit Knopf
 /// „Artikelgruppen“; Lieferanten haben wie offline einen eigenen Bereich
@@ -71,6 +74,7 @@ const stockMovementTypeLabels = {
   'purchaseOrderReceipt': 'Wareneingang',
   'inventoryCorrection': 'Inventur/Korrektur',
   'creditNoteReturn': 'Gutschrift-Rückbuchung',
+  'transfer': 'Umlagerung',
 };
 
 Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession session,
@@ -85,6 +89,13 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
     fields: [
       OnlineField('name', 'Bezeichnung', required: true, initial: existing?.name),
       OnlineField('unit', 'Einheit', initial: existing?.unit),
+      OnlineField(
+        'barcode',
+        'Barcode (optional)',
+        initial: existing?.barcode,
+        scannable: true,
+        helper: 'Code der Verpackung — nur zur Erkennung, keine Menge.',
+      ),
       OnlineField(
         'articleGroupId',
         'Artikelgruppe',
@@ -125,27 +136,138 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
       defaultSupplierId: values['defaultSupplierId'] as String?,
       // Ohne Lagermodul bleibt ein gesetzter Mindestbestand erhalten.
       minimumStock: values.containsKey('minimumStock') ? values['minimumStock'] as String? : existing?.minimumStock,
+      barcode: values['barcode'] as String?,
     ));
   });
   return saved;
 }
 
-class _ArticleList extends StatelessWidget {
+class _ArticleList extends StatefulWidget {
   const _ArticleList({required this.session, required this.smallBusiness});
   final OnlineSession session;
   final bool smallBusiness;
 
   @override
+  State<_ArticleList> createState() => _ArticleListState();
+}
+
+class _ArticleListState extends State<_ArticleList> {
+  /// A1-Nachtrag (Kay, 15.11.2026): Gruppenfilter wie offline — nur Anzeige.
+  ArticleGroupFilter _filter = const AllArticleGroups();
+  List<OnlineArticleGroup> _groups = const [];
+  bool _hasUngrouped = false;
+
+  /// C5.4: Filter nach Lagerort (`null` = alle, `''` = ohne Platz).
+  String? _locationFilter;
+  List<OnlineStorageLocation> _locations = const [];
+  Set<String> _unassigned = const {};
+
+  Future<List<OnlineArticle>> _load(String query) async {
+    final client = widget.session.client;
+    final all = await client.articles(query: query);
+    try {
+      _groups = await client.articleGroups();
+    } on Exception {
+      // Ohne Gruppenliste bleibt der Filter verborgen.
+    }
+    if (widget.session.modules.contains('lagerbestand') && widget.session.can('stock.read')) {
+      try {
+        final storage = await client.storageLocations();
+        _locations = storage.locations;
+        _unassigned = storage.unassignedArticleIds;
+      } on Exception {
+        // Ohne Lagerorte bleibt der Filter verborgen.
+      }
+    }
+    _hasUngrouped = all.any((a) => a.articleGroupId == null);
+    final atLocation = _locationFilter == null
+        ? null
+        : _locationFilter!.isEmpty
+            ? _unassigned
+            : _locations.where((l) => l.id == _locationFilter).firstOrNull?.articleIds ?? const <String>{};
+    return [
+      for (final a in all)
+        if (_filter.matches(a.articleGroupId) && (atLocation == null || atLocation.contains(a.id))) a,
+    ];
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
+    final smallBusiness = widget.smallBusiness;
     final canWrite = session.can('articles.write');
     final showStock = session.modules.contains('lagerbestand');
     return OnlineListView<OnlineArticle>(
-      load: (q) => session.client.articles(query: q),
-      emptyText: 'Noch keine Artikel angelegt.',
+      load: _load,
+      header: (context, items, reload) => _groups.isEmpty && _locations.isEmpty
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  if (_groups.isNotEmpty)
+                    SizedBox(
+                      width: 280,
+                      child: ArticleGroupFilterField(
+                        groups: [for (final g in _groups) (id: g.id, name: g.name)],
+                        hasUngrouped: _hasUngrouped,
+                        value: _filter,
+                        onChanged: (value) {
+                          setState(() => _filter = value);
+                          reload();
+                        },
+                      ),
+                    ),
+                  if (_locations.isNotEmpty)
+                    SizedBox(
+                      width: 280,
+                      child: DropdownButtonFormField<String?>(
+                        key: const Key('online-article-location-filter'),
+                        isExpanded: true,
+                        initialValue: _locationFilter,
+                        decoration: const InputDecoration(prefixIcon: Icon(Icons.warehouse_outlined), labelText: 'Lagerort'),
+                        items: [
+                          const DropdownMenuItem<String?>(value: null, child: Text('Alle Lagerorte')),
+                          for (final l in _locations) DropdownMenuItem<String?>(value: l.id, child: Text(l.name)),
+                          const DropdownMenuItem<String?>(value: '', child: Text('Platz noch nicht zugeordnet')),
+                        ],
+                        onChanged: (v) {
+                          setState(() => _locationFilter = v);
+                          reload();
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+      emptyText: _filter is AllArticleGroups && _locationFilter == null
+          ? 'Noch keine Artikel angelegt.'
+          : 'Keine Artikel für diese Auswahl.',
       appBar: (context, reload) => AppBar(
         automaticallyImplyLeading: false,
         title: const Text('Artikel'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Barcode scannen',
+            onPressed: () async {
+              final code = await barcodeScanner(context);
+              if (code == null || !context.mounted) return;
+              OnlineArticle? article;
+              await runOnline(context, () async => article = await session.client.articleByBarcode(code));
+              if (!context.mounted) return;
+              if (article == null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kein Artikel mit Barcode $code.')));
+                return;
+              }
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => OnlineArticleDetailScreen(session: session, articleId: article!.id)),
+              );
+              reload();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.category_outlined),
             tooltip: 'Artikelgruppen',
@@ -447,6 +569,13 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
                       TextButton(onPressed: () => _correctStock(article), child: const Text('Bestand korrigieren')),
                   ],
                 ),
+                // C5.4: Bestand je Platz, Standardplatz, Umlagern.
+                _OnlineBinStockSection(
+                  key: ValueKey('bins-${article.id}-${article.stockQuantity}'),
+                  session: widget.session,
+                  articleId: article.id,
+                  onChanged: _reload,
+                ),
               ],
             ],
           ),
@@ -512,6 +641,13 @@ class _SupplierList extends StatelessWidget {
         OnlineField('vatId', 'USt-IdNr.', initial: existing?.vatId),
         OnlineField('minimumOrderQuantity', 'Mindestbestellmenge', type: OnlineFieldType.decimal, initial: existing?.minimumOrderQuantity),
         OnlineField('deliveryTerms', 'Lieferbedingungen', initial: existing?.deliveryTerms),
+        // C5.2-Nachtrag: Text, führende Nullen bleiben.
+        OnlineField(
+          'ourCustomerNumber',
+          'Unsere Kundennummer beim Lieferanten',
+          initial: existing?.ourCustomerNumber,
+          helper: 'Erscheint auf jeder Bestellung an diesen Lieferanten.',
+        ),
         OnlineField('notes', 'Notizen', type: OnlineFieldType.multiline, initial: existing?.notes),
       ],
     );
@@ -528,6 +664,7 @@ class _SupplierList extends StatelessWidget {
         vatId: values['vatId'] as String?,
         minimumOrderQuantity: values['minimumOrderQuantity'] as String?,
         deliveryTerms: values['deliveryTerms'] as String?,
+        ourCustomerNumber: values['ourCustomerNumber'] as String?,
         notes: values['notes'] as String?,
       )),
     );
@@ -661,6 +798,141 @@ class _GroupList extends StatelessWidget {
                 ),
               )
           : null,
+    );
+  }
+}
+
+/// C5.4-Nachtrag (Kay, 16.11.2026): Platzbestände eines Artikels mit
+/// Standardplatz und Umlagerung — wie offline.
+class _OnlineBinStockSection extends StatefulWidget {
+  const _OnlineBinStockSection({super.key, required this.session, required this.articleId, required this.onChanged});
+  final OnlineSession session;
+  final String articleId;
+  final VoidCallback onChanged;
+
+  @override
+  State<_OnlineBinStockSection> createState() => _OnlineBinStockSectionState();
+}
+
+class _OnlineBinStockSectionState extends State<_OnlineBinStockSection> {
+  late Future<(List<OnlineStorageLocation>, OnlineArticleBinStock)> _future = _load();
+
+  Future<(List<OnlineStorageLocation>, OnlineArticleBinStock)> _load() async {
+    final client = widget.session.client;
+    return ((await client.storageLocations()).locations, await client.articleBinStock(widget.articleId));
+  }
+
+  Future<void> _defaultBin(List<OnlineStorageLocation> locations, OnlineArticleBinStock stock) async {
+    final values = await showOnlineForm(
+      context,
+      title: 'Standardplatz',
+      fields: [
+        OnlineField(
+          'bin',
+          'Standardplatz',
+          type: OnlineFieldType.choice,
+          required: true,
+          initial: stock.defaultBinId ?? '',
+          options: onlineBinOptions(locations, unassignedLabel: 'Kein Standardplatz'),
+        ),
+      ],
+    );
+    if (values == null || !mounted) return;
+    final bin = values['bin'] as String?;
+    if (await runOnline(context, () => widget.session.client.setDefaultBin(widget.articleId, bin == null || bin.isEmpty ? null : bin))) {
+      setState(() {
+        _future = _load();
+      });
+    }
+  }
+
+  Future<void> _transfer(List<OnlineStorageLocation> locations, OnlineArticleBinStock stock) async {
+    final quantities = {for (final s in stock.stocks) s.binKey: s.quantity};
+    final options = onlineBinOptions(locations, quantities: quantities);
+    final from = stock.stocks.where((s) => !s.quantity.startsWith('-') && s.quantity != '0').firstOrNull?.binKey ?? '';
+    final values = await showOnlineForm(
+      context,
+      title: 'Umlagern',
+      submitLabel: 'Umlagern',
+      fields: [
+        OnlineField('from', 'Von', type: OnlineFieldType.choice, required: true, initial: from, options: options),
+        OnlineField(
+          'to',
+          'Nach',
+          type: OnlineFieldType.choice,
+          required: true,
+          initial: stock.defaultBinId ?? (locations.expand((l) => l.bins).firstOrNull?.id ?? ''),
+          options: options,
+        ),
+        const OnlineField('quantity', 'Menge', type: OnlineFieldType.decimal, required: true),
+      ],
+    );
+    if (values == null || !mounted) return;
+    final fromKey = (values['from'] as String?) ?? '';
+    final toKey = (values['to'] as String?) ?? '';
+    if (fromKey == toKey) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Zwei verschiedene Plätze wählen.')));
+      return;
+    }
+    if (await runOnline(
+      context,
+      () => widget.session.client.transferStock(
+        widget.articleId,
+        fromBinKey: fromKey,
+        toBinKey: toKey,
+        quantity: values['quantity'] as String,
+      ),
+      success: 'Umgelagert.',
+    )) {
+      // Gesamtbestand bleibt gleich — Platzbestände selbst neu laden.
+      setState(() {
+        _future = _load();
+      });
+      widget.onChanged();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<(List<OnlineStorageLocation>, OnlineArticleBinStock)>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+        final (locations, stock) = snapshot.data!;
+        if (locations.every((l) => l.bins.isEmpty)) return const SizedBox.shrink();
+        final canWrite = widget.session.can('stock.write');
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final s in stock.stocks)
+              Padding(
+                padding: const EdgeInsets.only(left: 8, top: 2),
+                child: Text(
+                  '${s.label}: ${formatQuantity(s.quantity)}${s.binKey == stock.defaultBinId ? ' (Standardplatz)' : ''}',
+                  style: TextStyle(color: s.binKey.isEmpty ? Theme.of(context).colorScheme.tertiary : null),
+                ),
+              ),
+            if (canWrite)
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    key: const Key('online-article-default-bin'),
+                    onPressed: () => _defaultBin(locations, stock),
+                    icon: const Icon(Icons.push_pin_outlined, size: 18),
+                    label: const Text('Standardplatz'),
+                  ),
+                  TextButton.icon(
+                    key: const Key('online-article-transfer'),
+                    onPressed: () => _transfer(locations, stock),
+                    icon: const Icon(Icons.swap_horiz, size: 18),
+                    label: const Text('Umlagern'),
+                  ),
+                ],
+              ),
+          ],
+        );
+      },
     );
   }
 }

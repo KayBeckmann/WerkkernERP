@@ -79,7 +79,7 @@ class SupplierRoutes {
 
   // ---- Lieferanten --------------------------------------------------------------
 
-  Supplier? _supplierFromBody(Map<String, Object?> body, {required String id, required String companyId, required DateTime createdAt}) {
+  Supplier? _supplierFromBody(Map<String, Object?> body, {required String id, required String companyId, required DateTime createdAt, Supplier? existing}) {
     final name = trimmedOrNull(body['name']);
     if (name == null) return null;
     return Supplier(
@@ -95,6 +95,8 @@ class SupplierRoutes {
       minimumOrderQuantity: decimalOrNull(body['minimumOrderQuantity']),
       deliveryTerms: trimmedOrNull(body['deliveryTerms']),
       createdAt: createdAt,
+      // Ältere Clients kennen das Feld nicht — dann bleibt es unverändert.
+      ourCustomerNumber: body.containsKey('ourCustomerNumber') ? trimmedOrNull(body['ourCustomerNumber']) : existing?.ourCustomerNumber,
     );
   }
 
@@ -134,7 +136,7 @@ class SupplierRoutes {
     final companyId = check.auth!.session.companyId;
     final existing = await business.findSupplier(companyId, id);
     if (existing == null) return jsonError('Lieferant nicht gefunden.', status: 404);
-    final supplier = _supplierFromBody(await readJsonBody(request), id: id, companyId: companyId, createdAt: existing.createdAt);
+    final supplier = _supplierFromBody(await readJsonBody(request), id: id, companyId: companyId, createdAt: existing.createdAt, existing: existing);
     if (supplier == null) return jsonError('name ist Pflicht.');
     await business.updateSupplier(supplier);
     await auth.audit(check.auth!, 'supplier.update', 'supplier', id);

@@ -51,6 +51,14 @@ EInvoiceData? eInvoiceDataForInvoice({
     ],
     referencedInvoiceNumber: referencedInvoiceNumber,
     referencedInvoiceDate: referencedInvoiceDate,
+    terms: invoice.paymentTermLabel == null || invoice.paymentNetDays == null
+        ? null
+        : DocumentPaymentTerms(
+            label: invoice.paymentTermLabel!,
+            netDays: invoice.paymentNetDays!,
+            skontoPercent: invoice.skontoPercent,
+            skontoDays: invoice.skontoDays,
+          ),
     lines: [
       for (final item in items)
         EInvoiceLine(
@@ -135,6 +143,14 @@ EInvoiceData? eInvoiceDataForOnlineDocument(
       for (final a in document.advancePayments)
         EInvoicePriorPayment(invoiceNumber: a.number ?? '', grossCents: a.grossCents),
     ],
+    terms: document.paymentTerm == null
+        ? null
+        : DocumentPaymentTerms(
+            label: document.paymentTerm!.label,
+            netDays: document.paymentTerm!.netDays,
+            skontoPercent: document.paymentTerm!.skontoPercent,
+            skontoDays: document.paymentTerm!.skontoDays,
+          ),
     referencedInvoiceNumber: document.kind == 'creditNote' ? document.convertedFromNumber : null,
     lines: [
       for (final item in document.items)

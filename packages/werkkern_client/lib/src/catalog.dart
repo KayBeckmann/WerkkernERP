@@ -14,6 +14,7 @@ class OnlineSupplier {
     this.notes,
     this.minimumOrderQuantity,
     this.deliveryTerms,
+    this.ourCustomerNumber,
   });
   factory OnlineSupplier.fromJson(Map<String, Object?> j) => OnlineSupplier(
         id: j['id'] as String,
@@ -26,6 +27,7 @@ class OnlineSupplier {
         notes: j['notes'] as String?,
         minimumOrderQuantity: j['minimumOrderQuantity'] as String?,
         deliveryTerms: j['deliveryTerms'] as String?,
+        ourCustomerNumber: j['ourCustomerNumber'] as String?,
       );
   final String id;
   final String name;
@@ -38,6 +40,9 @@ class OnlineSupplier {
   final String? minimumOrderQuantity;
   final String? deliveryTerms;
 
+  /// C5.2-Nachtrag: unsere Kundennummer beim Lieferanten.
+  final String? ourCustomerNumber;
+
   Map<String, Object?> toWriteJson() => {
         'name': name,
         'address': address,
@@ -48,6 +53,7 @@ class OnlineSupplier {
         'notes': notes,
         'minimumOrderQuantity': minimumOrderQuantity,
         'deliveryTerms': deliveryTerms,
+        'ourCustomerNumber': ourCustomerNumber,
       };
 }
 

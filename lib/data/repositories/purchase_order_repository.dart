@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../database/database.dart';
 import '../database/tables.dart';
+import 'stock_ledger.dart';
 import 'number_sequence_repository.dart';
 
 /// Eine einzugebende Bestellposition (noch ohne ID — die vergibt das
@@ -266,6 +267,7 @@ class PurchaseOrderRepository {
           updatedAt: Value(now),
           supplierSnapshotName: Value(supplier.name),
           supplierSnapshotAddress: Value(supplier.address),
+          supplierSnapshotCustomerNumber: Value(supplier.ourCustomerNumber),
         ),
       );
       return findById(companyId: companyId, id: id);
@@ -309,6 +311,7 @@ class PurchaseOrderRepository {
     required String companyId,
     required String id,
     required Map<String, double> receipts,
+    Map<String, String> targetBins = const {},
   }) async {
     return _db.transaction(() async {
       final order = await findById(companyId: companyId, id: id);
@@ -343,25 +346,18 @@ class PurchaseOrderRepository {
         }
 
         if (item.articleId != null) {
-          final article = await (_db.select(_db.articles)..where((a) => a.id.equals(item.articleId!)))
-              .getSingleOrNull();
-          if (article != null) {
-            final newStock = article.stockQuantity + entry.value;
-            await (_db.update(_db.articles)..where((a) => a.id.equals(article.id)))
-                .write(ArticlesCompanion(stockQuantity: Value(newStock)));
-            await _db.into(_db.stockMovements).insert(
-                  StockMovementsCompanion.insert(
-                    id: _uuid.v4(),
-                    companyId: companyId,
-                    articleId: article.id,
-                    type: StockMovementType.purchaseOrderReceipt,
-                    quantityDelta: entry.value,
-                    resultingQuantity: newStock,
-                    referenceLabel: Value(order.orderNumber),
-                    createdAt: now,
-                  ),
-                );
-          }
+          // C5.4: Zielplatz je Position ([targetBins], Schlüssel =
+          // Positions-ID), sonst Standardplatz, sonst „nicht zugeordnet“.
+          final ledger = StockLedger(_db);
+          await ledger.book(
+            companyId: companyId,
+            articleId: item.articleId!,
+            delta: entry.value,
+            type: StockMovementType.purchaseOrderReceipt,
+            binKey: targetBins[item.id] ?? await ledger.defaultReceiptBin(companyId: companyId, articleId: item.articleId!),
+            referenceLabel: order.orderNumber,
+            at: now,
+          );
         }
       }
 

@@ -9,13 +9,14 @@ import 'timesheets.dart';
 import 'stock.dart';
 import 'suppliers.dart';
 import 'company_import.dart';
+import 'payment_terms.dart';
 
 /// Fachdaten-Repository. **Jede** Methode ist zwingend firmengebunden
 /// (`companyId`-Parameter) — es gibt bewusst keine firmenübergreifende
 /// Abfrage, auch keine "nach ID global" (ADR-0001 B0.5). Eine fremde
 /// ID liefert dadurch exakt dasselbe Ergebnis wie eine nicht
 /// existierende (`null`/`false`), kein Oracle.
-abstract class BusinessRepository implements SupplierStore, FleetStore, StockStore, AccountingStore, PurchasingStore, DunningStore, RecurringStore, TimeSheetStore, StaffRoleStore, CompanyImportStore {
+abstract class BusinessRepository implements SupplierStore, FleetStore, StockStore, AccountingStore, PurchasingStore, DunningStore, RecurringStore, TimeSheetStore, StaffRoleStore, CompanyImportStore, PaymentTermStore {
   // ---- Kunden -----------------------------------------------------------
   Future<List<Customer>> listCustomers(String companyId, {String? query});
   Future<Customer?> findCustomer(String companyId, String id);
@@ -74,6 +75,7 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
     DateTime? Function()? dueDate,
     String? userId,
     String? Function()? contactId,
+    DocTerms? Function()? terms,
   });
 
   Future<bool> deleteDraft(String companyId, String id);
@@ -92,6 +94,7 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
     required CompanySnapshot company,
     required DateTime now,
     ({StockBookingMode mode, String userId})? stockBooking,
+    Map<String, String> withdrawalBins = const {},
   });
 
   /// Dokumente, die per Umwandlung aus [sourceId] entstanden sind.

@@ -64,6 +64,8 @@ class MigrationPackageBuilder {
         'iban': company.iban,
         'email': company.email,
         'phone': company.phone,
+        'skontoPercent': company.skontoPercent,
+        'skontoDays': company.skontoDays,
         'street': company.street,
         'postalCode': company.postalCode,
         'city': company.city,
@@ -113,6 +115,11 @@ class MigrationPackageBuilder {
         for (final s in await (db.select(db.numberSequences)..where((s) => s.companyId.equals(companyId))).get())
           {'documentType': s.documentType, 'year': s.year, 'lastNumber': s.lastNumber},
       ],
+      // A2-Nachtrag: Zahlungsbedingungen vor den Kunden (Verweis).
+      'paymentTerms': [
+        for (final t in await (db.select(db.paymentTerms)..where((t) => t.companyId.equals(companyId))).get())
+          {'id': t.id, 'label': t.label, 'netDays': t.netDays, 'isDefault': t.isDefault, 'sortOrder': t.sortOrder},
+      ],
       'customers': [
         for (final c in await (db.select(db.customers)..where((c) => c.companyId.equals(companyId))).get())
           {
@@ -139,6 +146,10 @@ class MigrationPackageBuilder {
             'countryCode': c.countryCode,
             'leitwegId': c.leitwegId,
             'eInvoiceFormat': c.eInvoiceFormat,
+            'paymentTermId': c.paymentTermId,
+            'skontoMode': c.skontoMode,
+            'skontoPercent': c.skontoPercent,
+            'skontoDays': c.skontoDays,
           },
       ],
       'suppliers': [
@@ -154,6 +165,7 @@ class MigrationPackageBuilder {
             'notes': s.notes,
             'minimumOrderQuantity': _dec(s.minimumOrderQuantity),
             'deliveryTerms': s.deliveryTerms,
+            'ourCustomerNumber': s.ourCustomerNumber,
             'createdAt': _ts(s.createdAt),
           },
       ],
@@ -173,6 +185,8 @@ class MigrationPackageBuilder {
             'active': a.active,
             'stockQuantity': _dec(a.stockQuantity),
             'minimumStock': _dec(a.minimumStock),
+            'barcode': a.barcode,
+            'defaultBinId': a.defaultBinId,
             'createdAt': _ts(a.createdAt),
           },
       ],
@@ -226,6 +240,13 @@ class MigrationPackageBuilder {
             'convertedFromId': d.convertedFromId,
             'projectId': d.projectId,
             'contactId': d.contactId,
+            // C15/A2: Schnappschüsse ziehen unverändert mit um.
+            'eInvoiceSnapshot': d.eInvoiceSnapshot,
+            'paymentTermId': d.paymentTermId,
+            'paymentTermLabel': d.paymentTermLabel,
+            'paymentNetDays': d.paymentNetDays,
+            'skontoPercent': d.skontoPercent,
+            'skontoDays': d.skontoDays,
             'isAdvancePayment': d.isAdvancePayment,
             'isFixedPrice': d.isFixedPrice,
             'stockBooked': d.stockBooked,
@@ -317,6 +338,7 @@ class MigrationPackageBuilder {
             'notes': o.notes,
             'supplierSnapshotName': o.supplierSnapshotName,
             'supplierSnapshotAddress': o.supplierSnapshotAddress,
+            'supplierSnapshotCustomerNumber': o.supplierSnapshotCustomerNumber,
             'finalizedAt': _ts(o.finalizedAt),
             'sourceOrderId': o.sourceOrderId,
             'projectId': o.projectId,
@@ -349,7 +371,32 @@ class MigrationPackageBuilder {
             'referenceLabel': m.referenceLabel,
             'note': m.note,
             'createdAt': _ts(m.createdAt),
+            'binKey': m.binKey,
           },
+      ],
+      // C5.4 Lagerorte und Plätze mit Bestand je Platz.
+      'storageLocations': [
+        for (final l in await (db.select(db.storageLocations)..where((l) => l.companyId.equals(companyId))).get())
+          {
+            'id': l.id,
+            'name': l.name,
+            'sortOrder': l.sortOrder,
+            'createdAt': _ts(l.createdAt),
+            'bins': [
+              for (final b in await (db.select(db.storageBins)..where((b) => b.locationId.equals(l.id))).get())
+                {
+                  'id': b.id,
+                  'row': b.row,
+                  'shelf': b.shelf,
+                  'compartment': b.compartment,
+                  'sortOrder': b.sortOrder,
+                },
+            ],
+          },
+      ],
+      'articleBinStocks': [
+        for (final s in await (db.select(db.articleBinStocks)..where((s) => s.companyId.equals(companyId))).get())
+          {'articleId': s.articleId, 'binKey': s.binKey, 'quantity': _dec(s.quantity)},
       ],
       'inventoryCounts': [
         for (final c in counts)
@@ -360,6 +407,7 @@ class MigrationPackageBuilder {
             'status': c.status.name,
             'completedAt': _ts(c.completedAt),
             'createdAt': _ts(c.createdAt),
+            'locationId': c.locationId,
             'items': [
               for (final i in countItems.where((i) => i.inventoryCountId == c.id))
                 {
@@ -367,6 +415,7 @@ class MigrationPackageBuilder {
                   'expectedQuantity': _dec(i.expectedQuantity),
                   'countedQuantity': _dec(i.countedQuantity),
                   'countedAt': _ts(i.countedAt),
+                  'binKey': i.binKey,
                 },
             ],
           },

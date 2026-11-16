@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/inventory_repository.dart';
+import '../../data/repositories/storage_repository.dart';
 import '../../domain/services/active_company_service.dart';
 import 'inventory_count_detail_screen.dart';
+import 'storage_locations_screen.dart';
 
 /// Inventur-Läufe der aktiven Firma (C5.3 Bestandsbuchhaltung, Nachtrag
 /// 2026-10-19: "Wir müssen auch Inventur vorsehen" — Kay-Entscheidung
@@ -37,16 +39,20 @@ class _InventoryCountsScreenState extends State<InventoryCountsScreen> {
       });
 
   Future<void> _startCount() async {
-    final label = await showDialog<String>(
-      context: context,
-      builder: (context) => const _StartCountDialog(),
-    );
-    if (label == null || !mounted) return;
     final companyId = context.read<ActiveCompanyService>().active!.id;
-    final count = await context.read<InventoryRepository>().startCount(
-          companyId: companyId,
-          label: label,
-        );
+    final locations = await context.read<StorageRepository>().locations(companyId);
+    if (!mounted) return;
+    final result = await showDialog<(String, String?)>(
+      context: context,
+      builder: (context) => _StartCountDialog(locations: locations),
+    );
+    if (result == null || !mounted) return;
+    final (label, locationId) = result;
+    final repo = context.read<InventoryRepository>();
+    // C5.4: Inventur nach Lagerort — Positionen je Platz in Laufreihenfolge.
+    final count = locationId == null
+        ? await repo.startCount(companyId: companyId, label: label)
+        : await repo.startLocationCount(companyId: companyId, label: label, locationId: locationId);
     if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => InventoryCountDetailScreen(inventoryCountId: count.id)),
@@ -64,15 +70,32 @@ class _InventoryCountsScreenState extends State<InventoryCountsScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final counts = snapshot.data!;
+          final header = Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('open-storage-locations'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StorageLocationsScreen()),
+              ),
+              icon: const Icon(Icons.warehouse_outlined),
+              label: const Text('Lagerorte & Plätze'),
+            ),
+          );
           if (counts.isEmpty) {
-            return const Center(child: Text('Noch keine Inventur durchgeführt.'));
+            return Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [header, const Expanded(child: Center(child: Text('Noch keine Inventur durchgeführt.')))],
+              ),
+            );
           }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-            itemCount: counts.length,
+            itemCount: counts.length + 1,
             separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
-              final count = counts[index];
+              if (index == 0) return header;
+              final count = counts[index - 1];
               return Card(
                 child: ListTile(
                   leading: Icon(
@@ -110,7 +133,8 @@ class _InventoryCountsScreenState extends State<InventoryCountsScreen> {
 }
 
 class _StartCountDialog extends StatefulWidget {
-  const _StartCountDialog();
+  const _StartCountDialog({this.locations = const []});
+  final List<StorageLocation> locations;
 
   @override
   State<_StartCountDialog> createState() => _StartCountDialogState();
@@ -118,6 +142,7 @@ class _StartCountDialog extends StatefulWidget {
 
 class _StartCountDialogState extends State<_StartCountDialog> {
   final _labelCtrl = TextEditingController();
+  String? _locationId;
 
   @override
   void dispose() {
@@ -129,13 +154,31 @@ class _StartCountDialogState extends State<_StartCountDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Neue Inventur'),
-      content: TextField(
-        controller: _labelCtrl,
-        autofocus: true,
-        decoration: const InputDecoration(
-          labelText: 'Bezeichnung *',
-          hintText: 'z. B. "Jahresinventur 2026"',
-        ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _labelCtrl,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Bezeichnung *',
+              hintText: 'z. B. "Jahresinventur 2026"',
+            ),
+          ),
+          if (widget.locations.isNotEmpty)
+            DropdownButtonFormField<String?>(
+              key: const Key('inventory-location'),
+              isExpanded: true,
+              initialValue: _locationId,
+              decoration: const InputDecoration(labelText: 'Zählen nach'),
+              items: [
+                const DropdownMenuItem<String?>(value: null, child: Text('Artikeln (frei auswählen)')),
+                for (final l in widget.locations)
+                  DropdownMenuItem<String?>(value: l.id, child: Text('Lagerort ${l.name} (Platz für Platz)')),
+              ],
+              onChanged: (v) => setState(() => _locationId = v),
+            ),
+        ],
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
@@ -143,7 +186,7 @@ class _StartCountDialogState extends State<_StartCountDialog> {
           onPressed: () {
             final label = _labelCtrl.text.trim();
             if (label.isEmpty) return;
-            Navigator.pop(context, label);
+            Navigator.pop(context, (label, _locationId));
           },
           child: const Text('Starten'),
         ),

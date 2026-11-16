@@ -15,6 +15,7 @@ import 'package:decimal/decimal.dart';
 import 'einvoice_party.dart';
 import 'invoice_totals.dart';
 import 'money.dart';
+import 'payment_terms.dart';
 
 /// Zielprofil der Datei.
 enum EInvoiceProfile {
@@ -97,6 +98,7 @@ class EInvoiceData {
     this.referencedInvoiceNumber,
     this.referencedInvoiceDate,
     this.currency = 'EUR',
+    this.terms,
   });
 
   final EInvoiceProfile profile;
@@ -128,6 +130,11 @@ class EInvoiceData {
   final String? referencedInvoiceNumber;
   final DateTime? referencedInvoiceDate;
   final String currency;
+
+  /// A2-Nachtrag: Zahlungsbedingung mit optionalem Skonto (Schnappschuss
+  /// am Beleg). Ergibt Fälligkeit und Text; bei XRechnung zusätzlich die
+  /// maschinenlesbare Skonto-Zeile.
+  final DocumentPaymentTerms? terms;
 
   InvoiceTotals get totals => calculateInvoiceTotals([for (final l in lines) l.totalsInput]);
 
@@ -215,7 +222,7 @@ List<String> eInvoiceProblems(EInvoiceData d) {
     if (_blank(d.buyer.leitwegId)) problems.add('Kunde: Leitweg-ID / Käuferreferenz fehlt (XRechnung).');
     if (_blank(d.buyer.email)) problems.add('Kunde: E-Mail fehlt (XRechnung braucht eine elektronische Adresse).');
     if (_blank(d.seller.iban)) problems.add('Verkäufer: IBAN fehlt (XRechnung verlangt eine Zahlungsangabe).');
-    if (d.dueDate == null && _blank(d.paymentTerms) && !d.isCreditNote) {
+    if (d.dueDate == null && d.terms == null && _blank(d.paymentTerms) && !d.isCreditNote) {
       problems.add('Fälligkeitsdatum oder Zahlungsbedingungen fehlen (XRechnung).');
     }
   }
@@ -341,18 +348,37 @@ String buildEInvoiceXml(EInvoiceData d, {bool allowProblems = false}) {
     b.leaf('ram:RateApplicablePercent', _percent(rate));
     b.close('ram:ApplicableTradeTax');
   }
-  if (!_blank(d.paymentTerms) || d.dueDate != null) {
+  final prepaid = d.priorPayments.fold<int>(0, (sum, p) => sum + p.grossCents);
+  final grand = totals.totalGross.cents;
+  final terms = d.isCreditNote ? null : d.terms;
+  final summary = terms == null
+      ? null
+      : summarizePaymentTerms(
+          terms: terms,
+          issueDate: d.issueDate,
+          net: totals.totalNet,
+          gross: totals.totalGross,
+          payable: Money.fromCents(grand - prepaid),
+          smallBusinessExempt: d.smallBusinessExempt,
+        );
+  final dueDate = summary?.dueDate ?? d.dueDate;
+  final description = [
+    // XRechnung: Skonto maschinenlesbar am Anfang (BT-20, KoSIT-Format).
+    if (summary != null && summary.skontoAmount != null && d.profile == EInvoiceProfile.xrechnung)
+      xrechnungSkontoLine(summary, terms!.skontoDays!).trimRight(),
+    if (summary != null) paymentTermsText(terms!, summary),
+    if (!_blank(d.paymentTerms)) d.paymentTerms!.trim(),
+  ].join('\n');
+  if (description.isNotEmpty || dueDate != null) {
     b.open('ram:SpecifiedTradePaymentTerms');
-    if (!_blank(d.paymentTerms)) b.leaf('ram:Description', d.paymentTerms!.trim());
-    if (d.dueDate != null) {
+    if (description.isNotEmpty) b.leaf('ram:Description', description);
+    if (dueDate != null) {
       b.open('ram:DueDateDateTime');
-      b.leaf('udt:DateTimeString', _date(d.dueDate!), {'format': '102'});
+      b.leaf('udt:DateTimeString', _date(dueDate), {'format': '102'});
       b.close('ram:DueDateDateTime');
     }
     b.close('ram:SpecifiedTradePaymentTerms');
   }
-  final prepaid = d.priorPayments.fold<int>(0, (sum, p) => sum + p.grossCents);
-  final grand = totals.totalGross.cents;
   b.open('ram:SpecifiedTradeSettlementHeaderMonetarySummation');
   b.leaf('ram:LineTotalAmount', _amount(totals.totalNet));
   b.leaf('ram:TaxBasisTotalAmount', _amount(totals.totalNet));

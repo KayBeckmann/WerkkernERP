@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'payment_terms.dart';
 import 'platform.dart';
 
 /// Fehlerantwort des Servers. [statusCode] 409 = Konflikt (z. B.
@@ -227,6 +228,13 @@ class WerkkernApiClient {
     return [for (final a in j['articles'] as List) OnlineArticle.fromJson(a as Map<String, Object?>)];
   }
 
+  /// A1-Nachtrag: Artikel der aktiven Firma mit exakt diesem Barcode.
+  Future<OnlineArticle?> articleByBarcode(String barcode) async {
+    final j = _map(await _send('GET', '/articles', query: {'barcode': barcode}));
+    final list = j['articles'] as List;
+    return list.isEmpty ? null : OnlineArticle.fromJson(list.first as Map<String, Object?>);
+  }
+
   // ---- Dokumente ------------------------------------------------------------------
 
   Future<List<OnlineDocument>> documents({String? kind, String? status, String? query}) async {
@@ -250,6 +258,8 @@ class WerkkernApiClient {
     String? notes,
     String? projectId,
     String? contactId,
+    // A2-Nachtrag: ohne Angabe belegt der Server Kunden-/Firmenstandard vor.
+    OnlineDocumentTerms? Function()? paymentTerm,
   }) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents', body: {
         'kind': kind,
@@ -258,6 +268,7 @@ class WerkkernApiClient {
         'notes': ?notes,
         'projectId': ?projectId,
         'contactId': ?contactId,
+        if (paymentTerm != null) 'paymentTerm': paymentTerm()?.toJson(),
       })));
 
   /// Wirft [ApiException] mit 409, wenn [version] veraltet ist — dann
@@ -280,6 +291,8 @@ class WerkkernApiClient {
     DateTime? Function()? dueDate,
     // Kontaktperson; ohne Angabe unverändert, `() => null` entfernt sie.
     String? Function()? contactId,
+    // A2-Nachtrag: ohne Angabe unverändert, `() => null` entfernt sie.
+    OnlineDocumentTerms? Function()? paymentTerm,
   }) async {
     final due = dueDate?.call();
     return OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', idempotencyKey: idempotencyKey, body: {
@@ -292,6 +305,7 @@ class WerkkernApiClient {
       if (paymentTerms != null) 'paymentTerms': paymentTerms(),
       if (dueDate != null) 'dueDate': due == null ? null : _isoDate(due),
       if (contactId != null) 'contactId': contactId(),
+      if (paymentTerm != null) 'paymentTerm': paymentTerm()?.toJson(),
     })));
   }
 
@@ -321,8 +335,12 @@ class WerkkernApiClient {
 
   Future<void> deleteDocument(String id) => _send('DELETE', '/documents/$id');
 
-  Future<OnlineDocument> finalizeDocument(String id, {required int version}) async =>
-      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$id/finalize', body: {'version': version})));
+  /// [withdrawalBins]: C5.4 gewählter Entnahmeplatz je Artikel-ID.
+  Future<OnlineDocument> finalizeDocument(String id, {required int version, Map<String, String>? withdrawalBins}) async =>
+      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$id/finalize', body: {
+        'version': version,
+        if (withdrawalBins != null && withdrawalBins.isNotEmpty) 'withdrawalBins': withdrawalBins,
+      })));
 
   /// Neuer Entwurf der Zielart aus einem finalisierten Dokument.
   Future<OnlineDocument> convertDocument(String id, String targetKind) async =>

@@ -5,6 +5,7 @@ import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/inventory_repository.dart';
+import '../../data/repositories/stock_ledger.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/stock_change_notifier.dart';
 import 'articles_screen.dart' show formatArticleQuantity;
@@ -43,10 +44,17 @@ class _InventoryCountDetailScreenState extends State<InventoryCountDetailScreen>
     final companyId = context.read<ActiveCompanyService>().active!.id;
     final repo = context.read<InventoryRepository>();
     final articleRepo = context.read<ArticleRepository>();
+    final ledger = context.read<StockLedger>();
     final count = await repo.findById(companyId: companyId, id: widget.inventoryCountId);
     final items = count == null ? <InventoryCountItem>[] : await repo.itemsFor(count.id);
     final articles = await articleRepo.listForCompany(companyId);
     final articleNames = {for (final article in articles) article.id: article.name};
+    // C5.4: Plätze des gezählten Lagerorts in Laufreihenfolge.
+    final bins = count?.locationId == null
+        ? <({StorageLocation location, StorageBin bin})>[]
+        : (await ledger.binsWithLocation(companyId))
+            .where((e) => e.location.id == count!.locationId)
+            .toList();
 
     for (final item in items) {
       _controllers.putIfAbsent(
@@ -57,7 +65,7 @@ class _InventoryCountDetailScreenState extends State<InventoryCountDetailScreen>
       );
     }
 
-    return _DetailData(count: count, items: items, articles: articles, articleNames: articleNames);
+    return _DetailData(count: count, items: items, articles: articles, articleNames: articleNames, bins: bins);
   }
 
   void _reload() => setState(() {
@@ -79,6 +87,86 @@ class _InventoryCountDetailScreenState extends State<InventoryCountDetailScreen>
           articleIds: selected,
         );
     _reload();
+  }
+
+  /// C5.4: Fund an einem Platz (auch leerer Platz) nachtragen.
+  Future<void> _addFound(List<Article> allArticles, String binKey) async {
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => _AddArticlesDialog(candidates: allArticles.where((a) => a.active).toList()),
+    );
+    if (selected == null || selected.isEmpty || !mounted) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final repo = context.read<InventoryRepository>();
+    for (final articleId in selected) {
+      await repo.addArticleAtBin(
+        companyId: companyId,
+        inventoryCountId: widget.inventoryCountId,
+        articleId: articleId,
+        binKey: binKey,
+      );
+    }
+    _reload();
+  }
+
+  Widget _itemCard(InventoryCountItem item, _DetailData data, bool isDraft) => Card(
+        child: ListTile(
+          title: Text(data.articleNames[item.articleId] ?? '(unbekannt)'),
+          subtitle: Text('Soll: ${formatArticleQuantity(item.expectedQuantity)}'),
+          trailing: isDraft
+              ? SizedBox(
+                  width: 120,
+                  child: TextField(
+                    key: Key('inventory-count-${item.id}'),
+                    controller: _controllers[item.id],
+                    textAlign: TextAlign.right,
+                    decoration: const InputDecoration(labelText: 'Ist'),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (text) => _saveCountedQuantity(item.id, text),
+                  ),
+                )
+              : Text(
+                  'Ist: ${item.countedQuantity == null ? '–' : formatArticleQuantity(item.countedQuantity!)}',
+                ),
+        ),
+      );
+
+  /// Platz-Inventur: je Platz eine Überschrift (auch leere Plätze), dann
+  /// die Klärfälle ohne Platz.
+  List<Widget> _locationSections(_DetailData data, bool isDraft) {
+    Widget header(String text, String binKey, {bool empty = false}) => Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  empty ? '$text — leer' : text,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              if (isDraft)
+                TextButton.icon(
+                  onPressed: () => _addFound(data.articles, binKey),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Fund'),
+                ),
+            ],
+          ),
+        );
+    final widgets = <Widget>[];
+    for (final entry in data.bins) {
+      final here = data.items.where((i) => i.binKey == entry.bin.id).toList()
+        ..sort((a, b) => (data.articleNames[a.articleId] ?? '').compareTo(data.articleNames[b.articleId] ?? ''));
+      widgets.add(header(storageBinLabel(entry.bin), entry.bin.id, empty: here.isEmpty));
+      widgets.addAll(here.map((i) => _itemCard(i, data, isDraft)));
+    }
+    final known = {for (final e in data.bins) e.bin.id};
+    final rest = data.items.where((i) => !known.contains(i.binKey)).toList();
+    if (rest.isNotEmpty) {
+      widgets.add(header('Platz noch nicht zugeordnet (Klärfälle)', unassignedBinKey));
+      widgets.addAll(rest.map((i) => _itemCard(i, data, isDraft)));
+    }
+    return widgets;
   }
 
   Future<void> _saveCountedQuantity(String itemId, String text) async {
@@ -147,7 +235,7 @@ class _InventoryCountDetailScreenState extends State<InventoryCountDetailScreen>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Positionen', style: Theme.of(context).textTheme.titleMedium),
-                  if (isDraft)
+                  if (isDraft && count.locationId == null)
                     TextButton.icon(
                       onPressed: () => _addArticles(data.articles, data.items),
                       icon: const Icon(Icons.add),
@@ -155,31 +243,16 @@ class _InventoryCountDetailScreenState extends State<InventoryCountDetailScreen>
                     ),
                 ],
               ),
-              if (data.items.isEmpty) const Text('Noch keine Artikel in dieser Inventur.'),
-              for (final item in data.items)
-                Card(
-                  child: ListTile(
-                    title: Text(data.articleNames[item.articleId] ?? '(unbekannt)'),
-                    subtitle: Text('Soll: ${formatArticleQuantity(item.expectedQuantity)}'),
-                    trailing: isDraft
-                        ? SizedBox(
-                            width: 120,
-                            child: TextField(
-                              controller: _controllers[item.id],
-                              textAlign: TextAlign.right,
-                              decoration: const InputDecoration(labelText: 'Ist'),
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              onChanged: (text) => _saveCountedQuantity(item.id, text),
-                            ),
-                          )
-                        : Text(
-                            'Ist: ${item.countedQuantity == null ? '–' : formatArticleQuantity(item.countedQuantity!)}',
-                          ),
-                  ),
-                ),
+              if (count.locationId != null)
+                ..._locationSections(data, isDraft)
+              else ...[
+                if (data.items.isEmpty) const Text('Noch keine Artikel in dieser Inventur.'),
+                for (final item in data.items) _itemCard(item, data, isDraft),
+              ],
               const SizedBox(height: 24),
               if (isDraft)
                 FilledButton(
+                  key: const Key('inventory-complete'),
                   onPressed: _busy || data.items.isEmpty ? null : _complete,
                   child: const Text('Inventur abschließen'),
                 ),
@@ -197,7 +270,9 @@ class _DetailData {
     required this.items,
     required this.articles,
     required this.articleNames,
+    this.bins = const [],
   });
+  final List<({StorageLocation location, StorageBin bin})> bins;
   final InventoryCount? count;
   final List<InventoryCountItem> items;
   final List<Article> articles;

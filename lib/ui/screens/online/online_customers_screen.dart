@@ -47,6 +47,10 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
         countryCode: c.countryCode,
         leitwegId: c.leitwegId,
         eInvoiceFormat: c.eInvoiceFormat,
+        paymentTermId: c.paymentTermId,
+        skontoMode: c.skontoMode,
+        skontoPercent: c.skontoPercent,
+        skontoDays: c.skontoDays,
       );
 
   static OnlineCustomer _customer(String id, CustomerFormResult r) => OnlineCustomer(
@@ -67,15 +71,28 @@ class _OnlineCustomersScreenState extends State<OnlineCustomersScreen> {
         countryCode: r.countryCode,
         leitwegId: r.leitwegId,
         eInvoiceFormat: r.eInvoiceFormat,
+        paymentTermId: r.paymentTermId,
+        skontoMode: r.skontoMode,
+        skontoPercent: r.skontoPercent,
+        skontoDays: r.skontoDays,
       );
 
   /// Formular öffnen und speichern; liefert den gespeicherten Stand.
   Future<OnlineCustomer?> _save([OnlineCustomer? existing]) async {
+    // A2-Nachtrag: Zahlungsbedingungen der Firma fürs Formular.
+    var terms = const <({String id, String label})>[];
+    try {
+      terms = [for (final t in await widget.session.client.paymentTerms()) (id: t.id, label: t.label)];
+    } on Exception {
+      // Ohne Liste bleibt der Abschnitt verborgen.
+    }
+    if (!mounted) return null;
     final result = await showDialog<CustomerFormResult>(
       context: context,
       builder: (_) => CustomerFormDialog(
         existing: existing == null ? null : _form(existing),
         nameKey: const Key('online-customer-name'),
+        paymentTerms: terms,
       ),
     );
     if (result == null || !mounted) return null;

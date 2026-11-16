@@ -17,6 +17,7 @@ class Supplier {
     this.minimumOrderQuantity,
     this.deliveryTerms,
     required this.createdAt,
+    this.ourCustomerNumber,
   });
   final String id;
   final String companyId;
@@ -33,6 +34,9 @@ class Supplier {
   final String? deliveryTerms;
   final DateTime createdAt;
 
+  /// C5.2-Nachtrag: unsere Kundennummer beim Lieferanten (Text, führende Nullen bleiben).
+  final String? ourCustomerNumber;
+
   Map<String, Object?> toJson() => {
         'id': id,
         'name': name,
@@ -45,6 +49,7 @@ class Supplier {
         'minimumOrderQuantity': minimumOrderQuantity,
         'deliveryTerms': deliveryTerms,
         'createdAt': createdAt.toIso8601String(),
+        'ourCustomerNumber': ourCustomerNumber,
       };
 }
 

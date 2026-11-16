@@ -41,7 +41,10 @@ class ArticleRepository {
     // C5.1 Lagerbestand (Nachtrag 2026-10-19) — `null` = keine
     // Mindestbestand-Überwachung für diesen Artikel.
     double? minimumStock,
+    String? barcode,
   }) async {
+    final code = normalizeBarcode(barcode);
+    await _ensureBarcodeFree(companyId: companyId, barcode: code);
     final id = _uuid.v4();
     await _db.into(_db.articles).insert(
           ArticlesCompanion.insert(
@@ -53,6 +56,7 @@ class ArticleRepository {
             defaultSupplierId: Value(defaultSupplierId),
             manualSalePriceCents: Value(manualSalePriceCents),
             minimumStock: Value(minimumStock),
+            barcode: Value(code),
             createdAt: DateTime.now(),
           ),
         );
@@ -75,9 +79,14 @@ class ArticleRepository {
     Value<String?> defaultSupplierId = const Value.absent(),
     Value<int?> manualSalePriceCents = const Value.absent(),
     Value<double?> minimumStock = const Value.absent(),
+    Value<String?> barcode = const Value.absent(),
   }) async {
     final existing = await findById(companyId: companyId, id: id);
     if (existing == null) return null;
+    if (barcode.present) {
+      barcode = Value(normalizeBarcode(barcode.value));
+      await _ensureBarcodeFree(companyId: companyId, barcode: barcode.value, exceptId: id);
+    }
     await (_db.update(_db.articles)..where((a) => a.id.equals(id))).write(
       ArticlesCompanion(
         name: name == null ? const Value.absent() : Value(name),
@@ -86,9 +95,28 @@ class ArticleRepository {
         defaultSupplierId: defaultSupplierId,
         manualSalePriceCents: manualSalePriceCents,
         minimumStock: minimumStock,
+        barcode: barcode,
       ),
     );
     return findById(companyId: companyId, id: id);
+  }
+
+  /// A1-Nachtrag: Artikel mit exakt diesem Barcode in **dieser** Firma
+  /// (auch inaktive — die Anzeige entscheidet). Gleiche Codes anderer
+  /// Firmen sind nie ein Treffer.
+  Future<Article?> findByBarcode({required String companyId, required String barcode}) {
+    final code = normalizeBarcode(barcode);
+    if (code == null) return Future.value(null);
+    return (_db.select(_db.articles)..where((a) => a.companyId.equals(companyId) & a.barcode.equals(code)))
+        .getSingleOrNull();
+  }
+
+  /// Wirft [BarcodeInUseException], wenn [barcode] in der Firma schon an
+  /// einem anderen Artikel hängt.
+  Future<void> _ensureBarcodeFree({required String companyId, String? barcode, String? exceptId}) async {
+    if (barcode == null) return;
+    final other = await findByBarcode(companyId: companyId, barcode: barcode);
+    if (other != null && other.id != exceptId) throw BarcodeInUseException(barcode, other.name);
   }
 
   /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — Bestandskorrektur
@@ -103,10 +131,24 @@ class ArticleRepository {
     required String id,
     required double newQuantity,
   }) async {
-    final rows = await (_db.update(_db.articles)
-          ..where((a) => a.id.equals(id) & a.companyId.equals(companyId)))
+    final article = await findById(companyId: companyId, id: id);
+    if (article == null) return null;
+    final delta = newQuantity - article.stockQuantity;
+    await (_db.update(_db.articles)..where((a) => a.id.equals(id) & a.companyId.equals(companyId)))
         .write(ArticlesCompanion(stockQuantity: Value(newQuantity)));
-    if (rows == 0) return null;
+    // C5.4: Summe der Platzbestände bleibt gleich dem Gesamtbestand —
+    // die Differenz landet bei „Platz noch nicht zugeordnet“.
+    if (delta != 0) {
+      final row = await (_db.select(_db.articleBinStocks)
+            ..where((s) => s.articleId.equals(id) & s.binKey.equals('')))
+          .getSingleOrNull();
+      await _db.into(_db.articleBinStocks).insertOnConflictUpdate(ArticleBinStocksCompanion.insert(
+            companyId: companyId,
+            articleId: id,
+            binKey: '',
+            quantity: Value((row?.quantity ?? 0) + delta),
+          ));
+    }
     return findById(companyId: companyId, id: id);
   }
 
@@ -195,4 +237,20 @@ class ArticleRepository {
       articleGroupMarkupPercent: markupPercent,
     );
   }
+}
+
+/// Barcode säubern: Leerraum entfernen, leer = `null`. Führende Nullen
+/// bleiben (Text, nie als Zahl behandelt).
+String? normalizeBarcode(String? value) {
+  final code = value?.replaceAll(RegExp(r'\s'), '');
+  return code == null || code.isEmpty ? null : code;
+}
+
+/// Barcode ist in der Firma bereits einem anderen Artikel zugeordnet.
+class BarcodeInUseException implements Exception {
+  const BarcodeInUseException(this.barcode, this.articleName);
+  final String barcode;
+  final String articleName;
+  @override
+  String toString() => 'Barcode $barcode ist bereits dem Artikel „$articleName“ zugeordnet.';
 }

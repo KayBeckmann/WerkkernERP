@@ -205,7 +205,8 @@ void main() {
 
     await tester.tap(find.textContaining('R-${year}001'));
     await tester.pumpAndSettle();
-    expect(find.text('Offen (kein Fälligkeitsdatum gesetzt)'), findsOneWidget);
+    // A2-Nachtrag: Fälligkeit aus dem Firmenstandard (14 Tage) vorbelegt.
+    expect(find.textContaining('Offen — fällig am'), findsOneWidget);
     await tester.tap(find.text('Als bezahlt markieren'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Bezahlt am'), findsOneWidget);

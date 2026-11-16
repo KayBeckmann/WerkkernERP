@@ -12,8 +12,11 @@ import 'data/repositories/customer_repository.dart';
 import 'data/repositories/expense_category_repository.dart';
 import 'data/repositories/expense_repository.dart';
 import 'data/repositories/inventory_repository.dart';
+import 'data/repositories/stock_ledger.dart';
+import 'data/repositories/storage_repository.dart';
 import 'data/repositories/invoice_repository.dart';
 import 'data/repositories/number_sequence_repository.dart';
+import 'data/repositories/payment_term_repository.dart';
 import 'data/repositories/project_repository.dart';
 import 'data/repositories/purchase_order_repository.dart';
 import 'data/repositories/recurring_invoice_template_repository.dart';
@@ -117,6 +120,9 @@ class WerkkernErpApp extends StatelessWidget {
         Provider<CustomerRepository>(
           create: (context) => CustomerRepository(context.read<AppDatabase>()),
         ),
+        Provider<PaymentTermRepository>(
+          create: (context) => PaymentTermRepository(context.read<AppDatabase>()),
+        ),
         Provider<CustomerContactRepository>(
           create: (context) => CustomerContactRepository(context.read<AppDatabase>()),
         ),
@@ -148,6 +154,12 @@ class WerkkernErpApp extends StatelessWidget {
         ),
         Provider<InventoryRepository>(
           create: (context) => InventoryRepository(context.read<AppDatabase>()),
+        ),
+        Provider<StorageRepository>(
+          create: (context) => StorageRepository(context.read<AppDatabase>()),
+        ),
+        Provider<StockLedger>(
+          create: (context) => StockLedger(context.read<AppDatabase>()),
         ),
         Provider<StaffRoleRepository>(
           create: (context) => StaffRoleRepository(context.read<AppDatabase>()),

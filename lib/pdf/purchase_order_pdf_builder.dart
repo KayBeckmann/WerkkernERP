@@ -32,6 +32,7 @@ Future<Uint8List> buildPurchaseOrderPdf({
     notes: order.notes,
     supplierName: order.supplierSnapshotName ?? '',
     supplierAddress: order.supplierSnapshotAddress,
+    ourCustomerNumber: order.supplierSnapshotCustomerNumber,
     companyName: company.name,
     companyAddress: company.address,
     companyEmail: company.email,
@@ -52,6 +53,7 @@ class PurchaseOrderPdfData {
     this.notes,
     required this.supplierName,
     this.supplierAddress,
+    this.ourCustomerNumber,
     required this.companyName,
     this.companyAddress,
     this.companyEmail,
@@ -63,6 +65,10 @@ class PurchaseOrderPdfData {
   final String? notes;
   final String supplierName;
   final String? supplierAddress;
+
+  /// C5.2-Nachtrag: unsere Kundennummer beim Lieferanten (Schnappschuss);
+  /// fehlt sie, erscheint keine leere Zeile.
+  final String? ourCustomerNumber;
   final String companyName;
   final String? companyAddress;
   final String? companyEmail;
@@ -117,6 +123,8 @@ Future<Uint8List> buildPurchaseOrderPdfFromData(PurchaseOrderPdfData data) async
                   style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
                 ),
                 pw.Text('Bestelldatum: ${_formatDate(data.issueDate)}'),
+                if (data.ourCustomerNumber != null && data.ourCustomerNumber!.trim().isNotEmpty)
+                  pw.Text('Unsere Kundennummer bei Ihnen: ${data.ourCustomerNumber}'),
               ],
             ),
           ],

@@ -184,8 +184,14 @@ class CompanyProfile {
     this.city,
     this.countryCode = 'DE',
     this.bic,
+    this.skontoPercent,
+    this.skontoDays,
   });
   final String companyId;
+
+  /// A2-Nachtrag: optionale Skonto-Vorgabe der Firma (beide oder keins).
+  final double? skontoPercent;
+  final int? skontoDays;
   final String? address;
 
   /// C15 E-Rechnung: strukturierte Anschrift (BG-5) und BIC (BT-86).
@@ -228,6 +234,8 @@ class CompanyProfile {
         'city': city,
         'countryCode': countryCode,
         'bic': bic,
+        'skontoPercent': skontoPercent,
+        'skontoDays': skontoDays,
       };
 }
 

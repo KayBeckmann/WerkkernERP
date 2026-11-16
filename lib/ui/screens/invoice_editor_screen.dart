@@ -8,9 +8,13 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:werkkern_core/werkkern_core.dart'
     show
+        DocumentPaymentTerms,
         EInvoiceData,
         EInvoiceProfile,
         billingDocumentKinds,
+        documentKindUsesPaymentTerms,
+        paymentTermsText,
+        summarizePaymentTerms,
         buildEInvoiceXml,
         compareHoursByRole,
         documentRecipient,
@@ -20,9 +24,11 @@ import 'package:werkkern_core/werkkern_core.dart'
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
+import '../../data/repositories/article_group_repository.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
+import '../../data/repositories/payment_term_repository.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
 import '../../data/repositories/staff_role_repository.dart';
@@ -40,9 +46,13 @@ import '../../pdf/invoice_pdf_builder.dart';
 import '../../domain/services/einvoice_builder.dart';
 import '../../domain/services/einvoice_parties.dart' show isEInvoiceKind;
 import '../../domain/services/email_sender.dart' show EmailExtraAttachment;
+import '../../data/repositories/stock_ledger.dart';
+import '../widgets/storage_bin_picker.dart';
+import '../widgets/barcode_scanner.dart';
 import '../widgets/einvoice_actions.dart';
 import '../widgets/email_send_dialog.dart';
 import '../widgets/invoice_item_dialog.dart';
+import '../widgets/scan_position_dialog.dart';
 import 'invoices_screen.dart' show DocumentLabels;
 import 'purchase_order_detail_screen.dart';
 
@@ -179,6 +189,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _saving = false;
   bool _finalizing = false;
   List<Article> _articles = [];
+  List<ArticleGroup> _articleGroups = [];
 
   /// C3.4: Rollen für Stunden-Positionen (Auswahl im Positionsdialog,
   /// Anzeige an der Position).
@@ -250,6 +261,62 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
   /// C15 Modul E-Rechnung der Firma.
   bool _eInvoiceEnabled = false;
+
+  /// A2-Nachtrag (Kay, 15./16.11.2026): Zahlungsbedingung und Skonto je
+  /// Beleg (Rechnung/Auftrag); vorbelegt Kunde vor Firma, bewusst änderbar.
+  List<PaymentTerm> _paymentTermList = [];
+  String? _termId;
+  String? _termLabel;
+  int? _termDays;
+  bool _skontoOn = false;
+  final _skontoPercentCtrl = TextEditingController();
+  final _skontoDaysCtrl = TextEditingController();
+  bool get _usesPaymentTerms => documentKindUsesPaymentTerms(_kind.name);
+
+  void _applyTerms(DocumentTermsInput? t) {
+    _termId = t?.termId;
+    _termLabel = t?.label;
+    _termDays = t?.netDays;
+    _skontoOn = t?.skontoPercent != null && t?.skontoDays != null;
+    _skontoPercentCtrl.text = t?.skontoPercent == null ? '' : _fmtPercent(t!.skontoPercent!);
+    _skontoDaysCtrl.text = t?.skontoDays?.toString() ?? '';
+  }
+
+  static String _fmtPercent(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString().replaceAll('.', ',');
+
+  /// Aktuelle Auswahl als Schnappschuss; ungültiges Skonto zählt als keins.
+  DocumentTermsInput? get _termSelection {
+    if (_termLabel == null || _termDays == null) return null;
+    final percent = double.tryParse(_skontoPercentCtrl.text.trim().replaceAll(',', '.'));
+    final days = int.tryParse(_skontoDaysCtrl.text.trim());
+    final skonto = _skontoOn && percent != null && percent > 0 && percent < 100 && days != null && days >= 0;
+    return (
+      termId: _termId,
+      label: _termLabel!,
+      netDays: _termDays!,
+      skontoPercent: skonto ? percent : null,
+      skontoDays: skonto ? days : null,
+    );
+  }
+
+  void _selectTerm(String? id) {
+    final term = _paymentTermList.where((t) => t.id == id).firstOrNull;
+    setState(() {
+      if (term == null) {
+        _termId = null;
+        _termLabel = null;
+        _termDays = null;
+      } else {
+        _termId = term.id;
+        _termLabel = term.label;
+        _termDays = term.netDays;
+        // Fälligkeit der Rechnung folgt dem Zahlungsziel.
+        if (_kind == DocumentKind.invoice) {
+          _dueDate = DateTime(_issueDate.year, _issueDate.month, _issueDate.day + term.netDays);
+        }
+      }
+    });
+  }
   List<Invoice> _creditNotes = [];
 
   // C5.2 Bestellwesen (Nachtrag 2026-10-19): nur bei kind == order
@@ -297,12 +364,15 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final company = context.read<ActiveCompanyService>().active!;
     final companyId = company.id;
     final articleRepo = context.read<ArticleRepository>();
+    final articleGroupRepo = context.read<ArticleGroupRepository>();
     final invoiceRepo = context.read<InvoiceRepository>();
     final projectRepo = context.read<ProjectRepository>();
     final staffRoleRepo = context.read<StaffRoleRepository>();
     final contactRepo = context.read<CustomerContactRepository>();
     final customerRepo = context.read<CustomerRepository>();
+    final paymentTermRepo = context.read<PaymentTermRepository>();
     _articles = await articleRepo.listForCompany(companyId);
+    _articleGroups = await articleGroupRepo.listForCompany(companyId);
     _staffRoles = await staffRoleRepo.listForCompany(companyId);
     _contacts = await contactRepo.listForCustomer(companyId: companyId, customerId: widget.customer.id);
     _liveCustomer = await customerRepo.findById(companyId: companyId, id: widget.customer.id);
@@ -322,6 +392,24 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _timeTrackingEnabled = company.timeTrackingEnabled;
 
     final invoice = widget.invoice;
+    if (documentKindUsesPaymentTerms((invoice?.kind ?? widget.kind).name)) {
+      _paymentTermList = await paymentTermRepo.listForCompany(companyId);
+      if (invoice == null) {
+        _applyTerms(await invoiceRepo.defaultTermsFor(companyId: companyId, customerId: widget.customer.id));
+        if (widget.kind == DocumentKind.invoice && _termDays != null) {
+          final now = DateTime.now();
+          _dueDate = DateTime(now.year, now.month, now.day + _termDays!);
+        }
+      } else if (invoice.paymentTermLabel != null && invoice.paymentNetDays != null) {
+        _applyTerms((
+          termId: invoice.paymentTermId,
+          label: invoice.paymentTermLabel!,
+          netDays: invoice.paymentNetDays!,
+          skontoPercent: invoice.skontoPercent,
+          skontoDays: invoice.skontoDays,
+        ));
+      }
+    }
     _currentInvoice = invoice;
     if (invoice != null) {
       _issueDate = invoice.issueDate;
@@ -375,6 +463,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   void dispose() {
     _notesCtrl.dispose();
     _paymentTermsCtrl.dispose();
+    _skontoPercentCtrl.dispose();
+    _skontoDaysCtrl.dispose();
     super.dispose();
   }
 
@@ -410,6 +500,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final result = await showInvoiceItemDialog(
       context: context,
       articles: _articles,
+      articleGroups: _articleGroups,
       existingGroupLabels: _existingGroupLabels,
       allowHours: _kind != DocumentKind.deliveryNote,
       forceZeroVat: _isSmallBusinessExempt,
@@ -434,6 +525,76 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     });
   }
 
+  /// C5.5-Nachtrag (Kay, 16.11.2026): Barcode scannen → Artikel der
+  /// aktiven Firma → Menge und Positionsgruppe eingeben → Position. Keine
+  /// Lagerbuchung hier (die bleibt bei der Einmalbuchung beim Finalisieren).
+  Future<void> _scanArticle() async {
+    final code = await barcodeScanner(context);
+    if (code == null || !mounted) return;
+    final normalized = normalizeBarcode(code);
+    final article = _articles.where((a) => a.barcode != null && a.barcode == normalized).firstOrNull;
+    if (article == null || !article.active) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(article == null
+            ? 'Kein Artikel mit Barcode $code in dieser Firma — bitte manuell auswählen.'
+            : 'Artikel „${article.name}“ ist deaktiviert — bitte manuell auswählen.'),
+      ));
+      await _addItem();
+      return;
+    }
+    Decimal? existingIn(String? group) {
+      final matches = _items.where((i) => i.articleId == article.id && i.groupLabel == group);
+      return matches.isEmpty ? null : matches.first.quantity;
+    }
+
+    final result = await showScannedArticleDialog(
+      context,
+      articleName: article.name,
+      unit: article.unit,
+      groupLabels: _existingGroupLabels,
+      existingQuantityInGroup: existingIn,
+    );
+    if (result == null || !mounted) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final price = await context.read<ArticleRepository>().effectiveSalePrice(companyId: companyId, articleId: article.id);
+    if (!mounted) return;
+    setState(() {
+      final index = result.addToExisting
+          ? _items.indexWhere((i) => i.articleId == article.id && i.groupLabel == result.groupLabel)
+          : -1;
+      if (index >= 0) {
+        final old = _items[index];
+        _items[index] = _EditableItem(
+          kind: old.kind,
+          articleId: old.articleId,
+          description: old.description,
+          quantity: old.quantity + result.quantity,
+          unitPriceCents: old.unitPriceCents,
+          vatRatePercent: old.vatRatePercent,
+          unit: old.unit,
+          discountPercent: old.discountPercent,
+          groupLabel: old.groupLabel,
+          staffRoleId: old.staffRoleId,
+          existingId: old.existingId,
+        );
+      } else {
+        _items.add(_EditableItem(
+          kind: InvoiceItemKind.article,
+          articleId: article.id,
+          description: article.name,
+          quantity: result.quantity,
+          unitPriceCents: price?.cents ?? 0,
+          vatRatePercent: _isSmallBusinessExempt ? 0 : 19,
+          unit: article.unit,
+          groupLabel: result.groupLabel,
+        ));
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${article.name}: ${result.quantity}${article.unit == null ? '' : ' ${article.unit}'} übernommen — bitte speichern.')),
+    );
+  }
+
   /// Bestehende Position bearbeiten statt nur löschen+neu-anlegen zu
   /// können (Kay-Nachtrag 2026-10-16). `existingId` bleibt erhalten,
   /// damit `update()` dieselbe Zeile ersetzt statt eine neue anzulegen.
@@ -441,6 +602,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final result = await showInvoiceItemDialog(
       context: context,
       articles: _articles,
+      articleGroups: _articleGroups,
       existingGroupLabels: _existingGroupLabels,
       existing: item.toResult(),
       allowHours: _kind != DocumentKind.deliveryNote,
@@ -508,6 +670,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           isFixedPrice: _isFixedPrice,
           contactId: _contactId,
           items: items,
+          terms: _usesPaymentTerms ? _termSelection : null,
         );
       } else {
         saved = await repo.update(
@@ -523,6 +686,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           isFixedPrice: _isFixedPrice,
           contactId: Value(_contactId),
           items: items,
+          terms: _usesPaymentTerms ? Value(_termSelection) : const Value.absent(),
         );
       }
       if (mounted) {
@@ -917,6 +1081,19 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       if (proceedDespiteWarning != true || !mounted) return;
     }
 
+    // C5.4 (Kay, 16.11.2026): Entnahmeplatz vorschlagen, wenn Plätze
+    // angelegt sind.
+    var withdrawalBins = const <String, String>{};
+    final suggestions = await repo.withdrawalSuggestions(companyId: companyId, id: invoice.id);
+    if (!mounted) return;
+    if (suggestions.isNotEmpty) {
+      final bins = await context.read<StockLedger>().binsWithLocation(companyId);
+      if (!mounted) return;
+      final chosen = await showWithdrawalBinsDialog(context, suggestions: suggestions, bins: bins);
+      if (chosen == null || !mounted) return;
+      withdrawalBins = chosen;
+    }
+
     // C15: fehlende E-Rechnungsangaben anzeigen, nicht blockieren.
     final eInvoice = await _eInvoiceData();
     if (!mounted) return;
@@ -928,7 +1105,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
     setState(() => _finalizing = true);
     try {
-      final finalized = await repo.finalize(companyId: companyId, id: invoice.id);
+      final finalized = await repo.finalize(companyId: companyId, id: invoice.id, withdrawalBins: withdrawalBins);
       if (!mounted) return;
       if (finalized == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1250,6 +1427,97 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         InvoiceItemKind.text => Icons.notes_outlined,
       };
 
+  /// A2-Nachtrag: Zahlungsziel-Auswahl, Skonto je Beleg und Vorschau des
+  /// Zahlungstexts (wie auf dem PDF).
+  Widget _buildPaymentTermsSection(bool isLocked) {
+    final selection = _termSelection;
+    final ids = {for (final t in _paymentTermList) t.id};
+    final value = _termId != null && ids.contains(_termId) ? _termId : (_termLabel == null ? null : '__snapshot__');
+    String? preview;
+    if (selection != null) {
+      final terms = DocumentPaymentTerms(
+        label: selection.label,
+        netDays: selection.netDays,
+        skontoPercent: selection.skontoPercent,
+        skontoDays: selection.skontoDays,
+      );
+      final totals = _totals;
+      final advances = _priorAdvancePayments.fold<int>(0, (sum, e) => sum + e.amountGross.cents);
+      preview = paymentTermsText(
+        terms,
+        summarizePaymentTerms(
+          terms: terms,
+          issueDate: _issueDate,
+          net: totals.totalNet,
+          gross: totals.totalGross,
+          payable: Money.fromCents(totals.totalGross.cents - advances),
+          smallBusinessExempt: _isSmallBusinessExempt,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String?>(
+          key: const Key('document-payment-term'),
+          isExpanded: true,
+          initialValue: value,
+          decoration: const InputDecoration(labelText: 'Zahlungsziel'),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Keine Zahlungsbedingung')),
+            for (final t in _paymentTermList) DropdownMenuItem(value: t.id, child: Text(t.label)),
+            if (value == '__snapshot__') DropdownMenuItem(value: '__snapshot__', child: Text('${_termLabel!} (gespeichert)')),
+          ],
+          onChanged: isLocked ? null : (id) => id == '__snapshot__' ? null : _selectTerm(id),
+        ),
+        if (_termLabel != null)
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: CheckboxListTile(
+                  key: const Key('document-skonto'),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(_isSmallBusinessExempt ? 'Skonto (auf Rechnungsbetrag)' : 'Skonto (auf Nettobetrag)'),
+                  value: _skontoOn,
+                  onChanged: isLocked ? null : (v) => setState(() => _skontoOn = v ?? false),
+                ),
+              ),
+              if (_skontoOn) ...[
+                Expanded(
+                  child: TextField(
+                    key: const Key('document-skonto-percent'),
+                    controller: _skontoPercentCtrl,
+                    readOnly: isLocked,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: '%'),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    key: const Key('document-skonto-days'),
+                    controller: _skontoDaysCtrl,
+                    readOnly: isLocked,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Tage'),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        if (preview != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(preview, key: const Key('document-payment-preview'), style: Theme.of(context).textTheme.bodySmall),
+          ),
+      ],
+    );
+  }
+
   /// Positionszeile mit mehr Details statt einer einzigen Subtitle-Zeile
   /// (Kay-Nachtrag 2026-10-16: Vergleich mit RechnungsFee, "Es fehlen
   /// Details") — Einheit neben der Menge, Steuersatz und Gesamtbetrag
@@ -1409,6 +1677,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               tooltip: 'Materialabschlag erstellen',
               onPressed: _createMaterialAdvance,
             ),
+          if (!isLocked && _kind != DocumentKind.creditNote)
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'Barcode scannen',
+              onPressed: _scanArticle,
+            ),
           // Vorschau (ENTWURF-Wasserzeichen) macht nur vor der ersten
           // Finalisierung Sinn — danach existiert bereits ein echtes PDF
           // über "PDF teilen".
@@ -1452,6 +1726,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 style: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
             ),
+          if (_usesPaymentTerms) _buildPaymentTermsSection(isLocked),
           TextField(
             controller: _paymentTermsCtrl,
             readOnly: isLocked,

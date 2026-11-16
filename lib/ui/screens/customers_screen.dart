@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
 import '../../data/repositories/customer_repository.dart';
+import '../../data/repositories/payment_term_repository.dart';
 import '../../domain/services/active_company_service.dart';
 import '../widgets/customer_contacts.dart';
 
@@ -37,9 +38,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
       });
 
   Future<void> _create() async {
+    final terms = await _terms();
+    if (!mounted) return;
     final result = await showDialog<CustomerFormResult>(
       context: context,
-      builder: (context) => const CustomerFormDialog(),
+      builder: (context) => CustomerFormDialog(paymentTerms: terms),
     );
     if (result == null || !mounted) return;
     final companyId = context.read<ActiveCompanyService>().active!.id;
@@ -59,6 +62,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
           countryCode: result.countryCode,
           leitwegId: result.leitwegId,
           eInvoiceFormat: result.eInvoiceFormat,
+          paymentTermId: result.paymentTermId,
+          skontoMode: result.skontoMode,
+          skontoPercent: result.skontoPercent,
+          skontoDays: result.skontoDays,
         );
     await contactRepository.replaceForCustomer(
       companyId: companyId,
@@ -92,14 +99,20 @@ class _CustomersScreenState extends State<CustomersScreen> {
       countryCode: customer.countryCode,
       leitwegId: customer.leitwegId,
       eInvoiceFormat: customer.eInvoiceFormat,
+      paymentTermId: customer.paymentTermId,
+      skontoMode: customer.skontoMode,
+      skontoPercent: customer.skontoPercent,
+      skontoDays: customer.skontoDays,
     );
   }
 
   /// Speichert das Formular; liefert den neuen Stand für die Detailansicht.
   Future<CustomerFormResult?> _edit(Customer customer, CustomerFormResult current) async {
+    final terms = await _terms();
+    if (!mounted) return null;
     final result = await showDialog<CustomerFormResult>(
       context: context,
-      builder: (context) => CustomerFormDialog(existing: current),
+      builder: (context) => CustomerFormDialog(existing: current, paymentTerms: terms),
     );
     if (result == null || !mounted) return null;
     final companyId = context.read<ActiveCompanyService>().active!.id;
@@ -122,6 +135,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
         countryCode: result.countryCode,
         leitwegId: Value(result.leitwegId),
         eInvoiceFormat: result.eInvoiceFormat,
+        paymentTermId: Value(result.paymentTermId),
+        skontoMode: result.skontoMode,
+        skontoPercent: Value(result.skontoPercent),
+        skontoDays: Value(result.skontoDays),
       ),
     );
     final contacts = await contactRepository.replaceForCustomer(
@@ -145,7 +162,18 @@ class _CustomersScreenState extends State<CustomersScreen> {
       countryCode: result.countryCode,
       leitwegId: result.leitwegId,
       eInvoiceFormat: result.eInvoiceFormat,
+      paymentTermId: result.paymentTermId,
+      skontoMode: result.skontoMode,
+      skontoPercent: result.skontoPercent,
+      skontoDays: result.skontoDays,
     );
+  }
+
+  /// A2-Nachtrag: Zahlungsbedingungen der Firma für das Formular.
+  Future<List<({String id, String label})>> _terms() async {
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final terms = await context.read<PaymentTermRepository>().listForCompany(companyId);
+    return [for (final t in terms) (id: t.id, label: t.label)];
   }
 
   Future<void> _open(Customer customer) async {

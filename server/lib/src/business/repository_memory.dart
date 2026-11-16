@@ -12,6 +12,7 @@ import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
 import 'recurring.dart';
+import 'payment_terms.dart';
 import 'staff_roles.dart';
 import 'timesheets.dart';
 import 'company_import.dart';
@@ -26,8 +27,10 @@ part 'memory/dunning.dart';
 part 'memory/recurring.dart';
 part 'memory/timesheets.dart';
 part 'memory/staff_roles.dart';
+part 'memory/payment_terms.dart';
 
-class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring, _InMemoryTimeSheets, _InMemoryStaffRoles implements BusinessRepository {
+class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring, _InMemoryTimeSheets, _InMemoryStaffRoles, _InMemoryPaymentTerms implements BusinessRepository {
+  @override
   final List<Customer> _customers = [];
   @override
   final List<Article> _articles = [];
@@ -299,6 +302,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     DateTime? Function()? dueDate,
     String? userId,
     String? Function()? contactId,
+    DocTerms? Function()? terms,
   }) async {
     // Bewusst ohne await zwischen Prüfung und Schreiben — damit ist der
     // Abschnitt in Dart (single-threaded) atomar, wie die
@@ -319,6 +323,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       isFixedPrice: isFixedPrice,
       dueDate: dueDate,
       contactId: contactId,
+      terms: terms,
     );
     _documents[index] = updated;
     if (existing.stockBooked) {
@@ -330,7 +335,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
         companyId,
         [
           for (final articleId in {...before.keys, ...after.keys})
-            StockDelta(articleId, (before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero)),
+            StockDelta(articleId, (before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero), spread: true),
         ],
         StockBookingContext(
           type: 'documentBooking',
@@ -368,6 +373,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     required CompanySnapshot company,
     required DateTime now,
     ({StockBookingMode mode, String userId})? stockBooking,
+    Map<String, String> withdrawalBins = const {},
   }) async {
     final index = _documents.indexWhere((d) => d.companyId == companyId && d.id == id);
     if (index == -1) return null;
@@ -402,6 +408,10 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       finalizedAt: now,
       version: existing.version + 1,
       stockBooked: stockBooking?.mode == StockBookingMode.issue,
+      // A2-Nachtrag: Fälligkeit aus Belegdatum + Zahlungsziel.
+      dueDate: existing.kind == 'invoice' && existing.paymentNetDays != null
+          ? () => DateTime(existing.issueDate.year, existing.issueDate.month, existing.issueDate.day + existing.paymentNetDays!)
+          : null,
       // C15 E-Rechnung: Parteien einfrieren (nur Rechnung/Gutschrift).
       eInvoiceSnapshot: buildEInvoiceSnapshotJson(
         kind: existing.kind,
@@ -418,7 +428,12 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       );
       _bookStockSync(
         companyId,
-        [for (final e in quantities.entries) StockDelta(e.key, e.value * sign)],
+        [
+          // C5.4: Abgang vom gewählten/vorgeschlagenen Platz, Gutschrift
+          // zurück auf den Standardplatz.
+          for (final e in quantities.entries)
+            StockDelta(e.key, e.value * sign, binKey: withdrawalBins[e.key], spread: stockBooking.mode == StockBookingMode.issue),
+        ],
         StockBookingContext(
           type: stockBooking.mode == StockBookingMode.issue ? 'documentBooking' : 'creditNoteReturn',
           userId: stockBooking.userId,
@@ -497,6 +512,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
         any(_purchaseOrders, (o) => o.companyId) ||
         any(_stockMovements, (m) => m.companyId) ||
         any(_inventoryCounts, (c) => c.companyId) ||
+        any(_storageLocations, (l) => l.companyId) ||
         any(_recurringTemplates, (t) => t.companyId) ||
         any(_timeSheets, (t) => t.companyId);
   }
@@ -532,7 +548,15 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     _stockMovements.addAll(data.stockMovements);
     _inventoryCounts.addAll(data.inventoryCounts);
     _inventoryItems.addAll(data.inventoryItems);
+    _storageLocations.addAll(data.storageLocations);
+    _storageBins.addAll(data.storageBins);
+    for (final s in data.binStocks) {
+      _stocksOf(s.articleId)[s.binKey] = Decimal.parse(s.quantity);
+    }
+    _defaultBin.addAll(data.defaultBins);
     _staffRoles.addAll(data.staffRoles);
+    if (data.paymentTerms.isNotEmpty) _paymentTerms.removeWhere((t) => t.companyId == companyId);
+    _paymentTerms.addAll(data.paymentTerms);
     _timeEntries.addAll(data.timeEntries);
     _timeSheets.addAll(data.timeSheets);
     for (final e in data.timeSheetEntries.entries) {

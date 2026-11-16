@@ -8,6 +8,9 @@ import '../../data/repositories/supplier_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/stock_change_notifier.dart';
+import '../../data/repositories/storage_repository.dart';
+import '../widgets/article_group_filter.dart';
+import '../widgets/barcode_scanner.dart';
 import 'article_detail_screen.dart';
 import 'article_groups_screen.dart';
 
@@ -46,6 +49,14 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   /// is unsafe", per Widget-Test gefunden).
   late StockChangeNotifier _stockChangeNotifier;
 
+  /// A1-Nachtrag (Kay, 15.11.2026): Suche und Gruppenfilter — nur Anzeige.
+  String _query = '';
+  ArticleGroupFilter _filter = const AllArticleGroups();
+
+  /// C5.4: Filter nach Lagerort — `null` = alle, `''` = ohne Platz,
+  /// sonst Lagerort-ID.
+  String? _locationFilter;
+
   void _onStockChanged() {
     if (mounted) _reload();
   }
@@ -54,7 +65,8 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   void initState() {
     super.initState();
     _future = _load();
-    _stockChangeNotifier = context.read<StockChangeNotifier>()..addListener(_onStockChanged);
+    _stockChangeNotifier = context.read<StockChangeNotifier>()
+      ..addListener(_onStockChanged);
   }
 
   @override
@@ -66,6 +78,8 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   Future<_ArticlesData> _load() async {
     final company = context.read<ActiveCompanyService>().active!;
     final articleRepo = context.read<ArticleRepository>();
+    final groupRepo = context.read<ArticleGroupRepository>();
+    final storageRepo = context.read<StorageRepository>();
 
     final articles = await articleRepo.listForCompany(company.id);
     final prices = <String, Money?>{};
@@ -75,14 +89,29 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
         articleId: article.id,
       );
     }
+    final groups = await groupRepo.listForCompany(company.id);
+    final locationArticles = <String, Set<String>>{};
+    final locations = <StorageLocation>[];
+    if (company.lagerbestandEnabled) {
+      locations.addAll(await storageRepo.locations(company.id));
+      for (final l in locations) {
+        locationArticles[l.id] = await storageRepo.articleIdsAtLocation(companyId: company.id, locationId: l.id);
+      }
+      if (locations.isNotEmpty) locationArticles[''] = await storageRepo.articleIdsUnassigned(company.id);
+    }
     return _ArticlesData(
+      locations: locations,
+      locationArticles: locationArticles,
       articles: articles,
       salePrices: prices,
       lagerbestandEnabled: company.lagerbestandEnabled,
+      groups: groups,
     );
   }
 
-  void _reload() => setState(() { _future = _load(); });
+  void _reload() => setState(() {
+    _future = _load();
+  });
 
   Future<void> _create() async {
     // Frisch laden statt der gecachten Liste aus dem Tab-FutureBuilder:
@@ -93,9 +122,13 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     // Fehler, der in invoices_screen.dart über einen Widget-Test gefunden
     // wurde — hier analog ohne erneuten Test repariert, siehe Commit).
     final company = context.read<ActiveCompanyService>().active!;
-    final groups = await context.read<ArticleGroupRepository>().listForCompany(company.id);
+    final groups = await context.read<ArticleGroupRepository>().listForCompany(
+      company.id,
+    );
     if (!mounted) return;
-    final suppliers = await context.read<SupplierRepository>().listForCompany(company.id);
+    final suppliers = await context.read<SupplierRepository>().listForCompany(
+      company.id,
+    );
     if (!mounted) return;
     final result = await showDialog<ArticleFormResult>(
       context: context,
@@ -106,14 +139,36 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       ),
     );
     if (result == null || !mounted) return;
-    await context.read<ArticleRepository>().create(
-          companyId: company.id,
-          name: result.name,
-          unit: result.unit,
-          articleGroupId: result.articleGroupId,
-          defaultSupplierId: result.defaultSupplierId,
-          minimumStock: result.minimumStock,
-        );
+    try {
+      await context.read<ArticleRepository>().create(
+        companyId: company.id,
+        name: result.name,
+        unit: result.unit,
+        articleGroupId: result.articleGroupId,
+        defaultSupplierId: result.defaultSupplierId,
+        minimumStock: result.minimumStock,
+        barcode: result.barcode,
+      );
+    } on BarcodeInUseException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      return;
+    }
+    _reload();
+  }
+
+  /// A1-Nachtrag: Barcode scannen und den passenden Artikel der aktiven
+  /// Firma öffnen (Suche per exaktem Scanwert).
+  Future<void> _scanToOpen() async {
+    final code = await barcodeScanner(context);
+    if (code == null || !mounted) return;
+    final company = context.read<ActiveCompanyService>().active!;
+    final article = await context.read<ArticleRepository>().findByBarcode(companyId: company.id, barcode: code);
+    if (!mounted) return;
+    if (article == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kein Artikel mit Barcode $code.')));
+      return;
+    }
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: article)));
     _reload();
   }
 
@@ -123,6 +178,11 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       appBar: AppBar(
         title: const Text('Artikel'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Barcode scannen',
+            onPressed: _scanToOpen,
+          ),
           IconButton(
             icon: const Icon(Icons.category_outlined),
             tooltip: 'Artikelgruppen',
@@ -142,47 +202,132 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final data = snapshot.data!;
-          if (data.articles.isEmpty) {
+          if (data.articles.isEmpty && data.groups.isEmpty) {
             return const Center(child: Text('Noch keine Artikel angelegt.'));
           }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-            itemCount: data.articles.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final article = data.articles[index];
-              final price = data.salePrices[article.id];
-              final lowStock = data.lagerbestandEnabled &&
-                  article.minimumStock != null &&
-                  article.stockQuantity < article.minimumStock!;
-              return Card(
-                child: ListTile(
-                  leading: Icon(
-                    Icons.inventory_2_outlined,
-                    color: lowStock ? Theme.of(context).colorScheme.error : null,
+          final atLocation = _locationFilter == null ? null : data.locationArticles[_locationFilter];
+          final visible = [
+            for (final a in data.articles)
+              if (atLocation == null || atLocation.contains(a.id))
+              // Suche nach Name oder exaktem Barcode (A1-Nachtrag).
+              if (articleMatches(
+                    name: a.name,
+                    articleGroupId: a.articleGroupId,
+                    query: _query,
+                    filter: _filter,
+                  ) ||
+                  (_query.isNotEmpty && a.barcode == normalizeBarcode(_query) && _filter.matches(a.articleGroupId)))
+                a,
+          ];
+          final filterBar = Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                SizedBox(
+                  width: 280,
+                  child: TextField(
+                    key: const Key('article-search'),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Artikel suchen',
+                    ),
+                    onChanged: (value) => setState(() => _query = value.trim()),
                   ),
-                  title: Text(article.name),
-                  subtitle: Text(
-                    [
-                      if (article.unit != null) article.unit!,
-                      if (data.lagerbestandEnabled)
-                        'Bestand: ${formatArticleQuantity(article.stockQuantity)}'
-                            '${lowStock ? ' (unter Mindestbestand!)' : ''}',
-                    ].join(' · '),
-                    style: lowStock
-                        ? TextStyle(color: Theme.of(context).colorScheme.error)
-                        : null,
-                  ),
-                  trailing: Text(price?.toString() ?? '–'),
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: article)),
-                    );
-                    _reload();
-                  },
                 ),
-              );
-            },
+                if (data.groups.isNotEmpty)
+                  SizedBox(
+                    width: 280,
+                    child: ArticleGroupFilterField(
+                      groups: [
+                        for (final g in data.groups) (id: g.id, name: g.name),
+                      ],
+                      hasUngrouped: data.articles.any(
+                        (a) => a.articleGroupId == null,
+                      ),
+                      value: _filter,
+                      onChanged: (value) => setState(() => _filter = value),
+                    ),
+                  ),
+                if (data.locations.isNotEmpty)
+                  SizedBox(
+                    width: 280,
+                    child: DropdownButtonFormField<String?>(
+                      key: const Key('article-location-filter'),
+                      isExpanded: true,
+                      initialValue: _locationFilter,
+                      decoration: const InputDecoration(prefixIcon: Icon(Icons.warehouse_outlined), labelText: 'Lagerort'),
+                      items: [
+                        const DropdownMenuItem<String?>(value: null, child: Text('Alle Lagerorte')),
+                        for (final l in data.locations) DropdownMenuItem<String?>(value: l.id, child: Text(l.name)),
+                        const DropdownMenuItem<String?>(value: '', child: Text('Platz noch nicht zugeordnet')),
+                      ],
+                      onChanged: (v) => setState(() => _locationFilter = v),
+                    ),
+                  ),
+              ],
+            ),
+          );
+          return Column(
+            children: [
+              filterBar,
+              Expanded(
+                child: visible.isEmpty
+                    ? const Center(
+                        child: Text('Keine Artikel für diese Auswahl.'),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+                        itemCount: visible.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final article = visible[index];
+                          final price = data.salePrices[article.id];
+                          final lowStock =
+                              data.lagerbestandEnabled &&
+                              article.minimumStock != null &&
+                              article.stockQuantity < article.minimumStock!;
+                          return Card(
+                            child: ListTile(
+                              leading: Icon(
+                                Icons.inventory_2_outlined,
+                                color: lowStock
+                                    ? Theme.of(context).colorScheme.error
+                                    : null,
+                              ),
+                              title: Text(article.name),
+                              subtitle: Text(
+                                [
+                                  if (article.unit != null) article.unit!,
+                                  if (data.lagerbestandEnabled)
+                                    'Bestand: ${formatArticleQuantity(article.stockQuantity)}'
+                                        '${lowStock ? ' (unter Mindestbestand!)' : ''}',
+                                ].join(' · '),
+                                style: lowStock
+                                    ? TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.error,
+                                      )
+                                    : null,
+                              ),
+                              trailing: Text(price?.toString() ?? '–'),
+                              onTap: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        ArticleDetailScreen(article: article),
+                                  ),
+                                );
+                                _reload();
+                              },
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -197,14 +342,22 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
 }
 
 class _ArticlesData {
+  final List<StorageLocation> locations;
+  final Map<String, Set<String>> locationArticles;
   const _ArticlesData({
     required this.articles,
     required this.salePrices,
     required this.lagerbestandEnabled,
+    required this.groups,
+    this.locations = const [],
+    this.locationArticles = const {},
   });
   final List<Article> articles;
   final Map<String, Money?> salePrices;
   final bool lagerbestandEnabled;
+
+  /// A1-Nachtrag: Gruppen der aktiven Firma (auch leere) für den Filter.
+  final List<ArticleGroup> groups;
 }
 
 /// C5.1 Lagerbestand — `stockQuantity`/`minimumStock` sind `double`
@@ -212,8 +365,9 @@ class _ArticlesData {
 /// Mengen ("10 Steckdosen") sollen nicht als "10.0" angezeigt werden.
 /// Öffentlich, damit `article_detail_screen.dart` dieselbe Formatierung
 /// nutzen kann statt sie zu duplizieren.
-String formatArticleQuantity(double value) =>
-    value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString();
+String formatArticleQuantity(double value) => value == value.roundToDouble()
+    ? value.toStringAsFixed(0)
+    : value.toString();
 
 class ArticleFormResult {
   const ArticleFormResult({
@@ -222,9 +376,13 @@ class ArticleFormResult {
     this.articleGroupId,
     this.defaultSupplierId,
     this.minimumStock,
+    this.barcode,
   });
   final String name;
   final String? unit;
+
+  /// A1-Nachtrag: optionaler Barcode (Text, führende Nullen bleiben).
+  final String? barcode;
   final String? articleGroupId;
   final String? defaultSupplierId;
 
@@ -261,6 +419,7 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _unitCtrl;
   late final TextEditingController _minimumStockCtrl;
+  late final TextEditingController _barcodeCtrl;
   String? _groupId;
   String? _supplierId;
 
@@ -269,10 +428,15 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
     super.initState();
     final existing = widget.existing;
     _nameCtrl = TextEditingController(text: existing?.name);
-    _unitCtrl = TextEditingController(text: existing?.unit ?? (existing == null ? 'Stk' : null));
-    _minimumStockCtrl = TextEditingController(
-      text: existing?.minimumStock == null ? '' : formatArticleQuantity(existing!.minimumStock!),
+    _unitCtrl = TextEditingController(
+      text: existing?.unit ?? (existing == null ? 'Stk' : null),
     );
+    _minimumStockCtrl = TextEditingController(
+      text: existing?.minimumStock == null
+          ? ''
+          : formatArticleQuantity(existing!.minimumStock!),
+    );
+    _barcodeCtrl = TextEditingController(text: existing?.barcode);
     _groupId = existing?.articleGroupId;
     _supplierId = existing?.defaultSupplierId;
   }
@@ -282,13 +446,16 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
     _nameCtrl.dispose();
     _unitCtrl.dispose();
     _minimumStockCtrl.dispose();
+    _barcodeCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.existing == null ? 'Neuer Artikel' : 'Artikel bearbeiten'),
+      title: Text(
+        widget.existing == null ? 'Neuer Artikel' : 'Artikel bearbeiten',
+      ),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -303,16 +470,24 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
               controller: _unitCtrl,
               decoration: const InputDecoration(labelText: 'Einheit'),
             ),
+            BarcodeField(controller: _barcodeCtrl),
             DropdownButtonFormField<String?>(
               isExpanded: true,
               initialValue: _groupId,
-              decoration: const InputDecoration(labelText: 'Artikelgruppe (Aufschlag)'),
+              decoration: const InputDecoration(
+                labelText: 'Artikelgruppe (Aufschlag)',
+              ),
               items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('— keine —')),
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('— keine —'),
+                ),
                 for (final group in widget.groups)
                   DropdownMenuItem(
                     value: group.id,
-                    child: Text('${group.name} (+${group.markupPercent.toStringAsFixed(1)} %)'),
+                    child: Text(
+                      '${group.name} (+${group.markupPercent.toStringAsFixed(1)} %)',
+                    ),
                   ),
               ],
               onChanged: (value) => setState(() => _groupId = value),
@@ -322,9 +497,15 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
               initialValue: _supplierId,
               decoration: const InputDecoration(labelText: 'Standardlieferant'),
               items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('— keiner —')),
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('— keiner —'),
+                ),
                 for (final supplier in widget.suppliers)
-                  DropdownMenuItem(value: supplier.id, child: Text(supplier.name)),
+                  DropdownMenuItem(
+                    value: supplier.id,
+                    child: Text(supplier.name),
+                  ),
               ],
               onChanged: (value) => setState(() => _supplierId = value),
             ),
@@ -336,27 +517,40 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
                   labelText: 'Mindestbestand (optional)',
                   hintText: 'leer = keine Überwachung',
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
               ),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Abbrechen'),
+        ),
         FilledButton(
           onPressed: () {
             final name = _nameCtrl.text.trim();
             if (name.isEmpty) return;
-            final minimumStockText = _minimumStockCtrl.text.trim().replaceAll(',', '.');
+            final minimumStockText = _minimumStockCtrl.text.trim().replaceAll(
+              ',',
+              '.',
+            );
             Navigator.pop(
               context,
               ArticleFormResult(
                 name: name,
-                unit: _unitCtrl.text.trim().isEmpty ? null : _unitCtrl.text.trim(),
+                barcode: _barcodeCtrl.text.trim().isEmpty ? null : _barcodeCtrl.text.trim(),
+                unit: _unitCtrl.text.trim().isEmpty
+                    ? null
+                    : _unitCtrl.text.trim(),
                 articleGroupId: _groupId,
                 defaultSupplierId: _supplierId,
-                minimumStock: minimumStockText.isEmpty ? null : double.tryParse(minimumStockText),
+                minimumStock: minimumStockText.isEmpty
+                    ? null
+                    : double.tryParse(minimumStockText),
               ),
             );
           },

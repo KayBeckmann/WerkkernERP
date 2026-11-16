@@ -32,6 +32,7 @@ class SupplierRepository {
     // bekannt, siehe Doc-Kommentar bei `Suppliers.minimumOrderQuantity`.
     double? minimumOrderQuantity,
     String? deliveryTerms,
+    String? ourCustomerNumber,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.suppliers).insert(
@@ -47,6 +48,7 @@ class SupplierRepository {
             notes: Value(notes),
             minimumOrderQuantity: Value(minimumOrderQuantity),
             deliveryTerms: Value(deliveryTerms),
+            ourCustomerNumber: Value(ourCustomerNumber),
             createdAt: DateTime.now(),
           ),
         );

@@ -458,7 +458,15 @@ void runBusinessTests(Future<(PhaseBRepository, BusinessRepository)> Function() 
     Future<http.Response> put(Map<String, Object?> body) =>
         http.put(baseUrl.resolve('/documents/${draft['id']}'), headers: a.auth, body: jsonEncode(body));
 
-    final saved = await put({'version': 1, 'items': draft['items'], 'dueDate': '2026-12-01', 'paymentTerms': '14 Tage netto'});
+    // A2-Nachtrag: ohne strukturierte Bedingung bleibt ein manuelles
+    // Fälligkeitsdatum stehen (mit Bedingung rechnet das Finalisieren es aus).
+    final saved = await put({
+      'version': 1,
+      'items': draft['items'],
+      'dueDate': '2026-12-01',
+      'paymentTerms': '14 Tage netto',
+      'paymentTerm': null,
+    });
     expectStatus(saved, 200);
     expect((jsonDecode(saved.body) as Map)['dueDate'], '2026-12-01');
     expect((jsonDecode(saved.body) as Map)['paymentTerms'], '14 Tage netto');

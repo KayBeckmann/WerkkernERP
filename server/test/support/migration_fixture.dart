@@ -79,6 +79,7 @@ Map<String, Object?> sampleMigrationPackage() {
         'active': true,
         'stockQuantity': '7.5',
         'minimumStock': '5',
+        'defaultBinId': 'b1',
         'createdAt': at,
       },
       {'id': 'a2', 'name': 'Alte Dose', 'active': false, 'createdAt': at},
@@ -294,9 +295,25 @@ Map<String, Object?> sampleMigrationPackage() {
         ],
       },
     ],
+    // C5.4: 5 von 7,5 liegen an Platz b1, der Rest ist nicht zugeordnet
+    // (fehlt im Paket und wird beim Import ergänzt).
+    'storageLocations': [
+      {
+        'id': 'l1',
+        'name': 'Lager',
+        'createdAt': at,
+        'bins': [
+          {'id': 'b1', 'row': '1', 'shelf': 'A', 'compartment': '3'},
+        ],
+      },
+    ],
+    'articleBinStocks': [
+      {'articleId': 'a1', 'binKey': 'b1', 'quantity': '5'},
+    ],
     'stockMovements': [
       {
         'articleId': 'a1',
+        'binKey': 'b1',
         'type': 'purchaseOrderReceipt',
         'quantityDelta': '10',
         'resultingQuantity': '10',

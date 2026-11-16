@@ -19,6 +19,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
     'purchase_orders',
     'stock_movements',
     'inventory_counts',
+    'storage_locations',
     'recurring_templates',
     'time_sheets',
   ];
@@ -41,6 +42,10 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
     }
     await s.execute(Sql.named('DELETE FROM staff_roles WHERE company_id = @c'), parameters: {'c': companyId});
     await s.execute(Sql.named('DELETE FROM expense_categories WHERE company_id = @c'), parameters: {'c': companyId});
+    // A2: evtl. schon angelegte Vorgaben ersetzt das Paket.
+    if (data.paymentTerms.isNotEmpty) {
+      await s.execute(Sql.named('DELETE FROM payment_terms WHERE company_id = @c'), parameters: {'c': companyId});
+    }
 
     for (final c in data.customers) {
       await insert('customers', {
@@ -55,6 +60,17 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'notes': c.notes,
         'created_at': c.createdAt,
         'invoice_email': c.invoiceEmail,
+        // C15/A2: strukturierte Anschrift, E-Rechnung, Zahlung.
+        'street': c.street,
+        'postal_code': c.postalCode,
+        'city': c.city,
+        'country_code': c.countryCode,
+        'leitweg_id': c.leitwegId,
+        'e_invoice_format': c.eInvoiceFormat,
+        'payment_term_id': c.paymentTermId,
+        'skonto_mode': c.skontoMode,
+        'skonto_percent': c.skontoPercent,
+        'skonto_days': c.skontoDays,
       });
       for (final x in c.contacts) {
         await insert('customer_contacts', {
@@ -83,6 +99,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'minimum_order_quantity': x.minimumOrderQuantity,
         'delivery_terms': x.deliveryTerms,
         'created_at': x.createdAt,
+        'our_customer_number': x.ourCustomerNumber,
       });
     }
     for (final g in data.articleGroups) {
@@ -107,6 +124,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'default_supplier_id': a.defaultSupplierId,
         'stock_quantity': a.stockQuantity,
         'minimum_stock': a.minimumStock,
+        'barcode': a.barcode,
       });
     }
     for (final p in data.articlePrices) {
@@ -133,6 +151,16 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
     // Umwandlungsquellen zuerst (Fremdschlüssel converted_from_id).
     final inserted = <String>{};
     // Vor den Positionen: Stunden-Positionen verweisen auf Rollen (C3.4).
+    for (final t in data.paymentTerms) {
+      await insert('payment_terms', {
+        'id': t.id,
+        'company_id': companyId,
+        'label': t.label,
+        'net_days': t.netDays,
+        'is_default': t.isDefault,
+        'sort_order': t.sortOrder,
+      });
+    }
     for (final r in data.staffRoles) {
       await insert('staff_roles', {
         'id': r.id,
@@ -181,6 +209,12 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'is_advance_payment': d.isAdvancePayment,
         'is_fixed_price': d.isFixedPrice,
         'contact_id': d.contactId,
+        'e_invoice_snapshot': d.eInvoiceSnapshot,
+        'payment_term_id': d.paymentTermId,
+        'payment_term_label': d.paymentTermLabel,
+        'payment_net_days': d.paymentNetDays,
+        'skonto_percent': d.skontoPercent,
+        'skonto_days': d.skontoDays,
         'intro_text_snapshot': d.introTextSnapshot,
         'closing_text_snapshot': d.closingTextSnapshot,
         'footer_text_snapshot': d.footerTextSnapshot,
@@ -307,6 +341,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'notes': o.notes,
         'supplier_snapshot_name': o.supplierSnapshotName,
         'supplier_snapshot_address': o.supplierSnapshotAddress,
+        'supplier_snapshot_customer_number': o.supplierSnapshotCustomerNumber,
         'finalized_at': o.finalizedAt,
         'source_order_id': o.sourceOrderId,
         'project_id': o.projectId,
@@ -342,6 +377,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'document_id': m.documentId,
         'created_by_user_id': m.createdByUserId,
         'created_at': m.createdAt,
+        'bin_key': m.binKey,
       });
     }
     for (final c in data.inventoryCounts) {
@@ -353,6 +389,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'status': c.status,
         'completed_at': c.completedAt,
         'created_at': c.createdAt,
+        'location_id': c.locationId,
       });
     }
     for (final i in data.inventoryItems) {
@@ -363,7 +400,43 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'expected_quantity': i.expectedQuantity,
         'counted_quantity': i.countedQuantity,
         'counted_at': i.countedAt,
+        'bin_key': i.binKey,
       });
+    }
+    // C5.4 Lagerorte, Plätze, Platzbestände, Standardplätze.
+    for (final l in data.storageLocations) {
+      await insert('storage_locations', {
+        'id': l.id,
+        'company_id': companyId,
+        'name': l.name,
+        'sort_order': l.sortOrder,
+        'created_at': l.createdAt,
+      });
+    }
+    for (final b in data.storageBins) {
+      await insert('storage_bins', {
+        'id': b.id,
+        'company_id': companyId,
+        'location_id': b.locationId,
+        'row_label': b.row,
+        'shelf': b.shelf,
+        'compartment': b.compartment,
+        'sort_order': b.sortOrder,
+      });
+    }
+    for (final st in data.binStocks) {
+      await insert('article_bin_stock', {
+        'company_id': companyId,
+        'article_id': st.articleId,
+        'bin_key': st.binKey,
+        'quantity': st.quantity,
+      });
+    }
+    for (final e in data.defaultBins.entries) {
+      await s.execute(
+        Sql.named('UPDATE articles SET default_bin_id = @bin WHERE company_id = @companyId AND id = @id'),
+        parameters: {'bin': e.value, 'companyId': companyId, 'id': e.key},
+      );
     }
     for (final t in data.timeEntries) {
       await insert('time_entries', {

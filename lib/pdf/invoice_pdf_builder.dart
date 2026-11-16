@@ -5,7 +5,15 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:werkkern_core/werkkern_core.dart'
-    show EInvoiceData, EInvoiceProfile, buildEInvoiceXml, eInvoiceProblems, facturXAttachmentName;
+    show
+        DocumentPaymentTerms,
+        EInvoiceData,
+        EInvoiceProfile,
+        buildEInvoiceXml,
+        eInvoiceProblems,
+        facturXAttachmentName,
+        paymentTermsText,
+        summarizePaymentTerms;
 
 import '../data/database/database.dart';
 import '../data/database/tables.dart';
@@ -121,6 +129,7 @@ class PdfDocumentData {
     this.isSmallBusinessExempt = false,
     required this.lines,
     this.eInvoice,
+    this.terms,
   });
 
   final DocumentKind kind;
@@ -149,7 +158,23 @@ class PdfDocumentData {
   /// ZUGFeRD-Hybrid (PDF/A-3b mit `factur-x.xml`) erzeugt. Entwürfe und
   /// unvollständige Daten ergeben weiterhin ein reines PDF.
   final EInvoiceData? eInvoice;
+
+  /// A2-Nachtrag: Zahlungsbedingung mit optionalem Skonto (Schnappschuss
+  /// am Beleg) — ergibt den Zahlungstext über dem Freitext.
+  final DocumentPaymentTerms? terms;
 }
+
+/// Zahlungsbedingung eines Offline-Belegs (`null` ohne Auswahl oder bei
+/// Gutschriften/Lieferscheinen).
+DocumentPaymentTerms? documentTermsOf(Invoice invoice) =>
+    invoice.paymentTermLabel == null || invoice.paymentNetDays == null || invoice.kind == DocumentKind.creditNote
+        ? null
+        : DocumentPaymentTerms(
+            label: invoice.paymentTermLabel!,
+            netDays: invoice.paymentNetDays!,
+            skontoPercent: invoice.skontoPercent,
+            skontoDays: invoice.skontoDays,
+          );
 
 /// Ob [renderDocumentPdf] für [data] eine XML einbettet (für die
 /// Anzeige „E-Rechnung“ und die Dateinamen in der Bedienoberfläche).
@@ -228,6 +253,7 @@ Future<Uint8List> _buildPdf({
       footerText: isPreview ? company.pdfFooterText : invoice.pdfFooterTextSnapshot,
       isSmallBusinessExempt: company.isSmallBusinessExempt,
       lines: [for (final item in items) PdfLine.fromItem(item)],
+      terms: documentTermsOf(invoice),
       // C15: nur finalisierte Rechnungen/Gutschriften werden Hybrid-PDF.
       eInvoice: isPreview
           ? null
@@ -299,6 +325,21 @@ Future<Uint8List> renderDocumentPdf(
   // Factur-X-Schema, sRGB-Ausgabeprofil, eingebettete Schriften) plus
   // eingebettete `factur-x.xml`. Die XML entsteht VOR dem Dokument, weil
   // die Metadaten im Konstruktor mitgegeben werden.
+  final terms = invoice.kind == DocumentKind.deliveryNote ? null : data.terms;
+  final advanceGross = priorAdvancePayments.fold<int>(0, (sum, e) => sum + e.amountGross.cents);
+  final paymentText = terms == null
+      ? null
+      : paymentTermsText(
+          terms,
+          summarizePaymentTerms(
+            terms: terms,
+            issueDate: invoice.issueDate,
+            net: totals.totalNet,
+            gross: totals.totalGross,
+            payable: Money.fromCents(totals.totalGross.cents - advanceGross),
+            smallBusinessExempt: data.isSmallBusinessExempt,
+          ),
+        );
   final eInvoice = data.eInvoice;
   final embed = pdfEmbedsEInvoice(data, isPreview: isPreview);
   final eInvoiceXml = embed ? buildEInvoiceXml(eInvoice!) : null;
@@ -306,10 +347,14 @@ Future<Uint8List> renderDocumentPdf(
   final author = invoice.companySnapshotName ?? 'WerkkernERP';
   final doc = pw.Document(
     theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
-    title: title,
-    author: author,
-    creator: 'WerkkernERP',
-    producer: 'WerkkernERP',
+    // Info-Wörterbuch nur beim ZUGFeRD-PDF (PDF/A verlangt es passend zu
+    // XMP). Es enthält `/CreationDate` = jetzt — normale PDFs bleiben
+    // dadurch wie bisher inhaltsgleich reproduzierbar (Offline-/Online-
+    // Vergleich im Umzugstest).
+    title: embed ? title : null,
+    author: embed ? author : null,
+    creator: embed ? 'WerkkernERP' : null,
+    producer: embed ? 'WerkkernERP' : null,
     metadata: embed
         ? PdfaRdf(
             title: title,
@@ -398,8 +443,13 @@ Future<Uint8List> renderDocumentPdf(
             style: const pw.TextStyle(fontSize: 9),
           ),
         ],
-        if (invoice.paymentTerms != null) ...[
+        // A2-Nachtrag: Zahlungsbedingung/Skonto (nicht beim Lieferschein).
+        if (paymentText != null) ...[
           pw.SizedBox(height: 16),
+          pw.Text(paymentText, style: const pw.TextStyle(fontSize: 10)),
+        ],
+        if (invoice.paymentTerms != null) ...[
+          pw.SizedBox(height: paymentText == null ? 16 : 4),
           pw.Text(invoice.paymentTerms!, style: const pw.TextStyle(fontSize: 10)),
         ],
         if (invoice.notes != null) ...[

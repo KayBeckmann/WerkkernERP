@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
+import '../../widgets/article_group_filter.dart';
+
 /// Position hinzufügen **oder bearbeiten** — gleicher Dialog wie offline
 /// (`invoice_item_dialog.dart`): Artikel/Stunden/Freitext, Einheit,
 /// Rabatt, Positionsgruppe mit Vorschlägen aus dem Dokument. Für
@@ -122,10 +124,24 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
   static String _formatPercent(double value) =>
       (value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString()).replaceAll('.', ',');
 
-  List<OnlineArticle> get _articleChoices => [
+  /// A1-Nachtrag: Gruppenfilter der Artikelauswahl (nur Anzeige).
+  ArticleGroupFilter _groupFilter = const AllArticleGroups();
+
+  List<OnlineArticle> get _activeArticles => [
         for (final a in widget.articles)
           if (a.active || a.id == widget.existing?.articleId) a,
       ];
+
+  /// Gewählter Artikel bleibt sichtbar, auch wenn er nicht zum Filter passt.
+  List<OnlineArticle> get _articleChoices => [
+        for (final a in _activeArticles)
+          if (_groupFilter.matches(a.articleGroupId) || a.id == _article?.id) a,
+      ];
+
+  List<({String id, String name})> get _articleGroups => {
+        for (final a in _activeArticles)
+          if (a.articleGroupId != null) a.articleGroupId!: a.articleGroupName ?? a.articleGroupId!,
+      }.entries.map((e) => (id: e.key, name: e.value)).toList();
 
   @override
   void initState() {
@@ -228,6 +244,13 @@ class _OnlineItemDialogState extends State<_OnlineItemDialog> {
                       ),
                   ],
                   onChanged: _selectRole,
+                ),
+              if (_kind == OnlineItemKind.article && _articleGroups.isNotEmpty)
+                ArticleGroupFilterField(
+                  groups: _articleGroups,
+                  hasUngrouped: _activeArticles.any((a) => a.articleGroupId == null),
+                  value: _groupFilter,
+                  onChanged: (value) => setState(() => _groupFilter = value),
                 ),
               if (_kind == OnlineItemKind.article && _articleChoices.isNotEmpty)
                 DropdownButtonFormField<OnlineArticle>(

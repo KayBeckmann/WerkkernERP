@@ -115,6 +115,25 @@ class ExportRoutes {
       'vehicleCosts': [for (final c in await business.listVehicleCosts(companyId)) c.toJson()],
       'stockMovements': [for (final m in await business.listStockMovements(companyId, limit: 1 << 30)) m.toJson()],
       'inventoryCounts': inventoryCounts,
+      // C5.4 Lagerorte/Plätze, Bestand je Platz, Standardplätze.
+      'storageLocations': [
+        for (final l in await business.listStorageLocations(companyId))
+          {
+            'id': l.id,
+            'name': l.name,
+            'sortOrder': l.sortOrder,
+            'createdAt': l.createdAt.toIso8601String(),
+            'bins': [
+              for (final b in await business.listStorageBins(companyId))
+                if (b.locationId == l.id) b.toJson(),
+            ],
+          },
+      ],
+      'articleBinStocks': [
+        for (final s in await business.listBinStocks(companyId))
+          {'articleId': s.articleId, 'binKey': s.binKey, 'quantity': s.quantity},
+      ],
+      'articleDefaultBins': await business.defaultBins(companyId),
       'purchaseOrders': purchaseOrders,
       'expenseCategories': [for (final c in await business.listExpenseCategories(companyId)) c.toJson()],
       'expenses': [for (final e in await business.listExpenses(companyId)) e.toJson()],

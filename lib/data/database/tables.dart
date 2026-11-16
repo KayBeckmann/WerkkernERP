@@ -27,6 +27,11 @@ class Companies extends Table {
   TextColumn get bic => text().nullable()();
   BoolColumn get eInvoiceEnabled => boolean().withDefault(const Constant(false))();
 
+  /// A2-Nachtrag (Kay, 15.11.2026): optionale Skonto-Vorgabe der Firma —
+  /// beide gesetzt = Skonto; sonst keins. Nie aus dem Beleg erraten.
+  RealColumn get skontoPercent => real().nullable()();
+  IntColumn get skontoDays => integer().nullable()();
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -275,6 +280,16 @@ class Customers extends Table {
   TextColumn get leitwegId => text().nullable()();
   TextColumn get eInvoiceFormat => text().withDefault(const Constant('zugferd'))();
 
+  /// A2-Nachtrag: vom Firmenstandard abweichende Zahlungsbedingung
+  /// (`null` = Firmenstandard) und Skonto (`company` = Firmenvorgabe,
+  /// `none` = kein Skonto, `custom` = [skontoPercent]/[skontoDays]).
+  /// Ohne Fremdschlüssel (SQLite kann Spalten mit FK nicht wieder
+  /// entfernen); `PaymentTermRepository.delete` setzt die Zuordnung zurück.
+  TextColumn get paymentTermId => text().nullable()();
+  TextColumn get skontoMode => text().withDefault(const Constant('company'))();
+  RealColumn get skontoPercent => real().nullable()();
+  IntColumn get skontoDays => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -282,6 +297,23 @@ class Customers extends Table {
 /// Kontaktpersonen eines Kunden (Kay 2026-11-09), z. B. Max →
 /// Betriebstechniker, Erika → Buchhaltung. Angebote/Aufträge/Rechnungen
 /// können einer davon zugewiesen werden ([Invoices.contactId]).
+/// A2-Nachtrag (Kay, 15.11.2026): Zahlungsbedingungen je Firma als
+/// wiederverwendbare Stammdaten; genau eine ist Firmenstandard.
+class PaymentTerms extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get label => text()();
+
+  /// Zahlungsziel in Tagen ab Belegdatum (0 = sofort).
+  IntColumn get netDays => integer()();
+  BoolColumn get isDefault => boolean().withDefault(const Constant(false))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class CustomerContacts extends Table {
   TextColumn get id => text()();
   TextColumn get companyId =>
@@ -324,6 +356,11 @@ class Suppliers extends Table {
   /// es auf der Bestellung gezielt angezeigt werden kann.
   TextColumn get deliveryTerms => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+
+  /// C5.2-Nachtrag (Kay, 15.11.2026): „Unsere Kundennummer beim
+  /// Lieferanten“ — Text, damit führende Nullen erhalten bleiben
+  /// (z. B. `060903`). Erscheint auf jeder Bestellung an diesen Lieferanten.
+  TextColumn get ourCustomerNumber => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -395,6 +432,17 @@ class Articles extends Table {
   RealColumn get minimumStock => real().nullable()();
 
   DateTimeColumn get createdAt => dateTime()();
+
+  /// A1-Nachtrag (Kay, 16.11.2026): optionaler Barcode der Verpackung
+  /// (EAN/GTIN o. ä.) — **Text**, damit führende Nullen erhalten bleiben.
+  /// Je Firma eindeutig (Index `articles_company_barcode_idx`). Reine
+  /// Identifikation: keine Menge, kein Preis, keine Packungseinheit.
+  TextColumn get barcode => text().nullable()();
+
+  /// C5.4-Nachtrag: Standardplatz (ID eines `StorageBins`) — Vorschlag
+  /// für Wareneingang und, ohne Bestand an anderen Plätzen, für die
+  /// Entnahme. Ohne Fremdschlüssel (SQLite-Migrationstests).
+  TextColumn get defaultBinId => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -562,6 +610,15 @@ class Invoices extends Table {
   /// Kontaktperson nimmt nur die Zuordnung mit.
   TextColumn get contactId =>
       text().nullable().references(CustomerContacts, #id, onDelete: KeyAction.setNull)();
+
+  /// A2-Nachtrag: gewählte Zahlungsbedingung als Schnappschuss am Beleg
+  /// (Bezeichnung, Ziel, Skonto) — spätere Stammdatenänderungen ändern
+  /// ihn nicht. [paymentTermId] nur zur Vorauswahl im Dropdown.
+  TextColumn get paymentTermId => text().nullable()();
+  TextColumn get paymentTermLabel => text().nullable()();
+  IntColumn get paymentNetDays => integer().nullable()();
+  RealColumn get skontoPercent => real().nullable()();
+  IntColumn get skontoDays => integer().nullable()();
 
   /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
   /// markiert eine Rechnung als Abschlags-/Anzahlungsrechnung statt einer
@@ -1015,6 +1072,10 @@ class PurchaseOrders extends Table {
   TextColumn get supplierSnapshotName => text().nullable()();
   TextColumn get supplierSnapshotAddress => text().nullable()();
 
+  /// C5.2-Nachtrag: beim Finalisieren eingefrorene Kundennummer beim
+  /// Lieferanten — spätere Stammdatenänderungen ändern alte Bestellungen nicht.
+  TextColumn get supplierSnapshotCustomerNumber => text().nullable()();
+
   DateTimeColumn get finalizedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -1124,6 +1185,58 @@ enum StockMovementType {
   /// Rückfrage: "Automatisch beim Finalisieren der Gutschrift"). Anders
   /// als [documentBooking] ist [quantityDelta] hier immer positiv.
   creditNoteReturn,
+
+  /// C5.4-Nachtrag (Kay, 16.11.2026): Umlagerung zwischen zwei Plätzen —
+  /// je eine Bewegung ab und zu, die Gesamtmenge bleibt gleich.
+  transfer,
+}
+
+/// C5.4-Nachtrag (Kay, 16.11.2026): Lagerort einer Firma (z. B. Lager,
+/// Halle, Fahrzeug — frei benannt, nichts vorgegeben).
+class StorageLocations extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Physischer Platz innerhalb eines Lagerorts: Reihe → Regal → Fach.
+/// Die Laufreihenfolge der Inventur folgt [sortOrder], sonst Reihe/
+/// Regal/Fach.
+class StorageBins extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get locationId =>
+      text().references(StorageLocations, #id, onDelete: KeyAction.cascade)();
+  TextColumn get row => text().withDefault(const Constant(''))();
+  TextColumn get shelf => text().withDefault(const Constant(''))();
+  TextColumn get compartment => text().withDefault(const Constant(''))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Menge je Artikel **und** Platz. [binKey] = ID eines [StorageBins]
+/// oder `''` für „Platz noch nicht zugeordnet“ (Altbestand vor v40 und
+/// Buchungen ohne Platz). Die Summe aller Zeilen eines Artikels ist immer
+/// [Articles.stockQuantity] — beides schreibt nur `StockLedger`.
+class ArticleBinStocks extends Table {
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get articleId =>
+      text().references(Articles, #id, onDelete: KeyAction.cascade)();
+  TextColumn get binKey => text()();
+  RealColumn get quantity => real().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {articleId, binKey};
 }
 
 /// Lückenloses, **append-only** Bewegungsprotokoll jeder tatsächlichen
@@ -1172,6 +1285,10 @@ class StockMovements extends Table {
   TextColumn get note => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
+  /// C5.4-Nachtrag: betroffener Platz (`''` = nicht zugeordnet, `null` =
+  /// Buchung vor Einführung der Lagerplätze).
+  TextColumn get binKey => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1207,6 +1324,9 @@ class InventoryCounts extends Table {
   TextColumn get status =>
       textEnum<InventoryCountStatus>().withDefault(Constant(InventoryCountStatus.draft.name))();
   DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// C5.4-Nachtrag: Inventur nach Lagerort (`null` = artikelweise).
+  TextColumn get locationId => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override
@@ -1234,13 +1354,15 @@ class InventoryCountItems extends Table {
   RealColumn get countedQuantity => real().nullable()();
   DateTimeColumn get countedAt => dateTime().nullable()();
 
-  @override
-  Set<Column> get primaryKey => {id};
+  /// C5.4-Nachtrag: gezählter Platz — `null` = ganzer Artikel (bisherige
+  /// Inventur), `''` = nicht zugeordneter Bestand, sonst Platz-ID. Je
+  /// Lauf ist jede Kombination Artikel/Platz höchstens einmal enthalten
+  /// (`InventoryRepository` prüft das; kein Unique-Index, weil SQLite
+  /// Spalten darin nicht wieder entfernen kann).
+  TextColumn get binKey => text().nullable()();
 
   @override
-  List<Set<Column>> get uniqueKeys => [
-        {inventoryCountId, articleId},
-      ];
+  Set<Column> get primaryKey => {id};
 }
 
 /// Rollen-Stamm für die Zeiterfassung (C3, Nachtrag 2026-10-20,
