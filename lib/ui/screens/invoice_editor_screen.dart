@@ -8,9 +8,13 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 import 'package:werkkern_core/werkkern_core.dart'
     show
+        DocumentPaymentTerms,
         EInvoiceData,
         EInvoiceProfile,
         billingDocumentKinds,
+        documentKindUsesPaymentTerms,
+        paymentTermsText,
+        summarizePaymentTerms,
         buildEInvoiceXml,
         compareHoursByRole,
         documentRecipient,
@@ -24,6 +28,7 @@ import '../../data/repositories/article_group_repository.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
+import '../../data/repositories/payment_term_repository.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
 import '../../data/repositories/staff_role_repository.dart';
@@ -254,6 +259,62 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
   /// C15 Modul E-Rechnung der Firma.
   bool _eInvoiceEnabled = false;
+
+  /// A2-Nachtrag (Kay, 15./16.11.2026): Zahlungsbedingung und Skonto je
+  /// Beleg (Rechnung/Auftrag); vorbelegt Kunde vor Firma, bewusst änderbar.
+  List<PaymentTerm> _paymentTermList = [];
+  String? _termId;
+  String? _termLabel;
+  int? _termDays;
+  bool _skontoOn = false;
+  final _skontoPercentCtrl = TextEditingController();
+  final _skontoDaysCtrl = TextEditingController();
+  bool get _usesPaymentTerms => documentKindUsesPaymentTerms(_kind.name);
+
+  void _applyTerms(DocumentTermsInput? t) {
+    _termId = t?.termId;
+    _termLabel = t?.label;
+    _termDays = t?.netDays;
+    _skontoOn = t?.skontoPercent != null && t?.skontoDays != null;
+    _skontoPercentCtrl.text = t?.skontoPercent == null ? '' : _fmtPercent(t!.skontoPercent!);
+    _skontoDaysCtrl.text = t?.skontoDays?.toString() ?? '';
+  }
+
+  static String _fmtPercent(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString().replaceAll('.', ',');
+
+  /// Aktuelle Auswahl als Schnappschuss; ungültiges Skonto zählt als keins.
+  DocumentTermsInput? get _termSelection {
+    if (_termLabel == null || _termDays == null) return null;
+    final percent = double.tryParse(_skontoPercentCtrl.text.trim().replaceAll(',', '.'));
+    final days = int.tryParse(_skontoDaysCtrl.text.trim());
+    final skonto = _skontoOn && percent != null && percent > 0 && percent < 100 && days != null && days >= 0;
+    return (
+      termId: _termId,
+      label: _termLabel!,
+      netDays: _termDays!,
+      skontoPercent: skonto ? percent : null,
+      skontoDays: skonto ? days : null,
+    );
+  }
+
+  void _selectTerm(String? id) {
+    final term = _paymentTermList.where((t) => t.id == id).firstOrNull;
+    setState(() {
+      if (term == null) {
+        _termId = null;
+        _termLabel = null;
+        _termDays = null;
+      } else {
+        _termId = term.id;
+        _termLabel = term.label;
+        _termDays = term.netDays;
+        // Fälligkeit der Rechnung folgt dem Zahlungsziel.
+        if (_kind == DocumentKind.invoice) {
+          _dueDate = DateTime(_issueDate.year, _issueDate.month, _issueDate.day + term.netDays);
+        }
+      }
+    });
+  }
   List<Invoice> _creditNotes = [];
 
   // C5.2 Bestellwesen (Nachtrag 2026-10-19): nur bei kind == order
@@ -307,6 +368,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final staffRoleRepo = context.read<StaffRoleRepository>();
     final contactRepo = context.read<CustomerContactRepository>();
     final customerRepo = context.read<CustomerRepository>();
+    final paymentTermRepo = context.read<PaymentTermRepository>();
     _articles = await articleRepo.listForCompany(companyId);
     _articleGroups = await articleGroupRepo.listForCompany(companyId);
     _staffRoles = await staffRoleRepo.listForCompany(companyId);
@@ -328,6 +390,24 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     _timeTrackingEnabled = company.timeTrackingEnabled;
 
     final invoice = widget.invoice;
+    if (documentKindUsesPaymentTerms((invoice?.kind ?? widget.kind).name)) {
+      _paymentTermList = await paymentTermRepo.listForCompany(companyId);
+      if (invoice == null) {
+        _applyTerms(await invoiceRepo.defaultTermsFor(companyId: companyId, customerId: widget.customer.id));
+        if (widget.kind == DocumentKind.invoice && _termDays != null) {
+          final now = DateTime.now();
+          _dueDate = DateTime(now.year, now.month, now.day + _termDays!);
+        }
+      } else if (invoice.paymentTermLabel != null && invoice.paymentNetDays != null) {
+        _applyTerms((
+          termId: invoice.paymentTermId,
+          label: invoice.paymentTermLabel!,
+          netDays: invoice.paymentNetDays!,
+          skontoPercent: invoice.skontoPercent,
+          skontoDays: invoice.skontoDays,
+        ));
+      }
+    }
     _currentInvoice = invoice;
     if (invoice != null) {
       _issueDate = invoice.issueDate;
@@ -381,6 +461,8 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   void dispose() {
     _notesCtrl.dispose();
     _paymentTermsCtrl.dispose();
+    _skontoPercentCtrl.dispose();
+    _skontoDaysCtrl.dispose();
     super.dispose();
   }
 
@@ -586,6 +668,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           isFixedPrice: _isFixedPrice,
           contactId: _contactId,
           items: items,
+          terms: _usesPaymentTerms ? _termSelection : null,
         );
       } else {
         saved = await repo.update(
@@ -601,6 +684,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           isFixedPrice: _isFixedPrice,
           contactId: Value(_contactId),
           items: items,
+          terms: _usesPaymentTerms ? Value(_termSelection) : const Value.absent(),
         );
       }
       if (mounted) {
@@ -1328,6 +1412,97 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         InvoiceItemKind.text => Icons.notes_outlined,
       };
 
+  /// A2-Nachtrag: Zahlungsziel-Auswahl, Skonto je Beleg und Vorschau des
+  /// Zahlungstexts (wie auf dem PDF).
+  Widget _buildPaymentTermsSection(bool isLocked) {
+    final selection = _termSelection;
+    final ids = {for (final t in _paymentTermList) t.id};
+    final value = _termId != null && ids.contains(_termId) ? _termId : (_termLabel == null ? null : '__snapshot__');
+    String? preview;
+    if (selection != null) {
+      final terms = DocumentPaymentTerms(
+        label: selection.label,
+        netDays: selection.netDays,
+        skontoPercent: selection.skontoPercent,
+        skontoDays: selection.skontoDays,
+      );
+      final totals = _totals;
+      final advances = _priorAdvancePayments.fold<int>(0, (sum, e) => sum + e.amountGross.cents);
+      preview = paymentTermsText(
+        terms,
+        summarizePaymentTerms(
+          terms: terms,
+          issueDate: _issueDate,
+          net: totals.totalNet,
+          gross: totals.totalGross,
+          payable: Money.fromCents(totals.totalGross.cents - advances),
+          smallBusinessExempt: _isSmallBusinessExempt,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DropdownButtonFormField<String?>(
+          key: const Key('document-payment-term'),
+          isExpanded: true,
+          initialValue: value,
+          decoration: const InputDecoration(labelText: 'Zahlungsziel'),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('Keine Zahlungsbedingung')),
+            for (final t in _paymentTermList) DropdownMenuItem(value: t.id, child: Text(t.label)),
+            if (value == '__snapshot__') DropdownMenuItem(value: '__snapshot__', child: Text('${_termLabel!} (gespeichert)')),
+          ],
+          onChanged: isLocked ? null : (id) => id == '__snapshot__' ? null : _selectTerm(id),
+        ),
+        if (_termLabel != null)
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: CheckboxListTile(
+                  key: const Key('document-skonto'),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(_isSmallBusinessExempt ? 'Skonto (auf Rechnungsbetrag)' : 'Skonto (auf Nettobetrag)'),
+                  value: _skontoOn,
+                  onChanged: isLocked ? null : (v) => setState(() => _skontoOn = v ?? false),
+                ),
+              ),
+              if (_skontoOn) ...[
+                Expanded(
+                  child: TextField(
+                    key: const Key('document-skonto-percent'),
+                    controller: _skontoPercentCtrl,
+                    readOnly: isLocked,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: '%'),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    key: const Key('document-skonto-days'),
+                    controller: _skontoDaysCtrl,
+                    readOnly: isLocked,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Tage'),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        if (preview != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: Text(preview, key: const Key('document-payment-preview'), style: Theme.of(context).textTheme.bodySmall),
+          ),
+      ],
+    );
+  }
+
   /// Positionszeile mit mehr Details statt einer einzigen Subtitle-Zeile
   /// (Kay-Nachtrag 2026-10-16: Vergleich mit RechnungsFee, "Es fehlen
   /// Details") — Einheit neben der Menge, Steuersatz und Gesamtbetrag
@@ -1536,6 +1711,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 style: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
             ),
+          if (_usesPaymentTerms) _buildPaymentTermsSection(isLocked),
           TextField(
             controller: _paymentTermsCtrl,
             readOnly: isLocked,

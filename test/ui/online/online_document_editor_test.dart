@@ -103,7 +103,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Neubau Meyer').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Fälligkeitsdatum (optional)'));
+    // A2-Nachtrag: die Fälligkeit ist aus dem Firmenstandard (14 Tage) vorbelegt.
+    await tester.tap(find.textContaining('Fälligkeitsdatum: '));
     await tester.pumpAndSettle();
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();

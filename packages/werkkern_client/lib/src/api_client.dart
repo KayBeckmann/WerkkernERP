@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'payment_terms.dart';
 import 'platform.dart';
 
 /// Fehlerantwort des Servers. [statusCode] 409 = Konflikt (z. B.
@@ -257,6 +258,8 @@ class WerkkernApiClient {
     String? notes,
     String? projectId,
     String? contactId,
+    // A2-Nachtrag: ohne Angabe belegt der Server Kunden-/Firmenstandard vor.
+    OnlineDocumentTerms? Function()? paymentTerm,
   }) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents', body: {
         'kind': kind,
@@ -265,6 +268,7 @@ class WerkkernApiClient {
         'notes': ?notes,
         'projectId': ?projectId,
         'contactId': ?contactId,
+        if (paymentTerm != null) 'paymentTerm': paymentTerm()?.toJson(),
       })));
 
   /// Wirft [ApiException] mit 409, wenn [version] veraltet ist — dann
@@ -287,6 +291,8 @@ class WerkkernApiClient {
     DateTime? Function()? dueDate,
     // Kontaktperson; ohne Angabe unverändert, `() => null` entfernt sie.
     String? Function()? contactId,
+    // A2-Nachtrag: ohne Angabe unverändert, `() => null` entfernt sie.
+    OnlineDocumentTerms? Function()? paymentTerm,
   }) async {
     final due = dueDate?.call();
     return OnlineDocument.fromJson(_map(await _send('PUT', '/documents/$id', idempotencyKey: idempotencyKey, body: {
@@ -299,6 +305,7 @@ class WerkkernApiClient {
       if (paymentTerms != null) 'paymentTerms': paymentTerms(),
       if (dueDate != null) 'dueDate': due == null ? null : _isoDate(due),
       if (contactId != null) 'contactId': contactId(),
+      if (paymentTerm != null) 'paymentTerm': paymentTerm()?.toJson(),
     })));
   }
 

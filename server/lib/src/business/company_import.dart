@@ -15,6 +15,7 @@ import 'package:werkkern_core/werkkern_core.dart';
 import 'accounting.dart';
 import 'fleet.dart';
 import 'models.dart';
+import 'payment_terms.dart';
 import 'purchasing.dart';
 import 'recurring.dart';
 import 'staff_roles.dart';
@@ -46,6 +47,7 @@ class CompanyImportData {
   final inventoryCounts = <InventoryCount>[];
   final inventoryItems = <InventoryCountItem>[];
   final staffRoles = <StaffRole>[];
+  final paymentTerms = <PaymentTerm>[];
   final timeEntries = <TimeEntry>[];
   final timeSheets = <TimeSheet>[];
 
@@ -112,8 +114,12 @@ class CompanyImportProfile {
     this.city,
     this.countryCode = 'DE',
     this.bic,
+    this.skontoPercent,
+    this.skontoDays,
   });
   final String? address;
+  final double? skontoPercent;
+  final int? skontoDays;
 
   /// C15 E-Rechnung.
   final String? street;
@@ -273,6 +279,17 @@ class _Parser {
         lastNumber: r.integer('lastNumber'),
       ));
     }
+    for (final (i, t) in _list(p, 'paymentTerms')) {
+      final r = _R(t, 'paymentTerms[$i]');
+      data.paymentTerms.add(PaymentTerm(
+        id: _assign('paymentTerm', r.str('id'), r.path),
+        companyId: companyId,
+        label: r.str('label'),
+        netDays: r.integer('netDays'),
+        isDefault: r.boolean('isDefault', fallback: false),
+        sortOrder: r.optInt('sortOrder') ?? i,
+      ));
+    }
     for (final (i, c) in _list(p, 'customers')) {
       final r = _R(c, 'customers[$i]');
       final customerId = _assign('customer', r.str('id'), r.path);
@@ -312,6 +329,10 @@ class _Parser {
           countryCode: r.optStr('countryCode') ?? 'DE',
           leitwegId: r.optStr('leitwegId'),
           eInvoiceFormat: r.optStr('eInvoiceFormat') == 'xrechnung' ? 'xrechnung' : 'zugferd',
+          paymentTermId: _ref('paymentTerm', r.optStr('paymentTermId'), r.path),
+          skontoMode: r.optStr('skontoMode') ?? 'company',
+          skontoPercent: r.optNumber('skontoPercent'),
+          skontoDays: r.optInt('skontoDays'),
         ),
       );
     }
@@ -436,6 +457,8 @@ class _Parser {
         city: r.optStr('city'),
         countryCode: r.optStr('countryCode') ?? 'DE',
         bic: r.optStr('bic'),
+        skontoPercent: r.optNumber('skontoPercent'),
+        skontoDays: r.optInt('skontoDays'),
         modules: modules,
       ),
     )..warnings.addAll(result.warnings);
@@ -536,6 +559,13 @@ class _Parser {
           footerTextSnapshot: r.optStr('footerTextSnapshot'),
           smallBusinessExemptSnapshot: r.boolean('smallBusinessExemptSnapshot', fallback: false),
           stockBooked: r.boolean('stockBooked', fallback: false),
+          eInvoiceSnapshot: r.optStr('eInvoiceSnapshot'),
+          // Belegfeld ist ein Schnappschuss; die ID dient nur der Vorauswahl.
+          paymentTermId: _ids['paymentTerm']?[r.optStr('paymentTermId')],
+          paymentTermLabel: r.optStr('paymentTermLabel'),
+          paymentNetDays: r.optInt('paymentNetDays'),
+          skontoPercent: r.optNumber('skontoPercent'),
+          skontoDays: r.optInt('skontoDays'),
         ),
       );
       data.documentItems.addAll(_items(d['items'], '${r.path}.items', id));

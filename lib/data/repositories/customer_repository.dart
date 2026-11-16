@@ -41,6 +41,10 @@ class CustomerRepository {
     String? countryCode,
     String? leitwegId,
     String? eInvoiceFormat,
+    String? paymentTermId,
+    String skontoMode = 'company',
+    double? skontoPercent,
+    int? skontoDays,
   }) async {
     final id = _uuid.v4();
     await _db.into(_db.customers).insert(
@@ -61,6 +65,10 @@ class CustomerRepository {
             countryCode: Value(countryCode ?? 'DE'),
             leitwegId: Value(leitwegId),
             eInvoiceFormat: Value(eInvoiceFormat ?? 'zugferd'),
+            paymentTermId: Value(paymentTermId),
+            skontoMode: Value(skontoMode),
+            skontoPercent: Value(skontoPercent),
+            skontoDays: Value(skontoDays),
             createdAt: DateTime.now(),
           ),
         );

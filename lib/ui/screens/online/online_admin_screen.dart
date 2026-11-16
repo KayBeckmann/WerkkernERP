@@ -849,6 +849,9 @@ class _ProfileTabState extends State<_ProfileTab> {
   final _footer = TextEditingController();
   final Map<String, ({TextEditingController intro, TextEditingController closing})> _texts = {};
   bool _smallBusiness = false;
+  // A2-Nachtrag: Skonto wird auf eigener Seite gepflegt, hier unverändert zurück.
+  double? _skontoPercent;
+  int? _skontoDays;
   bool _loading = true;
   bool _busy = false;
 
@@ -893,6 +896,8 @@ class _ProfileTabState extends State<_ProfileTab> {
       _bic.text = p.bic ?? '';
       _footer.text = p.footerText ?? '';
       _smallBusiness = p.smallBusinessExempt;
+      _skontoPercent = p.skontoPercent;
+      _skontoDays = p.skontoDays;
       // Auch Texte inaktiver Arten behalten (werden unverändert zurückgeschickt).
       for (final kind in {..._kinds, ...p.documentTexts.keys}) {
         _texts[kind] = (
@@ -929,6 +934,8 @@ class _ProfileTabState extends State<_ProfileTab> {
         city: _v(_city),
         countryCode: (_v(_countryCode) ?? 'DE').toUpperCase(),
         bic: _v(_bic),
+        skontoPercent: _skontoPercent,
+        skontoDays: _skontoDays,
       ));
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.section.title} gespeichert.')));
     } on Exception catch (e) {

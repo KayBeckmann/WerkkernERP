@@ -161,6 +161,28 @@ class $CompaniesTable extends Companies
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _skontoPercentMeta = const VerificationMeta(
+    'skontoPercent',
+  );
+  @override
+  late final GeneratedColumn<double> skontoPercent = GeneratedColumn<double>(
+    'skonto_percent',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _skontoDaysMeta = const VerificationMeta(
+    'skontoDays',
+  );
+  @override
+  late final GeneratedColumn<int> skontoDays = GeneratedColumn<int>(
+    'skonto_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _quotesEnabledMeta = const VerificationMeta(
     'quotesEnabled',
   );
@@ -936,6 +958,8 @@ class $CompaniesTable extends Companies
     countryCode,
     bic,
     eInvoiceEnabled,
+    skontoPercent,
+    skontoDays,
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
@@ -1108,6 +1132,21 @@ class $CompaniesTable extends Companies
           data['e_invoice_enabled']!,
           _eInvoiceEnabledMeta,
         ),
+      );
+    }
+    if (data.containsKey('skonto_percent')) {
+      context.handle(
+        _skontoPercentMeta,
+        skontoPercent.isAcceptableOrUnknown(
+          data['skonto_percent']!,
+          _skontoPercentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('skonto_days')) {
+      context.handle(
+        _skontoDaysMeta,
+        skontoDays.isAcceptableOrUnknown(data['skonto_days']!, _skontoDaysMeta),
       );
     }
     if (data.containsKey('quotes_enabled')) {
@@ -1728,6 +1767,14 @@ class $CompaniesTable extends Companies
         DriftSqlType.bool,
         data['${effectivePrefix}e_invoice_enabled'],
       )!,
+      skontoPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}skonto_percent'],
+      ),
+      skontoDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}skonto_days'],
+      ),
       quotesEnabled: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}quotes_enabled'],
@@ -2007,6 +2054,11 @@ class Company extends DataClass implements Insertable<Company> {
   final String? bic;
   final bool eInvoiceEnabled;
 
+  /// A2-Nachtrag (Kay, 15.11.2026): optionale Skonto-Vorgabe der Firma —
+  /// beide gesetzt = Skonto; sonst keins. Nie aus dem Beleg erraten.
+  final double? skontoPercent;
+  final int? skontoDays;
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -2231,6 +2283,8 @@ class Company extends DataClass implements Insertable<Company> {
     required this.countryCode,
     this.bic,
     required this.eInvoiceEnabled,
+    this.skontoPercent,
+    this.skontoDays,
     required this.quotesEnabled,
     required this.ordersEnabled,
     required this.deliveryNotesEnabled,
@@ -2332,6 +2386,12 @@ class Company extends DataClass implements Insertable<Company> {
       map['bic'] = Variable<String>(bic);
     }
     map['e_invoice_enabled'] = Variable<bool>(eInvoiceEnabled);
+    if (!nullToAbsent || skontoPercent != null) {
+      map['skonto_percent'] = Variable<double>(skontoPercent);
+    }
+    if (!nullToAbsent || skontoDays != null) {
+      map['skonto_days'] = Variable<int>(skontoDays);
+    }
     map['quotes_enabled'] = Variable<bool>(quotesEnabled);
     map['orders_enabled'] = Variable<bool>(ordersEnabled);
     map['delivery_notes_enabled'] = Variable<bool>(deliveryNotesEnabled);
@@ -2526,6 +2586,12 @@ class Company extends DataClass implements Insertable<Company> {
       countryCode: Value(countryCode),
       bic: bic == null && nullToAbsent ? const Value.absent() : Value(bic),
       eInvoiceEnabled: Value(eInvoiceEnabled),
+      skontoPercent: skontoPercent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skontoPercent),
+      skontoDays: skontoDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skontoDays),
       quotesEnabled: Value(quotesEnabled),
       ordersEnabled: Value(ordersEnabled),
       deliveryNotesEnabled: Value(deliveryNotesEnabled),
@@ -2682,6 +2748,8 @@ class Company extends DataClass implements Insertable<Company> {
       countryCode: serializer.fromJson<String>(json['countryCode']),
       bic: serializer.fromJson<String?>(json['bic']),
       eInvoiceEnabled: serializer.fromJson<bool>(json['eInvoiceEnabled']),
+      skontoPercent: serializer.fromJson<double?>(json['skontoPercent']),
+      skontoDays: serializer.fromJson<int?>(json['skontoDays']),
       quotesEnabled: serializer.fromJson<bool>(json['quotesEnabled']),
       ordersEnabled: serializer.fromJson<bool>(json['ordersEnabled']),
       deliveryNotesEnabled: serializer.fromJson<bool>(
@@ -2845,6 +2913,8 @@ class Company extends DataClass implements Insertable<Company> {
       'countryCode': serializer.toJson<String>(countryCode),
       'bic': serializer.toJson<String?>(bic),
       'eInvoiceEnabled': serializer.toJson<bool>(eInvoiceEnabled),
+      'skontoPercent': serializer.toJson<double?>(skontoPercent),
+      'skontoDays': serializer.toJson<int?>(skontoDays),
       'quotesEnabled': serializer.toJson<bool>(quotesEnabled),
       'ordersEnabled': serializer.toJson<bool>(ordersEnabled),
       'deliveryNotesEnabled': serializer.toJson<bool>(deliveryNotesEnabled),
@@ -2962,6 +3032,8 @@ class Company extends DataClass implements Insertable<Company> {
     String? countryCode,
     Value<String?> bic = const Value.absent(),
     bool? eInvoiceEnabled,
+    Value<double?> skontoPercent = const Value.absent(),
+    Value<int?> skontoDays = const Value.absent(),
     bool? quotesEnabled,
     bool? ordersEnabled,
     bool? deliveryNotesEnabled,
@@ -3040,6 +3112,10 @@ class Company extends DataClass implements Insertable<Company> {
     countryCode: countryCode ?? this.countryCode,
     bic: bic.present ? bic.value : this.bic,
     eInvoiceEnabled: eInvoiceEnabled ?? this.eInvoiceEnabled,
+    skontoPercent: skontoPercent.present
+        ? skontoPercent.value
+        : this.skontoPercent,
+    skontoDays: skontoDays.present ? skontoDays.value : this.skontoDays,
     quotesEnabled: quotesEnabled ?? this.quotesEnabled,
     ordersEnabled: ordersEnabled ?? this.ordersEnabled,
     deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
@@ -3188,6 +3264,12 @@ class Company extends DataClass implements Insertable<Company> {
       eInvoiceEnabled: data.eInvoiceEnabled.present
           ? data.eInvoiceEnabled.value
           : this.eInvoiceEnabled,
+      skontoPercent: data.skontoPercent.present
+          ? data.skontoPercent.value
+          : this.skontoPercent,
+      skontoDays: data.skontoDays.present
+          ? data.skontoDays.value
+          : this.skontoDays,
       quotesEnabled: data.quotesEnabled.present
           ? data.quotesEnabled.value
           : this.quotesEnabled,
@@ -3391,6 +3473,8 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('countryCode: $countryCode, ')
           ..write('bic: $bic, ')
           ..write('eInvoiceEnabled: $eInvoiceEnabled, ')
+          ..write('skontoPercent: $skontoPercent, ')
+          ..write('skontoDays: $skontoDays, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
@@ -3476,6 +3560,8 @@ class Company extends DataClass implements Insertable<Company> {
     countryCode,
     bic,
     eInvoiceEnabled,
+    skontoPercent,
+    skontoDays,
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
@@ -3558,6 +3644,8 @@ class Company extends DataClass implements Insertable<Company> {
           other.countryCode == this.countryCode &&
           other.bic == this.bic &&
           other.eInvoiceEnabled == this.eInvoiceEnabled &&
+          other.skontoPercent == this.skontoPercent &&
+          other.skontoDays == this.skontoDays &&
           other.quotesEnabled == this.quotesEnabled &&
           other.ordersEnabled == this.ordersEnabled &&
           other.deliveryNotesEnabled == this.deliveryNotesEnabled &&
@@ -3639,6 +3727,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String> countryCode;
   final Value<String?> bic;
   final Value<bool> eInvoiceEnabled;
+  final Value<double?> skontoPercent;
+  final Value<int?> skontoDays;
   final Value<bool> quotesEnabled;
   final Value<bool> ordersEnabled;
   final Value<bool> deliveryNotesEnabled;
@@ -3718,6 +3808,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.countryCode = const Value.absent(),
     this.bic = const Value.absent(),
     this.eInvoiceEnabled = const Value.absent(),
+    this.skontoPercent = const Value.absent(),
+    this.skontoDays = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
@@ -3798,6 +3890,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.countryCode = const Value.absent(),
     this.bic = const Value.absent(),
     this.eInvoiceEnabled = const Value.absent(),
+    this.skontoPercent = const Value.absent(),
+    this.skontoDays = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
@@ -3880,6 +3974,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? countryCode,
     Expression<String>? bic,
     Expression<bool>? eInvoiceEnabled,
+    Expression<double>? skontoPercent,
+    Expression<int>? skontoDays,
     Expression<bool>? quotesEnabled,
     Expression<bool>? ordersEnabled,
     Expression<bool>? deliveryNotesEnabled,
@@ -3960,6 +4056,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (countryCode != null) 'country_code': countryCode,
       if (bic != null) 'bic': bic,
       if (eInvoiceEnabled != null) 'e_invoice_enabled': eInvoiceEnabled,
+      if (skontoPercent != null) 'skonto_percent': skontoPercent,
+      if (skontoDays != null) 'skonto_days': skontoDays,
       if (quotesEnabled != null) 'quotes_enabled': quotesEnabled,
       if (ordersEnabled != null) 'orders_enabled': ordersEnabled,
       if (deliveryNotesEnabled != null)
@@ -4080,6 +4178,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String>? countryCode,
     Value<String?>? bic,
     Value<bool>? eInvoiceEnabled,
+    Value<double?>? skontoPercent,
+    Value<int?>? skontoDays,
     Value<bool>? quotesEnabled,
     Value<bool>? ordersEnabled,
     Value<bool>? deliveryNotesEnabled,
@@ -4160,6 +4260,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       countryCode: countryCode ?? this.countryCode,
       bic: bic ?? this.bic,
       eInvoiceEnabled: eInvoiceEnabled ?? this.eInvoiceEnabled,
+      skontoPercent: skontoPercent ?? this.skontoPercent,
+      skontoDays: skontoDays ?? this.skontoDays,
       quotesEnabled: quotesEnabled ?? this.quotesEnabled,
       ordersEnabled: ordersEnabled ?? this.ordersEnabled,
       deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
@@ -4296,6 +4398,12 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     }
     if (eInvoiceEnabled.present) {
       map['e_invoice_enabled'] = Variable<bool>(eInvoiceEnabled.value);
+    }
+    if (skontoPercent.present) {
+      map['skonto_percent'] = Variable<double>(skontoPercent.value);
+    }
+    if (skontoDays.present) {
+      map['skonto_days'] = Variable<int>(skontoDays.value);
     }
     if (quotesEnabled.present) {
       map['quotes_enabled'] = Variable<bool>(quotesEnabled.value);
@@ -4571,6 +4679,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('countryCode: $countryCode, ')
           ..write('bic: $bic, ')
           ..write('eInvoiceEnabled: $eInvoiceEnabled, ')
+          ..write('skontoPercent: $skontoPercent, ')
+          ..write('skontoDays: $skontoDays, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
@@ -4823,6 +4933,51 @@ class $CustomersTable extends Customers
     requiredDuringInsert: false,
     defaultValue: const Constant('zugferd'),
   );
+  static const VerificationMeta _paymentTermIdMeta = const VerificationMeta(
+    'paymentTermId',
+  );
+  @override
+  late final GeneratedColumn<String> paymentTermId = GeneratedColumn<String>(
+    'payment_term_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _skontoModeMeta = const VerificationMeta(
+    'skontoMode',
+  );
+  @override
+  late final GeneratedColumn<String> skontoMode = GeneratedColumn<String>(
+    'skonto_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('company'),
+  );
+  static const VerificationMeta _skontoPercentMeta = const VerificationMeta(
+    'skontoPercent',
+  );
+  @override
+  late final GeneratedColumn<double> skontoPercent = GeneratedColumn<double>(
+    'skonto_percent',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _skontoDaysMeta = const VerificationMeta(
+    'skontoDays',
+  );
+  @override
+  late final GeneratedColumn<int> skontoDays = GeneratedColumn<int>(
+    'skonto_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -4842,6 +4997,10 @@ class $CustomersTable extends Customers
     countryCode,
     leitwegId,
     eInvoiceFormat,
+    paymentTermId,
+    skontoMode,
+    skontoPercent,
+    skontoDays,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4974,6 +5133,36 @@ class $CustomersTable extends Customers
         ),
       );
     }
+    if (data.containsKey('payment_term_id')) {
+      context.handle(
+        _paymentTermIdMeta,
+        paymentTermId.isAcceptableOrUnknown(
+          data['payment_term_id']!,
+          _paymentTermIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('skonto_mode')) {
+      context.handle(
+        _skontoModeMeta,
+        skontoMode.isAcceptableOrUnknown(data['skonto_mode']!, _skontoModeMeta),
+      );
+    }
+    if (data.containsKey('skonto_percent')) {
+      context.handle(
+        _skontoPercentMeta,
+        skontoPercent.isAcceptableOrUnknown(
+          data['skonto_percent']!,
+          _skontoPercentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('skonto_days')) {
+      context.handle(
+        _skontoDaysMeta,
+        skontoDays.isAcceptableOrUnknown(data['skonto_days']!, _skontoDaysMeta),
+      );
+    }
     return context;
   }
 
@@ -5051,6 +5240,22 @@ class $CustomersTable extends Customers
         DriftSqlType.string,
         data['${effectivePrefix}e_invoice_format'],
       )!,
+      paymentTermId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payment_term_id'],
+      ),
+      skontoMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}skonto_mode'],
+      )!,
+      skontoPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}skonto_percent'],
+      ),
+      skontoDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}skonto_days'],
+      ),
     );
   }
 
@@ -5093,6 +5298,16 @@ class Customer extends DataClass implements Insertable<Customer> {
   final String countryCode;
   final String? leitwegId;
   final String eInvoiceFormat;
+
+  /// A2-Nachtrag: vom Firmenstandard abweichende Zahlungsbedingung
+  /// (`null` = Firmenstandard) und Skonto (`company` = Firmenvorgabe,
+  /// `none` = kein Skonto, `custom` = [skontoPercent]/[skontoDays]).
+  /// Ohne Fremdschlüssel (SQLite kann Spalten mit FK nicht wieder
+  /// entfernen); `PaymentTermRepository.delete` setzt die Zuordnung zurück.
+  final String? paymentTermId;
+  final String skontoMode;
+  final double? skontoPercent;
+  final int? skontoDays;
   const Customer({
     required this.id,
     required this.companyId,
@@ -5111,6 +5326,10 @@ class Customer extends DataClass implements Insertable<Customer> {
     required this.countryCode,
     this.leitwegId,
     required this.eInvoiceFormat,
+    this.paymentTermId,
+    required this.skontoMode,
+    this.skontoPercent,
+    this.skontoDays,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5154,6 +5373,16 @@ class Customer extends DataClass implements Insertable<Customer> {
       map['leitweg_id'] = Variable<String>(leitwegId);
     }
     map['e_invoice_format'] = Variable<String>(eInvoiceFormat);
+    if (!nullToAbsent || paymentTermId != null) {
+      map['payment_term_id'] = Variable<String>(paymentTermId);
+    }
+    map['skonto_mode'] = Variable<String>(skontoMode);
+    if (!nullToAbsent || skontoPercent != null) {
+      map['skonto_percent'] = Variable<double>(skontoPercent);
+    }
+    if (!nullToAbsent || skontoDays != null) {
+      map['skonto_days'] = Variable<int>(skontoDays);
+    }
     return map;
   }
 
@@ -5196,6 +5425,16 @@ class Customer extends DataClass implements Insertable<Customer> {
           ? const Value.absent()
           : Value(leitwegId),
       eInvoiceFormat: Value(eInvoiceFormat),
+      paymentTermId: paymentTermId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentTermId),
+      skontoMode: Value(skontoMode),
+      skontoPercent: skontoPercent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skontoPercent),
+      skontoDays: skontoDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skontoDays),
     );
   }
 
@@ -5222,6 +5461,10 @@ class Customer extends DataClass implements Insertable<Customer> {
       countryCode: serializer.fromJson<String>(json['countryCode']),
       leitwegId: serializer.fromJson<String?>(json['leitwegId']),
       eInvoiceFormat: serializer.fromJson<String>(json['eInvoiceFormat']),
+      paymentTermId: serializer.fromJson<String?>(json['paymentTermId']),
+      skontoMode: serializer.fromJson<String>(json['skontoMode']),
+      skontoPercent: serializer.fromJson<double?>(json['skontoPercent']),
+      skontoDays: serializer.fromJson<int?>(json['skontoDays']),
     );
   }
   @override
@@ -5245,6 +5488,10 @@ class Customer extends DataClass implements Insertable<Customer> {
       'countryCode': serializer.toJson<String>(countryCode),
       'leitwegId': serializer.toJson<String?>(leitwegId),
       'eInvoiceFormat': serializer.toJson<String>(eInvoiceFormat),
+      'paymentTermId': serializer.toJson<String?>(paymentTermId),
+      'skontoMode': serializer.toJson<String>(skontoMode),
+      'skontoPercent': serializer.toJson<double?>(skontoPercent),
+      'skontoDays': serializer.toJson<int?>(skontoDays),
     };
   }
 
@@ -5266,6 +5513,10 @@ class Customer extends DataClass implements Insertable<Customer> {
     String? countryCode,
     Value<String?> leitwegId = const Value.absent(),
     String? eInvoiceFormat,
+    Value<String?> paymentTermId = const Value.absent(),
+    String? skontoMode,
+    Value<double?> skontoPercent = const Value.absent(),
+    Value<int?> skontoDays = const Value.absent(),
   }) => Customer(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -5286,6 +5537,14 @@ class Customer extends DataClass implements Insertable<Customer> {
     countryCode: countryCode ?? this.countryCode,
     leitwegId: leitwegId.present ? leitwegId.value : this.leitwegId,
     eInvoiceFormat: eInvoiceFormat ?? this.eInvoiceFormat,
+    paymentTermId: paymentTermId.present
+        ? paymentTermId.value
+        : this.paymentTermId,
+    skontoMode: skontoMode ?? this.skontoMode,
+    skontoPercent: skontoPercent.present
+        ? skontoPercent.value
+        : this.skontoPercent,
+    skontoDays: skontoDays.present ? skontoDays.value : this.skontoDays,
   );
   Customer copyWithCompanion(CustomersCompanion data) {
     return Customer(
@@ -5316,6 +5575,18 @@ class Customer extends DataClass implements Insertable<Customer> {
       eInvoiceFormat: data.eInvoiceFormat.present
           ? data.eInvoiceFormat.value
           : this.eInvoiceFormat,
+      paymentTermId: data.paymentTermId.present
+          ? data.paymentTermId.value
+          : this.paymentTermId,
+      skontoMode: data.skontoMode.present
+          ? data.skontoMode.value
+          : this.skontoMode,
+      skontoPercent: data.skontoPercent.present
+          ? data.skontoPercent.value
+          : this.skontoPercent,
+      skontoDays: data.skontoDays.present
+          ? data.skontoDays.value
+          : this.skontoDays,
     );
   }
 
@@ -5338,13 +5609,17 @@ class Customer extends DataClass implements Insertable<Customer> {
           ..write('city: $city, ')
           ..write('countryCode: $countryCode, ')
           ..write('leitwegId: $leitwegId, ')
-          ..write('eInvoiceFormat: $eInvoiceFormat')
+          ..write('eInvoiceFormat: $eInvoiceFormat, ')
+          ..write('paymentTermId: $paymentTermId, ')
+          ..write('skontoMode: $skontoMode, ')
+          ..write('skontoPercent: $skontoPercent, ')
+          ..write('skontoDays: $skontoDays')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     companyId,
     name,
@@ -5362,7 +5637,11 @@ class Customer extends DataClass implements Insertable<Customer> {
     countryCode,
     leitwegId,
     eInvoiceFormat,
-  );
+    paymentTermId,
+    skontoMode,
+    skontoPercent,
+    skontoDays,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5383,7 +5662,11 @@ class Customer extends DataClass implements Insertable<Customer> {
           other.city == this.city &&
           other.countryCode == this.countryCode &&
           other.leitwegId == this.leitwegId &&
-          other.eInvoiceFormat == this.eInvoiceFormat);
+          other.eInvoiceFormat == this.eInvoiceFormat &&
+          other.paymentTermId == this.paymentTermId &&
+          other.skontoMode == this.skontoMode &&
+          other.skontoPercent == this.skontoPercent &&
+          other.skontoDays == this.skontoDays);
 }
 
 class CustomersCompanion extends UpdateCompanion<Customer> {
@@ -5404,6 +5687,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
   final Value<String> countryCode;
   final Value<String?> leitwegId;
   final Value<String> eInvoiceFormat;
+  final Value<String?> paymentTermId;
+  final Value<String> skontoMode;
+  final Value<double?> skontoPercent;
+  final Value<int?> skontoDays;
   final Value<int> rowid;
   const CustomersCompanion({
     this.id = const Value.absent(),
@@ -5423,6 +5710,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.countryCode = const Value.absent(),
     this.leitwegId = const Value.absent(),
     this.eInvoiceFormat = const Value.absent(),
+    this.paymentTermId = const Value.absent(),
+    this.skontoMode = const Value.absent(),
+    this.skontoPercent = const Value.absent(),
+    this.skontoDays = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   CustomersCompanion.insert({
@@ -5443,6 +5734,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     this.countryCode = const Value.absent(),
     this.leitwegId = const Value.absent(),
     this.eInvoiceFormat = const Value.absent(),
+    this.paymentTermId = const Value.absent(),
+    this.skontoMode = const Value.absent(),
+    this.skontoPercent = const Value.absent(),
+    this.skontoDays = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -5466,6 +5761,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Expression<String>? countryCode,
     Expression<String>? leitwegId,
     Expression<String>? eInvoiceFormat,
+    Expression<String>? paymentTermId,
+    Expression<String>? skontoMode,
+    Expression<double>? skontoPercent,
+    Expression<int>? skontoDays,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5486,6 +5785,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       if (countryCode != null) 'country_code': countryCode,
       if (leitwegId != null) 'leitweg_id': leitwegId,
       if (eInvoiceFormat != null) 'e_invoice_format': eInvoiceFormat,
+      if (paymentTermId != null) 'payment_term_id': paymentTermId,
+      if (skontoMode != null) 'skonto_mode': skontoMode,
+      if (skontoPercent != null) 'skonto_percent': skontoPercent,
+      if (skontoDays != null) 'skonto_days': skontoDays,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5508,6 +5811,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     Value<String>? countryCode,
     Value<String?>? leitwegId,
     Value<String>? eInvoiceFormat,
+    Value<String?>? paymentTermId,
+    Value<String>? skontoMode,
+    Value<double?>? skontoPercent,
+    Value<int?>? skontoDays,
     Value<int>? rowid,
   }) {
     return CustomersCompanion(
@@ -5528,6 +5835,10 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
       countryCode: countryCode ?? this.countryCode,
       leitwegId: leitwegId ?? this.leitwegId,
       eInvoiceFormat: eInvoiceFormat ?? this.eInvoiceFormat,
+      paymentTermId: paymentTermId ?? this.paymentTermId,
+      skontoMode: skontoMode ?? this.skontoMode,
+      skontoPercent: skontoPercent ?? this.skontoPercent,
+      skontoDays: skontoDays ?? this.skontoDays,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5586,6 +5897,18 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
     if (eInvoiceFormat.present) {
       map['e_invoice_format'] = Variable<String>(eInvoiceFormat.value);
     }
+    if (paymentTermId.present) {
+      map['payment_term_id'] = Variable<String>(paymentTermId.value);
+    }
+    if (skontoMode.present) {
+      map['skonto_mode'] = Variable<String>(skontoMode.value);
+    }
+    if (skontoPercent.present) {
+      map['skonto_percent'] = Variable<double>(skontoPercent.value);
+    }
+    if (skontoDays.present) {
+      map['skonto_days'] = Variable<int>(skontoDays.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5612,6 +5935,422 @@ class CustomersCompanion extends UpdateCompanion<Customer> {
           ..write('countryCode: $countryCode, ')
           ..write('leitwegId: $leitwegId, ')
           ..write('eInvoiceFormat: $eInvoiceFormat, ')
+          ..write('paymentTermId: $paymentTermId, ')
+          ..write('skontoMode: $skontoMode, ')
+          ..write('skontoPercent: $skontoPercent, ')
+          ..write('skontoDays: $skontoDays, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PaymentTermsTable extends PaymentTerms
+    with TableInfo<$PaymentTermsTable, PaymentTerm> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PaymentTermsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES companies (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _netDaysMeta = const VerificationMeta(
+    'netDays',
+  );
+  @override
+  late final GeneratedColumn<int> netDays = GeneratedColumn<int>(
+    'net_days',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isDefaultMeta = const VerificationMeta(
+    'isDefault',
+  );
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+    'is_default',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_default" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    companyId,
+    label,
+    netDays,
+    isDefault,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'payment_terms';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PaymentTerm> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('net_days')) {
+      context.handle(
+        _netDaysMeta,
+        netDays.isAcceptableOrUnknown(data['net_days']!, _netDaysMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_netDaysMeta);
+    }
+    if (data.containsKey('is_default')) {
+      context.handle(
+        _isDefaultMeta,
+        isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  PaymentTerm map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PaymentTerm(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_id'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      netDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}net_days'],
+      )!,
+      isDefault: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_default'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $PaymentTermsTable createAlias(String alias) {
+    return $PaymentTermsTable(attachedDatabase, alias);
+  }
+}
+
+class PaymentTerm extends DataClass implements Insertable<PaymentTerm> {
+  final String id;
+  final String companyId;
+  final String label;
+
+  /// Zahlungsziel in Tagen ab Belegdatum (0 = sofort).
+  final int netDays;
+  final bool isDefault;
+  final int sortOrder;
+  const PaymentTerm({
+    required this.id,
+    required this.companyId,
+    required this.label,
+    required this.netDays,
+    required this.isDefault,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['company_id'] = Variable<String>(companyId);
+    map['label'] = Variable<String>(label);
+    map['net_days'] = Variable<int>(netDays);
+    map['is_default'] = Variable<bool>(isDefault);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  PaymentTermsCompanion toCompanion(bool nullToAbsent) {
+    return PaymentTermsCompanion(
+      id: Value(id),
+      companyId: Value(companyId),
+      label: Value(label),
+      netDays: Value(netDays),
+      isDefault: Value(isDefault),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory PaymentTerm.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PaymentTerm(
+      id: serializer.fromJson<String>(json['id']),
+      companyId: serializer.fromJson<String>(json['companyId']),
+      label: serializer.fromJson<String>(json['label']),
+      netDays: serializer.fromJson<int>(json['netDays']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'companyId': serializer.toJson<String>(companyId),
+      'label': serializer.toJson<String>(label),
+      'netDays': serializer.toJson<int>(netDays),
+      'isDefault': serializer.toJson<bool>(isDefault),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  PaymentTerm copyWith({
+    String? id,
+    String? companyId,
+    String? label,
+    int? netDays,
+    bool? isDefault,
+    int? sortOrder,
+  }) => PaymentTerm(
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    label: label ?? this.label,
+    netDays: netDays ?? this.netDays,
+    isDefault: isDefault ?? this.isDefault,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  PaymentTerm copyWithCompanion(PaymentTermsCompanion data) {
+    return PaymentTerm(
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      label: data.label.present ? data.label.value : this.label,
+      netDays: data.netDays.present ? data.netDays.value : this.netDays,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PaymentTerm(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('label: $label, ')
+          ..write('netDays: $netDays, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, companyId, label, netDays, isDefault, sortOrder);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PaymentTerm &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.label == this.label &&
+          other.netDays == this.netDays &&
+          other.isDefault == this.isDefault &&
+          other.sortOrder == this.sortOrder);
+}
+
+class PaymentTermsCompanion extends UpdateCompanion<PaymentTerm> {
+  final Value<String> id;
+  final Value<String> companyId;
+  final Value<String> label;
+  final Value<int> netDays;
+  final Value<bool> isDefault;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const PaymentTermsCompanion({
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.label = const Value.absent(),
+    this.netDays = const Value.absent(),
+    this.isDefault = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PaymentTermsCompanion.insert({
+    required String id,
+    required String companyId,
+    required String label,
+    required int netDays,
+    this.isDefault = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       companyId = Value(companyId),
+       label = Value(label),
+       netDays = Value(netDays);
+  static Insertable<PaymentTerm> custom({
+    Expression<String>? id,
+    Expression<String>? companyId,
+    Expression<String>? label,
+    Expression<int>? netDays,
+    Expression<bool>? isDefault,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (label != null) 'label': label,
+      if (netDays != null) 'net_days': netDays,
+      if (isDefault != null) 'is_default': isDefault,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PaymentTermsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? companyId,
+    Value<String>? label,
+    Value<int>? netDays,
+    Value<bool>? isDefault,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return PaymentTermsCompanion(
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      label: label ?? this.label,
+      netDays: netDays ?? this.netDays,
+      isDefault: isDefault ?? this.isDefault,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<String>(companyId.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (netDays.present) {
+      map['net_days'] = Variable<int>(netDays.value);
+    }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PaymentTermsCompanion(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('label: $label, ')
+          ..write('netDays: $netDays, ')
+          ..write('isDefault: $isDefault, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9412,6 +10151,61 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
       'REFERENCES customer_contacts (id) ON DELETE SET NULL',
     ),
   );
+  static const VerificationMeta _paymentTermIdMeta = const VerificationMeta(
+    'paymentTermId',
+  );
+  @override
+  late final GeneratedColumn<String> paymentTermId = GeneratedColumn<String>(
+    'payment_term_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _paymentTermLabelMeta = const VerificationMeta(
+    'paymentTermLabel',
+  );
+  @override
+  late final GeneratedColumn<String> paymentTermLabel = GeneratedColumn<String>(
+    'payment_term_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _paymentNetDaysMeta = const VerificationMeta(
+    'paymentNetDays',
+  );
+  @override
+  late final GeneratedColumn<int> paymentNetDays = GeneratedColumn<int>(
+    'payment_net_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _skontoPercentMeta = const VerificationMeta(
+    'skontoPercent',
+  );
+  @override
+  late final GeneratedColumn<double> skontoPercent = GeneratedColumn<double>(
+    'skonto_percent',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _skontoDaysMeta = const VerificationMeta(
+    'skontoDays',
+  );
+  @override
+  late final GeneratedColumn<int> skontoDays = GeneratedColumn<int>(
+    'skonto_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isAdvancePaymentMeta = const VerificationMeta(
     'isAdvancePayment',
   );
@@ -9518,6 +10312,11 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     convertedFromId,
     projectId,
     contactId,
+    paymentTermId,
+    paymentTermLabel,
+    paymentNetDays,
+    skontoPercent,
+    skontoDays,
     isAdvancePayment,
     isFixedPrice,
     stockBooked,
@@ -9761,6 +10560,48 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         contactId.isAcceptableOrUnknown(data['contact_id']!, _contactIdMeta),
       );
     }
+    if (data.containsKey('payment_term_id')) {
+      context.handle(
+        _paymentTermIdMeta,
+        paymentTermId.isAcceptableOrUnknown(
+          data['payment_term_id']!,
+          _paymentTermIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('payment_term_label')) {
+      context.handle(
+        _paymentTermLabelMeta,
+        paymentTermLabel.isAcceptableOrUnknown(
+          data['payment_term_label']!,
+          _paymentTermLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('payment_net_days')) {
+      context.handle(
+        _paymentNetDaysMeta,
+        paymentNetDays.isAcceptableOrUnknown(
+          data['payment_net_days']!,
+          _paymentNetDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('skonto_percent')) {
+      context.handle(
+        _skontoPercentMeta,
+        skontoPercent.isAcceptableOrUnknown(
+          data['skonto_percent']!,
+          _skontoPercentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('skonto_days')) {
+      context.handle(
+        _skontoDaysMeta,
+        skontoDays.isAcceptableOrUnknown(data['skonto_days']!, _skontoDaysMeta),
+      );
+    }
     if (data.containsKey('is_advance_payment')) {
       context.handle(
         _isAdvancePaymentMeta,
@@ -9929,6 +10770,26 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.string,
         data['${effectivePrefix}contact_id'],
       ),
+      paymentTermId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payment_term_id'],
+      ),
+      paymentTermLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payment_term_label'],
+      ),
+      paymentNetDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}payment_net_days'],
+      ),
+      skontoPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}skonto_percent'],
+      ),
+      skontoDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}skonto_days'],
+      ),
       isAdvancePayment: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_advance_payment'],
@@ -10061,6 +10922,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   /// Kontaktperson nimmt nur die Zuordnung mit.
   final String? contactId;
 
+  /// A2-Nachtrag: gewählte Zahlungsbedingung als Schnappschuss am Beleg
+  /// (Bezeichnung, Ziel, Skonto) — spätere Stammdatenänderungen ändern
+  /// ihn nicht. [paymentTermId] nur zur Vorauswahl im Dropdown.
+  final String? paymentTermId;
+  final String? paymentTermLabel;
+  final int? paymentNetDays;
+  final double? skontoPercent;
+  final int? skontoDays;
+
   /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
   /// markiert eine Rechnung als Abschlags-/Anzahlungsrechnung statt einer
   /// regulären (Schluss-)Rechnung. **Arbeitsvorgabe, keine Rechtsprüfung**
@@ -10138,6 +11008,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.convertedFromId,
     this.projectId,
     this.contactId,
+    this.paymentTermId,
+    this.paymentTermLabel,
+    this.paymentNetDays,
+    this.skontoPercent,
+    this.skontoDays,
     required this.isAdvancePayment,
     required this.isFixedPrice,
     required this.stockBooked,
@@ -10231,6 +11106,21 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     if (!nullToAbsent || contactId != null) {
       map['contact_id'] = Variable<String>(contactId);
     }
+    if (!nullToAbsent || paymentTermId != null) {
+      map['payment_term_id'] = Variable<String>(paymentTermId);
+    }
+    if (!nullToAbsent || paymentTermLabel != null) {
+      map['payment_term_label'] = Variable<String>(paymentTermLabel);
+    }
+    if (!nullToAbsent || paymentNetDays != null) {
+      map['payment_net_days'] = Variable<int>(paymentNetDays);
+    }
+    if (!nullToAbsent || skontoPercent != null) {
+      map['skonto_percent'] = Variable<double>(skontoPercent);
+    }
+    if (!nullToAbsent || skontoDays != null) {
+      map['skonto_days'] = Variable<int>(skontoDays);
+    }
     map['is_advance_payment'] = Variable<bool>(isAdvancePayment);
     map['is_fixed_price'] = Variable<bool>(isFixedPrice);
     map['stock_booked'] = Variable<bool>(stockBooked);
@@ -10319,6 +11209,21 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       contactId: contactId == null && nullToAbsent
           ? const Value.absent()
           : Value(contactId),
+      paymentTermId: paymentTermId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentTermId),
+      paymentTermLabel: paymentTermLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentTermLabel),
+      paymentNetDays: paymentNetDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentNetDays),
+      skontoPercent: skontoPercent == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skontoPercent),
+      skontoDays: skontoDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skontoDays),
       isAdvancePayment: Value(isAdvancePayment),
       isFixedPrice: Value(isFixedPrice),
       stockBooked: Value(stockBooked),
@@ -10393,6 +11298,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       convertedFromId: serializer.fromJson<String?>(json['convertedFromId']),
       projectId: serializer.fromJson<String?>(json['projectId']),
       contactId: serializer.fromJson<String?>(json['contactId']),
+      paymentTermId: serializer.fromJson<String?>(json['paymentTermId']),
+      paymentTermLabel: serializer.fromJson<String?>(json['paymentTermLabel']),
+      paymentNetDays: serializer.fromJson<int?>(json['paymentNetDays']),
+      skontoPercent: serializer.fromJson<double?>(json['skontoPercent']),
+      skontoDays: serializer.fromJson<int?>(json['skontoDays']),
       isAdvancePayment: serializer.fromJson<bool>(json['isAdvancePayment']),
       isFixedPrice: serializer.fromJson<bool>(json['isFixedPrice']),
       stockBooked: serializer.fromJson<bool>(json['stockBooked']),
@@ -10452,6 +11362,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'convertedFromId': serializer.toJson<String?>(convertedFromId),
       'projectId': serializer.toJson<String?>(projectId),
       'contactId': serializer.toJson<String?>(contactId),
+      'paymentTermId': serializer.toJson<String?>(paymentTermId),
+      'paymentTermLabel': serializer.toJson<String?>(paymentTermLabel),
+      'paymentNetDays': serializer.toJson<int?>(paymentNetDays),
+      'skontoPercent': serializer.toJson<double?>(skontoPercent),
+      'skontoDays': serializer.toJson<int?>(skontoDays),
       'isAdvancePayment': serializer.toJson<bool>(isAdvancePayment),
       'isFixedPrice': serializer.toJson<bool>(isFixedPrice),
       'stockBooked': serializer.toJson<bool>(stockBooked),
@@ -10493,6 +11408,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<String?> convertedFromId = const Value.absent(),
     Value<String?> projectId = const Value.absent(),
     Value<String?> contactId = const Value.absent(),
+    Value<String?> paymentTermId = const Value.absent(),
+    Value<String?> paymentTermLabel = const Value.absent(),
+    Value<int?> paymentNetDays = const Value.absent(),
+    Value<double?> skontoPercent = const Value.absent(),
+    Value<int?> skontoDays = const Value.absent(),
     bool? isAdvancePayment,
     bool? isFixedPrice,
     bool? stockBooked,
@@ -10557,6 +11477,19 @@ class Invoice extends DataClass implements Insertable<Invoice> {
         : this.convertedFromId,
     projectId: projectId.present ? projectId.value : this.projectId,
     contactId: contactId.present ? contactId.value : this.contactId,
+    paymentTermId: paymentTermId.present
+        ? paymentTermId.value
+        : this.paymentTermId,
+    paymentTermLabel: paymentTermLabel.present
+        ? paymentTermLabel.value
+        : this.paymentTermLabel,
+    paymentNetDays: paymentNetDays.present
+        ? paymentNetDays.value
+        : this.paymentNetDays,
+    skontoPercent: skontoPercent.present
+        ? skontoPercent.value
+        : this.skontoPercent,
+    skontoDays: skontoDays.present ? skontoDays.value : this.skontoDays,
     isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
     isFixedPrice: isFixedPrice ?? this.isFixedPrice,
     stockBooked: stockBooked ?? this.stockBooked,
@@ -10633,6 +11566,21 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           : this.convertedFromId,
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
       contactId: data.contactId.present ? data.contactId.value : this.contactId,
+      paymentTermId: data.paymentTermId.present
+          ? data.paymentTermId.value
+          : this.paymentTermId,
+      paymentTermLabel: data.paymentTermLabel.present
+          ? data.paymentTermLabel.value
+          : this.paymentTermLabel,
+      paymentNetDays: data.paymentNetDays.present
+          ? data.paymentNetDays.value
+          : this.paymentNetDays,
+      skontoPercent: data.skontoPercent.present
+          ? data.skontoPercent.value
+          : this.skontoPercent,
+      skontoDays: data.skontoDays.present
+          ? data.skontoDays.value
+          : this.skontoDays,
       isAdvancePayment: data.isAdvancePayment.present
           ? data.isAdvancePayment.value
           : this.isAdvancePayment,
@@ -10682,6 +11630,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('convertedFromId: $convertedFromId, ')
           ..write('projectId: $projectId, ')
           ..write('contactId: $contactId, ')
+          ..write('paymentTermId: $paymentTermId, ')
+          ..write('paymentTermLabel: $paymentTermLabel, ')
+          ..write('paymentNetDays: $paymentNetDays, ')
+          ..write('skontoPercent: $skontoPercent, ')
+          ..write('skontoDays: $skontoDays, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
           ..write('stockBooked: $stockBooked, ')
@@ -10723,6 +11676,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     convertedFromId,
     projectId,
     contactId,
+    paymentTermId,
+    paymentTermLabel,
+    paymentNetDays,
+    skontoPercent,
+    skontoDays,
     isAdvancePayment,
     isFixedPrice,
     stockBooked,
@@ -10763,6 +11721,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.convertedFromId == this.convertedFromId &&
           other.projectId == this.projectId &&
           other.contactId == this.contactId &&
+          other.paymentTermId == this.paymentTermId &&
+          other.paymentTermLabel == this.paymentTermLabel &&
+          other.paymentNetDays == this.paymentNetDays &&
+          other.skontoPercent == this.skontoPercent &&
+          other.skontoDays == this.skontoDays &&
           other.isAdvancePayment == this.isAdvancePayment &&
           other.isFixedPrice == this.isFixedPrice &&
           other.stockBooked == this.stockBooked &&
@@ -10801,6 +11764,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String?> convertedFromId;
   final Value<String?> projectId;
   final Value<String?> contactId;
+  final Value<String?> paymentTermId;
+  final Value<String?> paymentTermLabel;
+  final Value<int?> paymentNetDays;
+  final Value<double?> skontoPercent;
+  final Value<int?> skontoDays;
   final Value<bool> isAdvancePayment;
   final Value<bool> isFixedPrice;
   final Value<bool> stockBooked;
@@ -10838,6 +11806,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.convertedFromId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.contactId = const Value.absent(),
+    this.paymentTermId = const Value.absent(),
+    this.paymentTermLabel = const Value.absent(),
+    this.paymentNetDays = const Value.absent(),
+    this.skontoPercent = const Value.absent(),
+    this.skontoDays = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
     this.stockBooked = const Value.absent(),
@@ -10876,6 +11849,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.convertedFromId = const Value.absent(),
     this.projectId = const Value.absent(),
     this.contactId = const Value.absent(),
+    this.paymentTermId = const Value.absent(),
+    this.paymentTermLabel = const Value.absent(),
+    this.paymentNetDays = const Value.absent(),
+    this.skontoPercent = const Value.absent(),
+    this.skontoDays = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
     this.stockBooked = const Value.absent(),
@@ -10921,6 +11899,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? convertedFromId,
     Expression<String>? projectId,
     Expression<String>? contactId,
+    Expression<String>? paymentTermId,
+    Expression<String>? paymentTermLabel,
+    Expression<int>? paymentNetDays,
+    Expression<double>? skontoPercent,
+    Expression<int>? skontoDays,
     Expression<bool>? isAdvancePayment,
     Expression<bool>? isFixedPrice,
     Expression<bool>? stockBooked,
@@ -10970,6 +11953,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (convertedFromId != null) 'converted_from_id': convertedFromId,
       if (projectId != null) 'project_id': projectId,
       if (contactId != null) 'contact_id': contactId,
+      if (paymentTermId != null) 'payment_term_id': paymentTermId,
+      if (paymentTermLabel != null) 'payment_term_label': paymentTermLabel,
+      if (paymentNetDays != null) 'payment_net_days': paymentNetDays,
+      if (skontoPercent != null) 'skonto_percent': skontoPercent,
+      if (skontoDays != null) 'skonto_days': skontoDays,
       if (isAdvancePayment != null) 'is_advance_payment': isAdvancePayment,
       if (isFixedPrice != null) 'is_fixed_price': isFixedPrice,
       if (stockBooked != null) 'stock_booked': stockBooked,
@@ -11010,6 +11998,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String?>? convertedFromId,
     Value<String?>? projectId,
     Value<String?>? contactId,
+    Value<String?>? paymentTermId,
+    Value<String?>? paymentTermLabel,
+    Value<int?>? paymentNetDays,
+    Value<double?>? skontoPercent,
+    Value<int?>? skontoDays,
     Value<bool>? isAdvancePayment,
     Value<bool>? isFixedPrice,
     Value<bool>? stockBooked,
@@ -11054,6 +12047,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       convertedFromId: convertedFromId ?? this.convertedFromId,
       projectId: projectId ?? this.projectId,
       contactId: contactId ?? this.contactId,
+      paymentTermId: paymentTermId ?? this.paymentTermId,
+      paymentTermLabel: paymentTermLabel ?? this.paymentTermLabel,
+      paymentNetDays: paymentNetDays ?? this.paymentNetDays,
+      skontoPercent: skontoPercent ?? this.skontoPercent,
+      skontoDays: skontoDays ?? this.skontoDays,
       isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
       isFixedPrice: isFixedPrice ?? this.isFixedPrice,
       stockBooked: stockBooked ?? this.stockBooked,
@@ -11180,6 +12178,21 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (contactId.present) {
       map['contact_id'] = Variable<String>(contactId.value);
     }
+    if (paymentTermId.present) {
+      map['payment_term_id'] = Variable<String>(paymentTermId.value);
+    }
+    if (paymentTermLabel.present) {
+      map['payment_term_label'] = Variable<String>(paymentTermLabel.value);
+    }
+    if (paymentNetDays.present) {
+      map['payment_net_days'] = Variable<int>(paymentNetDays.value);
+    }
+    if (skontoPercent.present) {
+      map['skonto_percent'] = Variable<double>(skontoPercent.value);
+    }
+    if (skontoDays.present) {
+      map['skonto_days'] = Variable<int>(skontoDays.value);
+    }
     if (isAdvancePayment.present) {
       map['is_advance_payment'] = Variable<bool>(isAdvancePayment.value);
     }
@@ -11238,6 +12251,11 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('convertedFromId: $convertedFromId, ')
           ..write('projectId: $projectId, ')
           ..write('contactId: $contactId, ')
+          ..write('paymentTermId: $paymentTermId, ')
+          ..write('paymentTermLabel: $paymentTermLabel, ')
+          ..write('paymentNetDays: $paymentNetDays, ')
+          ..write('skontoPercent: $skontoPercent, ')
+          ..write('skontoDays: $skontoDays, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
           ..write('stockBooked: $stockBooked, ')
@@ -21630,6 +22648,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CompaniesTable companies = $CompaniesTable(this);
   late final $CustomersTable customers = $CustomersTable(this);
+  late final $PaymentTermsTable paymentTerms = $PaymentTermsTable(this);
   late final $CustomerContactsTable customerContacts = $CustomerContactsTable(
     this,
   );
@@ -21676,6 +22695,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     companies,
     customers,
+    paymentTerms,
     customerContacts,
     suppliers,
     articleGroups,
@@ -21709,6 +22729,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('customers', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'companies',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('payment_terms', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -22099,6 +23126,8 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String> countryCode,
       Value<String?> bic,
       Value<bool> eInvoiceEnabled,
+      Value<double?> skontoPercent,
+      Value<int?> skontoDays,
       Value<bool> quotesEnabled,
       Value<bool> ordersEnabled,
       Value<bool> deliveryNotesEnabled,
@@ -22180,6 +23209,8 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String> countryCode,
       Value<String?> bic,
       Value<bool> eInvoiceEnabled,
+      Value<double?> skontoPercent,
+      Value<int?> skontoDays,
       Value<bool> quotesEnabled,
       Value<bool> ordersEnabled,
       Value<bool> deliveryNotesEnabled,
@@ -22262,6 +23293,24 @@ final class $$CompaniesTableReferences
     ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_customersRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$PaymentTermsTable, List<PaymentTerm>>
+  _paymentTermsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.paymentTerms,
+    aliasName: 'companies__id__payment_terms__company_id',
+  );
+
+  $$PaymentTermsTableProcessedTableManager get paymentTermsRefs {
+    final manager = $$PaymentTermsTableTableManager(
+      $_db,
+      $_db.paymentTerms,
+    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_paymentTermsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -22720,6 +23769,16 @@ class $$CompaniesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<bool> get quotesEnabled => $composableBuilder(
     column: $table.quotesEnabled,
     builder: (column) => ColumnFilters(column),
@@ -23046,6 +24105,31 @@ class $$CompaniesTableFilterComposer
           }) => $$CustomersTableFilterComposer(
             $db: $db,
             $table: $db.customers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> paymentTermsRefs(
+    Expression<bool> Function($$PaymentTermsTableFilterComposer f) f,
+  ) {
+    final $$PaymentTermsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.paymentTerms,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PaymentTermsTableFilterComposer(
+            $db: $db,
+            $table: $db.paymentTerms,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -23617,6 +24701,16 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get quotesEnabled => $composableBuilder(
     column: $table.quotesEnabled,
     builder: (column) => ColumnOrderings(column),
@@ -23988,6 +25082,16 @@ class $$CompaniesTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get quotesEnabled => $composableBuilder(
     column: $table.quotesEnabled,
     builder: (column) => column,
@@ -24310,6 +25414,31 @@ class $$CompaniesTableAnnotationComposer
           }) => $$CustomersTableAnnotationComposer(
             $db: $db,
             $table: $db.customers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> paymentTermsRefs<T extends Object>(
+    Expression<T> Function($$PaymentTermsTableAnnotationComposer a) f,
+  ) {
+    final $$PaymentTermsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.paymentTerms,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PaymentTermsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.paymentTerms,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -24814,6 +25943,7 @@ class $$CompaniesTableTableManager
           Company,
           PrefetchHooks Function({
             bool customersRefs,
+            bool paymentTermsRefs,
             bool customerContactsRefs,
             bool suppliersRefs,
             bool articleGroupsRefs,
@@ -24863,6 +25993,8 @@ class $$CompaniesTableTableManager
                 Value<String> countryCode = const Value.absent(),
                 Value<String?> bic = const Value.absent(),
                 Value<bool> eInvoiceEnabled = const Value.absent(),
+                Value<double?> skontoPercent = const Value.absent(),
+                Value<int?> skontoDays = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
@@ -24946,6 +26078,8 @@ class $$CompaniesTableTableManager
                 countryCode: countryCode,
                 bic: bic,
                 eInvoiceEnabled: eInvoiceEnabled,
+                skontoPercent: skontoPercent,
+                skontoDays: skontoDays,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
@@ -25027,6 +26161,8 @@ class $$CompaniesTableTableManager
                 Value<String> countryCode = const Value.absent(),
                 Value<String?> bic = const Value.absent(),
                 Value<bool> eInvoiceEnabled = const Value.absent(),
+                Value<double?> skontoPercent = const Value.absent(),
+                Value<int?> skontoDays = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
@@ -25110,6 +26246,8 @@ class $$CompaniesTableTableManager
                 countryCode: countryCode,
                 bic: bic,
                 eInvoiceEnabled: eInvoiceEnabled,
+                skontoPercent: skontoPercent,
+                skontoDays: skontoDays,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
@@ -25185,6 +26323,7 @@ class $$CompaniesTableTableManager
           prefetchHooksCallback:
               ({
                 customersRefs = false,
+                paymentTermsRefs = false,
                 customerContactsRefs = false,
                 suppliersRefs = false,
                 articleGroupsRefs = false,
@@ -25209,6 +26348,7 @@ class $$CompaniesTableTableManager
                   db: db,
                   explicitlyWatchedTables: [
                     if (customersRefs) db.customers,
+                    if (paymentTermsRefs) db.paymentTerms,
                     if (customerContactsRefs) db.customerContacts,
                     if (suppliersRefs) db.suppliers,
                     if (articleGroupsRefs) db.articleGroups,
@@ -25248,6 +26388,27 @@ class $$CompaniesTableTableManager
                                 table,
                                 p0,
                               ).customersRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.companyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (paymentTermsRefs)
+                        await $_getPrefetchedData<
+                          Company,
+                          $CompaniesTable,
+                          PaymentTerm
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompaniesTableReferences
+                              ._paymentTermsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompaniesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).paymentTermsRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.companyId == item.id,
@@ -25675,6 +26836,7 @@ typedef $$CompaniesTableProcessedTableManager =
       Company,
       PrefetchHooks Function({
         bool customersRefs,
+        bool paymentTermsRefs,
         bool customerContactsRefs,
         bool suppliersRefs,
         bool articleGroupsRefs,
@@ -25715,6 +26877,10 @@ typedef $$CustomersTableCreateCompanionBuilder =
       Value<String> countryCode,
       Value<String?> leitwegId,
       Value<String> eInvoiceFormat,
+      Value<String?> paymentTermId,
+      Value<String> skontoMode,
+      Value<double?> skontoPercent,
+      Value<int?> skontoDays,
       Value<int> rowid,
     });
 typedef $$CustomersTableUpdateCompanionBuilder =
@@ -25736,6 +26902,10 @@ typedef $$CustomersTableUpdateCompanionBuilder =
       Value<String> countryCode,
       Value<String?> leitwegId,
       Value<String> eInvoiceFormat,
+      Value<String?> paymentTermId,
+      Value<String> skontoMode,
+      Value<double?> skontoPercent,
+      Value<int?> skontoDays,
       Value<int> rowid,
     });
 
@@ -25930,6 +27100,26 @@ class $$CustomersTableFilterComposer
 
   ColumnFilters<String> get eInvoiceFormat => $composableBuilder(
     column: $table.eInvoiceFormat,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paymentTermId => $composableBuilder(
+    column: $table.paymentTermId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get skontoMode => $composableBuilder(
+    column: $table.skontoMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -26148,6 +27338,26 @@ class $$CustomersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get paymentTermId => $composableBuilder(
+    column: $table.paymentTermId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get skontoMode => $composableBuilder(
+    column: $table.skontoMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CompaniesTableOrderingComposer get companyId {
     final $$CompaniesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -26236,6 +27446,26 @@ class $$CustomersTableAnnotationComposer
 
   GeneratedColumn<String> get eInvoiceFormat => $composableBuilder(
     column: $table.eInvoiceFormat,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get paymentTermId => $composableBuilder(
+    column: $table.paymentTermId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get skontoMode => $composableBuilder(
+    column: $table.skontoMode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
     builder: (column) => column,
   );
 
@@ -26416,6 +27646,10 @@ class $$CustomersTableTableManager
                 Value<String> countryCode = const Value.absent(),
                 Value<String?> leitwegId = const Value.absent(),
                 Value<String> eInvoiceFormat = const Value.absent(),
+                Value<String?> paymentTermId = const Value.absent(),
+                Value<String> skontoMode = const Value.absent(),
+                Value<double?> skontoPercent = const Value.absent(),
+                Value<int?> skontoDays = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CustomersCompanion(
                 id: id,
@@ -26435,6 +27669,10 @@ class $$CustomersTableTableManager
                 countryCode: countryCode,
                 leitwegId: leitwegId,
                 eInvoiceFormat: eInvoiceFormat,
+                paymentTermId: paymentTermId,
+                skontoMode: skontoMode,
+                skontoPercent: skontoPercent,
+                skontoDays: skontoDays,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -26456,6 +27694,10 @@ class $$CustomersTableTableManager
                 Value<String> countryCode = const Value.absent(),
                 Value<String?> leitwegId = const Value.absent(),
                 Value<String> eInvoiceFormat = const Value.absent(),
+                Value<String?> paymentTermId = const Value.absent(),
+                Value<String> skontoMode = const Value.absent(),
+                Value<double?> skontoPercent = const Value.absent(),
+                Value<int?> skontoDays = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CustomersCompanion.insert(
                 id: id,
@@ -26475,6 +27717,10 @@ class $$CustomersTableTableManager
                 countryCode: countryCode,
                 leitwegId: leitwegId,
                 eInvoiceFormat: eInvoiceFormat,
+                paymentTermId: paymentTermId,
+                skontoMode: skontoMode,
+                skontoPercent: skontoPercent,
+                skontoDays: skontoDays,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -26647,6 +27893,342 @@ typedef $$CustomersTableProcessedTableManager =
         bool invoicesRefs,
         bool recurringInvoiceTemplatesRefs,
       })
+    >;
+typedef $$PaymentTermsTableCreateCompanionBuilder =
+    PaymentTermsCompanion Function({
+      required String id,
+      required String companyId,
+      required String label,
+      required int netDays,
+      Value<bool> isDefault,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$PaymentTermsTableUpdateCompanionBuilder =
+    PaymentTermsCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> label,
+      Value<int> netDays,
+      Value<bool> isDefault,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+final class $$PaymentTermsTableReferences
+    extends BaseReferences<_$AppDatabase, $PaymentTermsTable, PaymentTerm> {
+  $$PaymentTermsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CompaniesTable _companyIdTable(_$AppDatabase db) =>
+      db.companies.createAlias('payment_terms__company_id__companies__id');
+
+  $$CompaniesTableProcessedTableManager get companyId {
+    final $_column = $_itemColumn<String>('company_id')!;
+
+    final manager = $$CompaniesTableTableManager(
+      $_db,
+      $_db.companies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$PaymentTermsTableFilterComposer
+    extends Composer<_$AppDatabase, $PaymentTermsTable> {
+  $$PaymentTermsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get netDays => $composableBuilder(
+    column: $table.netDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CompaniesTableFilterComposer get companyId {
+    final $$CompaniesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableFilterComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PaymentTermsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PaymentTermsTable> {
+  $$PaymentTermsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get netDays => $composableBuilder(
+    column: $table.netDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+    column: $table.isDefault,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CompaniesTableOrderingComposer get companyId {
+    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableOrderingComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PaymentTermsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PaymentTermsTable> {
+  $$PaymentTermsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<int> get netDays =>
+      $composableBuilder(column: $table.netDays, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  $$CompaniesTableAnnotationComposer get companyId {
+    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$PaymentTermsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PaymentTermsTable,
+          PaymentTerm,
+          $$PaymentTermsTableFilterComposer,
+          $$PaymentTermsTableOrderingComposer,
+          $$PaymentTermsTableAnnotationComposer,
+          $$PaymentTermsTableCreateCompanionBuilder,
+          $$PaymentTermsTableUpdateCompanionBuilder,
+          (PaymentTerm, $$PaymentTermsTableReferences),
+          PaymentTerm,
+          PrefetchHooks Function({bool companyId})
+        > {
+  $$PaymentTermsTableTableManager(_$AppDatabase db, $PaymentTermsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PaymentTermsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PaymentTermsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PaymentTermsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> companyId = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<int> netDays = const Value.absent(),
+                Value<bool> isDefault = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PaymentTermsCompanion(
+                id: id,
+                companyId: companyId,
+                label: label,
+                netDays: netDays,
+                isDefault: isDefault,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String companyId,
+                required String label,
+                required int netDays,
+                Value<bool> isDefault = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PaymentTermsCompanion.insert(
+                id: id,
+                companyId: companyId,
+                label: label,
+                netDays: netDays,
+                isDefault: isDefault,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$PaymentTermsTable, PaymentTerm>(table),
+                  $$PaymentTermsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({companyId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (companyId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.companyId,
+                                referencedTable: $$PaymentTermsTableReferences
+                                    ._companyIdTable(db),
+                                referencedColumn: $$PaymentTermsTableReferences
+                                    ._companyIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$PaymentTermsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PaymentTermsTable,
+      PaymentTerm,
+      $$PaymentTermsTableFilterComposer,
+      $$PaymentTermsTableOrderingComposer,
+      $$PaymentTermsTableAnnotationComposer,
+      $$PaymentTermsTableCreateCompanionBuilder,
+      $$PaymentTermsTableUpdateCompanionBuilder,
+      (PaymentTerm, $$PaymentTermsTableReferences),
+      PaymentTerm,
+      PrefetchHooks Function({bool companyId})
     >;
 typedef $$CustomerContactsTableCreateCompanionBuilder =
     CustomerContactsCompanion Function({
@@ -31168,6 +32750,11 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       Value<String?> convertedFromId,
       Value<String?> projectId,
       Value<String?> contactId,
+      Value<String?> paymentTermId,
+      Value<String?> paymentTermLabel,
+      Value<int?> paymentNetDays,
+      Value<double?> skontoPercent,
+      Value<int?> skontoDays,
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
       Value<bool> stockBooked,
@@ -31207,6 +32794,11 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<String?> convertedFromId,
       Value<String?> projectId,
       Value<String?> contactId,
+      Value<String?> paymentTermId,
+      Value<String?> paymentTermLabel,
+      Value<int?> paymentNetDays,
+      Value<double?> skontoPercent,
+      Value<int?> skontoDays,
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
       Value<bool> stockBooked,
@@ -31527,6 +33119,31 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paymentTermId => $composableBuilder(
+    column: $table.paymentTermId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get paymentTermLabel => $composableBuilder(
+    column: $table.paymentTermLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paymentNetDays => $composableBuilder(
+    column: $table.paymentNetDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -31931,6 +33548,31 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get paymentTermId => $composableBuilder(
+    column: $table.paymentTermId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get paymentTermLabel => $composableBuilder(
+    column: $table.paymentTermLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get paymentNetDays => $composableBuilder(
+    column: $table.paymentNetDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isAdvancePayment => $composableBuilder(
     column: $table.isAdvancePayment,
     builder: (column) => ColumnOrderings(column),
@@ -32191,6 +33833,31 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get paymentTermId => $composableBuilder(
+    column: $table.paymentTermId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get paymentTermLabel => $composableBuilder(
+    column: $table.paymentTermLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get paymentNetDays => $composableBuilder(
+    column: $table.paymentNetDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get skontoPercent => $composableBuilder(
+    column: $table.skontoPercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get skontoDays => $composableBuilder(
+    column: $table.skontoDays,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isAdvancePayment => $composableBuilder(
     column: $table.isAdvancePayment,
@@ -32528,6 +34195,11 @@ class $$InvoicesTableTableManager
                 Value<String?> convertedFromId = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<String?> contactId = const Value.absent(),
+                Value<String?> paymentTermId = const Value.absent(),
+                Value<String?> paymentTermLabel = const Value.absent(),
+                Value<int?> paymentNetDays = const Value.absent(),
+                Value<double?> skontoPercent = const Value.absent(),
+                Value<int?> skontoDays = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
                 Value<bool> stockBooked = const Value.absent(),
@@ -32565,6 +34237,11 @@ class $$InvoicesTableTableManager
                 convertedFromId: convertedFromId,
                 projectId: projectId,
                 contactId: contactId,
+                paymentTermId: paymentTermId,
+                paymentTermLabel: paymentTermLabel,
+                paymentNetDays: paymentNetDays,
+                skontoPercent: skontoPercent,
+                skontoDays: skontoDays,
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
                 stockBooked: stockBooked,
@@ -32604,6 +34281,11 @@ class $$InvoicesTableTableManager
                 Value<String?> convertedFromId = const Value.absent(),
                 Value<String?> projectId = const Value.absent(),
                 Value<String?> contactId = const Value.absent(),
+                Value<String?> paymentTermId = const Value.absent(),
+                Value<String?> paymentTermLabel = const Value.absent(),
+                Value<int?> paymentNetDays = const Value.absent(),
+                Value<double?> skontoPercent = const Value.absent(),
+                Value<int?> skontoDays = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
                 Value<bool> stockBooked = const Value.absent(),
@@ -32641,6 +34323,11 @@ class $$InvoicesTableTableManager
                 convertedFromId: convertedFromId,
                 projectId: projectId,
                 contactId: contactId,
+                paymentTermId: paymentTermId,
+                paymentTermLabel: paymentTermLabel,
+                paymentNetDays: paymentNetDays,
+                skontoPercent: skontoPercent,
+                skontoDays: skontoDays,
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
                 stockBooked: stockBooked,
@@ -42948,6 +44635,8 @@ class $AppDatabaseManager {
       $$CompaniesTableTableManager(_db, _db.companies);
   $$CustomersTableTableManager get customers =>
       $$CustomersTableTableManager(_db, _db.customers);
+  $$PaymentTermsTableTableManager get paymentTerms =>
+      $$PaymentTermsTableTableManager(_db, _db.paymentTerms);
   $$CustomerContactsTableTableManager get customerContacts =>
       $$CustomerContactsTableTableManager(_db, _db.customerContacts);
   $$SuppliersTableTableManager get suppliers =>

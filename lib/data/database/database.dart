@@ -13,6 +13,7 @@ part 'database.g.dart';
   tables: [
     Companies,
     Customers,
+    PaymentTerms,
     CustomerContacts,
     Suppliers,
     ArticleGroups,
@@ -49,7 +50,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 38;
+  int get schemaVersion => 39;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -420,6 +421,26 @@ class AppDatabase extends _$AppDatabase {
             // A1-Nachtrag (Kay, 16.11.2026): Barcode je Artikel, je Firma eindeutig.
             await migrator.addColumn(articles, articles.barcode);
             await _createArticleBarcodeIndex();
+          }
+          if (from < 39) {
+            // A2-Nachtrag (Kay, 15./16.11.2026): Zahlungsbedingungen und
+            // Skonto. Vorgaben (Sofort/7/14/30) entstehen beim ersten Lesen
+            // je Firma, nicht hier.
+            await migrator.createTable(paymentTerms);
+            await migrator.addColumn(companies, companies.skontoPercent);
+            await migrator.addColumn(companies, companies.skontoDays);
+            for (final column in [customers.paymentTermId, customers.skontoMode, customers.skontoPercent, customers.skontoDays]) {
+              await migrator.addColumn(customers, column);
+            }
+            for (final column in [
+              invoices.paymentTermId,
+              invoices.paymentTermLabel,
+              invoices.paymentNetDays,
+              invoices.skontoPercent,
+              invoices.skontoDays,
+            ]) {
+              await migrator.addColumn(invoices, column);
+            }
           }
         },
       );

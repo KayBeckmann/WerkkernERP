@@ -38,6 +38,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step23EInvoice,
   _step24SupplierCustomerNumber,
   _step25ArticleBarcode,
+  _step26PaymentTerms,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -624,4 +625,29 @@ Future<void> _step25ArticleBarcode(Session db) async {
   await db.execute(
     'CREATE UNIQUE INDEX IF NOT EXISTS articles_company_barcode_idx ON articles (company_id, barcode) WHERE barcode IS NOT NULL',
   );
+}
+
+/// A2-Nachtrag (Kay, 15./16.11.2026): Zahlungsbedingungen je Firma,
+/// Skonto-Vorgabe (Firma/Kunde) und Schnappschuss am Beleg.
+Future<void> _step26PaymentTerms(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS payment_terms (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      net_days INTEGER NOT NULL,
+      is_default BOOLEAN NOT NULL DEFAULT false,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS payment_terms_company_idx ON payment_terms (company_id)');
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS skonto_percent DOUBLE PRECISION');
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS skonto_days INTEGER');
+  await db.execute('ALTER TABLE customers ADD COLUMN IF NOT EXISTS payment_term_id TEXT');
+  await db.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS skonto_mode TEXT NOT NULL DEFAULT 'company'");
+  await db.execute('ALTER TABLE customers ADD COLUMN IF NOT EXISTS skonto_percent DOUBLE PRECISION');
+  await db.execute('ALTER TABLE customers ADD COLUMN IF NOT EXISTS skonto_days INTEGER');
+  for (final column in ['payment_term_id TEXT', 'payment_term_label TEXT', 'payment_net_days INTEGER', 'skonto_percent DOUBLE PRECISION', 'skonto_days INTEGER']) {
+    await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS $column');
+  }
 }

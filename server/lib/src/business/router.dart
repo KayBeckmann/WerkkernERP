@@ -10,6 +10,8 @@ import '../auth.dart';
 import '../repository.dart';
 import '../util/responses.dart';
 import 'models.dart';
+import 'payment_terms.dart';
+import 'payment_terms_routes.dart';
 import 'repository.dart';
 import 'request_util.dart';
 import 'staff_roles.dart';
@@ -51,6 +53,7 @@ class BusinessRoutes {
     RecurringRoutes(repository: repository, business: business, auth: auth, parseItems: _parseItems).mount(router);
     TimeSheetRoutes(business: business, auth: auth).mount(router);
     StaffRoleRoutes(repository: repository, business: business, auth: auth).mount(router);
+    PaymentTermRoutes(business: business, auth: auth, ensureDefaults: _paymentTermsOf).mount(router);
     ExportRoutes(repository: repository, business: business, auth: auth).mount(router);
     CompanyImportRoutes(repository: repository, business: business, auth: auth).mount(router);
 
@@ -195,6 +198,14 @@ class BusinessRoutes {
         countryCode: (kept('countryCode', existing?.countryCode) ?? 'DE').toUpperCase(),
         leitwegId: kept('leitwegId', existing?.leitwegId),
         eInvoiceFormat: kept('eInvoiceFormat', existing?.eInvoiceFormat) == 'xrechnung' ? 'xrechnung' : 'zugferd',
+        paymentTermId: kept('paymentTermId', existing?.paymentTermId),
+        skontoMode: switch (kept('skontoMode', existing?.skontoMode)) {
+          'none' => 'none',
+          'custom' => 'custom',
+          _ => 'company',
+        },
+        skontoPercent: body.containsKey('skontoPercent') ? (body['skontoPercent'] as num?)?.toDouble() : existing?.skontoPercent,
+        skontoDays: body.containsKey('skontoDays') ? body['skontoDays'] as int? : existing?.skontoDays,
       ),
       error: null,
     );
@@ -562,6 +573,7 @@ class BusinessRoutes {
       ],
       referencedInvoiceNumber: referenced?.number,
       referencedInvoiceDate: referenced?.issueDate,
+      terms: document.terms,
       lines: [
         for (final i in items)
           EInvoiceLine(
@@ -730,6 +742,77 @@ class BusinessRoutes {
     return null;
   }
 
+  /// A2-Nachtrag: `paymentTerm` aus dem Body — `null` = keine Bedingung,
+  /// sonst `{termId?, label, netDays, skontoPercent?, skontoDays?}`.
+  ({DocTerms? value, String? error}) _parseTerms(Object? raw) {
+    if (raw == null) return (value: null, error: null);
+    if (raw is! Map) return (value: null, error: 'paymentTerm (Objekt oder null) erwartet.');
+    final label = _trimmed(raw['label']);
+    final days = raw['netDays'];
+    if (label == null || days is! int || days < 0) {
+      return (value: null, error: 'paymentTerm braucht label und netDays (≥ 0).');
+    }
+    final percent = (raw['skontoPercent'] as num?)?.toDouble();
+    final skontoDays = raw['skontoDays'] as int?;
+    final skonto = percent != null && skontoDays != null;
+    if (skonto && (percent <= 0 || percent >= 100 || skontoDays < 0)) {
+      return (value: null, error: 'Skonto: skontoPercent 0–100 und skontoDays ≥ 0.');
+    }
+    return (
+      value: (
+        termId: raw['termId'] as String?,
+        label: label,
+        netDays: days,
+        skontoPercent: skonto ? percent : null,
+        skontoDays: skonto ? skontoDays : null,
+      ),
+      error: null,
+    );
+  }
+
+  /// Bedingungen der Firma; beim ersten Zugriff entstehen die Vorgaben
+  /// (Sofort/7/14/30, 14 Tage Standard) — wie offline.
+  Future<List<PaymentTerm>> _paymentTermsOf(String companyId) async {
+    final existing = await business.listPaymentTerms(companyId);
+    if (existing.isNotEmpty) return existing;
+    for (final (index, preset) in defaultPaymentTermPresets.indexed) {
+      await business.savePaymentTerm(PaymentTerm(
+        id: _uuid.v4(),
+        companyId: companyId,
+        label: preset.label,
+        netDays: preset.netDays,
+        isDefault: preset.isDefault,
+        sortOrder: index,
+      ));
+    }
+    return business.listPaymentTerms(companyId);
+  }
+
+  /// Kundenstandard vor Firmenstandard, Skonto nach Kundenmodus.
+  Future<DocTerms?> _defaultTerms(String companyId, Customer customer) async {
+    final terms = await _paymentTermsOf(companyId);
+    final profile = await repository.getCompanyProfile(companyId);
+    final resolved = resolvePaymentDefaults(
+      customerTermId: terms.any((t) => t.id == customer.paymentTermId) ? customer.paymentTermId : null,
+      companyDefaultTermId: terms.where((t) => t.isDefault).firstOrNull?.id,
+      customerSkontoMode: customer.skontoMode,
+      customerSkontoPercent: customer.skontoPercent,
+      customerSkontoDays: customer.skontoDays,
+      companySkontoPercent: profile.skontoPercent,
+      companySkontoDays: profile.skontoDays,
+    );
+    final term = terms.where((t) => t.id == resolved.termId).firstOrNull;
+    if (term == null) return null;
+    final skonto = resolved.skontoPercent != null && resolved.skontoDays != null;
+    return (
+      termId: term.id,
+      label: term.label,
+      netDays: term.netDays,
+      skontoPercent: skonto ? resolved.skontoPercent : null,
+      skontoDays: skonto ? resolved.skontoDays : null,
+    );
+  }
+
   Future<Response> _createDocument(Request request) async {
     final body = await _body(request);
     final kind = body['kind'] as String? ?? 'invoice';
@@ -739,8 +822,18 @@ class BusinessRoutes {
     final companyId = check.auth!.session.companyId;
 
     final customerId = body['customerId'] as String?;
-    if (customerId == null || await business.findCustomer(companyId, customerId) == null) {
+    final customer = customerId == null ? null : await business.findCustomer(companyId, customerId);
+    if (customerId == null || customer == null) {
       return jsonError('Kunde nicht gefunden.', status: 404);
+    }
+    // A2-Nachtrag: ausdrücklich oder Vorbelegung (Rechnung/Auftrag).
+    DocTerms? terms;
+    if (body.containsKey('paymentTerm')) {
+      final parsedTerms = _parseTerms(body['paymentTerm']);
+      if (parsedTerms.error != null) return jsonError(parsedTerms.error!);
+      terms = parsedTerms.value;
+    } else if (documentKindUsesPaymentTerms(kind)) {
+      terms = await _defaultTerms(companyId, customer);
     }
     final now = DateTime.now().toUtc();
     final today = DateTime.utc(now.year, now.month, now.day);
@@ -776,6 +869,14 @@ class BusinessRoutes {
       version: 1,
       projectId: projectId,
       contactId: contactId,
+      paymentTermId: terms?.termId,
+      paymentTermLabel: terms?.label,
+      paymentNetDays: terms?.netDays,
+      skontoPercent: terms?.skontoPercent,
+      skontoDays: terms?.skontoDays,
+      dueDate: kind == 'invoice' && terms != null
+          ? DateTime.utc(issueDate.year, issueDate.month, issueDate.day + terms.netDays)
+          : null,
     );
     await business.createDocument(document, parsed.items!);
     await auth.audit(check.auth!, 'document.create', document.kind, id);
@@ -801,6 +902,14 @@ class BusinessRoutes {
     }
     final customer = await business.findCustomer(companyId, customerId);
     if (customer == null) return jsonError('Kunde nicht gefunden.', status: 404);
+    // A2-Nachtrag: Zahlungsbedingung nur ändern, wenn genannt.
+    DocTerms? Function()? termsUpdate;
+    if (body.containsKey('paymentTerm')) {
+      final parsedTerms = _parseTerms(body['paymentTerm']);
+      if (parsedTerms.error != null) return jsonError(parsedTerms.error!);
+      final value = parsedTerms.value;
+      termsUpdate = () => value;
+    }
     // Kontaktperson: nur ändern, wenn genannt; bei Kundenwechsel fällt eine
     // Kontaktperson des alten Kunden weg.
     String? Function()? contactId;
@@ -856,6 +965,7 @@ class BusinessRoutes {
         dueDate: dueDate,
         userId: session.session.userId,
         contactId: contactId,
+        terms: termsUpdate,
       );
       if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
       await auth.audit(check.auth!, 'document.update', existing.kind, id);
@@ -1103,6 +1213,12 @@ class BusinessRoutes {
       projectId: source.projectId,
       isFixedPrice: source.isFixedPrice,
       contactId: source.contactId,
+      // A2-Nachtrag: Bedingung wandert sichtbar mit (Auftrag → Rechnung).
+      paymentTermId: source.paymentTermId,
+      paymentTermLabel: source.paymentTermLabel,
+      paymentNetDays: source.paymentNetDays,
+      skontoPercent: source.skontoPercent,
+      skontoDays: source.skontoDays,
     );
     try {
       await business.createDocument(draft, items, expectedSourceVersion: source.version);

@@ -28,11 +28,22 @@ class Customer {
     this.countryCode = 'DE',
     this.leitwegId,
     this.eInvoiceFormat = 'zugferd',
+    this.paymentTermId,
+    this.skontoMode = 'company',
+    this.skontoPercent,
+    this.skontoDays,
   });
   final String id;
   final String companyId;
   final String name;
   final String? address;
+
+  /// A2-Nachtrag: abweichende Zahlungsbedingung und Skonto-Modus
+  /// (`company`/`none`/`custom`).
+  final String? paymentTermId;
+  final String skontoMode;
+  final double? skontoPercent;
+  final int? skontoDays;
   final String? email;
   final String? phone;
   final String? vatId;
@@ -80,6 +91,35 @@ class Customer {
         countryCode: countryCode,
         leitwegId: leitwegId,
         eInvoiceFormat: eInvoiceFormat,
+        paymentTermId: paymentTermId,
+        skontoMode: skontoMode,
+        skontoPercent: skontoPercent,
+        skontoDays: skontoDays,
+      );
+
+  Customer copyWithPaymentTerm(String? termId) => Customer(
+        id: id,
+        companyId: companyId,
+        name: name,
+        address: address,
+        email: email,
+        phone: phone,
+        vatId: vatId,
+        contactPerson: contactPerson,
+        notes: notes,
+        createdAt: createdAt,
+        invoiceEmail: invoiceEmail,
+        contacts: contacts,
+        street: street,
+        postalCode: postalCode,
+        city: city,
+        countryCode: countryCode,
+        leitwegId: leitwegId,
+        eInvoiceFormat: eInvoiceFormat,
+        paymentTermId: termId,
+        skontoMode: skontoMode,
+        skontoPercent: skontoPercent,
+        skontoDays: skontoDays,
       );
 
   Map<String, Object?> toJson() => {
@@ -100,6 +140,10 @@ class Customer {
         'countryCode': countryCode,
         'leitwegId': leitwegId,
         'eInvoiceFormat': eInvoiceFormat,
+        'paymentTermId': paymentTermId,
+        'skontoMode': skontoMode,
+        'skontoPercent': skontoPercent,
+        'skontoDays': skontoDays,
       };
 }
 
@@ -231,6 +275,9 @@ const itemKinds = {'article', 'hours', 'text'};
 /// Änderung — Grundlage für die Konflikterkennung in B2 ("Kein last
 /// write wins"): ein Update mit veralteter Version wird mit 409
 /// abgewiesen statt still zu überschreiben.
+/// A2-Nachtrag: Zahlungsbedingung eines Belegs (Schnappschuss).
+typedef DocTerms = ({String? termId, String label, int netDays, double? skontoPercent, int? skontoDays});
+
 class Document {
   const Document({
     required this.id,
@@ -271,6 +318,11 @@ class Document {
     this.stockBooked = false,
     this.contactId,
     this.eInvoiceSnapshot,
+    this.paymentTermId,
+    this.paymentTermLabel,
+    this.paymentNetDays,
+    this.skontoPercent,
+    this.skontoDays,
   });
   final String id;
   final String companyId;
@@ -336,6 +388,17 @@ class Document {
   /// (`EInvoiceSnapshot` aus `werkkern_core`), nur bei Rechnung/Gutschrift.
   final String? eInvoiceSnapshot;
 
+  /// A2-Nachtrag: Zahlungsbedingung als Schnappschuss am Beleg.
+  final String? paymentTermId;
+  final String? paymentTermLabel;
+  final int? paymentNetDays;
+  final double? skontoPercent;
+  final int? skontoDays;
+
+  DocumentPaymentTerms? get terms => paymentTermLabel == null || paymentNetDays == null || kind == 'creditNote'
+      ? null
+      : DocumentPaymentTerms(label: paymentTermLabel!, netDays: paymentNetDays!, skontoPercent: skontoPercent, skontoDays: skontoDays);
+
   bool get isDraft => status == 'draft';
 
   /// Kopie mit geänderten Feldern — verhindert, dass beim Aktualisieren
@@ -365,6 +428,7 @@ class Document {
     bool? stockBooked,
     String? Function()? contactId,
     String? eInvoiceSnapshot,
+    DocTerms? Function()? terms,
   }) =>
       Document(
         id: id,
@@ -405,6 +469,11 @@ class Document {
         stockBooked: stockBooked ?? this.stockBooked,
         contactId: contactId != null ? contactId() : this.contactId,
         eInvoiceSnapshot: eInvoiceSnapshot ?? this.eInvoiceSnapshot,
+        paymentTermId: terms != null ? terms()?.termId : paymentTermId,
+        paymentTermLabel: terms != null ? terms()?.label : paymentTermLabel,
+        paymentNetDays: terms != null ? terms()?.netDays : paymentNetDays,
+        skontoPercent: terms != null ? terms()?.skontoPercent : skontoPercent,
+        skontoDays: terms != null ? terms()?.skontoDays : skontoDays,
       );
 
   Map<String, Object?> toJson() => {
@@ -441,6 +510,15 @@ class Document {
         'projectId': projectId,
         'contactId': contactId,
         'eInvoiceSnapshot': eInvoiceSnapshot == null ? null : jsonDecode(eInvoiceSnapshot!),
+        'paymentTerm': paymentTermLabel == null
+            ? null
+            : {
+                'termId': paymentTermId,
+                'label': paymentTermLabel,
+                'netDays': paymentNetDays,
+                'skontoPercent': skontoPercent,
+                'skontoDays': skontoDays,
+              },
         'isAdvancePayment': isAdvancePayment,
         'isFixedPrice': isFixedPrice,
         'stockBooked': stockBooked,

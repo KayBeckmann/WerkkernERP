@@ -944,7 +944,15 @@ class PhaseBRouter {
       city: body.containsKey('city') ? field('city') : current.city,
       countryCode: (body.containsKey('countryCode') ? field('countryCode') : null)?.toUpperCase() ?? current.countryCode,
       bic: body.containsKey('bic') ? field('bic') : current.bic,
+      // A2-Nachtrag: Skonto-Vorgabe — beide Werte oder keiner.
+      skontoPercent: body.containsKey('skontoPercent') ? (body['skontoPercent'] as num?)?.toDouble() : current.skontoPercent,
+      skontoDays: body.containsKey('skontoDays') ? body['skontoDays'] as int? : current.skontoDays,
     );
+    if ((profile.skontoPercent == null) != (profile.skontoDays == null) ||
+        (profile.skontoPercent != null && (profile.skontoPercent! <= 0 || profile.skontoPercent! >= 100)) ||
+        (profile.skontoDays != null && profile.skontoDays! < 0)) {
+      return jsonError('Skonto braucht skontoPercent (0–100) und skontoDays (≥ 0) — oder beides leer.');
+    }
     await repository.saveCompanyProfile(profile);
     await _auth.audit(auth, 'company.profile', 'company', auth.session.companyId);
     return jsonOk(profile.toJson());

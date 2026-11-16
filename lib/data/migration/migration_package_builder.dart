@@ -64,6 +64,8 @@ class MigrationPackageBuilder {
         'iban': company.iban,
         'email': company.email,
         'phone': company.phone,
+        'skontoPercent': company.skontoPercent,
+        'skontoDays': company.skontoDays,
         'street': company.street,
         'postalCode': company.postalCode,
         'city': company.city,
@@ -113,6 +115,11 @@ class MigrationPackageBuilder {
         for (final s in await (db.select(db.numberSequences)..where((s) => s.companyId.equals(companyId))).get())
           {'documentType': s.documentType, 'year': s.year, 'lastNumber': s.lastNumber},
       ],
+      // A2-Nachtrag: Zahlungsbedingungen vor den Kunden (Verweis).
+      'paymentTerms': [
+        for (final t in await (db.select(db.paymentTerms)..where((t) => t.companyId.equals(companyId))).get())
+          {'id': t.id, 'label': t.label, 'netDays': t.netDays, 'isDefault': t.isDefault, 'sortOrder': t.sortOrder},
+      ],
       'customers': [
         for (final c in await (db.select(db.customers)..where((c) => c.companyId.equals(companyId))).get())
           {
@@ -139,6 +146,10 @@ class MigrationPackageBuilder {
             'countryCode': c.countryCode,
             'leitwegId': c.leitwegId,
             'eInvoiceFormat': c.eInvoiceFormat,
+            'paymentTermId': c.paymentTermId,
+            'skontoMode': c.skontoMode,
+            'skontoPercent': c.skontoPercent,
+            'skontoDays': c.skontoDays,
           },
       ],
       'suppliers': [
@@ -228,6 +239,13 @@ class MigrationPackageBuilder {
             'convertedFromId': d.convertedFromId,
             'projectId': d.projectId,
             'contactId': d.contactId,
+            // C15/A2: Schnappschüsse ziehen unverändert mit um.
+            'eInvoiceSnapshot': d.eInvoiceSnapshot,
+            'paymentTermId': d.paymentTermId,
+            'paymentTermLabel': d.paymentTermLabel,
+            'paymentNetDays': d.paymentNetDays,
+            'skontoPercent': d.skontoPercent,
+            'skontoDays': d.skontoDays,
             'isAdvancePayment': d.isAdvancePayment,
             'isFixedPrice': d.isFixedPrice,
             'stockBooked': d.stockBooked,

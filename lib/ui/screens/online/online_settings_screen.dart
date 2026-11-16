@@ -8,6 +8,7 @@ import 'package:werkkern_core/werkkern_core.dart' show Money;
 
 import '../../../domain/services/online_session.dart';
 import '../settings_appearance_screen.dart';
+import 'online_payment_terms_screen.dart';
 import 'online_admin_screen.dart';
 
 /// Einstellungen der Online-Firma — dieselbe Menüseite wie offline
@@ -61,6 +62,13 @@ class OnlineSettingsScreen extends StatelessWidget {
           ),
         if (admin && modules.contains('smtp'))
           adminTile(OnlineAdminSection.mail, Icons.outgoing_mail, 'Server, Zugangsdaten, E-Mail-Vorlagen'),
+        if (admin)
+          _MenuTile(
+            icon: Icons.payments_outlined,
+            title: 'Zahlungsbedingungen',
+            subtitle: 'Sofort, 7/14/30 Tage, Standard, Skonto',
+            onTap: () => _push(context, OnlinePaymentTermsScreen(session: session)),
+          ),
         if (admin && modules.contains('timeTracking'))
           _MenuTile(
             icon: Icons.badge_outlined,

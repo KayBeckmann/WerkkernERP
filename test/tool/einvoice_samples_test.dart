@@ -62,6 +62,7 @@ EInvoiceData _sample(
   bool exempt = false,
   List<EInvoicePriorPayment> prior = const [],
   String? referenced,
+  DocumentPaymentTerms? terms,
 }) =>
     EInvoiceData(
       profile: profile,
@@ -77,6 +78,7 @@ EInvoiceData _sample(
       priorPayments: prior,
       referencedInvoiceNumber: referenced,
       referencedInvoiceDate: referenced == null ? null : DateTime(2026, 11, 1),
+      terms: terms,
       lines: _lines(exempt: exempt),
     );
 
@@ -84,6 +86,14 @@ Map<String, EInvoiceData> _samples(EInvoiceProfile p) => {
       'rechnung': _sample(p),
       'kleinunternehmer': _sample(p, number: 'R-26002', exempt: true),
       'gutschrift': _sample(p, kind: 'creditNote', number: 'G-26001', referenced: 'R-26001'),
+      // A2-Nachtrag: Skonto (XRechnung maschinenlesbar #SKONTO#).
+      'skonto': _sample(p, number: 'R-26005', terms: const DocumentPaymentTerms(label: '14 Tage', netDays: 14, skontoPercent: 2, skontoDays: 7)),
+      'skonto-kleinunternehmer': _sample(
+        p,
+        number: 'R-26006',
+        exempt: true,
+        terms: const DocumentPaymentTerms(label: '30 Tage', netDays: 30, skontoPercent: 3, skontoDays: 10),
+      ),
       'schlussrechnung': _sample(p, number: 'R-26004', prior: const [
         EInvoicePriorPayment(invoiceNumber: 'R-26003', grossCents: 10000),
       ]),
@@ -130,6 +140,7 @@ void main() {
               ),
           ],
           eInvoice: data,
+          terms: data.terms,
         ),
         isPreview: false,
       );

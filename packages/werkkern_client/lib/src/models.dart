@@ -3,6 +3,8 @@
 /// vermischt (ADR-0001 B0.1: kein automatischer Übergang).
 library;
 
+import 'payment_terms.dart';
+
 class OnlineMembership {
   const OnlineMembership({
     required this.companyId,
@@ -51,6 +53,10 @@ class OnlineCustomer {
     this.countryCode = 'DE',
     this.leitwegId,
     this.eInvoiceFormat = 'zugferd',
+    this.paymentTermId,
+    this.skontoMode = 'company',
+    this.skontoPercent,
+    this.skontoDays,
   });
   factory OnlineCustomer.fromJson(Map<String, Object?> j) => OnlineCustomer(
         id: j['id'] as String,
@@ -71,9 +77,19 @@ class OnlineCustomer {
         countryCode: j['countryCode'] as String? ?? 'DE',
         leitwegId: j['leitwegId'] as String?,
         eInvoiceFormat: j['eInvoiceFormat'] as String? ?? 'zugferd',
+        paymentTermId: j['paymentTermId'] as String?,
+        skontoMode: j['skontoMode'] as String? ?? 'company',
+        skontoPercent: (j['skontoPercent'] as num?)?.toDouble(),
+        skontoDays: j['skontoDays'] as int?,
       );
   final String id;
   final String name;
+
+  /// A2-Nachtrag: abweichende Zahlungsbedingung und Skonto-Modus.
+  final String? paymentTermId;
+  final String skontoMode;
+  final double? skontoPercent;
+  final int? skontoDays;
   final String? address;
 
   /// C15 E-Rechnung: strukturierte Anschrift, Leitweg-ID, Format.
@@ -112,6 +128,10 @@ class OnlineCustomer {
         'countryCode': countryCode,
         'leitwegId': leitwegId,
         'eInvoiceFormat': eInvoiceFormat,
+        'paymentTermId': paymentTermId,
+        'skontoMode': skontoMode,
+        'skontoPercent': skontoPercent,
+        'skontoDays': skontoDays,
       };
 }
 
@@ -312,6 +332,7 @@ class OnlineDocument {
     this.taxLines = const [],
     this.rawJson = const {},
     this.eInvoiceSnapshot,
+    this.paymentTerm,
     bool? editable,
   }) : editable = editable ?? status == 'draft';
 
@@ -377,6 +398,7 @@ class OnlineDocument {
       ],
       rawJson: j,
       eInvoiceSnapshot: j['eInvoiceSnapshot'] as Map<String, Object?>?,
+      paymentTerm: j['paymentTerm'] == null ? null : OnlineDocumentTerms.fromJson(j['paymentTerm'] as Map<String, Object?>),
     );
   }
 
@@ -386,6 +408,9 @@ class OnlineDocument {
   /// C15 E-Rechnung: eingefrorene Parteien (nur finalisierte Rechnungen/
   /// Gutschriften), siehe `EInvoiceSnapshot` in `werkkern_core`.
   final Map<String, Object?>? eInvoiceSnapshot;
+
+  /// A2-Nachtrag: Zahlungsbedingung am Beleg.
+  final OnlineDocumentTerms? paymentTerm;
 
   final String id;
   final String customerId;
@@ -550,6 +575,8 @@ class OnlineCompanyProfile {
     this.city,
     this.countryCode = 'DE',
     this.bic,
+    this.skontoPercent,
+    this.skontoDays,
   });
   factory OnlineCompanyProfile.fromJson(Map<String, Object?> j) => OnlineCompanyProfile(
         name: j['name'] as String?,
@@ -573,8 +600,14 @@ class OnlineCompanyProfile {
         city: j['city'] as String?,
         countryCode: j['countryCode'] as String? ?? 'DE',
         bic: j['bic'] as String?,
+        skontoPercent: (j['skontoPercent'] as num?)?.toDouble(),
+        skontoDays: j['skontoDays'] as int?,
       );
   final String? name;
+
+  /// A2-Nachtrag: Skonto-Vorgabe der Firma.
+  final double? skontoPercent;
+  final int? skontoDays;
 
   /// C15 E-Rechnung: strukturierte Anschrift und BIC.
   final String? street;
@@ -613,6 +646,8 @@ class OnlineCompanyProfile {
         'city': city,
         'countryCode': countryCode,
         'bic': bic,
+        'skontoPercent': skontoPercent,
+        'skontoDays': skontoDays,
       };
 }
 

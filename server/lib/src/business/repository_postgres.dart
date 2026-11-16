@@ -14,6 +14,7 @@ import 'dunning.dart';
 import 'fleet.dart';
 import 'purchasing.dart';
 import 'recurring.dart';
+import 'payment_terms.dart';
 import 'staff_roles.dart';
 import 'timesheets.dart';
 import 'stock.dart';
@@ -28,12 +29,13 @@ part 'postgres/dunning.dart';
 part 'postgres/staff_roles.dart';
 part 'postgres/recurring.dart';
 part 'postgres/timesheets.dart';
+part 'postgres/payment_terms.dart';
 part 'postgres/company_import.dart';
 
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets, _PostgresStaffRoles, _PostgresCompanyImport implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets, _PostgresStaffRoles, _PostgresCompanyImport, _PostgresPaymentTerms implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   @override
   final SessionExecutor _db;
@@ -46,7 +48,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
 
   static const _customerColumns =
       'id, company_id, name, address, email, phone, vat_id, contact_person, notes, created_at, invoice_email, '
-      'street, postal_code, city, country_code, leitweg_id, e_invoice_format';
+      'street, postal_code, city, country_code, leitweg_id, e_invoice_format, payment_term_id, skonto_mode, '
+      'skonto_percent, skonto_days';
 
   Customer _toCustomer(ResultRow r) => Customer(
         id: r[0] as String,
@@ -66,6 +69,10 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         countryCode: r[14] as String? ?? 'DE',
         leitwegId: r[15] as String?,
         eInvoiceFormat: r[16] as String? ?? 'zugferd',
+        paymentTermId: r[17] as String?,
+        skontoMode: r[18] as String? ?? 'company',
+        skontoPercent: (r[19] as num?)?.toDouble(),
+        skontoDays: r[20] as int?,
       );
 
   /// Kontaktpersonen der Firma, optional nur eines Kunden, gruppiert nach
@@ -138,6 +145,10 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'countryCode': c.countryCode,
         'leitwegId': c.leitwegId,
         'eInvoiceFormat': c.eInvoiceFormat,
+        'termId': c.paymentTermId,
+        'skontoMode': c.skontoMode,
+        'skontoPercent': TypedValue(Type.double, c.skontoPercent),
+        'skontoDays': TypedValue(Type.integer, c.skontoDays),
       };
 
   @override
@@ -145,7 +156,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
     await _q(
       'INSERT INTO customers ($_customerColumns) VALUES '
       '(@id, @companyId, @name, @address, @email, @phone, @vatId, @contactPerson, @notes, @createdAt, @invoiceEmail, '
-      '@street, @postalCode, @city, @countryCode, @leitwegId, @eInvoiceFormat)',
+      '@street, @postalCode, @city, @countryCode, @leitwegId, @eInvoiceFormat, @termId, @skontoMode, @skontoPercent, @skontoDays)',
       _customerParams(customer),
     );
   }
@@ -156,7 +167,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'UPDATE customers SET name = @name, address = @address, email = @email, phone = @phone, vat_id = @vatId, '
       'contact_person = @contactPerson, notes = @notes, invoice_email = @invoiceEmail, street = @street, '
       'postal_code = @postalCode, city = @city, country_code = @countryCode, leitweg_id = @leitwegId, '
-      'e_invoice_format = @eInvoiceFormat WHERE company_id = @companyId AND id = @id',
+      'e_invoice_format = @eInvoiceFormat, payment_term_id = @termId, skonto_mode = @skontoMode, '
+      'skonto_percent = @skontoPercent, skonto_days = @skontoDays WHERE company_id = @companyId AND id = @id',
       // createdAt ist unveränderlich — der Treiber lehnt überzählige
       // Parameter ab, daher explizit entfernen.
       _customerParams(customer)..remove('createdAt'),
@@ -306,7 +318,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'd.company_snapshot_address, d.company_snapshot_tax_number, d.company_snapshot_vat_id, d.company_snapshot_iban, '
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
       'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked, '
-      'd.contact_id, d.e_invoice_snapshot';
+      'd.contact_id, d.e_invoice_snapshot, d.payment_term_id, d.payment_term_label, d.payment_net_days, '
+      'd.skonto_percent, d.skonto_days';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -347,6 +360,11 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         stockBooked: r[35] as bool,
         contactId: r[36] as String?,
         eInvoiceSnapshot: r[37] as String?,
+        paymentTermId: r[38] as String?,
+        paymentTermLabel: r[39] as String?,
+        paymentNetDays: r[40] as int?,
+        skontoPercent: (r[41] as num?)?.toDouble(),
+        skontoDays: r[42] as int?,
       );
 
   @override
@@ -452,9 +470,11 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       Sql.named(
         'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
         'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id, '
-        'is_advance_payment, is_fixed_price, contact_id) VALUES (@id, @companyId, @customerId, @kind, @status, '
+        'is_advance_payment, is_fixed_price, contact_id, due_date, payment_term_id, payment_term_label, payment_net_days, '
+        'skonto_percent, skonto_days) VALUES (@id, @companyId, @customerId, @kind, @status, '
         '@issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version, '
-        '@convertedFromId, @projectId, @advance, @fixed, @contactId)',
+        '@convertedFromId, @projectId, @advance, @fixed, @contactId, @due, @termId, @termLabel, @termDays, '
+        '@skontoPercent, @skontoDays)',
       ),
       parameters: {
         'id': d.id,
@@ -475,6 +495,12 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'advance': d.isAdvancePayment,
         'fixed': d.isFixedPrice,
         'contactId': d.contactId,
+        'due': TypedValue(Type.date, d.dueDate),
+        'termId': d.paymentTermId,
+        'termLabel': d.paymentTermLabel,
+        'termDays': TypedValue(Type.integer, d.paymentNetDays),
+        'skontoPercent': TypedValue(Type.double, d.skontoPercent),
+        'skontoDays': TypedValue(Type.integer, d.skontoDays),
       },
     );
     await _insertItems(s, items);
@@ -537,6 +563,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
     DateTime? Function()? dueDate,
     String? userId,
     String? Function()? contactId,
+    DocTerms? Function()? terms,
   }) async {
     final updated = await _db.runTx((s) async {
       if (!await _lockEditable(s, companyId, id, expectedVersion)) return false;
@@ -577,10 +604,21 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'is_advance_payment = coalesce(@advance, is_advance_payment), '
           'is_fixed_price = coalesce(@fixed, is_fixed_price), '
           'due_date = CASE WHEN @setDue THEN @due ELSE due_date END, '
-          'contact_id = CASE WHEN @setContact THEN @contactId ELSE contact_id END '
+          'contact_id = CASE WHEN @setContact THEN @contactId ELSE contact_id END, '
+          'payment_term_id = CASE WHEN @setTerms THEN @termId ELSE payment_term_id END, '
+          'payment_term_label = CASE WHEN @setTerms THEN @termLabel ELSE payment_term_label END, '
+          'payment_net_days = CASE WHEN @setTerms THEN @termDays ELSE payment_net_days END, '
+          'skonto_percent = CASE WHEN @setTerms THEN @skontoPercent ELSE skonto_percent END, '
+          'skonto_days = CASE WHEN @setTerms THEN @skontoDays ELSE skonto_days END '
           'WHERE company_id = @companyId AND id = @id',
         ),
         parameters: {
+          'setTerms': TypedValue(Type.boolean, terms != null),
+          'termId': TypedValue(Type.text, terms?.call()?.termId),
+          'termLabel': TypedValue(Type.text, terms?.call()?.label),
+          'termDays': TypedValue(Type.integer, terms?.call()?.netDays),
+          'skontoPercent': TypedValue(Type.double, terms?.call()?.skontoPercent),
+          'skontoDays': TypedValue(Type.integer, terms?.call()?.skontoDays),
           'setDue': TypedValue(Type.boolean, dueDate != null),
           'due': TypedValue(Type.date, dueDate?.call()),
           'setContact': TypedValue(Type.boolean, contactId != null),
@@ -699,6 +737,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, '
           'intro_text_snapshot = @intro, closing_text_snapshot = @closing, footer_text_snapshot = @footer, '
           'small_business_exempt_snapshot = @exempt, e_invoice_snapshot = @eInvoice, '
+          "due_date = CASE WHEN d.kind = 'invoice' AND d.payment_net_days IS NOT NULL "
+          'THEN d.issue_date + d.payment_net_days ELSE d.due_date END, '
           'customer_snapshot_name = c.name, customer_snapshot_address = c.address, customer_snapshot_vat_id = c.vat_id '
           'FROM customers c WHERE c.id = d.customer_id AND d.company_id = @companyId AND d.id = @id',
         ),

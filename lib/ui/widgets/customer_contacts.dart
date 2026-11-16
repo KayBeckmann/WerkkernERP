@@ -41,8 +41,19 @@ class CustomerFormResult {
     this.countryCode = 'DE',
     this.leitwegId,
     this.eInvoiceFormat = 'zugferd',
+    this.paymentTermId,
+    this.skontoMode = 'company',
+    this.skontoPercent,
+    this.skontoDays,
   });
   final String name;
+
+  /// A2-Nachtrag: abweichende Zahlungsbedingung (`null` = Firmenstandard)
+  /// und Skonto (`company`/`none`/`custom`).
+  final String? paymentTermId;
+  final String skontoMode;
+  final double? skontoPercent;
+  final int? skontoDays;
   final String? address;
 
   /// C15 E-Rechnung: strukturierte Anschrift (BG-8), Leitweg-ID (BT-10)
@@ -89,7 +100,10 @@ String? _trimmedOrNull(TextEditingController c) => c.text.trim().isEmpty ? null 
 /// Formular für Kunde inkl. Rechnungs-E-Mail und Kontaktpersonen —
 /// offline und online gleich.
 class CustomerFormDialog extends StatefulWidget {
-  const CustomerFormDialog({super.key, this.existing, this.nameKey});
+  const CustomerFormDialog({super.key, this.existing, this.nameKey, this.paymentTerms = const []});
+
+  /// A2-Nachtrag: Zahlungsbedingungen der Firma (leer = Abschnitt verborgen).
+  final List<({String id, String label})> paymentTerms;
 
   /// `null` = neuer Kunde.
   final CustomerFormResult? existing;
@@ -115,14 +129,22 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
   late final _countryCode = TextEditingController(text: widget.existing?.countryCode ?? 'DE');
   late final _leitwegId = TextEditingController(text: widget.existing?.leitwegId);
   late String _eInvoiceFormat = widget.existing?.eInvoiceFormat ?? 'zugferd';
+  late String? _paymentTermId =
+      widget.paymentTerms.any((t) => t.id == widget.existing?.paymentTermId) ? widget.existing?.paymentTermId : null;
+  late String _skontoMode = widget.existing?.skontoMode ?? 'company';
+  late final _skontoPercent = TextEditingController(
+    text: widget.existing?.skontoPercent == null ? '' : widget.existing!.skontoPercent.toString().replaceAll('.', ','),
+  );
+  late final _skontoDays = TextEditingController(text: widget.existing?.skontoDays?.toString() ?? '');
   late final List<ContactData> _contacts = [...?widget.existing?.contacts];
   String? _error;
+  String? _skontoError;
 
   bool get _isEdit => widget.existing != null;
 
   @override
   void dispose() {
-    for (final c in [_name, _address, _email, _invoiceEmail, _phone, _vatId, _notes, _street, _postalCode, _city, _countryCode, _leitwegId]) {
+    for (final c in [_name, _address, _email, _invoiceEmail, _phone, _vatId, _notes, _street, _postalCode, _city, _countryCode, _leitwegId, _skontoPercent, _skontoDays]) {
       c.dispose();
     }
     super.dispose();
@@ -144,6 +166,13 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
       setState(() => _error = 'Die Rechnungs-E-Mail ist keine E-Mail-Adresse.');
       return;
     }
+    final skontoPercent = double.tryParse(_skontoPercent.text.trim().replaceAll(',', '.'));
+    final skontoDays = int.tryParse(_skontoDays.text.trim());
+    if (_skontoMode == 'custom' &&
+        (skontoPercent == null || skontoPercent <= 0 || skontoPercent >= 100 || skontoDays == null || skontoDays < 0)) {
+      setState(() => _skontoError = 'Eigenes Skonto braucht Prozentsatz (0–100) und Frist in Tagen.');
+      return;
+    }
     Navigator.pop(
       context,
       CustomerFormResult(
@@ -161,6 +190,10 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
         countryCode: (_trimmedOrNull(_countryCode) ?? 'DE').toUpperCase(),
         leitwegId: _trimmedOrNull(_leitwegId),
         eInvoiceFormat: _eInvoiceFormat,
+        paymentTermId: _paymentTermId,
+        skontoMode: _skontoMode,
+        skontoPercent: _skontoMode == 'custom' ? skontoPercent : null,
+        skontoDays: _skontoMode == 'custom' ? skontoDays : null,
       ),
     );
   }
@@ -271,6 +304,55 @@ class _CustomerFormDialogState extends State<CustomerFormDialog> {
                   helperText: 'Pflicht bei XRechnung (öffentliche Auftraggeber).',
                 ),
               ),
+              if (widget.paymentTerms.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const SectionLabel('Zahlung'),
+                DropdownButtonFormField<String?>(
+                  key: const Key('customer-payment-term'),
+                  isExpanded: true,
+                  initialValue: _paymentTermId,
+                  decoration: const InputDecoration(labelText: 'Zahlungsbedingung'),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('Firmenstandard')),
+                    for (final t in widget.paymentTerms) DropdownMenuItem(value: t.id, child: Text(t.label)),
+                  ],
+                  onChanged: (value) => setState(() => _paymentTermId = value),
+                ),
+                DropdownButtonFormField<String>(
+                  key: const Key('customer-skonto-mode'),
+                  isExpanded: true,
+                  initialValue: _skontoMode,
+                  decoration: InputDecoration(labelText: 'Skonto', errorText: _skontoError),
+                  items: const [
+                    DropdownMenuItem(value: 'company', child: Text('Vorgabe der Firma')),
+                    DropdownMenuItem(value: 'none', child: Text('Kein Skonto')),
+                    DropdownMenuItem(value: 'custom', child: Text('Eigenes Skonto')),
+                  ],
+                  onChanged: (value) => setState(() => _skontoMode = value ?? 'company'),
+                ),
+                if (_skontoMode == 'custom')
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          key: const Key('customer-skonto-percent'),
+                          controller: _skontoPercent,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(labelText: 'Skonto %'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          key: const Key('customer-skonto-days'),
+                          controller: _skontoDays,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Frist (Tage)'),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
               const SizedBox(height: 8),
               const SectionLabel('Kontaktpersonen'),
               for (final (index, contact) in _contacts.indexed)

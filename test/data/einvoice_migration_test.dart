@@ -57,6 +57,17 @@ void main() {
     // v37 -> v38 (A1-Nachtrag: Barcode je Artikel).
     raw.execute('DROP INDEX IF EXISTS articles_company_barcode_idx;');
     raw.execute('ALTER TABLE articles DROP COLUMN barcode;');
+    // v38 -> v39 (A2-Nachtrag: Zahlungsbedingungen und Skonto).
+    raw.execute('DROP TABLE IF EXISTS payment_terms;');
+    for (final c in ['skonto_percent', 'skonto_days']) {
+      raw.execute('ALTER TABLE companies DROP COLUMN $c;');
+    }
+    for (final c in ['payment_term_id', 'skonto_mode', 'skonto_percent', 'skonto_days']) {
+      raw.execute('ALTER TABLE customers DROP COLUMN $c;');
+    }
+    for (final c in ['payment_term_id', 'payment_term_label', 'payment_net_days', 'skonto_percent', 'skonto_days']) {
+      raw.execute('ALTER TABLE invoices DROP COLUMN $c;');
+    }
     raw.execute('ALTER TABLE purchase_orders DROP COLUMN supplier_snapshot_customer_number;');
     raw.execute('PRAGMA user_version = 35;');
     raw.close();

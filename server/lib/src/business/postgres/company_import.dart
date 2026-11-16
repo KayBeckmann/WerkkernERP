@@ -41,6 +41,10 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
     }
     await s.execute(Sql.named('DELETE FROM staff_roles WHERE company_id = @c'), parameters: {'c': companyId});
     await s.execute(Sql.named('DELETE FROM expense_categories WHERE company_id = @c'), parameters: {'c': companyId});
+    // A2: evtl. schon angelegte Vorgaben ersetzt das Paket.
+    if (data.paymentTerms.isNotEmpty) {
+      await s.execute(Sql.named('DELETE FROM payment_terms WHERE company_id = @c'), parameters: {'c': companyId});
+    }
 
     for (final c in data.customers) {
       await insert('customers', {
@@ -55,6 +59,17 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'notes': c.notes,
         'created_at': c.createdAt,
         'invoice_email': c.invoiceEmail,
+        // C15/A2: strukturierte Anschrift, E-Rechnung, Zahlung.
+        'street': c.street,
+        'postal_code': c.postalCode,
+        'city': c.city,
+        'country_code': c.countryCode,
+        'leitweg_id': c.leitwegId,
+        'e_invoice_format': c.eInvoiceFormat,
+        'payment_term_id': c.paymentTermId,
+        'skonto_mode': c.skontoMode,
+        'skonto_percent': c.skontoPercent,
+        'skonto_days': c.skontoDays,
       });
       for (final x in c.contacts) {
         await insert('customer_contacts', {
@@ -135,6 +150,16 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
     // Umwandlungsquellen zuerst (Fremdschlüssel converted_from_id).
     final inserted = <String>{};
     // Vor den Positionen: Stunden-Positionen verweisen auf Rollen (C3.4).
+    for (final t in data.paymentTerms) {
+      await insert('payment_terms', {
+        'id': t.id,
+        'company_id': companyId,
+        'label': t.label,
+        'net_days': t.netDays,
+        'is_default': t.isDefault,
+        'sort_order': t.sortOrder,
+      });
+    }
     for (final r in data.staffRoles) {
       await insert('staff_roles', {
         'id': r.id,
@@ -183,6 +208,12 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'is_advance_payment': d.isAdvancePayment,
         'is_fixed_price': d.isFixedPrice,
         'contact_id': d.contactId,
+        'e_invoice_snapshot': d.eInvoiceSnapshot,
+        'payment_term_id': d.paymentTermId,
+        'payment_term_label': d.paymentTermLabel,
+        'payment_net_days': d.paymentNetDays,
+        'skonto_percent': d.skontoPercent,
+        'skonto_days': d.skontoDays,
         'intro_text_snapshot': d.introTextSnapshot,
         'closing_text_snapshot': d.closingTextSnapshot,
         'footer_text_snapshot': d.footerTextSnapshot,

@@ -2,7 +2,7 @@ import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart'
-    show BillingRole, PlannedHoursItem, billBookedHoursByRole, documentConversionTargets;
+    show BillingRole, PlannedHoursItem, billBookedHoursByRole, documentConversionTargets, documentKindUsesPaymentTerms, resolvePaymentDefaults;
 
 import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
@@ -12,6 +12,7 @@ import '../../domain/services/stock_booking_service.dart';
 import '../database/database.dart';
 import '../database/tables.dart';
 import 'number_sequence_repository.dart';
+import 'payment_term_repository.dart';
 import 'time_entry_repository.dart';
 
 /// Eine einzugebende Rechnungsposition (noch ohne ID — die vergibt das
@@ -61,6 +62,11 @@ class AdvancePaymentEntry {
   final String invoiceNumber;
   final Money amountGross;
 }
+
+/// A2-Nachtrag (Kay, 15.11.2026): Zahlungsbedingung eines Belegs —
+/// Bezeichnung, Ziel und optionales Skonto werden am Beleg gespeichert
+/// (Schnappschuss); [termId] dient nur der Vorauswahl.
+typedef DocumentTermsInput = ({String? termId, String label, int netDays, double? skontoPercent, int? skontoDays});
 
 /// C5.1 Lagerbestand (Nachtrag 2026-10-19) — ein Artikel, der beim
 /// Finalisieren unter 0 Lagerbestand fallen würde. Reine Anzeige-
@@ -183,8 +189,17 @@ class InvoiceRepository {
     // Kontaktperson des Kunden (Kay 2026-11-09), optional.
     String? contactId,
     List<InvoiceItemInput> items = const [],
+    // A2-Nachtrag: ausdrückliche Bedingung; ohne Angabe gelten bei
+    // Rechnung/Auftrag Kunden- vor Firmenstandard.
+    DocumentTermsInput? terms,
   }) async {
     _validateItemsForKind(kind, items);
+    final resolvedTerms = terms ??
+        (documentKindUsesPaymentTerms(kind.name) ? await defaultTermsFor(companyId: companyId, customerId: customerId) : null);
+    final resolvedDue = dueDate ??
+        (kind == DocumentKind.invoice && resolvedTerms != null
+            ? DateTime(issueDate.year, issueDate.month, issueDate.day + resolvedTerms.netDays)
+            : null);
     final id = _uuid.v4();
     final now = DateTime.now();
     return _db.transaction(() async {
@@ -201,9 +216,14 @@ class InvoiceRepository {
               notes: Value(notes),
               projectId: Value(projectId),
               isAdvancePayment: Value(isAdvancePayment),
-              dueDate: Value(dueDate),
+              dueDate: Value(resolvedDue),
               isFixedPrice: Value(isFixedPrice),
               contactId: Value(contactId),
+              paymentTermId: Value(resolvedTerms?.termId),
+              paymentTermLabel: Value(resolvedTerms?.label),
+              paymentNetDays: Value(resolvedTerms?.netDays),
+              skontoPercent: Value(resolvedTerms?.skontoPercent),
+              skontoDays: Value(resolvedTerms?.skontoDays),
               createdAt: now,
               updatedAt: now,
             ),
@@ -211,6 +231,38 @@ class InvoiceRepository {
       await _replaceItems(id, items);
       return (await findById(companyId: companyId, id: id))!;
     });
+  }
+
+  /// A2-Nachtrag: Vorbelegung — Kundenstandard vor Firmenstandard, Skonto
+  /// nach Kundenmodus (Firmenvorgabe/keins/eigen). `null`, wenn die Firma
+  /// keine Bedingung hat.
+  Future<DocumentTermsInput?> defaultTermsFor({required String companyId, required String customerId}) async {
+    final company = await (_db.select(_db.companies)..where((c) => c.id.equals(companyId))).getSingleOrNull();
+    final customer = await (_db.select(_db.customers)
+          ..where((c) => c.id.equals(customerId) & c.companyId.equals(companyId)))
+        .getSingleOrNull();
+    if (company == null) return null;
+    final termsRepo = PaymentTermRepository(_db);
+    final all = await termsRepo.listForCompany(companyId);
+    final resolved = resolvePaymentDefaults(
+      customerTermId: all.any((t) => t.id == customer?.paymentTermId) ? customer?.paymentTermId : null,
+      companyDefaultTermId: all.where((t) => t.isDefault).firstOrNull?.id,
+      customerSkontoMode: customer?.skontoMode ?? 'company',
+      customerSkontoPercent: customer?.skontoPercent,
+      customerSkontoDays: customer?.skontoDays,
+      companySkontoPercent: company.skontoPercent,
+      companySkontoDays: company.skontoDays,
+    );
+    final term = all.where((t) => t.id == resolved.termId).firstOrNull;
+    if (term == null) return null;
+    final hasSkonto = resolved.skontoPercent != null && resolved.skontoDays != null;
+    return (
+      termId: term.id,
+      label: term.label,
+      netDays: term.netDays,
+      skontoPercent: hasSkonto ? resolved.skontoPercent : null,
+      skontoDays: hasSkonto ? resolved.skontoDays : null,
+    );
   }
 
   /// Ob ein Dokument noch über [update] bearbeitet werden darf.
@@ -257,6 +309,8 @@ class InvoiceRepository {
     // Kontaktperson: wie projectId absent/null/id.
     Value<String?> contactId = const Value.absent(),
     List<InvoiceItemInput>? items,
+    // A2-Nachtrag: absent = unverändert, Value(null) = keine Bedingung.
+    Value<DocumentTermsInput?> terms = const Value.absent(),
   }) async {
     return _db.transaction(() async {
       final existing = await findById(companyId: companyId, id: id);
@@ -275,6 +329,11 @@ class InvoiceRepository {
           dueDate: dueDate,
           isFixedPrice: Value(isFixedPrice ?? existing.isFixedPrice),
           contactId: contactId,
+          paymentTermId: terms.present ? Value(terms.value?.termId) : const Value.absent(),
+          paymentTermLabel: terms.present ? Value(terms.value?.label) : const Value.absent(),
+          paymentNetDays: terms.present ? Value(terms.value?.netDays) : const Value.absent(),
+          skontoPercent: terms.present ? Value(terms.value?.skontoPercent) : const Value.absent(),
+          skontoDays: terms.present ? Value(terms.value?.skontoDays) : const Value.absent(),
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -414,6 +473,11 @@ class InvoiceRepository {
           companySnapshotTaxNumber: Value(company.taxNumber),
           companySnapshotVatId: Value(company.vatId),
           companySnapshotIban: Value(company.iban),
+          // A2-Nachtrag: Fälligkeit konsistent aus Belegdatum + Zahlungsziel.
+          dueDate: invoice.kind == DocumentKind.invoice && invoice.paymentNetDays != null
+              ? Value(DateTime(
+                  invoice.issueDate.year, invoice.issueDate.month, invoice.issueDate.day + invoice.paymentNetDays!))
+              : const Value.absent(),
           // C15 E-Rechnung: strukturierte Parteien einfrieren (nur bei
           // E-Rechnungs-Dokumentarten; Angebote & Co. brauchen sie nicht).
           eInvoiceSnapshot: Value(
@@ -723,6 +787,12 @@ class InvoiceRepository {
               issueDate: now,
               serviceDate: source.serviceDate,
               paymentTerms: Value(source.paymentTerms),
+              // A2-Nachtrag: Auftrag → Rechnung übernimmt die Bedingung sichtbar.
+              paymentTermId: Value(source.paymentTermId),
+              paymentTermLabel: Value(source.paymentTermLabel),
+              paymentNetDays: Value(source.paymentNetDays),
+              skontoPercent: Value(source.skontoPercent),
+              skontoDays: Value(source.skontoDays),
               notes: Value(source.notes),
               // C1 Projekte: Umwandlung bleibt im selben Projektkontext —
               // der Nutzer kann die Zuordnung danach wie jedes andere

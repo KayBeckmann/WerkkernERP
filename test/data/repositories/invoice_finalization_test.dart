@@ -279,6 +279,8 @@ void main() {
       final company = await companies.create(name: 'Firma A');
       final customer = await customers.create(companyId: company.id, name: 'Kunde');
       final draft = await draftWithOneItem(company.id, customer.id);
+      // A2-Nachtrag: ohne Zahlungsbedingung keine automatische Fälligkeit.
+      await invoices.update(companyId: company.id, id: draft.id, terms: const Value(null), dueDate: const Value(null));
       final finalized = await invoices.finalize(companyId: company.id, id: draft.id);
       expect(finalized!.dueDate, isNull);
 

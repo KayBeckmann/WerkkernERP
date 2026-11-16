@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:werkkern_client/werkkern_client.dart';
+import 'package:werkkern_core/werkkern_core.dart' show DocumentPaymentTerms;
 
 import '../data/database/tables.dart' show DocumentKind;
 import '../data/repositories/invoice_repository.dart' show AdvancePaymentEntry;
@@ -89,6 +90,14 @@ PdfDocumentData onlineDocumentPdfData(
           groupLabel: item.groupLabel,
         ),
     ],
+    terms: document.paymentTerm == null || document.kind == 'creditNote'
+        ? null
+        : DocumentPaymentTerms(
+            label: document.paymentTerm!.label,
+            netDays: document.paymentTerm!.netDays,
+            skontoPercent: document.paymentTerm!.skontoPercent,
+            skontoDays: document.paymentTerm!.skontoDays,
+          ),
     eInvoice: isPreview
         ? null
         : eInvoiceDataForOnlineDocument(document, enabled: eInvoiceEnabled, liveCompany: liveCompany, liveCustomer: liveCustomer),

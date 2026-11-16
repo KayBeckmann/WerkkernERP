@@ -27,6 +27,11 @@ class Companies extends Table {
   TextColumn get bic => text().nullable()();
   BoolColumn get eInvoiceEnabled => boolean().withDefault(const Constant(false))();
 
+  /// A2-Nachtrag (Kay, 15.11.2026): optionale Skonto-Vorgabe der Firma —
+  /// beide gesetzt = Skonto; sonst keins. Nie aus dem Beleg erraten.
+  RealColumn get skontoPercent => real().nullable()();
+  IntColumn get skontoDays => integer().nullable()();
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -275,6 +280,16 @@ class Customers extends Table {
   TextColumn get leitwegId => text().nullable()();
   TextColumn get eInvoiceFormat => text().withDefault(const Constant('zugferd'))();
 
+  /// A2-Nachtrag: vom Firmenstandard abweichende Zahlungsbedingung
+  /// (`null` = Firmenstandard) und Skonto (`company` = Firmenvorgabe,
+  /// `none` = kein Skonto, `custom` = [skontoPercent]/[skontoDays]).
+  /// Ohne Fremdschlüssel (SQLite kann Spalten mit FK nicht wieder
+  /// entfernen); `PaymentTermRepository.delete` setzt die Zuordnung zurück.
+  TextColumn get paymentTermId => text().nullable()();
+  TextColumn get skontoMode => text().withDefault(const Constant('company'))();
+  RealColumn get skontoPercent => real().nullable()();
+  IntColumn get skontoDays => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -282,6 +297,23 @@ class Customers extends Table {
 /// Kontaktpersonen eines Kunden (Kay 2026-11-09), z. B. Max →
 /// Betriebstechniker, Erika → Buchhaltung. Angebote/Aufträge/Rechnungen
 /// können einer davon zugewiesen werden ([Invoices.contactId]).
+/// A2-Nachtrag (Kay, 15.11.2026): Zahlungsbedingungen je Firma als
+/// wiederverwendbare Stammdaten; genau eine ist Firmenstandard.
+class PaymentTerms extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get label => text()();
+
+  /// Zahlungsziel in Tagen ab Belegdatum (0 = sofort).
+  IntColumn get netDays => integer()();
+  BoolColumn get isDefault => boolean().withDefault(const Constant(false))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 class CustomerContacts extends Table {
   TextColumn get id => text()();
   TextColumn get companyId =>
@@ -573,6 +605,15 @@ class Invoices extends Table {
   /// Kontaktperson nimmt nur die Zuordnung mit.
   TextColumn get contactId =>
       text().nullable().references(CustomerContacts, #id, onDelete: KeyAction.setNull)();
+
+  /// A2-Nachtrag: gewählte Zahlungsbedingung als Schnappschuss am Beleg
+  /// (Bezeichnung, Ziel, Skonto) — spätere Stammdatenänderungen ändern
+  /// ihn nicht. [paymentTermId] nur zur Vorauswahl im Dropdown.
+  TextColumn get paymentTermId => text().nullable()();
+  TextColumn get paymentTermLabel => text().nullable()();
+  IntColumn get paymentNetDays => integer().nullable()();
+  RealColumn get skontoPercent => real().nullable()();
+  IntColumn get skontoDays => integer().nullable()();
 
   /// C13 Abschlagsrechnungen (Kay-Priorisierungsentscheidung 2026-10-17):
   /// markiert eine Rechnung als Abschlags-/Anzahlungsrechnung statt einer
