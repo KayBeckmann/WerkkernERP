@@ -153,6 +153,7 @@ class OnlineArticle {
     int? effectiveSalePriceCents,
     this.stockQuantity = '0',
     this.minimumStock,
+    this.barcode,
   }) : effectiveSalePriceCents = effectiveSalePriceCents ?? salePriceCents;
   factory OnlineArticle.fromJson(Map<String, Object?> j) => OnlineArticle(
         id: j['id'] as String,
@@ -167,10 +168,14 @@ class OnlineArticle {
         effectiveSalePriceCents: j['effectiveSalePriceCents'] as int?,
         stockQuantity: j['stockQuantity'] as String? ?? '0',
         minimumStock: j['minimumStock'] as String?,
+        barcode: j['barcode'] as String?,
       );
   final String id;
   final String name;
   final String? unit;
+
+  /// A1-Nachtrag: Barcode der Verpackung (Text, je Firma eindeutig).
+  final String? barcode;
 
   /// Manueller Netto-Verkaufspreis (überschreibt die Kalkulation).
   final int? salePriceCents;
@@ -197,6 +202,7 @@ class OnlineArticle {
         'articleGroupId': articleGroupId,
         'defaultSupplierId': defaultSupplierId,
         'minimumStock': minimumStock,
+        'barcode': barcode,
       };
 }
 

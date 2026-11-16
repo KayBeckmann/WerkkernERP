@@ -76,6 +76,9 @@ dependencies:
   # Backup-Export/-Import über Android-Dateiauswahl (A4).
   file_picker: ^13.1.0
   share_plus: ^13.3.1
+  # A1/C5.5-Nachtrag (Kay, 16.11.2026): Barcode per Kamera scannen
+  # (Android: ML Kit, Web: ZXing). BSD-3-Clause.
+  mobile_scanner: ^7.5.0
   archive: ^4.5.2
   provider: ^6.1.5+1
   cryptography: ^2.9.0

@@ -49,12 +49,13 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 37;
+  int get schemaVersion => 38;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (migrator) async {
           await migrator.createAll();
+          await _createArticleBarcodeIndex();
         },
         // Niemals eine bestehende Stufe nachträglich ändern, nur neue
         // anhängen (A0: "schema-versionierte Migrationen").
@@ -415,6 +416,18 @@ class AppDatabase extends _$AppDatabase {
               await migrator.addColumn(purchaseOrders, purchaseOrders.supplierSnapshotCustomerNumber);
             }
           }
+          if (from < 38) {
+            // A1-Nachtrag (Kay, 16.11.2026): Barcode je Artikel, je Firma eindeutig.
+            await migrator.addColumn(articles, articles.barcode);
+            await _createArticleBarcodeIndex();
+          }
         },
       );
+
+  /// Barcode je Firma eindeutig; leere Barcodes (NULL) beliebig oft.
+  Future<void> _createArticleBarcodeIndex() => customStatement(
+        'CREATE UNIQUE INDEX IF NOT EXISTS articles_company_barcode_idx '
+        'ON articles (company_id, barcode) WHERE barcode IS NOT NULL',
+      );
+
 }

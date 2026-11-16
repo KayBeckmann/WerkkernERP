@@ -108,6 +108,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'default_supplier_id': a.defaultSupplierId,
         'stock_quantity': a.stockQuantity,
         'minimum_stock': a.minimumStock,
+        'barcode': a.barcode,
       });
     }
     for (final p in data.articlePrices) {

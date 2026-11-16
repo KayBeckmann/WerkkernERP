@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Online-Betrieb: Zugriff auf das WerkkernERP-Backend. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- A1/C5.5: Barcode-Scan mit der Kamera; Geräte ohne Kamera bleiben unterstützt. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="WerkkernERP"
         android:name="${applicationName}"

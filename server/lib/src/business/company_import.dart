@@ -362,6 +362,7 @@ class _Parser {
           defaultSupplierId: _ref('supplier', r.optStr('defaultSupplierId'), r.path),
           stockQuantity: r.optDecimal('stockQuantity') ?? '0',
           minimumStock: r.optDecimal('minimumStock'),
+          barcode: r.optStr('barcode'),
         ),
       );
     }

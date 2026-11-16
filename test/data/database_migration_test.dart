@@ -303,6 +303,9 @@ void main() {
       raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
       // v36 -> v37 (C5.2-Nachtrag: Kundennummer beim Lieferanten).
       raw.execute('ALTER TABLE suppliers DROP COLUMN our_customer_number;');
+      // v37 -> v38 (A1-Nachtrag: Barcode je Artikel).
+      raw.execute('DROP INDEX IF EXISTS articles_company_barcode_idx;');
+      raw.execute('ALTER TABLE articles DROP COLUMN barcode;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -746,6 +749,9 @@ void main() {
     raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
     // v36 -> v37 (C5.2-Nachtrag: Kundennummer beim Lieferanten).
     raw.execute('ALTER TABLE suppliers DROP COLUMN our_customer_number;');
+    // v37 -> v38 (A1-Nachtrag: Barcode je Artikel).
+    raw.execute('DROP INDEX IF EXISTS articles_company_barcode_idx;');
+    raw.execute('ALTER TABLE articles DROP COLUMN barcode;');
     raw.execute('ALTER TABLE purchase_orders DROP COLUMN supplier_snapshot_customer_number;');
     raw.execute('PRAGMA user_version = 33;');
     raw.close();
@@ -790,6 +796,9 @@ void main() {
     raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
     // v36 -> v37 (C5.2-Nachtrag: Kundennummer beim Lieferanten).
     raw.execute('ALTER TABLE suppliers DROP COLUMN our_customer_number;');
+    // v37 -> v38 (A1-Nachtrag: Barcode je Artikel).
+    raw.execute('DROP INDEX IF EXISTS articles_company_barcode_idx;');
+    raw.execute('ALTER TABLE articles DROP COLUMN barcode;');
     raw.execute('ALTER TABLE purchase_orders DROP COLUMN supplier_snapshot_customer_number;');
     raw.execute('PRAGMA user_version = 34;');
     raw.close();

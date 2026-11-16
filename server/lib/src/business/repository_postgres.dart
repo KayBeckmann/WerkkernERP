@@ -224,7 +224,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   // ---- Artikel --------------------------------------------------------------
 
   static const _articleColumns = 'id, company_id, name, unit, sale_price_cents, active, created_at, article_group_id, '
-      'default_supplier_id, stock_quantity, minimum_stock';
+      'default_supplier_id, stock_quantity, minimum_stock, barcode';
 
   Article _toArticle(ResultRow r) => Article(
         id: r[0] as String,
@@ -238,6 +238,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         defaultSupplierId: r[8] as String?,
         stockQuantity: r[9] as String,
         minimumStock: r[10] as String?,
+        barcode: r[11] as String?,
       );
 
   @override
@@ -271,13 +272,14 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         'supplierId': a.defaultSupplierId,
         'stock': a.stockQuantity,
         'minimumStock': a.minimumStock,
+        'barcode': a.barcode,
       };
 
   @override
   Future<void> createArticle(Article article) async {
     await _q(
       'INSERT INTO articles ($_articleColumns) VALUES (@id, @companyId, @name, @unit, @price, @active, @createdAt, @groupId, @supplierId, '
-      '@stock, @minimumStock)',
+      '@stock, @minimumStock, @barcode)',
       _articleParams(article),
     );
   }
@@ -286,7 +288,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
   Future<bool> updateArticle(Article article) async {
     final result = await _q(
       'UPDATE articles SET name = @name, unit = @unit, sale_price_cents = @price, active = @active, '
-      'article_group_id = @groupId, default_supplier_id = @supplierId, minimum_stock = @minimumStock '
+      'article_group_id = @groupId, default_supplier_id = @supplierId, minimum_stock = @minimumStock, barcode = @barcode '
       'WHERE company_id = @companyId AND id = @id',
       _articleParams(article)
         ..remove('createdAt')

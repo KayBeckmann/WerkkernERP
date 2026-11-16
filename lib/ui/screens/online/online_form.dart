@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../widgets/barcode_scanner.dart';
 
 /// Feldarten des generischen Online-Formulars.
 enum OnlineFieldType { text, multiline, money, decimal, date, choice, toggle }
@@ -21,6 +22,7 @@ class OnlineField {
     this.options = const {},
     this.helper,
     this.visibleWhen,
+    this.scannable = false,
   });
   final String key;
   final String label;
@@ -37,6 +39,9 @@ class OnlineField {
   /// Werte des Formulars gilt (z. B. Tilgung nur bei Leasing); verborgen
   /// liefert es `null`.
   final bool Function(Map<String, Object?> values)? visibleWhen;
+
+  /// A1-Nachtrag: Textfeld mit Knopf „Barcode scannen“.
+  final bool scannable;
 }
 
 final _dateFormat = DateFormat('dd.MM.yyyy');
@@ -159,6 +164,16 @@ class _OnlineFormDialogState extends State<_OnlineFormDialog> {
             labelText: f.required ? '${f.label} *' : f.label,
             helperText: f.helper,
             suffixText: f.type == OnlineFieldType.money ? '€' : null,
+            suffixIcon: f.scannable
+                ? IconButton(
+                    tooltip: 'Barcode scannen',
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: () async {
+                      final code = await barcodeScanner(context);
+                      if (code != null) _controllers[f.key]?.text = code;
+                    },
+                  )
+                : null,
           ),
         );
       case OnlineFieldType.date:

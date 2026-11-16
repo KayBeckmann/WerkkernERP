@@ -10,7 +10,9 @@ import 'package:werkkern_core/werkkern_core.dart';
 import '../../../domain/services/online_session.dart';
 import '../../../pdf/dunning_letter_pdf_builder.dart';
 import '../../../pdf/online_document_pdf.dart';
+import '../../widgets/barcode_scanner.dart';
 import '../../widgets/einvoice_actions.dart';
+import '../../widgets/scan_position_dialog.dart';
 import 'online_documents_screen.dart' show onlineEditorTitle;
 import 'online_dunning_screen.dart';
 import 'online_item_dialog.dart';
@@ -726,6 +728,73 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     });
   }
 
+  /// C5.5-Nachtrag (Kay, 16.11.2026): Barcode scannen → Artikel der
+  /// aktiven Firma (Serverliste) → Menge und Positionsgruppe → Position,
+  /// wie offline. Keine Lagerbuchung hier.
+  Future<void> _scanArticle() async {
+    final code = await barcodeScanner(context);
+    if (code == null || !mounted) return;
+    final normalized = code.replaceAll(RegExp(r'\s'), '');
+    final article = (await _loadArticles()).where((a) => a.barcode != null && a.barcode == normalized).firstOrNull;
+    if (!mounted) return;
+    if (article == null || !article.active) {
+      _snack(article == null
+          ? 'Kein Artikel mit Barcode $code in dieser Firma — bitte manuell auswählen.'
+          : 'Artikel „${article.name}“ ist deaktiviert — bitte manuell auswählen.');
+      await _addItem();
+      return;
+    }
+    Decimal? existingIn(String? group) {
+      final match = _items.where((i) => i.articleId == article.id && i.groupLabel == group).firstOrNull;
+      return match == null ? null : Decimal.parse(match.quantity);
+    }
+
+    final result = await showScannedArticleDialog(
+      context,
+      articleName: article.name,
+      unit: article.unit,
+      groupLabels: onlineGroupLabels(_items),
+      existingQuantityInGroup: existingIn,
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      final index = result.addToExisting
+          ? _items.indexWhere((i) => i.articleId == article.id && i.groupLabel == result.groupLabel)
+          : -1;
+      if (index >= 0) {
+        final old = _items[index];
+        _items = [..._items]
+          ..[index] = OnlineDocumentItem(
+            kind: old.kind,
+            articleId: old.articleId,
+            description: old.description,
+            quantity: (Decimal.parse(old.quantity) + result.quantity).toString(),
+            unitPriceCents: old.unitPriceCents,
+            vatRatePercent: old.vatRatePercent,
+            unit: old.unit,
+            discountPercent: old.discountPercent,
+            groupLabel: old.groupLabel,
+            staffRoleId: old.staffRoleId,
+          );
+      } else {
+        _items = [
+          ..._items,
+          OnlineDocumentItem(
+            kind: OnlineItemKind.article,
+            articleId: article.id,
+            description: article.name,
+            quantity: result.quantity.toString(),
+            unitPriceCents: article.effectiveSalePriceCents ?? 0,
+            vatRatePercent: _smallBusiness ? 0 : 19,
+            unit: article.unit,
+            groupLabel: result.groupLabel,
+          ),
+        ];
+      }
+      _dirty = true;
+    });
+  }
+
   /// Bestehende Position bearbeiten statt nur löschen + neu anlegen (wie
   /// offline).
   Future<void> _editItem(int index) async {
@@ -870,6 +939,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           icon: const Icon(Icons.picture_as_pdf_outlined),
           tooltip: 'PDF teilen',
           onPressed: _busy || _dirty ? null : _showPdf,
+        ),
+      if (_editable && document.kind != 'creditNote' && session.can('articles.read') && !session.offlineOnly)
+        IconButton(
+          icon: const Icon(Icons.qr_code_scanner),
+          tooltip: 'Barcode scannen',
+          onPressed: _busy ? null : _scanArticle,
         ),
       if (_eInvoiceAvailable)
         PopupMenuButton<String>(

@@ -174,6 +174,7 @@ class MigrationPackageBuilder {
             'active': a.active,
             'stockQuantity': _dec(a.stockQuantity),
             'minimumStock': _dec(a.minimumStock),
+            'barcode': a.barcode,
             'createdAt': _ts(a.createdAt),
           },
       ],

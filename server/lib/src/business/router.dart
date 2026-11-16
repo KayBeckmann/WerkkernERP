@@ -256,11 +256,14 @@ class BusinessRoutes {
   Future<Response> _listArticles(Request request) async {
     final check = await auth.requirePermission(request, 'articles.read');
     if (check.error != null) return check.error!;
-    final articles = await business.listArticles(
+    final barcode = _barcode(request.url.queryParameters['barcode']);
+    var articles = await business.listArticles(
       check.auth!.session.companyId,
-      query: request.url.queryParameters['q'],
-      includeInactive: request.url.queryParameters['includeInactive'] == 'true',
+      query: barcode == null ? request.url.queryParameters['q'] : null,
+      includeInactive: barcode != null || request.url.queryParameters['includeInactive'] == 'true',
     );
+    // A1-Nachtrag: exakte Suche per Scanwert, nur in der eigenen Firma.
+    if (barcode != null) articles = [for (final a in articles) if (a.barcode == barcode) a];
     return jsonOk({'articles': await _suppliers.articlesJson(check.auth!.session.companyId, articles)});
   }
 
@@ -272,7 +275,23 @@ class BusinessRoutes {
     return jsonOk((await _suppliers.articlesJson(check.auth!.session.companyId, [article])).single);
   }
 
-  Article? _articleFromBody(Map<String, Object?> body, {required String id, required String companyId, required DateTime createdAt, required bool defaultActive}) {
+  /// A1-Nachtrag: Barcode säubern (Leerraum raus, leer = null); führende
+  /// Nullen bleiben.
+  static String? _barcode(Object? value) {
+    final code = value is String ? value.replaceAll(RegExp(r'\s'), '') : null;
+    return code == null || code.isEmpty ? null : code;
+  }
+
+  /// 409, wenn der Barcode in der Firma schon an einem anderen Artikel hängt.
+  Future<Response?> _barcodeConflict(String companyId, String? barcode, {String? exceptId}) async {
+    if (barcode == null) return null;
+    final other = (await business.listArticles(companyId, includeInactive: true))
+        .where((a) => a.barcode == barcode && a.id != exceptId)
+        .firstOrNull;
+    return other == null ? null : jsonError('Barcode $barcode ist bereits dem Artikel „${other.name}“ zugeordnet.', status: 409);
+  }
+
+  Article? _articleFromBody(Map<String, Object?> body, {required String id, required String companyId, required DateTime createdAt, required bool defaultActive, Article? existing}) {
     final name = _trimmed(body['name']);
     if (name == null) return null;
     final price = body['salePriceCents'] as int?;
@@ -288,6 +307,8 @@ class BusinessRoutes {
       articleGroupId: _trimmed(body['articleGroupId']),
       defaultSupplierId: _trimmed(body['defaultSupplierId']),
       minimumStock: decimalOrNull(body['minimumStock']),
+      // Ältere Clients kennen das Feld nicht — dann bleibt es unverändert.
+      barcode: body.containsKey('barcode') ? _barcode(body['barcode']) : existing?.barcode,
     );
   }
 
@@ -302,6 +323,8 @@ class BusinessRoutes {
       defaultActive: true,
     );
     if (article == null) return jsonError('name ist Pflicht, salePriceCents (falls gesetzt) >= 0.');
+    final conflict = await _barcodeConflict(article.companyId, article.barcode);
+    if (conflict != null) return conflict;
     final invalid = await _suppliers.validateArticleReferences(
       article.companyId,
       articleGroupId: article.articleGroupId,
@@ -325,8 +348,11 @@ class BusinessRoutes {
       companyId: companyId,
       createdAt: existing.createdAt,
       defaultActive: existing.active,
+      existing: existing,
     );
     if (article == null) return jsonError('name ist Pflicht, salePriceCents (falls gesetzt) >= 0.');
+    final conflict = await _barcodeConflict(companyId, article.barcode, exceptId: id);
+    if (conflict != null) return conflict;
     final invalid = await _suppliers.validateArticleReferences(
       companyId,
       articleGroupId: article.articleGroupId,

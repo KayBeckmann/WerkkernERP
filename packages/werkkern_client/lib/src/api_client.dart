@@ -227,6 +227,13 @@ class WerkkernApiClient {
     return [for (final a in j['articles'] as List) OnlineArticle.fromJson(a as Map<String, Object?>)];
   }
 
+  /// A1-Nachtrag: Artikel der aktiven Firma mit exakt diesem Barcode.
+  Future<OnlineArticle?> articleByBarcode(String barcode) async {
+    final j = _map(await _send('GET', '/articles', query: {'barcode': barcode}));
+    final list = j['articles'] as List;
+    return list.isEmpty ? null : OnlineArticle.fromJson(list.first as Map<String, Object?>);
+  }
+
   // ---- Dokumente ------------------------------------------------------------------
 
   Future<List<OnlineDocument>> documents({String? kind, String? status, String? query}) async {

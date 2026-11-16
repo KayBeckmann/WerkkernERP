@@ -41,9 +41,11 @@ import '../../pdf/invoice_pdf_builder.dart';
 import '../../domain/services/einvoice_builder.dart';
 import '../../domain/services/einvoice_parties.dart' show isEInvoiceKind;
 import '../../domain/services/email_sender.dart' show EmailExtraAttachment;
+import '../widgets/barcode_scanner.dart';
 import '../widgets/einvoice_actions.dart';
 import '../widgets/email_send_dialog.dart';
 import '../widgets/invoice_item_dialog.dart';
+import '../widgets/scan_position_dialog.dart';
 import 'invoices_screen.dart' show DocumentLabels;
 import 'purchase_order_detail_screen.dart';
 
@@ -437,6 +439,76 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         ),
       );
     });
+  }
+
+  /// C5.5-Nachtrag (Kay, 16.11.2026): Barcode scannen → Artikel der
+  /// aktiven Firma → Menge und Positionsgruppe eingeben → Position. Keine
+  /// Lagerbuchung hier (die bleibt bei der Einmalbuchung beim Finalisieren).
+  Future<void> _scanArticle() async {
+    final code = await barcodeScanner(context);
+    if (code == null || !mounted) return;
+    final normalized = normalizeBarcode(code);
+    final article = _articles.where((a) => a.barcode != null && a.barcode == normalized).firstOrNull;
+    if (article == null || !article.active) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(article == null
+            ? 'Kein Artikel mit Barcode $code in dieser Firma — bitte manuell auswählen.'
+            : 'Artikel „${article.name}“ ist deaktiviert — bitte manuell auswählen.'),
+      ));
+      await _addItem();
+      return;
+    }
+    Decimal? existingIn(String? group) {
+      final matches = _items.where((i) => i.articleId == article.id && i.groupLabel == group);
+      return matches.isEmpty ? null : matches.first.quantity;
+    }
+
+    final result = await showScannedArticleDialog(
+      context,
+      articleName: article.name,
+      unit: article.unit,
+      groupLabels: _existingGroupLabels,
+      existingQuantityInGroup: existingIn,
+    );
+    if (result == null || !mounted) return;
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final price = await context.read<ArticleRepository>().effectiveSalePrice(companyId: companyId, articleId: article.id);
+    if (!mounted) return;
+    setState(() {
+      final index = result.addToExisting
+          ? _items.indexWhere((i) => i.articleId == article.id && i.groupLabel == result.groupLabel)
+          : -1;
+      if (index >= 0) {
+        final old = _items[index];
+        _items[index] = _EditableItem(
+          kind: old.kind,
+          articleId: old.articleId,
+          description: old.description,
+          quantity: old.quantity + result.quantity,
+          unitPriceCents: old.unitPriceCents,
+          vatRatePercent: old.vatRatePercent,
+          unit: old.unit,
+          discountPercent: old.discountPercent,
+          groupLabel: old.groupLabel,
+          staffRoleId: old.staffRoleId,
+          existingId: old.existingId,
+        );
+      } else {
+        _items.add(_EditableItem(
+          kind: InvoiceItemKind.article,
+          articleId: article.id,
+          description: article.name,
+          quantity: result.quantity,
+          unitPriceCents: price?.cents ?? 0,
+          vatRatePercent: _isSmallBusinessExempt ? 0 : 19,
+          unit: article.unit,
+          groupLabel: result.groupLabel,
+        ));
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${article.name}: ${result.quantity}${article.unit == null ? '' : ' ${article.unit}'} übernommen — bitte speichern.')),
+    );
   }
 
   /// Bestehende Position bearbeiten statt nur löschen+neu-anlegen zu
@@ -1414,6 +1486,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               icon: const Icon(Icons.request_quote_outlined),
               tooltip: 'Materialabschlag erstellen',
               onPressed: _createMaterialAdvance,
+            ),
+          if (!isLocked && _kind != DocumentKind.creditNote)
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'Barcode scannen',
+              onPressed: _scanArticle,
             ),
           // Vorschau (ENTWURF-Wasserzeichen) macht nur vor der ersten
           // Finalisierung Sinn — danach existiert bereits ein echtes PDF

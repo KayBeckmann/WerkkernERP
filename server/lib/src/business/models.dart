@@ -147,11 +147,16 @@ class Article {
     this.defaultSupplierId,
     this.stockQuantity = '0',
     this.minimumStock,
+    this.barcode,
   });
   final String id;
   final String companyId;
   final String name;
   final String? unit;
+
+  /// A1-Nachtrag (Kay, 16.11.2026): Barcode der Verpackung — Text, je
+  /// Firma eindeutig, nur Identifikation.
+  final String? barcode;
   final int? salePriceCents;
   final bool active;
   final DateTime createdAt;
@@ -175,6 +180,7 @@ class Article {
         defaultSupplierId: defaultSupplierId,
         stockQuantity: stockQuantity,
         minimumStock: minimumStock,
+        barcode: barcode,
       );
 
   Article withStock(String quantity) => Article(
@@ -189,12 +195,14 @@ class Article {
         defaultSupplierId: defaultSupplierId,
         stockQuantity: quantity,
         minimumStock: minimumStock,
+        barcode: barcode,
       );
 
   Map<String, Object?> toJson() => {
         'id': id,
         'name': name,
         'unit': unit,
+        'barcode': barcode,
         'salePriceCents': salePriceCents,
         'active': active,
         'createdAt': createdAt.toIso8601String(),

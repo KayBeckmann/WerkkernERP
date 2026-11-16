@@ -7438,6 +7438,17 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _barcodeMeta = const VerificationMeta(
+    'barcode',
+  );
+  @override
+  late final GeneratedColumn<String> barcode = GeneratedColumn<String>(
+    'barcode',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -7451,6 +7462,7 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     stockQuantity,
     minimumStock,
     createdAt,
+    barcode,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -7550,6 +7562,12 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('barcode')) {
+      context.handle(
+        _barcodeMeta,
+        barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta),
+      );
+    }
     return context;
   }
 
@@ -7603,6 +7621,10 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      barcode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode'],
+      ),
     );
   }
 
@@ -7658,6 +7680,12 @@ class Article extends DataClass implements Insertable<Article> {
   /// "nicht überwacht".
   final double? minimumStock;
   final DateTime createdAt;
+
+  /// A1-Nachtrag (Kay, 16.11.2026): optionaler Barcode der Verpackung
+  /// (EAN/GTIN o. ä.) — **Text**, damit führende Nullen erhalten bleiben.
+  /// Je Firma eindeutig (Index `articles_company_barcode_idx`). Reine
+  /// Identifikation: keine Menge, kein Preis, keine Packungseinheit.
+  final String? barcode;
   const Article({
     required this.id,
     required this.companyId,
@@ -7670,6 +7698,7 @@ class Article extends DataClass implements Insertable<Article> {
     required this.stockQuantity,
     this.minimumStock,
     required this.createdAt,
+    this.barcode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7695,6 +7724,9 @@ class Article extends DataClass implements Insertable<Article> {
       map['minimum_stock'] = Variable<double>(minimumStock);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || barcode != null) {
+      map['barcode'] = Variable<String>(barcode);
+    }
     return map;
   }
 
@@ -7719,6 +7751,9 @@ class Article extends DataClass implements Insertable<Article> {
           ? const Value.absent()
           : Value(minimumStock),
       createdAt: Value(createdAt),
+      barcode: barcode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(barcode),
     );
   }
 
@@ -7743,6 +7778,7 @@ class Article extends DataClass implements Insertable<Article> {
       stockQuantity: serializer.fromJson<double>(json['stockQuantity']),
       minimumStock: serializer.fromJson<double?>(json['minimumStock']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      barcode: serializer.fromJson<String?>(json['barcode']),
     );
   }
   @override
@@ -7760,6 +7796,7 @@ class Article extends DataClass implements Insertable<Article> {
       'stockQuantity': serializer.toJson<double>(stockQuantity),
       'minimumStock': serializer.toJson<double?>(minimumStock),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'barcode': serializer.toJson<String?>(barcode),
     };
   }
 
@@ -7775,6 +7812,7 @@ class Article extends DataClass implements Insertable<Article> {
     double? stockQuantity,
     Value<double?> minimumStock = const Value.absent(),
     DateTime? createdAt,
+    Value<String?> barcode = const Value.absent(),
   }) => Article(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -7793,6 +7831,7 @@ class Article extends DataClass implements Insertable<Article> {
     stockQuantity: stockQuantity ?? this.stockQuantity,
     minimumStock: minimumStock.present ? minimumStock.value : this.minimumStock,
     createdAt: createdAt ?? this.createdAt,
+    barcode: barcode.present ? barcode.value : this.barcode,
   );
   Article copyWithCompanion(ArticlesCompanion data) {
     return Article(
@@ -7817,6 +7856,7 @@ class Article extends DataClass implements Insertable<Article> {
           ? data.minimumStock.value
           : this.minimumStock,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      barcode: data.barcode.present ? data.barcode.value : this.barcode,
     );
   }
 
@@ -7833,7 +7873,8 @@ class Article extends DataClass implements Insertable<Article> {
           ..write('active: $active, ')
           ..write('stockQuantity: $stockQuantity, ')
           ..write('minimumStock: $minimumStock, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('barcode: $barcode')
           ..write(')'))
         .toString();
   }
@@ -7851,6 +7892,7 @@ class Article extends DataClass implements Insertable<Article> {
     stockQuantity,
     minimumStock,
     createdAt,
+    barcode,
   );
   @override
   bool operator ==(Object other) =>
@@ -7866,7 +7908,8 @@ class Article extends DataClass implements Insertable<Article> {
           other.active == this.active &&
           other.stockQuantity == this.stockQuantity &&
           other.minimumStock == this.minimumStock &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.barcode == this.barcode);
 }
 
 class ArticlesCompanion extends UpdateCompanion<Article> {
@@ -7881,6 +7924,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
   final Value<double> stockQuantity;
   final Value<double?> minimumStock;
   final Value<DateTime> createdAt;
+  final Value<String?> barcode;
   final Value<int> rowid;
   const ArticlesCompanion({
     this.id = const Value.absent(),
@@ -7894,6 +7938,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     this.stockQuantity = const Value.absent(),
     this.minimumStock = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.barcode = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ArticlesCompanion.insert({
@@ -7908,6 +7953,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     this.stockQuantity = const Value.absent(),
     this.minimumStock = const Value.absent(),
     required DateTime createdAt,
+    this.barcode = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -7925,6 +7971,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     Expression<double>? stockQuantity,
     Expression<double>? minimumStock,
     Expression<DateTime>? createdAt,
+    Expression<String>? barcode,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -7940,6 +7987,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
       if (stockQuantity != null) 'stock_quantity': stockQuantity,
       if (minimumStock != null) 'minimum_stock': minimumStock,
       if (createdAt != null) 'created_at': createdAt,
+      if (barcode != null) 'barcode': barcode,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -7956,6 +8004,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     Value<double>? stockQuantity,
     Value<double?>? minimumStock,
     Value<DateTime>? createdAt,
+    Value<String?>? barcode,
     Value<int>? rowid,
   }) {
     return ArticlesCompanion(
@@ -7970,6 +8019,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
       stockQuantity: stockQuantity ?? this.stockQuantity,
       minimumStock: minimumStock ?? this.minimumStock,
       createdAt: createdAt ?? this.createdAt,
+      barcode: barcode ?? this.barcode,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -8012,6 +8062,9 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (barcode.present) {
+      map['barcode'] = Variable<String>(barcode.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -8032,6 +8085,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
           ..write('stockQuantity: $stockQuantity, ')
           ..write('minimumStock: $minimumStock, ')
           ..write('createdAt: $createdAt, ')
+          ..write('barcode: $barcode, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -28366,6 +28420,7 @@ typedef $$ArticlesTableCreateCompanionBuilder =
       Value<double> stockQuantity,
       Value<double?> minimumStock,
       required DateTime createdAt,
+      Value<String?> barcode,
       Value<int> rowid,
     });
 typedef $$ArticlesTableUpdateCompanionBuilder =
@@ -28381,6 +28436,7 @@ typedef $$ArticlesTableUpdateCompanionBuilder =
       Value<double> stockQuantity,
       Value<double?> minimumStock,
       Value<DateTime> createdAt,
+      Value<String?> barcode,
       Value<int> rowid,
     });
 
@@ -28618,6 +28674,11 @@ class $$ArticlesTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get barcode => $composableBuilder(
+    column: $table.barcode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -28895,6 +28956,11 @@ class $$ArticlesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CompaniesTableOrderingComposer get companyId {
     final $$CompaniesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -29003,6 +29069,9 @@ class $$ArticlesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get barcode =>
+      $composableBuilder(column: $table.barcode, builder: (column) => column);
 
   $$CompaniesTableAnnotationComposer get companyId {
     final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
@@ -29280,6 +29349,7 @@ class $$ArticlesTableTableManager
                 Value<double> stockQuantity = const Value.absent(),
                 Value<double?> minimumStock = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> barcode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ArticlesCompanion(
                 id: id,
@@ -29293,6 +29363,7 @@ class $$ArticlesTableTableManager
                 stockQuantity: stockQuantity,
                 minimumStock: minimumStock,
                 createdAt: createdAt,
+                barcode: barcode,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -29308,6 +29379,7 @@ class $$ArticlesTableTableManager
                 Value<double> stockQuantity = const Value.absent(),
                 Value<double?> minimumStock = const Value.absent(),
                 required DateTime createdAt,
+                Value<String?> barcode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ArticlesCompanion.insert(
                 id: id,
@@ -29321,6 +29393,7 @@ class $$ArticlesTableTableManager
                 stockQuantity: stockQuantity,
                 minimumStock: minimumStock,
                 createdAt: createdAt,
+                barcode: barcode,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

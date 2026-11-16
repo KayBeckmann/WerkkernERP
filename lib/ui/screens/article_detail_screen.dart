@@ -116,17 +116,25 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
     );
     if (result == null || !mounted) return;
     final companyId = context.read<ActiveCompanyService>().active!.id;
-    final updated = await context.read<ArticleRepository>().update(
-          companyId: companyId,
-          id: _article.id,
-          name: result.name,
-          unit: Value(result.unit),
-          articleGroupId: Value(result.articleGroupId),
-          defaultSupplierId: Value(result.defaultSupplierId),
-          minimumStock: Value(result.minimumStock),
-        );
+    final Article? updated;
+    try {
+      updated = await context.read<ArticleRepository>().update(
+            companyId: companyId,
+            id: _article.id,
+            name: result.name,
+            unit: Value(result.unit),
+            articleGroupId: Value(result.articleGroupId),
+            defaultSupplierId: Value(result.defaultSupplierId),
+            minimumStock: Value(result.minimumStock),
+            barcode: Value(result.barcode),
+          );
+    } on BarcodeInUseException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      return;
+    }
     if (updated == null || !mounted) return;
-    setState(() => _article = updated);
+    final saved = updated;
+    setState(() => _article = saved);
     _reload();
   }
 

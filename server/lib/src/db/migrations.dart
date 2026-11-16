@@ -37,6 +37,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step22CustomerContacts,
   _step23EInvoice,
   _step24SupplierCustomerNumber,
+  _step25ArticleBarcode,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -615,4 +616,12 @@ Future<void> _step23EInvoice(Session db) async {
 Future<void> _step24SupplierCustomerNumber(Session db) async {
   await db.execute('ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS our_customer_number TEXT');
   await db.execute('ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS supplier_snapshot_customer_number TEXT');
+}
+
+/// A1-Nachtrag (Kay, 16.11.2026): Barcode je Artikel, je Firma eindeutig.
+Future<void> _step25ArticleBarcode(Session db) async {
+  await db.execute('ALTER TABLE articles ADD COLUMN IF NOT EXISTS barcode TEXT');
+  await db.execute(
+    'CREATE UNIQUE INDEX IF NOT EXISTS articles_company_barcode_idx ON articles (company_id, barcode) WHERE barcode IS NOT NULL',
+  );
 }

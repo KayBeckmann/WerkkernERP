@@ -401,6 +401,12 @@ class Articles extends Table {
 
   DateTimeColumn get createdAt => dateTime()();
 
+  /// A1-Nachtrag (Kay, 16.11.2026): optionaler Barcode der Verpackung
+  /// (EAN/GTIN o. ä.) — **Text**, damit führende Nullen erhalten bleiben.
+  /// Je Firma eindeutig (Index `articles_company_barcode_idx`). Reine
+  /// Identifikation: keine Menge, kein Preis, keine Packungseinheit.
+  TextColumn get barcode => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

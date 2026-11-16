@@ -5,6 +5,7 @@ import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
 import '../../widgets/article_group_filter.dart';
+import '../../widgets/barcode_scanner.dart';
 import 'online_form.dart';
 
 /// Artikel der Online-Firma (wie offline A1): Liste mit Knopf
@@ -87,6 +88,13 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
       OnlineField('name', 'Bezeichnung', required: true, initial: existing?.name),
       OnlineField('unit', 'Einheit', initial: existing?.unit),
       OnlineField(
+        'barcode',
+        'Barcode (optional)',
+        initial: existing?.barcode,
+        scannable: true,
+        helper: 'Code der Verpackung — nur zur Erkennung, keine Menge.',
+      ),
+      OnlineField(
         'articleGroupId',
         'Artikelgruppe',
         type: OnlineFieldType.choice,
@@ -126,6 +134,7 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
       defaultSupplierId: values['defaultSupplierId'] as String?,
       // Ohne Lagermodul bleibt ein gesetzter Mindestbestand erhalten.
       minimumStock: values.containsKey('minimumStock') ? values['minimumStock'] as String? : existing?.minimumStock,
+      barcode: values['barcode'] as String?,
     ));
   });
   return saved;
@@ -185,6 +194,25 @@ class _ArticleListState extends State<_ArticleList> {
         automaticallyImplyLeading: false,
         title: const Text('Artikel'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Barcode scannen',
+            onPressed: () async {
+              final code = await barcodeScanner(context);
+              if (code == null || !context.mounted) return;
+              OnlineArticle? article;
+              await runOnline(context, () async => article = await session.client.articleByBarcode(code));
+              if (!context.mounted) return;
+              if (article == null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kein Artikel mit Barcode $code.')));
+                return;
+              }
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => OnlineArticleDetailScreen(session: session, articleId: article!.id)),
+              );
+              reload();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.category_outlined),
             tooltip: 'Artikelgruppen',

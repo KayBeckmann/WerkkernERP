@@ -9,6 +9,7 @@ import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/stock_change_notifier.dart';
 import '../widgets/article_group_filter.dart';
+import '../widgets/barcode_scanner.dart';
 import 'article_detail_screen.dart';
 import 'article_groups_screen.dart';
 
@@ -121,14 +122,36 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       ),
     );
     if (result == null || !mounted) return;
-    await context.read<ArticleRepository>().create(
-      companyId: company.id,
-      name: result.name,
-      unit: result.unit,
-      articleGroupId: result.articleGroupId,
-      defaultSupplierId: result.defaultSupplierId,
-      minimumStock: result.minimumStock,
-    );
+    try {
+      await context.read<ArticleRepository>().create(
+        companyId: company.id,
+        name: result.name,
+        unit: result.unit,
+        articleGroupId: result.articleGroupId,
+        defaultSupplierId: result.defaultSupplierId,
+        minimumStock: result.minimumStock,
+        barcode: result.barcode,
+      );
+    } on BarcodeInUseException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      return;
+    }
+    _reload();
+  }
+
+  /// A1-Nachtrag: Barcode scannen und den passenden Artikel der aktiven
+  /// Firma öffnen (Suche per exaktem Scanwert).
+  Future<void> _scanToOpen() async {
+    final code = await barcodeScanner(context);
+    if (code == null || !mounted) return;
+    final company = context.read<ActiveCompanyService>().active!;
+    final article = await context.read<ArticleRepository>().findByBarcode(companyId: company.id, barcode: code);
+    if (!mounted) return;
+    if (article == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Kein Artikel mit Barcode $code.')));
+      return;
+    }
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => ArticleDetailScreen(article: article)));
     _reload();
   }
 
@@ -138,6 +161,11 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       appBar: AppBar(
         title: const Text('Artikel'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'Barcode scannen',
+            onPressed: _scanToOpen,
+          ),
           IconButton(
             icon: const Icon(Icons.category_outlined),
             tooltip: 'Artikelgruppen',
@@ -162,12 +190,14 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           }
           final visible = [
             for (final a in data.articles)
+              // Suche nach Name oder exaktem Barcode (A1-Nachtrag).
               if (articleMatches(
-                name: a.name,
-                articleGroupId: a.articleGroupId,
-                query: _query,
-                filter: _filter,
-              ))
+                    name: a.name,
+                    articleGroupId: a.articleGroupId,
+                    query: _query,
+                    filter: _filter,
+                  ) ||
+                  (_query.isNotEmpty && a.barcode == normalizeBarcode(_query) && _filter.matches(a.articleGroupId)))
                 a,
           ];
           final filterBar = Padding(
@@ -307,9 +337,13 @@ class ArticleFormResult {
     this.articleGroupId,
     this.defaultSupplierId,
     this.minimumStock,
+    this.barcode,
   });
   final String name;
   final String? unit;
+
+  /// A1-Nachtrag: optionaler Barcode (Text, führende Nullen bleiben).
+  final String? barcode;
   final String? articleGroupId;
   final String? defaultSupplierId;
 
@@ -346,6 +380,7 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _unitCtrl;
   late final TextEditingController _minimumStockCtrl;
+  late final TextEditingController _barcodeCtrl;
   String? _groupId;
   String? _supplierId;
 
@@ -362,6 +397,7 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
           ? ''
           : formatArticleQuantity(existing!.minimumStock!),
     );
+    _barcodeCtrl = TextEditingController(text: existing?.barcode);
     _groupId = existing?.articleGroupId;
     _supplierId = existing?.defaultSupplierId;
   }
@@ -371,6 +407,7 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
     _nameCtrl.dispose();
     _unitCtrl.dispose();
     _minimumStockCtrl.dispose();
+    _barcodeCtrl.dispose();
     super.dispose();
   }
 
@@ -394,6 +431,7 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
               controller: _unitCtrl,
               decoration: const InputDecoration(labelText: 'Einheit'),
             ),
+            BarcodeField(controller: _barcodeCtrl),
             DropdownButtonFormField<String?>(
               isExpanded: true,
               initialValue: _groupId,
@@ -465,6 +503,7 @@ class _ArticleFormDialogState extends State<ArticleFormDialog> {
               context,
               ArticleFormResult(
                 name: name,
+                barcode: _barcodeCtrl.text.trim().isEmpty ? null : _barcodeCtrl.text.trim(),
                 unit: _unitCtrl.text.trim().isEmpty
                     ? null
                     : _unitCtrl.text.trim(),
