@@ -306,10 +306,14 @@ Future<Uint8List> renderDocumentPdf(
   final author = invoice.companySnapshotName ?? 'WerkkernERP';
   final doc = pw.Document(
     theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
-    title: title,
-    author: author,
-    creator: 'WerkkernERP',
-    producer: 'WerkkernERP',
+    // Info-Wörterbuch nur beim ZUGFeRD-PDF (PDF/A verlangt es passend zu
+    // XMP). Es enthält `/CreationDate` = jetzt — normale PDFs bleiben
+    // dadurch wie bisher inhaltsgleich reproduzierbar (Offline-/Online-
+    // Vergleich im Umzugstest).
+    title: embed ? title : null,
+    author: embed ? author : null,
+    creator: embed ? 'WerkkernERP' : null,
+    producer: embed ? 'WerkkernERP' : null,
     metadata: embed
         ? PdfaRdf(
             title: title,
