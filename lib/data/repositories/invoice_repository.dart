@@ -13,6 +13,7 @@ import '../database/database.dart';
 import '../database/tables.dart';
 import 'number_sequence_repository.dart';
 import 'payment_term_repository.dart';
+import 'stock_ledger.dart';
 import 'time_entry_repository.dart';
 
 /// Eine einzugebende Rechnungsposition (noch ohne ID — die vergibt das
@@ -105,6 +106,22 @@ final allowedConversionTargets = <DocumentKind, Set<DocumentKind>>{
 /// Rechnungen als Entwurf (A2) — Finalisierung/Nummernvergabe kommt erst
 /// mit A3. Jede Methode verlangt companyId und prüft sie (gleiche
 /// Isolation wie die übrigen A0/A1-Repositories).
+/// Entnahme-Vorschlag eines Artikels beim Finalisieren (C5.4).
+class WithdrawalSuggestion {
+  const WithdrawalSuggestion({
+    required this.article,
+    required this.quantity,
+    required this.suggestedBinKey,
+    required this.stocks,
+  });
+  final Article article;
+  final double quantity;
+
+  /// `''` = „Platz noch nicht zugeordnet“.
+  final String suggestedBinKey;
+  final List<BinStock> stocks;
+}
+
 class InvoiceRepository {
   InvoiceRepository(this._db, this._numberSequences);
 
@@ -365,24 +382,36 @@ class InvoiceRepository {
     for (final articleId in {...before.keys, ...after.keys}) {
       final delta = ((before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero)).toDouble();
       if (delta == 0) continue;
-      final article = await (_db.select(_db.articles)..where((a) => a.id.equals(articleId))).getSingleOrNull();
-      if (article == null) continue;
-      final newStock = article.stockQuantity + delta;
-      await (_db.update(_db.articles)..where((a) => a.id.equals(articleId)))
-          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
-      await _db.into(_db.stockMovements).insert(
-            StockMovementsCompanion.insert(
-              id: _uuid.v4(),
-              companyId: companyId,
-              articleId: articleId,
-              type: StockMovementType.documentBooking,
-              quantityDelta: delta,
-              resultingQuantity: newStock,
-              referenceLabel: Value(invoice.invoiceNumber),
-              note: const Value('Korrektur nach Bearbeitung'),
-              createdAt: DateTime.now(),
-            ),
-          );
+      final ledger = StockLedger(_db);
+      if (delta < 0) {
+        await ledger.withdraw(
+          companyId: companyId,
+          articleId: articleId,
+          quantity: -delta,
+          type: StockMovementType.documentBooking,
+          referenceLabel: invoice.invoiceNumber,
+          note: 'Korrektur nach Bearbeitung',
+        );
+      } else {
+        // Zurück an den Platz, von dem dieses Dokument entnommen hat.
+        final last = await (_db.select(_db.stockMovements)
+              ..where((m) =>
+                  m.articleId.equals(articleId) &
+                  m.referenceLabel.equalsNullable(invoice.invoiceNumber) &
+                  m.quantityDelta.isSmallerThanValue(0))
+              ..orderBy([(m) => OrderingTerm.desc(m.createdAt)])
+              ..limit(1))
+            .getSingleOrNull();
+        await ledger.book(
+          companyId: companyId,
+          articleId: articleId,
+          delta: delta,
+          type: StockMovementType.documentBooking,
+          binKey: last?.binKey ?? await ledger.defaultReceiptBin(companyId: companyId, articleId: articleId),
+          referenceLabel: invoice.invoiceNumber,
+          note: 'Korrektur nach Bearbeitung',
+        );
+      }
     }
   }
 
@@ -401,7 +430,11 @@ class InvoiceRepository {
   /// `null`, wenn die Rechnung nicht existiert oder bereits finalisiert
   /// ist (kein Fehler — Aufrufer behandeln das wie "nichts zu tun").
   /// Wirft [StateError], wenn der Entwurf keine Positionen hat.
-  Future<Invoice?> finalize({required String companyId, required String id}) async {
+  Future<Invoice?> finalize({
+    required String companyId,
+    required String id,
+    Map<String, String> withdrawalBins = const {},
+  }) async {
     return _db.transaction(() async {
       final invoice = await findById(companyId: companyId, id: id);
       if (invoice == null || invoice.status != InvoiceStatus.draft) return null;
@@ -506,6 +539,7 @@ class InvoiceRepository {
             invoice: invoice,
             items: items,
             referenceLabel: invoiceNumber,
+            withdrawalBins: withdrawalBins,
           );
         }
       }
@@ -549,6 +583,7 @@ class InvoiceRepository {
     required Invoice invoice,
     required List<InvoiceItem> items,
     required String referenceLabel,
+    Map<String, String> withdrawalBins = const {},
   }) async {
     final predecessorKind = await _predecessorKind(invoice);
     if (!shouldBookStockOnFinalize(kind: invoice.kind, predecessorKind: predecessorKind)) {
@@ -557,26 +592,16 @@ class InvoiceRepository {
     await (_db.update(_db.invoices)..where((i) => i.id.equals(invoice.id)))
         .write(const InvoicesCompanion(stockBooked: Value(true)));
 
+    final ledger = StockLedger(_db);
     for (final entry in _aggregateArticleQuantities(items).entries) {
-      final article =
-          await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
-      if (article == null) continue;
-      final delta = -entry.value.toDouble();
-      final newStock = article.stockQuantity + delta;
-      await (_db.update(_db.articles)..where((a) => a.id.equals(entry.key)))
-          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
-      await _db.into(_db.stockMovements).insert(
-            StockMovementsCompanion.insert(
-              id: _uuid.v4(),
-              companyId: companyId,
-              articleId: entry.key,
-              type: StockMovementType.documentBooking,
-              quantityDelta: delta,
-              resultingQuantity: newStock,
-              referenceLabel: Value(referenceLabel),
-              createdAt: DateTime.now(),
-            ),
-          );
+      await ledger.withdraw(
+        companyId: companyId,
+        articleId: entry.key,
+        quantity: entry.value.toDouble(),
+        type: StockMovementType.documentBooking,
+        preferredBinKey: withdrawalBins[entry.key],
+        referenceLabel: referenceLabel,
+      );
     }
   }
 
@@ -592,27 +617,51 @@ class InvoiceRepository {
     required List<InvoiceItem> items,
     required String referenceLabel,
   }) async {
+    final ledger = StockLedger(_db);
     for (final entry in _aggregateArticleQuantities(items).entries) {
-      final article =
-          await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
-      if (article == null) continue;
-      final delta = entry.value.toDouble();
-      final newStock = article.stockQuantity + delta;
-      await (_db.update(_db.articles)..where((a) => a.id.equals(entry.key)))
-          .write(ArticlesCompanion(stockQuantity: Value(newStock)));
-      await _db.into(_db.stockMovements).insert(
-            StockMovementsCompanion.insert(
-              id: _uuid.v4(),
-              companyId: companyId,
-              articleId: entry.key,
-              type: StockMovementType.creditNoteReturn,
-              quantityDelta: delta,
-              resultingQuantity: newStock,
-              referenceLabel: Value(referenceLabel),
-              createdAt: DateTime.now(),
-            ),
-          );
+      // C5.4: Rückgabe an den Standardplatz, sonst „nicht zugeordnet“.
+      await ledger.book(
+        companyId: companyId,
+        articleId: entry.key,
+        delta: entry.value.toDouble(),
+        type: StockMovementType.creditNoteReturn,
+        binKey: await ledger.defaultReceiptBin(companyId: companyId, articleId: entry.key),
+        referenceLabel: referenceLabel,
+      );
     }
+  }
+
+  /// C5.4-Nachtrag (Kay, 16.11.2026: „Bei Entnahme auch einen Lagerplatz
+  /// vorschlagen, wenn einer hinterlegt ist“): je zu entnehmendem Artikel
+  /// der vorgeschlagene Platz und alle Plätze mit Bestand. Leer, wenn
+  /// nicht gebucht wird oder die Firma noch keine Plätze angelegt hat.
+  Future<List<WithdrawalSuggestion>> withdrawalSuggestions({
+    required String companyId,
+    required String id,
+  }) async {
+    final company = await (_db.select(_db.companies)..where((c) => c.id.equals(companyId))).getSingleOrNull();
+    if (company == null || !company.lagerbestandEnabled) return const [];
+    final hasBins = await (_db.select(_db.storageBins)..where((b) => b.companyId.equals(companyId))..limit(1))
+        .getSingleOrNull();
+    if (hasBins == null) return const [];
+    final invoice = await findById(companyId: companyId, id: id);
+    if (invoice == null || invoice.status != InvoiceStatus.draft) return const [];
+    if (!shouldBookStockOnFinalize(kind: invoice.kind, predecessorKind: await _predecessorKind(invoice))) {
+      return const [];
+    }
+    final ledger = StockLedger(_db);
+    final result = <WithdrawalSuggestion>[];
+    for (final entry in _aggregateArticleQuantities(await itemsFor(id)).entries) {
+      final article = await (_db.select(_db.articles)..where((a) => a.id.equals(entry.key))).getSingleOrNull();
+      if (article == null) continue;
+      result.add(WithdrawalSuggestion(
+        article: article,
+        quantity: entry.value.toDouble(),
+        suggestedBinKey: await ledger.suggestWithdrawalBin(companyId: companyId, articleId: article.id),
+        stocks: await ledger.stocksFor(companyId: companyId, articleId: article.id),
+      ));
+    }
+    return result;
   }
 
   /// Prüft **ohne zu buchen**, ob das Finalisieren von [id] einen oder

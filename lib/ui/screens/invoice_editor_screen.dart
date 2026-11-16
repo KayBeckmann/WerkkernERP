@@ -46,6 +46,8 @@ import '../../pdf/invoice_pdf_builder.dart';
 import '../../domain/services/einvoice_builder.dart';
 import '../../domain/services/einvoice_parties.dart' show isEInvoiceKind;
 import '../../domain/services/email_sender.dart' show EmailExtraAttachment;
+import '../../data/repositories/stock_ledger.dart';
+import '../widgets/storage_bin_picker.dart';
 import '../widgets/barcode_scanner.dart';
 import '../widgets/einvoice_actions.dart';
 import '../widgets/email_send_dialog.dart';
@@ -1079,6 +1081,19 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       if (proceedDespiteWarning != true || !mounted) return;
     }
 
+    // C5.4 (Kay, 16.11.2026): Entnahmeplatz vorschlagen, wenn Plätze
+    // angelegt sind.
+    var withdrawalBins = const <String, String>{};
+    final suggestions = await repo.withdrawalSuggestions(companyId: companyId, id: invoice.id);
+    if (!mounted) return;
+    if (suggestions.isNotEmpty) {
+      final bins = await context.read<StockLedger>().binsWithLocation(companyId);
+      if (!mounted) return;
+      final chosen = await showWithdrawalBinsDialog(context, suggestions: suggestions, bins: bins);
+      if (chosen == null || !mounted) return;
+      withdrawalBins = chosen;
+    }
+
     // C15: fehlende E-Rechnungsangaben anzeigen, nicht blockieren.
     final eInvoice = await _eInvoiceData();
     if (!mounted) return;
@@ -1090,7 +1105,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
 
     setState(() => _finalizing = true);
     try {
-      final finalized = await repo.finalize(companyId: companyId, id: invoice.id);
+      final finalized = await repo.finalize(companyId: companyId, id: invoice.id, withdrawalBins: withdrawalBins);
       if (!mounted) return;
       if (finalized == null) {
         ScaffoldMessenger.of(context).showSnackBar(

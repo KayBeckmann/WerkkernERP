@@ -439,6 +439,11 @@ class Articles extends Table {
   /// Identifikation: keine Menge, kein Preis, keine Packungseinheit.
   TextColumn get barcode => text().nullable()();
 
+  /// C5.4-Nachtrag: Standardplatz (ID eines `StorageBins`) — Vorschlag
+  /// für Wareneingang und, ohne Bestand an anderen Plätzen, für die
+  /// Entnahme. Ohne Fremdschlüssel (SQLite-Migrationstests).
+  TextColumn get defaultBinId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1180,6 +1185,58 @@ enum StockMovementType {
   /// Rückfrage: "Automatisch beim Finalisieren der Gutschrift"). Anders
   /// als [documentBooking] ist [quantityDelta] hier immer positiv.
   creditNoteReturn,
+
+  /// C5.4-Nachtrag (Kay, 16.11.2026): Umlagerung zwischen zwei Plätzen —
+  /// je eine Bewegung ab und zu, die Gesamtmenge bleibt gleich.
+  transfer,
+}
+
+/// C5.4-Nachtrag (Kay, 16.11.2026): Lagerort einer Firma (z. B. Lager,
+/// Halle, Fahrzeug — frei benannt, nichts vorgegeben).
+class StorageLocations extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get name => text()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Physischer Platz innerhalb eines Lagerorts: Reihe → Regal → Fach.
+/// Die Laufreihenfolge der Inventur folgt [sortOrder], sonst Reihe/
+/// Regal/Fach.
+class StorageBins extends Table {
+  TextColumn get id => text()();
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get locationId =>
+      text().references(StorageLocations, #id, onDelete: KeyAction.cascade)();
+  TextColumn get row => text().withDefault(const Constant(''))();
+  TextColumn get shelf => text().withDefault(const Constant(''))();
+  TextColumn get compartment => text().withDefault(const Constant(''))();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Menge je Artikel **und** Platz. [binKey] = ID eines [StorageBins]
+/// oder `''` für „Platz noch nicht zugeordnet“ (Altbestand vor v40 und
+/// Buchungen ohne Platz). Die Summe aller Zeilen eines Artikels ist immer
+/// [Articles.stockQuantity] — beides schreibt nur `StockLedger`.
+class ArticleBinStocks extends Table {
+  TextColumn get companyId =>
+      text().references(Companies, #id, onDelete: KeyAction.cascade)();
+  TextColumn get articleId =>
+      text().references(Articles, #id, onDelete: KeyAction.cascade)();
+  TextColumn get binKey => text()();
+  RealColumn get quantity => real().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {articleId, binKey};
 }
 
 /// Lückenloses, **append-only** Bewegungsprotokoll jeder tatsächlichen
@@ -1228,6 +1285,10 @@ class StockMovements extends Table {
   TextColumn get note => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
+  /// C5.4-Nachtrag: betroffener Platz (`''` = nicht zugeordnet, `null` =
+  /// Buchung vor Einführung der Lagerplätze).
+  TextColumn get binKey => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1263,6 +1324,9 @@ class InventoryCounts extends Table {
   TextColumn get status =>
       textEnum<InventoryCountStatus>().withDefault(Constant(InventoryCountStatus.draft.name))();
   DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// C5.4-Nachtrag: Inventur nach Lagerort (`null` = artikelweise).
+  TextColumn get locationId => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
   @override
@@ -1290,13 +1354,15 @@ class InventoryCountItems extends Table {
   RealColumn get countedQuantity => real().nullable()();
   DateTimeColumn get countedAt => dateTime().nullable()();
 
-  @override
-  Set<Column> get primaryKey => {id};
+  /// C5.4-Nachtrag: gezählter Platz — `null` = ganzer Artikel (bisherige
+  /// Inventur), `''` = nicht zugeordneter Bestand, sonst Platz-ID. Je
+  /// Lauf ist jede Kombination Artikel/Platz höchstens einmal enthalten
+  /// (`InventoryRepository` prüft das; kein Unique-Index, weil SQLite
+  /// Spalten darin nicht wieder entfernen kann).
+  TextColumn get binKey => text().nullable()();
 
   @override
-  List<Set<Column>> get uniqueKeys => [
-        {inventoryCountId, articleId},
-      ];
+  Set<Column> get primaryKey => {id};
 }
 
 /// Rollen-Stamm für die Zeiterfassung (C3, Nachtrag 2026-10-20,

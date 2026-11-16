@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/data/repositories/article_group_repository.dart';
 import 'package:werkkernerp/data/repositories/article_repository.dart';
+import 'package:werkkernerp/data/repositories/storage_repository.dart';
 import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/domain/services/active_company_service.dart';
 import 'package:werkkernerp/domain/services/stock_change_notifier.dart';
@@ -48,6 +49,7 @@ void main() {
             Provider<ArticleRepository>.value(value: articleRepo),
             // A1-Nachtrag: die Übersicht lädt die Gruppen für den Filter.
             Provider<ArticleGroupRepository>.value(value: ArticleGroupRepository(db)),
+            Provider<StorageRepository>.value(value: StorageRepository(db)),
             ChangeNotifierProvider<ActiveCompanyService>.value(value: activeCompanyService),
             ChangeNotifierProvider<StockChangeNotifier>.value(value: stockChangeNotifier),
           ],

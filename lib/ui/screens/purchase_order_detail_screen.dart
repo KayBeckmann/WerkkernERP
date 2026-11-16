@@ -10,9 +10,11 @@ import '../../data/repositories/expense_category_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
+import '../../data/repositories/stock_ledger.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/stock_change_notifier.dart';
 import '../../pdf/purchase_order_pdf_builder.dart';
+import '../widgets/storage_bin_picker.dart';
 
 /// Bestellungsdetail (C5.2 Bestellwesen, Nachtrag 2026-10-19) —
 /// Positionen bearbeiten (nur im Entwurf), Finalisieren, PDF teilen und
@@ -209,16 +211,27 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   }
 
   Future<void> _receiveGoods(PurchaseOrder order, List<PurchaseOrderItem> items) async {
-    final receipts = await showDialog<Map<String, double>>(
+    final companyId = context.read<ActiveCompanyService>().active!.id;
+    final company = context.read<ActiveCompanyService>().active!;
+    final ledger = context.read<StockLedger>();
+    // C5.4: Zielplatz je Position, vorbelegt mit dem Standardplatz.
+    final bins = company.lagerbestandEnabled ? await ledger.binsWithLocation(companyId) : <BinEntry>[];
+    final defaults = <String, String>{
+      for (final item in items)
+        if (item.articleId != null && bins.isNotEmpty)
+          item.id: await ledger.defaultReceiptBin(companyId: companyId, articleId: item.articleId!),
+    };
+    if (!mounted) return;
+    final result = await showDialog<(Map<String, double>, Map<String, String>)>(
       context: context,
-      builder: (context) => _ReceiveGoodsDialog(items: items),
+      builder: (context) => _ReceiveGoodsDialog(items: items, bins: bins, defaultBins: defaults),
     );
-    if (receipts == null || receipts.isEmpty || !mounted) return;
+    if (result == null || result.$1.isEmpty || !mounted) return;
+    final (receipts, targetBins) = result;
     try {
-      final companyId = context.read<ActiveCompanyService>().active!.id;
       await context
           .read<PurchaseOrderRepository>()
-          .receiveGoods(companyId: companyId, id: order.id, receipts: receipts);
+          .receiveGoods(companyId: companyId, id: order.id, receipts: receipts, targetBins: targetBins);
       // Bugfix 2026-10-19 (Kay: "Wenn ich den Bestand aus einer
       // Bestellung buche, wird dieser nicht angezeigt") — siehe
       // Doc-Kommentar bei `StockChangeNotifier`.
@@ -366,8 +379,10 @@ class _DetailData {
 /// Kommentar bei `PurchaseOrderRepository.receiveGoods`), vorausgefüllt
 /// mit der noch offenen Restmenge als Platzhalter.
 class _ReceiveGoodsDialog extends StatefulWidget {
-  const _ReceiveGoodsDialog({required this.items});
+  const _ReceiveGoodsDialog({required this.items, this.bins = const [], this.defaultBins = const {}});
   final List<PurchaseOrderItem> items;
+  final List<BinEntry> bins;
+  final Map<String, String> defaultBins;
 
   @override
   State<_ReceiveGoodsDialog> createState() => _ReceiveGoodsDialogState();
@@ -377,6 +392,7 @@ class _ReceiveGoodsDialogState extends State<_ReceiveGoodsDialog> {
   late final Map<String, TextEditingController> _controllers = {
     for (final item in widget.items) item.id: TextEditingController(),
   };
+  late final Map<String, String> _bins = {...widget.defaultBins};
 
   @override
   void dispose() {
@@ -400,13 +416,25 @@ class _ReceiveGoodsDialogState extends State<_ReceiveGoodsDialog> {
                 if (item.receivedQuantity < item.quantity)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: TextField(
-                      controller: _controllers[item.id],
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: InputDecoration(
-                        labelText: item.description,
-                        hintText: 'offen: ${_formatQuantity(item.quantity - item.receivedQuantity)}',
-                      ),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _controllers[item.id],
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: item.description,
+                            hintText: 'offen: ${_formatQuantity(item.quantity - item.receivedQuantity)}',
+                          ),
+                        ),
+                        if (item.articleId != null && widget.bins.isNotEmpty)
+                          StorageBinDropdown(
+                            key: Key('receive-bin-${item.id}'),
+                            bins: widget.bins,
+                            value: _bins[item.id] ?? unassignedBinKey,
+                            label: 'Einlagern in',
+                            onChanged: (v) => setState(() => _bins[item.id] = v ?? unassignedBinKey),
+                          ),
+                      ],
                     ),
                   ),
             ],
@@ -424,7 +452,10 @@ class _ReceiveGoodsDialogState extends State<_ReceiveGoodsDialog> {
               final value = double.tryParse(text);
               if (value != null && value > 0) receipts[entry.key] = value;
             }
-            Navigator.pop(context, receipts);
+            Navigator.pop(context, (receipts, {
+              for (final e in _bins.entries)
+                if (receipts.containsKey(e.key)) e.key: e.value,
+            }));
           },
           child: const Text('Buchen'),
         ),

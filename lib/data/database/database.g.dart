@@ -8188,6 +8188,17 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _defaultBinIdMeta = const VerificationMeta(
+    'defaultBinId',
+  );
+  @override
+  late final GeneratedColumn<String> defaultBinId = GeneratedColumn<String>(
+    'default_bin_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -8202,6 +8213,7 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
     minimumStock,
     createdAt,
     barcode,
+    defaultBinId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -8307,6 +8319,15 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
         barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta),
       );
     }
+    if (data.containsKey('default_bin_id')) {
+      context.handle(
+        _defaultBinIdMeta,
+        defaultBinId.isAcceptableOrUnknown(
+          data['default_bin_id']!,
+          _defaultBinIdMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -8363,6 +8384,10 @@ class $ArticlesTable extends Articles with TableInfo<$ArticlesTable, Article> {
       barcode: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}barcode'],
+      ),
+      defaultBinId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_bin_id'],
       ),
     );
   }
@@ -8425,6 +8450,11 @@ class Article extends DataClass implements Insertable<Article> {
   /// Je Firma eindeutig (Index `articles_company_barcode_idx`). Reine
   /// Identifikation: keine Menge, kein Preis, keine Packungseinheit.
   final String? barcode;
+
+  /// C5.4-Nachtrag: Standardplatz (ID eines `StorageBins`) — Vorschlag
+  /// für Wareneingang und, ohne Bestand an anderen Plätzen, für die
+  /// Entnahme. Ohne Fremdschlüssel (SQLite-Migrationstests).
+  final String? defaultBinId;
   const Article({
     required this.id,
     required this.companyId,
@@ -8438,6 +8468,7 @@ class Article extends DataClass implements Insertable<Article> {
     this.minimumStock,
     required this.createdAt,
     this.barcode,
+    this.defaultBinId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -8466,6 +8497,9 @@ class Article extends DataClass implements Insertable<Article> {
     if (!nullToAbsent || barcode != null) {
       map['barcode'] = Variable<String>(barcode);
     }
+    if (!nullToAbsent || defaultBinId != null) {
+      map['default_bin_id'] = Variable<String>(defaultBinId);
+    }
     return map;
   }
 
@@ -8493,6 +8527,9 @@ class Article extends DataClass implements Insertable<Article> {
       barcode: barcode == null && nullToAbsent
           ? const Value.absent()
           : Value(barcode),
+      defaultBinId: defaultBinId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultBinId),
     );
   }
 
@@ -8518,6 +8555,7 @@ class Article extends DataClass implements Insertable<Article> {
       minimumStock: serializer.fromJson<double?>(json['minimumStock']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       barcode: serializer.fromJson<String?>(json['barcode']),
+      defaultBinId: serializer.fromJson<String?>(json['defaultBinId']),
     );
   }
   @override
@@ -8536,6 +8574,7 @@ class Article extends DataClass implements Insertable<Article> {
       'minimumStock': serializer.toJson<double?>(minimumStock),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'barcode': serializer.toJson<String?>(barcode),
+      'defaultBinId': serializer.toJson<String?>(defaultBinId),
     };
   }
 
@@ -8552,6 +8591,7 @@ class Article extends DataClass implements Insertable<Article> {
     Value<double?> minimumStock = const Value.absent(),
     DateTime? createdAt,
     Value<String?> barcode = const Value.absent(),
+    Value<String?> defaultBinId = const Value.absent(),
   }) => Article(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -8571,6 +8611,7 @@ class Article extends DataClass implements Insertable<Article> {
     minimumStock: minimumStock.present ? minimumStock.value : this.minimumStock,
     createdAt: createdAt ?? this.createdAt,
     barcode: barcode.present ? barcode.value : this.barcode,
+    defaultBinId: defaultBinId.present ? defaultBinId.value : this.defaultBinId,
   );
   Article copyWithCompanion(ArticlesCompanion data) {
     return Article(
@@ -8596,6 +8637,9 @@ class Article extends DataClass implements Insertable<Article> {
           : this.minimumStock,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       barcode: data.barcode.present ? data.barcode.value : this.barcode,
+      defaultBinId: data.defaultBinId.present
+          ? data.defaultBinId.value
+          : this.defaultBinId,
     );
   }
 
@@ -8613,7 +8657,8 @@ class Article extends DataClass implements Insertable<Article> {
           ..write('stockQuantity: $stockQuantity, ')
           ..write('minimumStock: $minimumStock, ')
           ..write('createdAt: $createdAt, ')
-          ..write('barcode: $barcode')
+          ..write('barcode: $barcode, ')
+          ..write('defaultBinId: $defaultBinId')
           ..write(')'))
         .toString();
   }
@@ -8632,6 +8677,7 @@ class Article extends DataClass implements Insertable<Article> {
     minimumStock,
     createdAt,
     barcode,
+    defaultBinId,
   );
   @override
   bool operator ==(Object other) =>
@@ -8648,7 +8694,8 @@ class Article extends DataClass implements Insertable<Article> {
           other.stockQuantity == this.stockQuantity &&
           other.minimumStock == this.minimumStock &&
           other.createdAt == this.createdAt &&
-          other.barcode == this.barcode);
+          other.barcode == this.barcode &&
+          other.defaultBinId == this.defaultBinId);
 }
 
 class ArticlesCompanion extends UpdateCompanion<Article> {
@@ -8664,6 +8711,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
   final Value<double?> minimumStock;
   final Value<DateTime> createdAt;
   final Value<String?> barcode;
+  final Value<String?> defaultBinId;
   final Value<int> rowid;
   const ArticlesCompanion({
     this.id = const Value.absent(),
@@ -8678,6 +8726,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     this.minimumStock = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.barcode = const Value.absent(),
+    this.defaultBinId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ArticlesCompanion.insert({
@@ -8693,6 +8742,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     this.minimumStock = const Value.absent(),
     required DateTime createdAt,
     this.barcode = const Value.absent(),
+    this.defaultBinId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -8711,6 +8761,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     Expression<double>? minimumStock,
     Expression<DateTime>? createdAt,
     Expression<String>? barcode,
+    Expression<String>? defaultBinId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -8727,6 +8778,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
       if (minimumStock != null) 'minimum_stock': minimumStock,
       if (createdAt != null) 'created_at': createdAt,
       if (barcode != null) 'barcode': barcode,
+      if (defaultBinId != null) 'default_bin_id': defaultBinId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -8744,6 +8796,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     Value<double?>? minimumStock,
     Value<DateTime>? createdAt,
     Value<String?>? barcode,
+    Value<String?>? defaultBinId,
     Value<int>? rowid,
   }) {
     return ArticlesCompanion(
@@ -8759,6 +8812,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
       minimumStock: minimumStock ?? this.minimumStock,
       createdAt: createdAt ?? this.createdAt,
       barcode: barcode ?? this.barcode,
+      defaultBinId: defaultBinId ?? this.defaultBinId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -8804,6 +8858,9 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
     if (barcode.present) {
       map['barcode'] = Variable<String>(barcode.value);
     }
+    if (defaultBinId.present) {
+      map['default_bin_id'] = Variable<String>(defaultBinId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -8825,6 +8882,7 @@ class ArticlesCompanion extends UpdateCompanion<Article> {
           ..write('minimumStock: $minimumStock, ')
           ..write('createdAt: $createdAt, ')
           ..write('barcode: $barcode, ')
+          ..write('defaultBinId: $defaultBinId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -19908,6 +19966,15 @@ class $StockMovementsTable extends StockMovements
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _binKeyMeta = const VerificationMeta('binKey');
+  @override
+  late final GeneratedColumn<String> binKey = GeneratedColumn<String>(
+    'bin_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -19919,6 +19986,7 @@ class $StockMovementsTable extends StockMovements
     referenceLabel,
     note,
     createdAt,
+    binKey,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -19998,6 +20066,12 @@ class $StockMovementsTable extends StockMovements
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('bin_key')) {
+      context.handle(
+        _binKeyMeta,
+        binKey.isAcceptableOrUnknown(data['bin_key']!, _binKeyMeta),
+      );
+    }
     return context;
   }
 
@@ -20045,6 +20119,10 @@ class $StockMovementsTable extends StockMovements
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      binKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bin_key'],
+      ),
     );
   }
 
@@ -20086,6 +20164,10 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
   /// correctSingleArticleStock()`).
   final String? note;
   final DateTime createdAt;
+
+  /// C5.4-Nachtrag: betroffener Platz (`''` = nicht zugeordnet, `null` =
+  /// Buchung vor Einführung der Lagerplätze).
+  final String? binKey;
   const StockMovement({
     required this.id,
     required this.companyId,
@@ -20096,6 +20178,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     this.referenceLabel,
     this.note,
     required this.createdAt,
+    this.binKey,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -20117,6 +20200,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       map['note'] = Variable<String>(note);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || binKey != null) {
+      map['bin_key'] = Variable<String>(binKey);
+    }
     return map;
   }
 
@@ -20133,6 +20219,9 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           : Value(referenceLabel),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
       createdAt: Value(createdAt),
+      binKey: binKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(binKey),
     );
   }
 
@@ -20153,6 +20242,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       referenceLabel: serializer.fromJson<String?>(json['referenceLabel']),
       note: serializer.fromJson<String?>(json['note']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      binKey: serializer.fromJson<String?>(json['binKey']),
     );
   }
   @override
@@ -20170,6 +20260,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
       'referenceLabel': serializer.toJson<String?>(referenceLabel),
       'note': serializer.toJson<String?>(note),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'binKey': serializer.toJson<String?>(binKey),
     };
   }
 
@@ -20183,6 +20274,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     Value<String?> referenceLabel = const Value.absent(),
     Value<String?> note = const Value.absent(),
     DateTime? createdAt,
+    Value<String?> binKey = const Value.absent(),
   }) => StockMovement(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -20195,6 +20287,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
         : this.referenceLabel,
     note: note.present ? note.value : this.note,
     createdAt: createdAt ?? this.createdAt,
+    binKey: binKey.present ? binKey.value : this.binKey,
   );
   StockMovement copyWithCompanion(StockMovementsCompanion data) {
     return StockMovement(
@@ -20213,6 +20306,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           : this.referenceLabel,
       note: data.note.present ? data.note.value : this.note,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      binKey: data.binKey.present ? data.binKey.value : this.binKey,
     );
   }
 
@@ -20227,7 +20321,8 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           ..write('resultingQuantity: $resultingQuantity, ')
           ..write('referenceLabel: $referenceLabel, ')
           ..write('note: $note, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('binKey: $binKey')
           ..write(')'))
         .toString();
   }
@@ -20243,6 +20338,7 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
     referenceLabel,
     note,
     createdAt,
+    binKey,
   );
   @override
   bool operator ==(Object other) =>
@@ -20256,7 +20352,8 @@ class StockMovement extends DataClass implements Insertable<StockMovement> {
           other.resultingQuantity == this.resultingQuantity &&
           other.referenceLabel == this.referenceLabel &&
           other.note == this.note &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.binKey == this.binKey);
 }
 
 class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
@@ -20269,6 +20366,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
   final Value<String?> referenceLabel;
   final Value<String?> note;
   final Value<DateTime> createdAt;
+  final Value<String?> binKey;
   final Value<int> rowid;
   const StockMovementsCompanion({
     this.id = const Value.absent(),
@@ -20280,6 +20378,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     this.referenceLabel = const Value.absent(),
     this.note = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.binKey = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   StockMovementsCompanion.insert({
@@ -20292,6 +20391,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     this.referenceLabel = const Value.absent(),
     this.note = const Value.absent(),
     required DateTime createdAt,
+    this.binKey = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -20310,6 +20410,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     Expression<String>? referenceLabel,
     Expression<String>? note,
     Expression<DateTime>? createdAt,
+    Expression<String>? binKey,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -20322,6 +20423,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
       if (referenceLabel != null) 'reference_label': referenceLabel,
       if (note != null) 'note': note,
       if (createdAt != null) 'created_at': createdAt,
+      if (binKey != null) 'bin_key': binKey,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -20336,6 +20438,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     Value<String?>? referenceLabel,
     Value<String?>? note,
     Value<DateTime>? createdAt,
+    Value<String?>? binKey,
     Value<int>? rowid,
   }) {
     return StockMovementsCompanion(
@@ -20348,6 +20451,7 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
       referenceLabel: referenceLabel ?? this.referenceLabel,
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
+      binKey: binKey ?? this.binKey,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -20384,6 +20488,9 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (binKey.present) {
+      map['bin_key'] = Variable<String>(binKey.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -20402,6 +20509,1155 @@ class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
           ..write('referenceLabel: $referenceLabel, ')
           ..write('note: $note, ')
           ..write('createdAt: $createdAt, ')
+          ..write('binKey: $binKey, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $StorageLocationsTable extends StorageLocations
+    with TableInfo<$StorageLocationsTable, StorageLocation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StorageLocationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES companies (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    companyId,
+    name,
+    sortOrder,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'storage_locations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StorageLocation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StorageLocation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StorageLocation(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $StorageLocationsTable createAlias(String alias) {
+    return $StorageLocationsTable(attachedDatabase, alias);
+  }
+}
+
+class StorageLocation extends DataClass implements Insertable<StorageLocation> {
+  final String id;
+  final String companyId;
+  final String name;
+  final int sortOrder;
+  final DateTime createdAt;
+  const StorageLocation({
+    required this.id,
+    required this.companyId,
+    required this.name,
+    required this.sortOrder,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['company_id'] = Variable<String>(companyId);
+    map['name'] = Variable<String>(name);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  StorageLocationsCompanion toCompanion(bool nullToAbsent) {
+    return StorageLocationsCompanion(
+      id: Value(id),
+      companyId: Value(companyId),
+      name: Value(name),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory StorageLocation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StorageLocation(
+      id: serializer.fromJson<String>(json['id']),
+      companyId: serializer.fromJson<String>(json['companyId']),
+      name: serializer.fromJson<String>(json['name']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'companyId': serializer.toJson<String>(companyId),
+      'name': serializer.toJson<String>(name),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  StorageLocation copyWith({
+    String? id,
+    String? companyId,
+    String? name,
+    int? sortOrder,
+    DateTime? createdAt,
+  }) => StorageLocation(
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    name: name ?? this.name,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  StorageLocation copyWithCompanion(StorageLocationsCompanion data) {
+    return StorageLocation(
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      name: data.name.present ? data.name.value : this.name,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StorageLocation(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, companyId, name, sortOrder, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StorageLocation &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.name == this.name &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt);
+}
+
+class StorageLocationsCompanion extends UpdateCompanion<StorageLocation> {
+  final Value<String> id;
+  final Value<String> companyId;
+  final Value<String> name;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const StorageLocationsCompanion({
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StorageLocationsCompanion.insert({
+    required String id,
+    required String companyId,
+    required String name,
+    this.sortOrder = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       companyId = Value(companyId),
+       name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<StorageLocation> custom({
+    Expression<String>? id,
+    Expression<String>? companyId,
+    Expression<String>? name,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (name != null) 'name': name,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StorageLocationsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? companyId,
+    Value<String>? name,
+    Value<int>? sortOrder,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return StorageLocationsCompanion(
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      name: name ?? this.name,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<String>(companyId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StorageLocationsCompanion(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $StorageBinsTable extends StorageBins
+    with TableInfo<$StorageBinsTable, StorageBin> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StorageBinsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES companies (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _locationIdMeta = const VerificationMeta(
+    'locationId',
+  );
+  @override
+  late final GeneratedColumn<String> locationId = GeneratedColumn<String>(
+    'location_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES storage_locations (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _rowMeta = const VerificationMeta('row');
+  @override
+  late final GeneratedColumn<String> row = GeneratedColumn<String>(
+    'row',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _shelfMeta = const VerificationMeta('shelf');
+  @override
+  late final GeneratedColumn<String> shelf = GeneratedColumn<String>(
+    'shelf',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _compartmentMeta = const VerificationMeta(
+    'compartment',
+  );
+  @override
+  late final GeneratedColumn<String> compartment = GeneratedColumn<String>(
+    'compartment',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    companyId,
+    locationId,
+    row,
+    shelf,
+    compartment,
+    sortOrder,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'storage_bins';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StorageBin> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('location_id')) {
+      context.handle(
+        _locationIdMeta,
+        locationId.isAcceptableOrUnknown(data['location_id']!, _locationIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_locationIdMeta);
+    }
+    if (data.containsKey('row')) {
+      context.handle(
+        _rowMeta,
+        row.isAcceptableOrUnknown(data['row']!, _rowMeta),
+      );
+    }
+    if (data.containsKey('shelf')) {
+      context.handle(
+        _shelfMeta,
+        shelf.isAcceptableOrUnknown(data['shelf']!, _shelfMeta),
+      );
+    }
+    if (data.containsKey('compartment')) {
+      context.handle(
+        _compartmentMeta,
+        compartment.isAcceptableOrUnknown(
+          data['compartment']!,
+          _compartmentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StorageBin map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StorageBin(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_id'],
+      )!,
+      locationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location_id'],
+      )!,
+      row: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}row'],
+      )!,
+      shelf: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}shelf'],
+      )!,
+      compartment: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}compartment'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+    );
+  }
+
+  @override
+  $StorageBinsTable createAlias(String alias) {
+    return $StorageBinsTable(attachedDatabase, alias);
+  }
+}
+
+class StorageBin extends DataClass implements Insertable<StorageBin> {
+  final String id;
+  final String companyId;
+  final String locationId;
+  final String row;
+  final String shelf;
+  final String compartment;
+  final int sortOrder;
+  const StorageBin({
+    required this.id,
+    required this.companyId,
+    required this.locationId,
+    required this.row,
+    required this.shelf,
+    required this.compartment,
+    required this.sortOrder,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['company_id'] = Variable<String>(companyId);
+    map['location_id'] = Variable<String>(locationId);
+    map['row'] = Variable<String>(row);
+    map['shelf'] = Variable<String>(shelf);
+    map['compartment'] = Variable<String>(compartment);
+    map['sort_order'] = Variable<int>(sortOrder);
+    return map;
+  }
+
+  StorageBinsCompanion toCompanion(bool nullToAbsent) {
+    return StorageBinsCompanion(
+      id: Value(id),
+      companyId: Value(companyId),
+      locationId: Value(locationId),
+      row: Value(row),
+      shelf: Value(shelf),
+      compartment: Value(compartment),
+      sortOrder: Value(sortOrder),
+    );
+  }
+
+  factory StorageBin.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StorageBin(
+      id: serializer.fromJson<String>(json['id']),
+      companyId: serializer.fromJson<String>(json['companyId']),
+      locationId: serializer.fromJson<String>(json['locationId']),
+      row: serializer.fromJson<String>(json['row']),
+      shelf: serializer.fromJson<String>(json['shelf']),
+      compartment: serializer.fromJson<String>(json['compartment']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'companyId': serializer.toJson<String>(companyId),
+      'locationId': serializer.toJson<String>(locationId),
+      'row': serializer.toJson<String>(row),
+      'shelf': serializer.toJson<String>(shelf),
+      'compartment': serializer.toJson<String>(compartment),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+    };
+  }
+
+  StorageBin copyWith({
+    String? id,
+    String? companyId,
+    String? locationId,
+    String? row,
+    String? shelf,
+    String? compartment,
+    int? sortOrder,
+  }) => StorageBin(
+    id: id ?? this.id,
+    companyId: companyId ?? this.companyId,
+    locationId: locationId ?? this.locationId,
+    row: row ?? this.row,
+    shelf: shelf ?? this.shelf,
+    compartment: compartment ?? this.compartment,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
+  StorageBin copyWithCompanion(StorageBinsCompanion data) {
+    return StorageBin(
+      id: data.id.present ? data.id.value : this.id,
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      locationId: data.locationId.present
+          ? data.locationId.value
+          : this.locationId,
+      row: data.row.present ? data.row.value : this.row,
+      shelf: data.shelf.present ? data.shelf.value : this.shelf,
+      compartment: data.compartment.present
+          ? data.compartment.value
+          : this.compartment,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StorageBin(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('locationId: $locationId, ')
+          ..write('row: $row, ')
+          ..write('shelf: $shelf, ')
+          ..write('compartment: $compartment, ')
+          ..write('sortOrder: $sortOrder')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    locationId,
+    row,
+    shelf,
+    compartment,
+    sortOrder,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StorageBin &&
+          other.id == this.id &&
+          other.companyId == this.companyId &&
+          other.locationId == this.locationId &&
+          other.row == this.row &&
+          other.shelf == this.shelf &&
+          other.compartment == this.compartment &&
+          other.sortOrder == this.sortOrder);
+}
+
+class StorageBinsCompanion extends UpdateCompanion<StorageBin> {
+  final Value<String> id;
+  final Value<String> companyId;
+  final Value<String> locationId;
+  final Value<String> row;
+  final Value<String> shelf;
+  final Value<String> compartment;
+  final Value<int> sortOrder;
+  final Value<int> rowid;
+  const StorageBinsCompanion({
+    this.id = const Value.absent(),
+    this.companyId = const Value.absent(),
+    this.locationId = const Value.absent(),
+    this.row = const Value.absent(),
+    this.shelf = const Value.absent(),
+    this.compartment = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StorageBinsCompanion.insert({
+    required String id,
+    required String companyId,
+    required String locationId,
+    this.row = const Value.absent(),
+    this.shelf = const Value.absent(),
+    this.compartment = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       companyId = Value(companyId),
+       locationId = Value(locationId);
+  static Insertable<StorageBin> custom({
+    Expression<String>? id,
+    Expression<String>? companyId,
+    Expression<String>? locationId,
+    Expression<String>? row,
+    Expression<String>? shelf,
+    Expression<String>? compartment,
+    Expression<int>? sortOrder,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (companyId != null) 'company_id': companyId,
+      if (locationId != null) 'location_id': locationId,
+      if (row != null) 'row': row,
+      if (shelf != null) 'shelf': shelf,
+      if (compartment != null) 'compartment': compartment,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StorageBinsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? companyId,
+    Value<String>? locationId,
+    Value<String>? row,
+    Value<String>? shelf,
+    Value<String>? compartment,
+    Value<int>? sortOrder,
+    Value<int>? rowid,
+  }) {
+    return StorageBinsCompanion(
+      id: id ?? this.id,
+      companyId: companyId ?? this.companyId,
+      locationId: locationId ?? this.locationId,
+      row: row ?? this.row,
+      shelf: shelf ?? this.shelf,
+      compartment: compartment ?? this.compartment,
+      sortOrder: sortOrder ?? this.sortOrder,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (companyId.present) {
+      map['company_id'] = Variable<String>(companyId.value);
+    }
+    if (locationId.present) {
+      map['location_id'] = Variable<String>(locationId.value);
+    }
+    if (row.present) {
+      map['row'] = Variable<String>(row.value);
+    }
+    if (shelf.present) {
+      map['shelf'] = Variable<String>(shelf.value);
+    }
+    if (compartment.present) {
+      map['compartment'] = Variable<String>(compartment.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StorageBinsCompanion(')
+          ..write('id: $id, ')
+          ..write('companyId: $companyId, ')
+          ..write('locationId: $locationId, ')
+          ..write('row: $row, ')
+          ..write('shelf: $shelf, ')
+          ..write('compartment: $compartment, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ArticleBinStocksTable extends ArticleBinStocks
+    with TableInfo<$ArticleBinStocksTable, ArticleBinStock> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ArticleBinStocksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _companyIdMeta = const VerificationMeta(
+    'companyId',
+  );
+  @override
+  late final GeneratedColumn<String> companyId = GeneratedColumn<String>(
+    'company_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES companies (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _articleIdMeta = const VerificationMeta(
+    'articleId',
+  );
+  @override
+  late final GeneratedColumn<String> articleId = GeneratedColumn<String>(
+    'article_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES articles (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _binKeyMeta = const VerificationMeta('binKey');
+  @override
+  late final GeneratedColumn<String> binKey = GeneratedColumn<String>(
+    'bin_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _quantityMeta = const VerificationMeta(
+    'quantity',
+  );
+  @override
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
+    'quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    companyId,
+    articleId,
+    binKey,
+    quantity,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'article_bin_stocks';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ArticleBinStock> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('company_id')) {
+      context.handle(
+        _companyIdMeta,
+        companyId.isAcceptableOrUnknown(data['company_id']!, _companyIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_companyIdMeta);
+    }
+    if (data.containsKey('article_id')) {
+      context.handle(
+        _articleIdMeta,
+        articleId.isAcceptableOrUnknown(data['article_id']!, _articleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_articleIdMeta);
+    }
+    if (data.containsKey('bin_key')) {
+      context.handle(
+        _binKeyMeta,
+        binKey.isAcceptableOrUnknown(data['bin_key']!, _binKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_binKeyMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(
+        _quantityMeta,
+        quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {articleId, binKey};
+  @override
+  ArticleBinStock map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ArticleBinStock(
+      companyId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_id'],
+      )!,
+      articleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}article_id'],
+      )!,
+      binKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bin_key'],
+      )!,
+      quantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}quantity'],
+      )!,
+    );
+  }
+
+  @override
+  $ArticleBinStocksTable createAlias(String alias) {
+    return $ArticleBinStocksTable(attachedDatabase, alias);
+  }
+}
+
+class ArticleBinStock extends DataClass implements Insertable<ArticleBinStock> {
+  final String companyId;
+  final String articleId;
+  final String binKey;
+  final double quantity;
+  const ArticleBinStock({
+    required this.companyId,
+    required this.articleId,
+    required this.binKey,
+    required this.quantity,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['company_id'] = Variable<String>(companyId);
+    map['article_id'] = Variable<String>(articleId);
+    map['bin_key'] = Variable<String>(binKey);
+    map['quantity'] = Variable<double>(quantity);
+    return map;
+  }
+
+  ArticleBinStocksCompanion toCompanion(bool nullToAbsent) {
+    return ArticleBinStocksCompanion(
+      companyId: Value(companyId),
+      articleId: Value(articleId),
+      binKey: Value(binKey),
+      quantity: Value(quantity),
+    );
+  }
+
+  factory ArticleBinStock.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ArticleBinStock(
+      companyId: serializer.fromJson<String>(json['companyId']),
+      articleId: serializer.fromJson<String>(json['articleId']),
+      binKey: serializer.fromJson<String>(json['binKey']),
+      quantity: serializer.fromJson<double>(json['quantity']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'companyId': serializer.toJson<String>(companyId),
+      'articleId': serializer.toJson<String>(articleId),
+      'binKey': serializer.toJson<String>(binKey),
+      'quantity': serializer.toJson<double>(quantity),
+    };
+  }
+
+  ArticleBinStock copyWith({
+    String? companyId,
+    String? articleId,
+    String? binKey,
+    double? quantity,
+  }) => ArticleBinStock(
+    companyId: companyId ?? this.companyId,
+    articleId: articleId ?? this.articleId,
+    binKey: binKey ?? this.binKey,
+    quantity: quantity ?? this.quantity,
+  );
+  ArticleBinStock copyWithCompanion(ArticleBinStocksCompanion data) {
+    return ArticleBinStock(
+      companyId: data.companyId.present ? data.companyId.value : this.companyId,
+      articleId: data.articleId.present ? data.articleId.value : this.articleId,
+      binKey: data.binKey.present ? data.binKey.value : this.binKey,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ArticleBinStock(')
+          ..write('companyId: $companyId, ')
+          ..write('articleId: $articleId, ')
+          ..write('binKey: $binKey, ')
+          ..write('quantity: $quantity')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(companyId, articleId, binKey, quantity);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ArticleBinStock &&
+          other.companyId == this.companyId &&
+          other.articleId == this.articleId &&
+          other.binKey == this.binKey &&
+          other.quantity == this.quantity);
+}
+
+class ArticleBinStocksCompanion extends UpdateCompanion<ArticleBinStock> {
+  final Value<String> companyId;
+  final Value<String> articleId;
+  final Value<String> binKey;
+  final Value<double> quantity;
+  final Value<int> rowid;
+  const ArticleBinStocksCompanion({
+    this.companyId = const Value.absent(),
+    this.articleId = const Value.absent(),
+    this.binKey = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ArticleBinStocksCompanion.insert({
+    required String companyId,
+    required String articleId,
+    required String binKey,
+    this.quantity = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : companyId = Value(companyId),
+       articleId = Value(articleId),
+       binKey = Value(binKey);
+  static Insertable<ArticleBinStock> custom({
+    Expression<String>? companyId,
+    Expression<String>? articleId,
+    Expression<String>? binKey,
+    Expression<double>? quantity,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (companyId != null) 'company_id': companyId,
+      if (articleId != null) 'article_id': articleId,
+      if (binKey != null) 'bin_key': binKey,
+      if (quantity != null) 'quantity': quantity,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ArticleBinStocksCompanion copyWith({
+    Value<String>? companyId,
+    Value<String>? articleId,
+    Value<String>? binKey,
+    Value<double>? quantity,
+    Value<int>? rowid,
+  }) {
+    return ArticleBinStocksCompanion(
+      companyId: companyId ?? this.companyId,
+      articleId: articleId ?? this.articleId,
+      binKey: binKey ?? this.binKey,
+      quantity: quantity ?? this.quantity,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (companyId.present) {
+      map['company_id'] = Variable<String>(companyId.value);
+    }
+    if (articleId.present) {
+      map['article_id'] = Variable<String>(articleId.value);
+    }
+    if (binKey.present) {
+      map['bin_key'] = Variable<String>(binKey.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<double>(quantity.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ArticleBinStocksCompanion(')
+          ..write('companyId: $companyId, ')
+          ..write('articleId: $articleId, ')
+          ..write('binKey: $binKey, ')
+          ..write('quantity: $quantity, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -20476,6 +21732,17 @@ class $InventoryCountsTable extends InventoryCounts
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _locationIdMeta = const VerificationMeta(
+    'locationId',
+  );
+  @override
+  late final GeneratedColumn<String> locationId = GeneratedColumn<String>(
+    'location_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -20495,6 +21762,7 @@ class $InventoryCountsTable extends InventoryCounts
     date,
     status,
     completedAt,
+    locationId,
     createdAt,
   ];
   @override
@@ -20547,6 +21815,12 @@ class $InventoryCountsTable extends InventoryCounts
         ),
       );
     }
+    if (data.containsKey('location_id')) {
+      context.handle(
+        _locationIdMeta,
+        locationId.isAcceptableOrUnknown(data['location_id']!, _locationIdMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -20590,6 +21864,10 @@ class $InventoryCountsTable extends InventoryCounts
         DriftSqlType.dateTime,
         data['${effectivePrefix}completed_at'],
       ),
+      locationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}location_id'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -20619,6 +21897,9 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
   final DateTime date;
   final InventoryCountStatus status;
   final DateTime? completedAt;
+
+  /// C5.4-Nachtrag: Inventur nach Lagerort (`null` = artikelweise).
+  final String? locationId;
   final DateTime createdAt;
   const InventoryCount({
     required this.id,
@@ -20627,6 +21908,7 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
     required this.date,
     required this.status,
     this.completedAt,
+    this.locationId,
     required this.createdAt,
   });
   @override
@@ -20644,6 +21926,9 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
     if (!nullToAbsent || completedAt != null) {
       map['completed_at'] = Variable<DateTime>(completedAt);
     }
+    if (!nullToAbsent || locationId != null) {
+      map['location_id'] = Variable<String>(locationId);
+    }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
@@ -20658,6 +21943,9 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
       completedAt: completedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(completedAt),
+      locationId: locationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locationId),
       createdAt: Value(createdAt),
     );
   }
@@ -20676,6 +21964,7 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
         serializer.fromJson<String>(json['status']),
       ),
       completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      locationId: serializer.fromJson<String?>(json['locationId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -20691,6 +21980,7 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
         $InventoryCountsTable.$converterstatus.toJson(status),
       ),
       'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'locationId': serializer.toJson<String?>(locationId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -20702,6 +21992,7 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
     DateTime? date,
     InventoryCountStatus? status,
     Value<DateTime?> completedAt = const Value.absent(),
+    Value<String?> locationId = const Value.absent(),
     DateTime? createdAt,
   }) => InventoryCount(
     id: id ?? this.id,
@@ -20710,6 +22001,7 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
     date: date ?? this.date,
     status: status ?? this.status,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    locationId: locationId.present ? locationId.value : this.locationId,
     createdAt: createdAt ?? this.createdAt,
   );
   InventoryCount copyWithCompanion(InventoryCountsCompanion data) {
@@ -20722,6 +22014,9 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      locationId: data.locationId.present
+          ? data.locationId.value
+          : this.locationId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -20735,14 +22030,23 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
           ..write('date: $date, ')
           ..write('status: $status, ')
           ..write('completedAt: $completedAt, ')
+          ..write('locationId: $locationId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, companyId, label, date, status, completedAt, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    label,
+    date,
+    status,
+    completedAt,
+    locationId,
+    createdAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -20753,6 +22057,7 @@ class InventoryCount extends DataClass implements Insertable<InventoryCount> {
           other.date == this.date &&
           other.status == this.status &&
           other.completedAt == this.completedAt &&
+          other.locationId == this.locationId &&
           other.createdAt == this.createdAt);
 }
 
@@ -20763,6 +22068,7 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
   final Value<DateTime> date;
   final Value<InventoryCountStatus> status;
   final Value<DateTime?> completedAt;
+  final Value<String?> locationId;
   final Value<DateTime> createdAt;
   final Value<int> rowid;
   const InventoryCountsCompanion({
@@ -20772,6 +22078,7 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
     this.date = const Value.absent(),
     this.status = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.locationId = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -20782,6 +22089,7 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
     required DateTime date,
     this.status = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.locationId = const Value.absent(),
     required DateTime createdAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -20796,6 +22104,7 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
     Expression<DateTime>? date,
     Expression<String>? status,
     Expression<DateTime>? completedAt,
+    Expression<String>? locationId,
     Expression<DateTime>? createdAt,
     Expression<int>? rowid,
   }) {
@@ -20806,6 +22115,7 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
       if (date != null) 'date': date,
       if (status != null) 'status': status,
       if (completedAt != null) 'completed_at': completedAt,
+      if (locationId != null) 'location_id': locationId,
       if (createdAt != null) 'created_at': createdAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -20818,6 +22128,7 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
     Value<DateTime>? date,
     Value<InventoryCountStatus>? status,
     Value<DateTime?>? completedAt,
+    Value<String?>? locationId,
     Value<DateTime>? createdAt,
     Value<int>? rowid,
   }) {
@@ -20828,6 +22139,7 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
       date: date ?? this.date,
       status: status ?? this.status,
       completedAt: completedAt ?? this.completedAt,
+      locationId: locationId ?? this.locationId,
       createdAt: createdAt ?? this.createdAt,
       rowid: rowid ?? this.rowid,
     );
@@ -20856,6 +22168,9 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
     if (completedAt.present) {
       map['completed_at'] = Variable<DateTime>(completedAt.value);
     }
+    if (locationId.present) {
+      map['location_id'] = Variable<String>(locationId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -20874,6 +22189,7 @@ class InventoryCountsCompanion extends UpdateCompanion<InventoryCount> {
           ..write('date: $date, ')
           ..write('status: $status, ')
           ..write('completedAt: $completedAt, ')
+          ..write('locationId: $locationId, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -20957,6 +22273,15 @@ class $InventoryCountItemsTable extends InventoryCountItems
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _binKeyMeta = const VerificationMeta('binKey');
+  @override
+  late final GeneratedColumn<String> binKey = GeneratedColumn<String>(
+    'bin_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -20965,6 +22290,7 @@ class $InventoryCountItemsTable extends InventoryCountItems
     expectedQuantity,
     countedQuantity,
     countedAt,
+    binKey,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -21028,15 +22354,17 @@ class $InventoryCountItemsTable extends InventoryCountItems
         countedAt.isAcceptableOrUnknown(data['counted_at']!, _countedAtMeta),
       );
     }
+    if (data.containsKey('bin_key')) {
+      context.handle(
+        _binKeyMeta,
+        binKey.isAcceptableOrUnknown(data['bin_key']!, _binKeyMeta),
+      );
+    }
     return context;
   }
 
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  List<Set<GeneratedColumn>> get uniqueKeys => [
-    {inventoryCountId, articleId},
-  ];
   @override
   InventoryCountItem map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -21065,6 +22393,10 @@ class $InventoryCountItemsTable extends InventoryCountItems
         DriftSqlType.dateTime,
         data['${effectivePrefix}counted_at'],
       ),
+      binKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bin_key'],
+      ),
     );
   }
 
@@ -21087,6 +22419,13 @@ class InventoryCountItem extends DataClass
   /// Position erzeugt keine [StockMovements]-Zeile.
   final double? countedQuantity;
   final DateTime? countedAt;
+
+  /// C5.4-Nachtrag: gezählter Platz — `null` = ganzer Artikel (bisherige
+  /// Inventur), `''` = nicht zugeordneter Bestand, sonst Platz-ID. Je
+  /// Lauf ist jede Kombination Artikel/Platz höchstens einmal enthalten
+  /// (`InventoryRepository` prüft das; kein Unique-Index, weil SQLite
+  /// Spalten darin nicht wieder entfernen kann).
+  final String? binKey;
   const InventoryCountItem({
     required this.id,
     required this.inventoryCountId,
@@ -21094,6 +22433,7 @@ class InventoryCountItem extends DataClass
     required this.expectedQuantity,
     this.countedQuantity,
     this.countedAt,
+    this.binKey,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -21107,6 +22447,9 @@ class InventoryCountItem extends DataClass
     }
     if (!nullToAbsent || countedAt != null) {
       map['counted_at'] = Variable<DateTime>(countedAt);
+    }
+    if (!nullToAbsent || binKey != null) {
+      map['bin_key'] = Variable<String>(binKey);
     }
     return map;
   }
@@ -21123,6 +22466,9 @@ class InventoryCountItem extends DataClass
       countedAt: countedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(countedAt),
+      binKey: binKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(binKey),
     );
   }
 
@@ -21138,6 +22484,7 @@ class InventoryCountItem extends DataClass
       expectedQuantity: serializer.fromJson<double>(json['expectedQuantity']),
       countedQuantity: serializer.fromJson<double?>(json['countedQuantity']),
       countedAt: serializer.fromJson<DateTime?>(json['countedAt']),
+      binKey: serializer.fromJson<String?>(json['binKey']),
     );
   }
   @override
@@ -21150,6 +22497,7 @@ class InventoryCountItem extends DataClass
       'expectedQuantity': serializer.toJson<double>(expectedQuantity),
       'countedQuantity': serializer.toJson<double?>(countedQuantity),
       'countedAt': serializer.toJson<DateTime?>(countedAt),
+      'binKey': serializer.toJson<String?>(binKey),
     };
   }
 
@@ -21160,6 +22508,7 @@ class InventoryCountItem extends DataClass
     double? expectedQuantity,
     Value<double?> countedQuantity = const Value.absent(),
     Value<DateTime?> countedAt = const Value.absent(),
+    Value<String?> binKey = const Value.absent(),
   }) => InventoryCountItem(
     id: id ?? this.id,
     inventoryCountId: inventoryCountId ?? this.inventoryCountId,
@@ -21169,6 +22518,7 @@ class InventoryCountItem extends DataClass
         ? countedQuantity.value
         : this.countedQuantity,
     countedAt: countedAt.present ? countedAt.value : this.countedAt,
+    binKey: binKey.present ? binKey.value : this.binKey,
   );
   InventoryCountItem copyWithCompanion(InventoryCountItemsCompanion data) {
     return InventoryCountItem(
@@ -21184,6 +22534,7 @@ class InventoryCountItem extends DataClass
           ? data.countedQuantity.value
           : this.countedQuantity,
       countedAt: data.countedAt.present ? data.countedAt.value : this.countedAt,
+      binKey: data.binKey.present ? data.binKey.value : this.binKey,
     );
   }
 
@@ -21195,7 +22546,8 @@ class InventoryCountItem extends DataClass
           ..write('articleId: $articleId, ')
           ..write('expectedQuantity: $expectedQuantity, ')
           ..write('countedQuantity: $countedQuantity, ')
-          ..write('countedAt: $countedAt')
+          ..write('countedAt: $countedAt, ')
+          ..write('binKey: $binKey')
           ..write(')'))
         .toString();
   }
@@ -21208,6 +22560,7 @@ class InventoryCountItem extends DataClass
     expectedQuantity,
     countedQuantity,
     countedAt,
+    binKey,
   );
   @override
   bool operator ==(Object other) =>
@@ -21218,7 +22571,8 @@ class InventoryCountItem extends DataClass
           other.articleId == this.articleId &&
           other.expectedQuantity == this.expectedQuantity &&
           other.countedQuantity == this.countedQuantity &&
-          other.countedAt == this.countedAt);
+          other.countedAt == this.countedAt &&
+          other.binKey == this.binKey);
 }
 
 class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
@@ -21228,6 +22582,7 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
   final Value<double> expectedQuantity;
   final Value<double?> countedQuantity;
   final Value<DateTime?> countedAt;
+  final Value<String?> binKey;
   final Value<int> rowid;
   const InventoryCountItemsCompanion({
     this.id = const Value.absent(),
@@ -21236,6 +22591,7 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
     this.expectedQuantity = const Value.absent(),
     this.countedQuantity = const Value.absent(),
     this.countedAt = const Value.absent(),
+    this.binKey = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   InventoryCountItemsCompanion.insert({
@@ -21245,6 +22601,7 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
     required double expectedQuantity,
     this.countedQuantity = const Value.absent(),
     this.countedAt = const Value.absent(),
+    this.binKey = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        inventoryCountId = Value(inventoryCountId),
@@ -21257,6 +22614,7 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
     Expression<double>? expectedQuantity,
     Expression<double>? countedQuantity,
     Expression<DateTime>? countedAt,
+    Expression<String>? binKey,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -21266,6 +22624,7 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
       if (expectedQuantity != null) 'expected_quantity': expectedQuantity,
       if (countedQuantity != null) 'counted_quantity': countedQuantity,
       if (countedAt != null) 'counted_at': countedAt,
+      if (binKey != null) 'bin_key': binKey,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -21277,6 +22636,7 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
     Value<double>? expectedQuantity,
     Value<double?>? countedQuantity,
     Value<DateTime?>? countedAt,
+    Value<String?>? binKey,
     Value<int>? rowid,
   }) {
     return InventoryCountItemsCompanion(
@@ -21286,6 +22646,7 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
       expectedQuantity: expectedQuantity ?? this.expectedQuantity,
       countedQuantity: countedQuantity ?? this.countedQuantity,
       countedAt: countedAt ?? this.countedAt,
+      binKey: binKey ?? this.binKey,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -21311,6 +22672,9 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
     if (countedAt.present) {
       map['counted_at'] = Variable<DateTime>(countedAt.value);
     }
+    if (binKey.present) {
+      map['bin_key'] = Variable<String>(binKey.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -21326,6 +22690,7 @@ class InventoryCountItemsCompanion extends UpdateCompanion<InventoryCountItem> {
           ..write('expectedQuantity: $expectedQuantity, ')
           ..write('countedQuantity: $countedQuantity, ')
           ..write('countedAt: $countedAt, ')
+          ..write('binKey: $binKey, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -22681,6 +24046,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PurchaseOrderItemsTable purchaseOrderItems =
       $PurchaseOrderItemsTable(this);
   late final $StockMovementsTable stockMovements = $StockMovementsTable(this);
+  late final $StorageLocationsTable storageLocations = $StorageLocationsTable(
+    this,
+  );
+  late final $StorageBinsTable storageBins = $StorageBinsTable(this);
+  late final $ArticleBinStocksTable articleBinStocks = $ArticleBinStocksTable(
+    this,
+  );
   late final $InventoryCountsTable inventoryCounts = $InventoryCountsTable(
     this,
   );
@@ -22716,6 +24088,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     purchaseOrders,
     purchaseOrderItems,
     stockMovements,
+    storageLocations,
+    storageBins,
+    articleBinStocks,
     inventoryCounts,
     inventoryCountItems,
     timeSheets,
@@ -23028,6 +24403,41 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('stock_movements', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'companies',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('storage_locations', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'companies',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('storage_bins', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'storage_locations',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('storage_bins', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'companies',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('article_bin_stocks', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'articles',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('article_bin_stocks', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -23623,6 +25033,64 @@ final class $$CompaniesTableReferences
     ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_stockMovementsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$StorageLocationsTable, List<StorageLocation>>
+  _storageLocationsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.storageLocations,
+    aliasName: 'companies__id__storage_locations__company_id',
+  );
+
+  $$StorageLocationsTableProcessedTableManager get storageLocationsRefs {
+    final manager = $$StorageLocationsTableTableManager(
+      $_db,
+      $_db.storageLocations,
+    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _storageLocationsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$StorageBinsTable, List<StorageBin>>
+  _storageBinsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.storageBins,
+    aliasName: 'companies__id__storage_bins__company_id',
+  );
+
+  $$StorageBinsTableProcessedTableManager get storageBinsRefs {
+    final manager = $$StorageBinsTableTableManager(
+      $_db,
+      $_db.storageBins,
+    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_storageBinsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$ArticleBinStocksTable, List<ArticleBinStock>>
+  _articleBinStocksRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.articleBinStocks,
+    aliasName: 'companies__id__article_bin_stocks__company_id',
+  );
+
+  $$ArticleBinStocksTableProcessedTableManager get articleBinStocksRefs {
+    final manager = $$ArticleBinStocksTableTableManager(
+      $_db,
+      $_db.articleBinStocks,
+    ).filter((f) => f.companyId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _articleBinStocksRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -24532,6 +26000,81 @@ class $$CompaniesTableFilterComposer
           }) => $$StockMovementsTableFilterComposer(
             $db: $db,
             $table: $db.stockMovements,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> storageLocationsRefs(
+    Expression<bool> Function($$StorageLocationsTableFilterComposer f) f,
+  ) {
+    final $$StorageLocationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.storageLocations,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageLocationsTableFilterComposer(
+            $db: $db,
+            $table: $db.storageLocations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> storageBinsRefs(
+    Expression<bool> Function($$StorageBinsTableFilterComposer f) f,
+  ) {
+    final $$StorageBinsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.storageBins,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageBinsTableFilterComposer(
+            $db: $db,
+            $table: $db.storageBins,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> articleBinStocksRefs(
+    Expression<bool> Function($$ArticleBinStocksTableFilterComposer f) f,
+  ) {
+    final $$ArticleBinStocksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.articleBinStocks,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticleBinStocksTableFilterComposer(
+            $db: $db,
+            $table: $db.articleBinStocks,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -25852,6 +27395,81 @@ class $$CompaniesTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> storageLocationsRefs<T extends Object>(
+    Expression<T> Function($$StorageLocationsTableAnnotationComposer a) f,
+  ) {
+    final $$StorageLocationsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.storageLocations,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageLocationsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.storageLocations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> storageBinsRefs<T extends Object>(
+    Expression<T> Function($$StorageBinsTableAnnotationComposer a) f,
+  ) {
+    final $$StorageBinsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.storageBins,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageBinsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.storageBins,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> articleBinStocksRefs<T extends Object>(
+    Expression<T> Function($$ArticleBinStocksTableAnnotationComposer a) f,
+  ) {
+    final $$ArticleBinStocksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.articleBinStocks,
+      getReferencedColumn: (t) => t.companyId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticleBinStocksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.articleBinStocks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> inventoryCountsRefs<T extends Object>(
     Expression<T> Function($$InventoryCountsTableAnnotationComposer a) f,
   ) {
@@ -25960,6 +27578,9 @@ class $$CompaniesTableTableManager
             bool bankTransactionsRefs,
             bool purchaseOrdersRefs,
             bool stockMovementsRefs,
+            bool storageLocationsRefs,
+            bool storageBinsRefs,
+            bool articleBinStocksRefs,
             bool inventoryCountsRefs,
             bool timeSheetsRefs,
             bool timeEntriesRefs,
@@ -26340,6 +27961,9 @@ class $$CompaniesTableTableManager
                 bankTransactionsRefs = false,
                 purchaseOrdersRefs = false,
                 stockMovementsRefs = false,
+                storageLocationsRefs = false,
+                storageBinsRefs = false,
+                articleBinStocksRefs = false,
                 inventoryCountsRefs = false,
                 timeSheetsRefs = false,
                 timeEntriesRefs = false,
@@ -26366,6 +27990,9 @@ class $$CompaniesTableTableManager
                     if (bankTransactionsRefs) db.bankTransactions,
                     if (purchaseOrdersRefs) db.purchaseOrders,
                     if (stockMovementsRefs) db.stockMovements,
+                    if (storageLocationsRefs) db.storageLocations,
+                    if (storageBinsRefs) db.storageBins,
+                    if (articleBinStocksRefs) db.articleBinStocks,
                     if (inventoryCountsRefs) db.inventoryCounts,
                     if (timeSheetsRefs) db.timeSheets,
                     if (timeEntriesRefs) db.timeEntries,
@@ -26751,6 +28378,69 @@ class $$CompaniesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (storageLocationsRefs)
+                        await $_getPrefetchedData<
+                          Company,
+                          $CompaniesTable,
+                          StorageLocation
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompaniesTableReferences
+                              ._storageLocationsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompaniesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).storageLocationsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.companyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (storageBinsRefs)
+                        await $_getPrefetchedData<
+                          Company,
+                          $CompaniesTable,
+                          StorageBin
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompaniesTableReferences
+                              ._storageBinsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompaniesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).storageBinsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.companyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (articleBinStocksRefs)
+                        await $_getPrefetchedData<
+                          Company,
+                          $CompaniesTable,
+                          ArticleBinStock
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CompaniesTableReferences
+                              ._articleBinStocksRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CompaniesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).articleBinStocksRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.companyId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (inventoryCountsRefs)
                         await $_getPrefetchedData<
                           Company,
@@ -26853,6 +28543,9 @@ typedef $$CompaniesTableProcessedTableManager =
         bool bankTransactionsRefs,
         bool purchaseOrdersRefs,
         bool stockMovementsRefs,
+        bool storageLocationsRefs,
+        bool storageBinsRefs,
+        bool articleBinStocksRefs,
         bool inventoryCountsRefs,
         bool timeSheetsRefs,
         bool timeEntriesRefs,
@@ -30003,6 +31696,7 @@ typedef $$ArticlesTableCreateCompanionBuilder =
       Value<double?> minimumStock,
       required DateTime createdAt,
       Value<String?> barcode,
+      Value<String?> defaultBinId,
       Value<int> rowid,
     });
 typedef $$ArticlesTableUpdateCompanionBuilder =
@@ -30019,6 +31713,7 @@ typedef $$ArticlesTableUpdateCompanionBuilder =
       Value<double?> minimumStock,
       Value<DateTime> createdAt,
       Value<String?> barcode,
+      Value<String?> defaultBinId,
       Value<int> rowid,
     });
 
@@ -30185,6 +31880,26 @@ final class $$ArticlesTableReferences
     );
   }
 
+  static MultiTypedResultKey<$ArticleBinStocksTable, List<ArticleBinStock>>
+  _articleBinStocksRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.articleBinStocks,
+    aliasName: 'articles__id__article_bin_stocks__article_id',
+  );
+
+  $$ArticleBinStocksTableProcessedTableManager get articleBinStocksRefs {
+    final manager = $$ArticleBinStocksTableTableManager(
+      $_db,
+      $_db.articleBinStocks,
+    ).filter((f) => f.articleId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _articleBinStocksRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<
     $InventoryCountItemsTable,
     List<InventoryCountItem>
@@ -30261,6 +31976,11 @@ class $$ArticlesTableFilterComposer
 
   ColumnFilters<String> get barcode => $composableBuilder(
     column: $table.barcode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultBinId => $composableBuilder(
+    column: $table.defaultBinId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -30463,6 +32183,31 @@ class $$ArticlesTableFilterComposer
     return f(composer);
   }
 
+  Expression<bool> articleBinStocksRefs(
+    Expression<bool> Function($$ArticleBinStocksTableFilterComposer f) f,
+  ) {
+    final $$ArticleBinStocksTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.articleBinStocks,
+      getReferencedColumn: (t) => t.articleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticleBinStocksTableFilterComposer(
+            $db: $db,
+            $table: $db.articleBinStocks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<bool> inventoryCountItemsRefs(
     Expression<bool> Function($$InventoryCountItemsTableFilterComposer f) f,
   ) {
@@ -30540,6 +32285,11 @@ class $$ArticlesTableOrderingComposer
 
   ColumnOrderings<String> get barcode => $composableBuilder(
     column: $table.barcode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get defaultBinId => $composableBuilder(
+    column: $table.defaultBinId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -30654,6 +32404,11 @@ class $$ArticlesTableAnnotationComposer
 
   GeneratedColumn<String> get barcode =>
       $composableBuilder(column: $table.barcode, builder: (column) => column);
+
+  GeneratedColumn<String> get defaultBinId => $composableBuilder(
+    column: $table.defaultBinId,
+    builder: (column) => column,
+  );
 
   $$CompaniesTableAnnotationComposer get companyId {
     final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
@@ -30855,6 +32610,31 @@ class $$ArticlesTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> articleBinStocksRefs<T extends Object>(
+    Expression<T> Function($$ArticleBinStocksTableAnnotationComposer a) f,
+  ) {
+    final $$ArticleBinStocksTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.articleBinStocks,
+      getReferencedColumn: (t) => t.articleId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticleBinStocksTableAnnotationComposer(
+            $db: $db,
+            $table: $db.articleBinStocks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> inventoryCountItemsRefs<T extends Object>(
     Expression<T> Function($$InventoryCountItemsTableAnnotationComposer a) f,
   ) {
@@ -30904,6 +32684,7 @@ class $$ArticlesTableTableManager
             bool recurringInvoiceTemplateItemsRefs,
             bool purchaseOrderItemsRefs,
             bool stockMovementsRefs,
+            bool articleBinStocksRefs,
             bool inventoryCountItemsRefs,
           })
         > {
@@ -30932,6 +32713,7 @@ class $$ArticlesTableTableManager
                 Value<double?> minimumStock = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> barcode = const Value.absent(),
+                Value<String?> defaultBinId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ArticlesCompanion(
                 id: id,
@@ -30946,6 +32728,7 @@ class $$ArticlesTableTableManager
                 minimumStock: minimumStock,
                 createdAt: createdAt,
                 barcode: barcode,
+                defaultBinId: defaultBinId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -30962,6 +32745,7 @@ class $$ArticlesTableTableManager
                 Value<double?> minimumStock = const Value.absent(),
                 required DateTime createdAt,
                 Value<String?> barcode = const Value.absent(),
+                Value<String?> defaultBinId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ArticlesCompanion.insert(
                 id: id,
@@ -30976,6 +32760,7 @@ class $$ArticlesTableTableManager
                 minimumStock: minimumStock,
                 createdAt: createdAt,
                 barcode: barcode,
+                defaultBinId: defaultBinId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -30996,6 +32781,7 @@ class $$ArticlesTableTableManager
                 recurringInvoiceTemplateItemsRefs = false,
                 purchaseOrderItemsRefs = false,
                 stockMovementsRefs = false,
+                articleBinStocksRefs = false,
                 inventoryCountItemsRefs = false,
               }) {
                 return PrefetchHooks(
@@ -31007,6 +32793,7 @@ class $$ArticlesTableTableManager
                       db.recurringInvoiceTemplateItems,
                     if (purchaseOrderItemsRefs) db.purchaseOrderItems,
                     if (stockMovementsRefs) db.stockMovements,
+                    if (articleBinStocksRefs) db.articleBinStocks,
                     if (inventoryCountItemsRefs) db.inventoryCountItems,
                   ],
                   addJoins:
@@ -31174,6 +32961,27 @@ class $$ArticlesTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (articleBinStocksRefs)
+                        await $_getPrefetchedData<
+                          Article,
+                          $ArticlesTable,
+                          ArticleBinStock
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ArticlesTableReferences
+                              ._articleBinStocksRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ArticlesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).articleBinStocksRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.articleId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                       if (inventoryCountItemsRefs)
                         await $_getPrefetchedData<
                           Article,
@@ -31224,6 +33032,7 @@ typedef $$ArticlesTableProcessedTableManager =
         bool recurringInvoiceTemplateItemsRefs,
         bool purchaseOrderItemsRefs,
         bool stockMovementsRefs,
+        bool articleBinStocksRefs,
         bool inventoryCountItemsRefs,
       })
     >;
@@ -41644,6 +43453,7 @@ typedef $$StockMovementsTableCreateCompanionBuilder =
       Value<String?> referenceLabel,
       Value<String?> note,
       required DateTime createdAt,
+      Value<String?> binKey,
       Value<int> rowid,
     });
 typedef $$StockMovementsTableUpdateCompanionBuilder =
@@ -41657,6 +43467,7 @@ typedef $$StockMovementsTableUpdateCompanionBuilder =
       Value<String?> referenceLabel,
       Value<String?> note,
       Value<DateTime> createdAt,
+      Value<String?> binKey,
       Value<int> rowid,
     });
 
@@ -41745,6 +43556,11 @@ class $$StockMovementsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get binKey => $composableBuilder(
+    column: $table.binKey,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -41839,6 +43655,11 @@ class $$StockMovementsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get binKey => $composableBuilder(
+    column: $table.binKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CompaniesTableOrderingComposer get companyId {
     final $$CompaniesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -41921,6 +43742,9 @@ class $$StockMovementsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get binKey =>
+      $composableBuilder(column: $table.binKey, builder: (column) => column);
 
   $$CompaniesTableAnnotationComposer get companyId {
     final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
@@ -42008,6 +43832,7 @@ class $$StockMovementsTableTableManager
                 Value<String?> referenceLabel = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> binKey = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StockMovementsCompanion(
                 id: id,
@@ -42019,6 +43844,7 @@ class $$StockMovementsTableTableManager
                 referenceLabel: referenceLabel,
                 note: note,
                 createdAt: createdAt,
+                binKey: binKey,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -42032,6 +43858,7 @@ class $$StockMovementsTableTableManager
                 Value<String?> referenceLabel = const Value.absent(),
                 Value<String?> note = const Value.absent(),
                 required DateTime createdAt,
+                Value<String?> binKey = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => StockMovementsCompanion.insert(
                 id: id,
@@ -42043,6 +43870,7 @@ class $$StockMovementsTableTableManager
                 referenceLabel: referenceLabel,
                 note: note,
                 createdAt: createdAt,
+                binKey: binKey,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -42127,6 +43955,1264 @@ typedef $$StockMovementsTableProcessedTableManager =
       StockMovement,
       PrefetchHooks Function({bool companyId, bool articleId})
     >;
+typedef $$StorageLocationsTableCreateCompanionBuilder =
+    StorageLocationsCompanion Function({
+      required String id,
+      required String companyId,
+      required String name,
+      Value<int> sortOrder,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$StorageLocationsTableUpdateCompanionBuilder =
+    StorageLocationsCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> name,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$StorageLocationsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $StorageLocationsTable, StorageLocation> {
+  $$StorageLocationsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CompaniesTable _companyIdTable(_$AppDatabase db) =>
+      db.companies.createAlias('storage_locations__company_id__companies__id');
+
+  $$CompaniesTableProcessedTableManager get companyId {
+    final $_column = $_itemColumn<String>('company_id')!;
+
+    final manager = $$CompaniesTableTableManager(
+      $_db,
+      $_db.companies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$StorageBinsTable, List<StorageBin>>
+  _storageBinsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.storageBins,
+    aliasName: 'storage_locations__id__storage_bins__location_id',
+  );
+
+  $$StorageBinsTableProcessedTableManager get storageBinsRefs {
+    final manager = $$StorageBinsTableTableManager(
+      $_db,
+      $_db.storageBins,
+    ).filter((f) => f.locationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_storageBinsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$StorageLocationsTableFilterComposer
+    extends Composer<_$AppDatabase, $StorageLocationsTable> {
+  $$StorageLocationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CompaniesTableFilterComposer get companyId {
+    final $$CompaniesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableFilterComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> storageBinsRefs(
+    Expression<bool> Function($$StorageBinsTableFilterComposer f) f,
+  ) {
+    final $$StorageBinsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.storageBins,
+      getReferencedColumn: (t) => t.locationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageBinsTableFilterComposer(
+            $db: $db,
+            $table: $db.storageBins,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$StorageLocationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $StorageLocationsTable> {
+  $$StorageLocationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CompaniesTableOrderingComposer get companyId {
+    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableOrderingComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$StorageLocationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StorageLocationsTable> {
+  $$StorageLocationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$CompaniesTableAnnotationComposer get companyId {
+    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> storageBinsRefs<T extends Object>(
+    Expression<T> Function($$StorageBinsTableAnnotationComposer a) f,
+  ) {
+    final $$StorageBinsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.storageBins,
+      getReferencedColumn: (t) => t.locationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageBinsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.storageBins,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$StorageLocationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $StorageLocationsTable,
+          StorageLocation,
+          $$StorageLocationsTableFilterComposer,
+          $$StorageLocationsTableOrderingComposer,
+          $$StorageLocationsTableAnnotationComposer,
+          $$StorageLocationsTableCreateCompanionBuilder,
+          $$StorageLocationsTableUpdateCompanionBuilder,
+          (StorageLocation, $$StorageLocationsTableReferences),
+          StorageLocation,
+          PrefetchHooks Function({bool companyId, bool storageBinsRefs})
+        > {
+  $$StorageLocationsTableTableManager(
+    _$AppDatabase db,
+    $StorageLocationsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StorageLocationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StorageLocationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StorageLocationsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> companyId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StorageLocationsCompanion(
+                id: id,
+                companyId: companyId,
+                name: name,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String companyId,
+                required String name,
+                Value<int> sortOrder = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => StorageLocationsCompanion.insert(
+                id: id,
+                companyId: companyId,
+                name: name,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$StorageLocationsTable, StorageLocation>(table),
+                  $$StorageLocationsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({companyId = false, storageBinsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (storageBinsRefs) db.storageBins,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (companyId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.companyId,
+                                    referencedTable:
+                                        $$StorageLocationsTableReferences
+                                            ._companyIdTable(db),
+                                    referencedColumn:
+                                        $$StorageLocationsTableReferences
+                                            ._companyIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (storageBinsRefs)
+                        await $_getPrefetchedData<
+                          StorageLocation,
+                          $StorageLocationsTable,
+                          StorageBin
+                        >(
+                          currentTable: table,
+                          referencedTable: $$StorageLocationsTableReferences
+                              ._storageBinsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$StorageLocationsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).storageBinsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.locationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$StorageLocationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $StorageLocationsTable,
+      StorageLocation,
+      $$StorageLocationsTableFilterComposer,
+      $$StorageLocationsTableOrderingComposer,
+      $$StorageLocationsTableAnnotationComposer,
+      $$StorageLocationsTableCreateCompanionBuilder,
+      $$StorageLocationsTableUpdateCompanionBuilder,
+      (StorageLocation, $$StorageLocationsTableReferences),
+      StorageLocation,
+      PrefetchHooks Function({bool companyId, bool storageBinsRefs})
+    >;
+typedef $$StorageBinsTableCreateCompanionBuilder =
+    StorageBinsCompanion Function({
+      required String id,
+      required String companyId,
+      required String locationId,
+      Value<String> row,
+      Value<String> shelf,
+      Value<String> compartment,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+typedef $$StorageBinsTableUpdateCompanionBuilder =
+    StorageBinsCompanion Function({
+      Value<String> id,
+      Value<String> companyId,
+      Value<String> locationId,
+      Value<String> row,
+      Value<String> shelf,
+      Value<String> compartment,
+      Value<int> sortOrder,
+      Value<int> rowid,
+    });
+
+final class $$StorageBinsTableReferences
+    extends BaseReferences<_$AppDatabase, $StorageBinsTable, StorageBin> {
+  $$StorageBinsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CompaniesTable _companyIdTable(_$AppDatabase db) =>
+      db.companies.createAlias('storage_bins__company_id__companies__id');
+
+  $$CompaniesTableProcessedTableManager get companyId {
+    final $_column = $_itemColumn<String>('company_id')!;
+
+    final manager = $$CompaniesTableTableManager(
+      $_db,
+      $_db.companies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $StorageLocationsTable _locationIdTable(_$AppDatabase db) => db
+      .storageLocations
+      .createAlias('storage_bins__location_id__storage_locations__id');
+
+  $$StorageLocationsTableProcessedTableManager get locationId {
+    final $_column = $_itemColumn<String>('location_id')!;
+
+    final manager = $$StorageLocationsTableTableManager(
+      $_db,
+      $_db.storageLocations,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_locationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$StorageBinsTableFilterComposer
+    extends Composer<_$AppDatabase, $StorageBinsTable> {
+  $$StorageBinsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get row => $composableBuilder(
+    column: $table.row,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get shelf => $composableBuilder(
+    column: $table.shelf,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get compartment => $composableBuilder(
+    column: $table.compartment,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CompaniesTableFilterComposer get companyId {
+    final $$CompaniesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableFilterComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$StorageLocationsTableFilterComposer get locationId {
+    final $$StorageLocationsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.locationId,
+      referencedTable: $db.storageLocations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageLocationsTableFilterComposer(
+            $db: $db,
+            $table: $db.storageLocations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$StorageBinsTableOrderingComposer
+    extends Composer<_$AppDatabase, $StorageBinsTable> {
+  $$StorageBinsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get row => $composableBuilder(
+    column: $table.row,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get shelf => $composableBuilder(
+    column: $table.shelf,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get compartment => $composableBuilder(
+    column: $table.compartment,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CompaniesTableOrderingComposer get companyId {
+    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableOrderingComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$StorageLocationsTableOrderingComposer get locationId {
+    final $$StorageLocationsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.locationId,
+      referencedTable: $db.storageLocations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageLocationsTableOrderingComposer(
+            $db: $db,
+            $table: $db.storageLocations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$StorageBinsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StorageBinsTable> {
+  $$StorageBinsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get row =>
+      $composableBuilder(column: $table.row, builder: (column) => column);
+
+  GeneratedColumn<String> get shelf =>
+      $composableBuilder(column: $table.shelf, builder: (column) => column);
+
+  GeneratedColumn<String> get compartment => $composableBuilder(
+    column: $table.compartment,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  $$CompaniesTableAnnotationComposer get companyId {
+    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$StorageLocationsTableAnnotationComposer get locationId {
+    final $$StorageLocationsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.locationId,
+      referencedTable: $db.storageLocations,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$StorageLocationsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.storageLocations,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$StorageBinsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $StorageBinsTable,
+          StorageBin,
+          $$StorageBinsTableFilterComposer,
+          $$StorageBinsTableOrderingComposer,
+          $$StorageBinsTableAnnotationComposer,
+          $$StorageBinsTableCreateCompanionBuilder,
+          $$StorageBinsTableUpdateCompanionBuilder,
+          (StorageBin, $$StorageBinsTableReferences),
+          StorageBin,
+          PrefetchHooks Function({bool companyId, bool locationId})
+        > {
+  $$StorageBinsTableTableManager(_$AppDatabase db, $StorageBinsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StorageBinsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StorageBinsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StorageBinsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> companyId = const Value.absent(),
+                Value<String> locationId = const Value.absent(),
+                Value<String> row = const Value.absent(),
+                Value<String> shelf = const Value.absent(),
+                Value<String> compartment = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StorageBinsCompanion(
+                id: id,
+                companyId: companyId,
+                locationId: locationId,
+                row: row,
+                shelf: shelf,
+                compartment: compartment,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String companyId,
+                required String locationId,
+                Value<String> row = const Value.absent(),
+                Value<String> shelf = const Value.absent(),
+                Value<String> compartment = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StorageBinsCompanion.insert(
+                id: id,
+                companyId: companyId,
+                locationId: locationId,
+                row: row,
+                shelf: shelf,
+                compartment: compartment,
+                sortOrder: sortOrder,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$StorageBinsTable, StorageBin>(table),
+                  $$StorageBinsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({companyId = false, locationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (companyId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.companyId,
+                                referencedTable: $$StorageBinsTableReferences
+                                    ._companyIdTable(db),
+                                referencedColumn: $$StorageBinsTableReferences
+                                    ._companyIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+                    if (locationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.locationId,
+                                referencedTable: $$StorageBinsTableReferences
+                                    ._locationIdTable(db),
+                                referencedColumn: $$StorageBinsTableReferences
+                                    ._locationIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$StorageBinsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $StorageBinsTable,
+      StorageBin,
+      $$StorageBinsTableFilterComposer,
+      $$StorageBinsTableOrderingComposer,
+      $$StorageBinsTableAnnotationComposer,
+      $$StorageBinsTableCreateCompanionBuilder,
+      $$StorageBinsTableUpdateCompanionBuilder,
+      (StorageBin, $$StorageBinsTableReferences),
+      StorageBin,
+      PrefetchHooks Function({bool companyId, bool locationId})
+    >;
+typedef $$ArticleBinStocksTableCreateCompanionBuilder =
+    ArticleBinStocksCompanion Function({
+      required String companyId,
+      required String articleId,
+      required String binKey,
+      Value<double> quantity,
+      Value<int> rowid,
+    });
+typedef $$ArticleBinStocksTableUpdateCompanionBuilder =
+    ArticleBinStocksCompanion Function({
+      Value<String> companyId,
+      Value<String> articleId,
+      Value<String> binKey,
+      Value<double> quantity,
+      Value<int> rowid,
+    });
+
+final class $$ArticleBinStocksTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $ArticleBinStocksTable, ArticleBinStock> {
+  $$ArticleBinStocksTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $CompaniesTable _companyIdTable(_$AppDatabase db) =>
+      db.companies.createAlias('article_bin_stocks__company_id__companies__id');
+
+  $$CompaniesTableProcessedTableManager get companyId {
+    final $_column = $_itemColumn<String>('company_id')!;
+
+    final manager = $$CompaniesTableTableManager(
+      $_db,
+      $_db.companies,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_companyIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ArticlesTable _articleIdTable(_$AppDatabase db) =>
+      db.articles.createAlias('article_bin_stocks__article_id__articles__id');
+
+  $$ArticlesTableProcessedTableManager get articleId {
+    final $_column = $_itemColumn<String>('article_id')!;
+
+    final manager = $$ArticlesTableTableManager(
+      $_db,
+      $_db.articles,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_articleIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ArticleBinStocksTableFilterComposer
+    extends Composer<_$AppDatabase, $ArticleBinStocksTable> {
+  $$ArticleBinStocksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get binKey => $composableBuilder(
+    column: $table.binKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CompaniesTableFilterComposer get companyId {
+    final $$CompaniesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableFilterComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ArticlesTableFilterComposer get articleId {
+    final $$ArticlesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.articleId,
+      referencedTable: $db.articles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticlesTableFilterComposer(
+            $db: $db,
+            $table: $db.articles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ArticleBinStocksTableOrderingComposer
+    extends Composer<_$AppDatabase, $ArticleBinStocksTable> {
+  $$ArticleBinStocksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get binKey => $composableBuilder(
+    column: $table.binKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get quantity => $composableBuilder(
+    column: $table.quantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CompaniesTableOrderingComposer get companyId {
+    final $$CompaniesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableOrderingComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ArticlesTableOrderingComposer get articleId {
+    final $$ArticlesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.articleId,
+      referencedTable: $db.articles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticlesTableOrderingComposer(
+            $db: $db,
+            $table: $db.articles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ArticleBinStocksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ArticleBinStocksTable> {
+  $$ArticleBinStocksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get binKey =>
+      $composableBuilder(column: $table.binKey, builder: (column) => column);
+
+  GeneratedColumn<double> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  $$CompaniesTableAnnotationComposer get companyId {
+    final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.companyId,
+      referencedTable: $db.companies,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CompaniesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.companies,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ArticlesTableAnnotationComposer get articleId {
+    final $$ArticlesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.articleId,
+      referencedTable: $db.articles,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ArticlesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.articles,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ArticleBinStocksTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ArticleBinStocksTable,
+          ArticleBinStock,
+          $$ArticleBinStocksTableFilterComposer,
+          $$ArticleBinStocksTableOrderingComposer,
+          $$ArticleBinStocksTableAnnotationComposer,
+          $$ArticleBinStocksTableCreateCompanionBuilder,
+          $$ArticleBinStocksTableUpdateCompanionBuilder,
+          (ArticleBinStock, $$ArticleBinStocksTableReferences),
+          ArticleBinStock,
+          PrefetchHooks Function({bool companyId, bool articleId})
+        > {
+  $$ArticleBinStocksTableTableManager(
+    _$AppDatabase db,
+    $ArticleBinStocksTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ArticleBinStocksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ArticleBinStocksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ArticleBinStocksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> companyId = const Value.absent(),
+                Value<String> articleId = const Value.absent(),
+                Value<String> binKey = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ArticleBinStocksCompanion(
+                companyId: companyId,
+                articleId: articleId,
+                binKey: binKey,
+                quantity: quantity,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String companyId,
+                required String articleId,
+                required String binKey,
+                Value<double> quantity = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ArticleBinStocksCompanion.insert(
+                companyId: companyId,
+                articleId: articleId,
+                binKey: binKey,
+                quantity: quantity,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ArticleBinStocksTable, ArticleBinStock>(table),
+                  $$ArticleBinStocksTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({companyId = false, articleId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (companyId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.companyId,
+                                referencedTable:
+                                    $$ArticleBinStocksTableReferences
+                                        ._companyIdTable(db),
+                                referencedColumn:
+                                    $$ArticleBinStocksTableReferences
+                                        ._companyIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+                    if (articleId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.articleId,
+                                referencedTable:
+                                    $$ArticleBinStocksTableReferences
+                                        ._articleIdTable(db),
+                                referencedColumn:
+                                    $$ArticleBinStocksTableReferences
+                                        ._articleIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ArticleBinStocksTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ArticleBinStocksTable,
+      ArticleBinStock,
+      $$ArticleBinStocksTableFilterComposer,
+      $$ArticleBinStocksTableOrderingComposer,
+      $$ArticleBinStocksTableAnnotationComposer,
+      $$ArticleBinStocksTableCreateCompanionBuilder,
+      $$ArticleBinStocksTableUpdateCompanionBuilder,
+      (ArticleBinStock, $$ArticleBinStocksTableReferences),
+      ArticleBinStock,
+      PrefetchHooks Function({bool companyId, bool articleId})
+    >;
 typedef $$InventoryCountsTableCreateCompanionBuilder =
     InventoryCountsCompanion Function({
       required String id,
@@ -42135,6 +45221,7 @@ typedef $$InventoryCountsTableCreateCompanionBuilder =
       required DateTime date,
       Value<InventoryCountStatus> status,
       Value<DateTime?> completedAt,
+      Value<String?> locationId,
       required DateTime createdAt,
       Value<int> rowid,
     });
@@ -42146,6 +45233,7 @@ typedef $$InventoryCountsTableUpdateCompanionBuilder =
       Value<DateTime> date,
       Value<InventoryCountStatus> status,
       Value<DateTime?> completedAt,
+      Value<String?> locationId,
       Value<DateTime> createdAt,
       Value<int> rowid,
     });
@@ -42244,6 +45332,11 @@ class $$InventoryCountsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get locationId => $composableBuilder(
+    column: $table.locationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
@@ -42332,6 +45425,11 @@ class $$InventoryCountsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get locationId => $composableBuilder(
+    column: $table.locationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -42384,6 +45482,11 @@ class $$InventoryCountsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get locationId => $composableBuilder(
+    column: $table.locationId,
     builder: (column) => column,
   );
 
@@ -42476,6 +45579,7 @@ class $$InventoryCountsTableTableManager
                 Value<DateTime> date = const Value.absent(),
                 Value<InventoryCountStatus> status = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<String?> locationId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InventoryCountsCompanion(
@@ -42485,6 +45589,7 @@ class $$InventoryCountsTableTableManager
                 date: date,
                 status: status,
                 completedAt: completedAt,
+                locationId: locationId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -42496,6 +45601,7 @@ class $$InventoryCountsTableTableManager
                 required DateTime date,
                 Value<InventoryCountStatus> status = const Value.absent(),
                 Value<DateTime?> completedAt = const Value.absent(),
+                Value<String?> locationId = const Value.absent(),
                 required DateTime createdAt,
                 Value<int> rowid = const Value.absent(),
               }) => InventoryCountsCompanion.insert(
@@ -42505,6 +45611,7 @@ class $$InventoryCountsTableTableManager
                 date: date,
                 status: status,
                 completedAt: completedAt,
+                locationId: locationId,
                 createdAt: createdAt,
                 rowid: rowid,
               ),
@@ -42610,6 +45717,7 @@ typedef $$InventoryCountItemsTableCreateCompanionBuilder =
       required double expectedQuantity,
       Value<double?> countedQuantity,
       Value<DateTime?> countedAt,
+      Value<String?> binKey,
       Value<int> rowid,
     });
 typedef $$InventoryCountItemsTableUpdateCompanionBuilder =
@@ -42620,6 +45728,7 @@ typedef $$InventoryCountItemsTableUpdateCompanionBuilder =
       Value<double> expectedQuantity,
       Value<double?> countedQuantity,
       Value<DateTime?> countedAt,
+      Value<String?> binKey,
       Value<int> rowid,
     });
 
@@ -42702,6 +45811,11 @@ class $$InventoryCountItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get binKey => $composableBuilder(
+    column: $table.binKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$InventoryCountsTableFilterComposer get inventoryCountId {
     final $$InventoryCountsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -42778,6 +45892,11 @@ class $$InventoryCountItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get binKey => $composableBuilder(
+    column: $table.binKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$InventoryCountsTableOrderingComposer get inventoryCountId {
     final $$InventoryCountsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -42849,6 +45968,9 @@ class $$InventoryCountItemsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get countedAt =>
       $composableBuilder(column: $table.countedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get binKey =>
+      $composableBuilder(column: $table.binKey, builder: (column) => column);
 
   $$InventoryCountsTableAnnotationComposer get inventoryCountId {
     final $$InventoryCountsTableAnnotationComposer composer = $composerBuilder(
@@ -42939,6 +46061,7 @@ class $$InventoryCountItemsTableTableManager
                 Value<double> expectedQuantity = const Value.absent(),
                 Value<double?> countedQuantity = const Value.absent(),
                 Value<DateTime?> countedAt = const Value.absent(),
+                Value<String?> binKey = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InventoryCountItemsCompanion(
                 id: id,
@@ -42947,6 +46070,7 @@ class $$InventoryCountItemsTableTableManager
                 expectedQuantity: expectedQuantity,
                 countedQuantity: countedQuantity,
                 countedAt: countedAt,
+                binKey: binKey,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -42957,6 +46081,7 @@ class $$InventoryCountItemsTableTableManager
                 required double expectedQuantity,
                 Value<double?> countedQuantity = const Value.absent(),
                 Value<DateTime?> countedAt = const Value.absent(),
+                Value<String?> binKey = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InventoryCountItemsCompanion.insert(
                 id: id,
@@ -42965,6 +46090,7 @@ class $$InventoryCountItemsTableTableManager
                 expectedQuantity: expectedQuantity,
                 countedQuantity: countedQuantity,
                 countedAt: countedAt,
+                binKey: binKey,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -44684,6 +47810,12 @@ class $AppDatabaseManager {
       $$PurchaseOrderItemsTableTableManager(_db, _db.purchaseOrderItems);
   $$StockMovementsTableTableManager get stockMovements =>
       $$StockMovementsTableTableManager(_db, _db.stockMovements);
+  $$StorageLocationsTableTableManager get storageLocations =>
+      $$StorageLocationsTableTableManager(_db, _db.storageLocations);
+  $$StorageBinsTableTableManager get storageBins =>
+      $$StorageBinsTableTableManager(_db, _db.storageBins);
+  $$ArticleBinStocksTableTableManager get articleBinStocks =>
+      $$ArticleBinStocksTableTableManager(_db, _db.articleBinStocks);
   $$InventoryCountsTableTableManager get inventoryCounts =>
       $$InventoryCountsTableTableManager(_db, _db.inventoryCounts);
   $$InventoryCountItemsTableTableManager get inventoryCountItems =>

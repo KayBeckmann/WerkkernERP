@@ -8,6 +8,7 @@ import '../../data/repositories/supplier_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/stock_change_notifier.dart';
+import '../../data/repositories/storage_repository.dart';
 import '../widgets/article_group_filter.dart';
 import '../widgets/barcode_scanner.dart';
 import 'article_detail_screen.dart';
@@ -52,6 +53,10 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
   String _query = '';
   ArticleGroupFilter _filter = const AllArticleGroups();
 
+  /// C5.4: Filter nach Lagerort — `null` = alle, `''` = ohne Platz,
+  /// sonst Lagerort-ID.
+  String? _locationFilter;
+
   void _onStockChanged() {
     if (mounted) _reload();
   }
@@ -74,6 +79,7 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
     final company = context.read<ActiveCompanyService>().active!;
     final articleRepo = context.read<ArticleRepository>();
     final groupRepo = context.read<ArticleGroupRepository>();
+    final storageRepo = context.read<StorageRepository>();
 
     final articles = await articleRepo.listForCompany(company.id);
     final prices = <String, Money?>{};
@@ -84,7 +90,18 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
       );
     }
     final groups = await groupRepo.listForCompany(company.id);
+    final locationArticles = <String, Set<String>>{};
+    final locations = <StorageLocation>[];
+    if (company.lagerbestandEnabled) {
+      locations.addAll(await storageRepo.locations(company.id));
+      for (final l in locations) {
+        locationArticles[l.id] = await storageRepo.articleIdsAtLocation(companyId: company.id, locationId: l.id);
+      }
+      if (locations.isNotEmpty) locationArticles[''] = await storageRepo.articleIdsUnassigned(company.id);
+    }
     return _ArticlesData(
+      locations: locations,
+      locationArticles: locationArticles,
       articles: articles,
       salePrices: prices,
       lagerbestandEnabled: company.lagerbestandEnabled,
@@ -188,8 +205,10 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
           if (data.articles.isEmpty && data.groups.isEmpty) {
             return const Center(child: Text('Noch keine Artikel angelegt.'));
           }
+          final atLocation = _locationFilter == null ? null : data.locationArticles[_locationFilter];
           final visible = [
             for (final a in data.articles)
+              if (atLocation == null || atLocation.contains(a.id))
               // Suche nach Name oder exaktem Barcode (A1-Nachtrag).
               if (articleMatches(
                     name: a.name,
@@ -229,6 +248,22 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
                       ),
                       value: _filter,
                       onChanged: (value) => setState(() => _filter = value),
+                    ),
+                  ),
+                if (data.locations.isNotEmpty)
+                  SizedBox(
+                    width: 280,
+                    child: DropdownButtonFormField<String?>(
+                      key: const Key('article-location-filter'),
+                      isExpanded: true,
+                      initialValue: _locationFilter,
+                      decoration: const InputDecoration(prefixIcon: Icon(Icons.warehouse_outlined), labelText: 'Lagerort'),
+                      items: [
+                        const DropdownMenuItem<String?>(value: null, child: Text('Alle Lagerorte')),
+                        for (final l in data.locations) DropdownMenuItem<String?>(value: l.id, child: Text(l.name)),
+                        const DropdownMenuItem<String?>(value: '', child: Text('Platz noch nicht zugeordnet')),
+                      ],
+                      onChanged: (v) => setState(() => _locationFilter = v),
                     ),
                   ),
               ],
@@ -307,11 +342,15 @@ class _ArticlesScreenState extends State<ArticlesScreen> {
 }
 
 class _ArticlesData {
+  final List<StorageLocation> locations;
+  final Map<String, Set<String>> locationArticles;
   const _ArticlesData({
     required this.articles,
     required this.salePrices,
     required this.lagerbestandEnabled,
     required this.groups,
+    this.locations = const [],
+    this.locationArticles = const {},
   });
   final List<Article> articles;
   final Map<String, Money?> salePrices;

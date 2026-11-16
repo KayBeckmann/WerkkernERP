@@ -131,10 +131,24 @@ class ArticleRepository {
     required String id,
     required double newQuantity,
   }) async {
-    final rows = await (_db.update(_db.articles)
-          ..where((a) => a.id.equals(id) & a.companyId.equals(companyId)))
+    final article = await findById(companyId: companyId, id: id);
+    if (article == null) return null;
+    final delta = newQuantity - article.stockQuantity;
+    await (_db.update(_db.articles)..where((a) => a.id.equals(id) & a.companyId.equals(companyId)))
         .write(ArticlesCompanion(stockQuantity: Value(newQuantity)));
-    if (rows == 0) return null;
+    // C5.4: Summe der Platzbestände bleibt gleich dem Gesamtbestand —
+    // die Differenz landet bei „Platz noch nicht zugeordnet“.
+    if (delta != 0) {
+      final row = await (_db.select(_db.articleBinStocks)
+            ..where((s) => s.articleId.equals(id) & s.binKey.equals('')))
+          .getSingleOrNull();
+      await _db.into(_db.articleBinStocks).insertOnConflictUpdate(ArticleBinStocksCompanion.insert(
+            companyId: companyId,
+            articleId: id,
+            binKey: '',
+            quantity: Value((row?.quantity ?? 0) + delta),
+          ));
+    }
     return findById(companyId: companyId, id: id);
   }
 

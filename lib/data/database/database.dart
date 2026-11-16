@@ -33,6 +33,9 @@ part 'database.g.dart';
     PurchaseOrders,
     PurchaseOrderItems,
     StockMovements,
+    StorageLocations,
+    StorageBins,
+    ArticleBinStocks,
     InventoryCounts,
     InventoryCountItems,
     StaffRoles,
@@ -50,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 39;
+  int get schemaVersion => 40;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -441,6 +444,27 @@ class AppDatabase extends _$AppDatabase {
             ]) {
               await migrator.addColumn(invoices, column);
             }
+          }
+          if (from < 40) {
+            // C5.4-Nachtrag (Kay, 16.11.2026): Lagerorte/Plätze. Bisherige
+            // Bestände haben keinen belegten Platz → „noch nicht zugeordnet“
+            // (keinen Regalplatz erfinden). Der Unique-Schlüssel der
+            // Inventurpositionen entfällt (jetzt je Artikel und Platz).
+            await migrator.createTable(storageLocations);
+            await migrator.createTable(storageBins);
+            await migrator.createTable(articleBinStocks);
+            await migrator.addColumn(articles, articles.defaultBinId);
+            // Ab v26 angelegte Lagertabellen haben die Spalten schon
+            // (createTable nutzt das aktuelle Schema).
+            if (from >= 26) {
+              await migrator.addColumn(stockMovements, stockMovements.binKey);
+              await migrator.addColumn(inventoryCounts, inventoryCounts.locationId);
+              await migrator.alterTable(TableMigration(inventoryCountItems, newColumns: [inventoryCountItems.binKey]));
+            }
+            await customStatement(
+              "INSERT INTO article_bin_stocks (company_id, article_id, bin_key, quantity) "
+              "SELECT company_id, id, '', stock_quantity FROM articles WHERE stock_quantity <> 0",
+            );
           }
         },
       );
