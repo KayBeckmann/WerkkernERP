@@ -157,6 +157,22 @@ const defaultMailTemplates = <String, String>{
 String applyMailPlaceholders(String template, {String kunde = '', String nummer = '', required String firma, String code = ''}) =>
     template.replaceAll('{{kunde}}', kunde).replaceAll('{{nummer}}', nummer).replaceAll('{{firma}}', firma).replaceAll('{{code}}', code);
 
+/// C15: XML-Anhang (E-Rechnung) aus Base64 prüfen — muss mit `<?xml`
+/// oder dem CII-Wurzelelement beginnen, höchstens 2 MB.
+Uint8List? decodeXmlAttachment(Object? base64Value, {int maxBytes = 2 * 1024 * 1024}) {
+  if (base64Value is! String) return null;
+  final Uint8List bytes;
+  try {
+    bytes = base64Decode(base64Value);
+  } on FormatException {
+    return null;
+  }
+  if (bytes.length < 5 || bytes.length > maxBytes) return null;
+  final head = utf8.decode(bytes.take(64).toList(), allowMalformed: true).trimLeft();
+  if (!head.startsWith('<?xml') && !head.startsWith('<rsm:CrossIndustryInvoice')) return null;
+  return bytes;
+}
+
 /// PDF-Anhang aus Base64 prüfen (Dateisignatur, Größe).
 Uint8List? decodePdfAttachment(Object? base64Value, {int maxBytes = 10 * 1024 * 1024}) {
   if (base64Value is! String) return null;

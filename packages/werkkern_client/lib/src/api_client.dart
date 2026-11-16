@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -89,6 +90,45 @@ class WerkkernApiClient {
   }
 
   Map<String, Object?> _map(Object? o) => o as Map<String, Object?>;
+
+  /// Rohe Antwort (z. B. XML-Datei) statt JSON — Fehler wie bei [_send].
+  Future<Uint8List> downloadBytes(String path) async {
+    final request = http.Request('GET', _uri(path));
+    if (token != null) request.headers['authorization'] = 'Bearer $token';
+    final http.Response response;
+    try {
+      response = await http.Response.fromStream(await _http.send(request));
+    } on http.ClientException catch (e) {
+      throw ApiUnreachable(e);
+    }
+    if (response.statusCode >= 400) {
+      final text = utf8.decode(response.bodyBytes, allowMalformed: true);
+      Object? decoded;
+      try {
+        decoded = jsonDecode(text);
+      } on FormatException {
+        decoded = null;
+      }
+      throw ApiException(
+        response.statusCode,
+        decoded is Map && decoded['error'] is String ? decoded['error'] as String : 'Fehler ${response.statusCode}',
+      );
+    }
+    return response.bodyBytes;
+  }
+
+  /// C15 E-Rechnung: Format und fehlende Pflichtangaben eines Dokuments.
+  Future<({String format, List<String> problems, String fileName})> eInvoiceStatus(String documentId) async {
+    final j = _map(await _send('GET', '/documents/$documentId/einvoice'));
+    return (
+      format: j['format'] as String,
+      problems: [for (final p in j['problems'] as List) p as String],
+      fileName: j['fileName'] as String,
+    );
+  }
+
+  /// C15 E-Rechnung: XML (XRechnung bzw. ZUGFeRD-Inhalt) eines finalisierten Dokuments.
+  Future<Uint8List> eInvoiceXml(String documentId) => downloadBytes('/documents/$documentId/einvoice.xml');
 
   // ---- Anmeldung ----------------------------------------------------------
 

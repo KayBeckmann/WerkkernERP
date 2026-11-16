@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:werkkern_core/werkkern_core.dart';
@@ -240,6 +241,13 @@ class MailRoutes {
     if (to == null) return jsonError('Empfänger fehlt (beim Kunden ist keine E-Mail hinterlegt).');
     final pdf = decodePdfAttachment(body['pdfBase64']);
     if (pdf == null) return jsonError('pdfBase64 muss ein PDF bis 10 MB sein.');
+    // C15: optional die XRechnung-XML als zweiter Anhang (Kunden mit
+    // Format XRechnung); Name wird vom Server festgelegt.
+    Uint8List? xml;
+    if (body['xmlBase64'] != null) {
+      xml = decodeXmlAttachment(body['xmlBase64']);
+      if (xml == null) return jsonError('xmlBase64 muss eine XML-Datei bis 2 MB sein.');
+    }
     final templates = (await resolve(companyId)).templates;
     final composed = _compose(templates, 'document', body,
         kunde: document.customerSnapshotName ?? customer?.name ?? '', nummer: document.number ?? '', firma: await _companyName(companyId));
@@ -248,7 +256,10 @@ class MailRoutes {
       to: to,
       subject: composed.subject,
       body: composed.body,
-      attachments: [MailAttachment(fileName: '${document.number}.pdf', contentType: 'application/pdf', bytes: pdf)],
+      attachments: [
+        MailAttachment(fileName: '${document.number}.pdf', contentType: 'application/pdf', bytes: pdf),
+        if (xml != null) MailAttachment(fileName: eInvoiceXmlFileName(document.number), contentType: 'application/xml', bytes: xml),
+      ],
       auditAction: 'mail.document',
       entityType: document.kind,
       entityId: id,

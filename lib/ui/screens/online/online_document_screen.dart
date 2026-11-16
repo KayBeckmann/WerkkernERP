@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +10,7 @@ import 'package:werkkern_core/werkkern_core.dart';
 import '../../../domain/services/online_session.dart';
 import '../../../pdf/dunning_letter_pdf_builder.dart';
 import '../../../pdf/online_document_pdf.dart';
+import '../../widgets/einvoice_actions.dart';
 import 'online_documents_screen.dart' show onlineEditorTitle;
 import 'online_dunning_screen.dart';
 import 'online_item_dialog.dart';
@@ -447,7 +450,61 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       ),
     );
     if (confirmed != true) return;
+    // C15: fehlende E-Rechnungsangaben zeigen, nicht blockieren.
+    if (_eInvoiceAvailable) {
+      List<String> problems = const [];
+      try {
+        problems = problemsBeforeFinalize((await _client.eInvoiceStatus(widget.documentId)).problems);
+      } on Exception {
+        // Prüfung optional — Finalisieren bleibt möglich.
+      }
+      if (!mounted || !await confirmFinalizeDespiteEInvoiceProblems(context, problems)) return;
+    }
     await _run(() => _client.finalizeDocument(widget.documentId, version: _document!.version), 'Finalisiert.');
+  }
+
+  /// C15: Modul aktiv, Rechnung/Gutschrift, Server erreichbar.
+  bool get _eInvoiceAvailable =>
+      widget.session.modules.contains('eInvoice') &&
+      !widget.session.offlineOnly &&
+      _document != null &&
+      isEInvoiceDocumentKind(_document!.kind);
+
+  static String _formatLabel(String format) =>
+      format == 'xrechnung' ? 'XRechnung (XML)' : 'ZUGFeRD (PDF mit eingebetteter XML)';
+
+  Future<void> _checkEInvoice() async {
+    try {
+      final status = await _client.eInvoiceStatus(widget.documentId);
+      if (!mounted) return;
+      await showEInvoiceCheckDialog(context, formatLabel: _formatLabel(status.format), problems: status.problems);
+    } on Exception catch (e) {
+      if (mounted) _snack(describeOnlineError(e));
+    }
+  }
+
+  Future<void> _saveEInvoiceXml() async {
+    try {
+      final status = await _client.eInvoiceStatus(widget.documentId);
+      if (!mounted) return;
+      if (status.problems.isNotEmpty) {
+        await showEInvoiceCheckDialog(context, formatLabel: _formatLabel(status.format), problems: status.problems);
+        return;
+      }
+      final bytes = await _client.eInvoiceXml(widget.documentId);
+      if (mounted) await saveEInvoiceXml(context, bytes, status.fileName);
+    } on Exception catch (e) {
+      if (mounted) _snack(describeOnlineError(e));
+    }
+  }
+
+  /// XRechnung-XML für den Mailversand, wenn der Kunde dieses Format hat
+  /// und die Angaben vollständig sind — sonst nur das PDF.
+  Future<Uint8List?> _xrechnungForMail() async {
+    if (!_eInvoiceAvailable) return null;
+    final status = await _client.eInvoiceStatus(widget.documentId);
+    if (status.format != 'xrechnung' || status.problems.isNotEmpty) return null;
+    return _client.eInvoiceXml(widget.documentId);
   }
 
   Future<void> _delete() async {
@@ -814,6 +871,17 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           tooltip: 'PDF teilen',
           onPressed: _busy || _dirty ? null : _showPdf,
         ),
+      if (_eInvoiceAvailable)
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.receipt_outlined),
+          tooltip: 'E-Rechnung',
+          enabled: !_busy && !_dirty,
+          onSelected: (value) => value == 'check' ? _checkEInvoice() : _saveEInvoiceXml(),
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'check', child: Text('E-Rechnung prüfen')),
+            if (finalized) const PopupMenuItem(value: 'xml', child: Text('E-Rechnung (XML) speichern')),
+          ],
+        ),
       if (finalized && canSendMail(session) && _serverActionsAllowed)
         IconButton(
           icon: const Icon(Icons.mail_outline),
@@ -827,8 +895,14 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                     defaultRecipientHint: _recipientHint(billing: billingDocumentKinds.contains(document.kind)),
                     customText: true,
                     buildPdf: () => buildOnlineDocumentPdf(document, eInvoiceEnabled: widget.session.modules.contains('eInvoice')),
-                    send: (pdf, {to, subject, body}) =>
-                        _client.sendDocumentMail(document.id, pdf, to: to, subject: subject, body: body),
+                    send: (pdf, {to, subject, body}) async => _client.sendDocumentMail(
+                          document.id,
+                          pdf,
+                          to: to,
+                          subject: subject,
+                          body: body,
+                          xml: await _xrechnungForMail(),
+                        ),
                   ),
         ),
       if (finalized && session.can('invoices.write') && targets.isNotEmpty)

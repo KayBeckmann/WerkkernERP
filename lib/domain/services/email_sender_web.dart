@@ -2,6 +2,9 @@ import 'dart:typed_data';
 
 import 'smtp_config.dart';
 
+/// Zusätzlicher Anhang (C15: XRechnung-XML neben dem PDF).
+typedef EmailExtraAttachment = ({String filename, String contentType, Uint8List bytes});
+
 bool get emailSendingSupported => false;
 
 /// Ergebnis eines Versandversuchs — siehe `email_sender_native.dart` für
@@ -29,6 +32,8 @@ Future<EmailSendResult> sendEmail({
   required String body,
   required String attachmentFilename,
   required Uint8List attachmentBytes,
+  // C15: weitere Anhänge, z. B. die XRechnung-XML.
+  List<EmailExtraAttachment> extraAttachments = const [],
 }) async => const EmailSendResult.failure(
       'E-Mail-Versand per SMTP ist im Web-Build aus technischen Gründen '
       '(kein Rohsocket-Zugriff im Browser) nicht möglich. Bitte das PDF '

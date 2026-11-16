@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:test/test.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 
@@ -114,5 +116,52 @@ void runEInvoiceSnapshotTests(RepositoryFactory create) {
     final finalizedQuote = await c.post('/documents/${quote['id']}/finalize', {'version': quote['version']});
     expect(finalizedQuote['eInvoiceSnapshot'], isNull);
     await expectLater(c.get('/documents/unbekannt'), status(404));
+  });
+
+  test('E-Rechnung: Prüfung und XML-Abruf nur mit Modul, nur finalisiert, vollständige Daten', () async {
+    final c = await h.company('e4@example.com', permissions: permissions, modules: {'eInvoice'});
+    await c.put('/company/profile', {
+      'address': 'Musterstraße 1, 23966 Wismar',
+      'taxNumber': '079/123/45678',
+      'iban': 'DE02120300000000202051',
+      'email': 'info@elektro.example',
+      'phone': '03841 1',
+    });
+    final customer = await c.post('/customers', {
+      'name': 'Stadt Wismar',
+      'address': 'Am Markt 1, 23966 Wismar',
+      'email': 'rechnung@wismar.example',
+      'leitwegId': '04011000-1234512345-06',
+      'eInvoiceFormat': 'xrechnung',
+    });
+    final draft = await c.post('/documents', {
+      'kind': 'invoice',
+      'customerId': customer['id'],
+      'paymentTerms': '14 Tage netto',
+      'items': [
+        {'kind': 'text', 'description': 'Montage', 'quantity': '2', 'unit': 'h', 'unitPriceCents': 6500, 'vatRatePercent': 19},
+      ],
+    });
+    final draftStatus = await c.get('/documents/${draft['id']}/einvoice');
+    expect(draftStatus['format'], 'xrechnung');
+    expect(draftStatus['problems'], contains('Dokument ist noch nicht finalisiert (keine Nummer).'));
+    await expectLater(c.client.eInvoiceXml(draft['id'] as String), status(409));
+
+    final finalized = await c.post('/documents/${draft['id']}/finalize', {'version': draft['version']});
+    final ready = await c.get('/documents/${draft['id']}/einvoice');
+    expect(ready['problems'], isEmpty);
+    expect(ready['fileName'], '${finalized['number']}.xml');
+    final xml = utf8.decode(await c.client.eInvoiceXml(draft['id'] as String));
+    expect(xml, contains('urn:xeinkauf.de:kosit:xrechnung_3.0'));
+    expect(xml, contains('<ram:BuyerReference>04011000-1234512345-06</ram:BuyerReference>'));
+    expect(xml, contains('<ram:GrandTotalAmount>154.70</ram:GrandTotalAmount>'));
+    expect(xml, contains('<ram:BilledQuantity unitCode="HUR">2</ram:BilledQuantity>'));
+
+    // Ohne Modul: 409; fremdes/fehlendes Dokument: 404.
+    final other = await h.company('e5@example.com', permissions: permissions);
+    await expectLater(other.get('/documents/${draft['id']}/einvoice'), status(404));
+    final quote = await other.post('/customers', {'name': 'X'});
+    final inv = await other.post('/documents', {'kind': 'invoice', 'customerId': quote['id'], 'items': []});
+    await expectLater(other.get('/documents/${inv['id']}/einvoice'), status(409));
   });
 }

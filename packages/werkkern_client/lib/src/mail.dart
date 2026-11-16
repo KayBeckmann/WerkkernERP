@@ -70,9 +70,11 @@ extension MailApi on WerkkernApiClient {
   Future<void> sendTestMail(String to) => request('POST', '/mail/test', body: {'to': to});
 
   /// Liefert den tatsächlichen Empfänger.
-  Future<String> sendDocumentMail(String documentId, Uint8List pdf, {String? to, String? subject, String? body}) async =>
+  Future<String> sendDocumentMail(String documentId, Uint8List pdf, {String? to, String? subject, String? body, Uint8List? xml}) async =>
       _map(await request('POST', '/documents/$documentId/send', body: {
         'pdfBase64': base64Encode(pdf),
+        // C15: XRechnung-XML als zweiter Anhang.
+        'xmlBase64': ?(xml == null ? null : base64Encode(xml)),
         'to': ?to,
         'subject': ?subject,
         'body': ?body,
