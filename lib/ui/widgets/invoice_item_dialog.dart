@@ -8,6 +8,7 @@ import '../../data/database/tables.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../domain/models/money.dart';
 import '../../domain/services/active_company_service.dart';
+import 'article_group_filter.dart';
 
 /// Dialog zum Hinzufügen **oder Bearbeiten** einer Rechnungsposition —
 /// Artikel, Stunden oder Freitext (A2: alle drei ohne Pflicht auf einen
@@ -29,6 +30,8 @@ Future<InvoiceItemInputResult?> showInvoiceItemDialog({
   // C3.4 (Kay 2026-11-03): Rollen für Stunden-Positionen; leer = keine
   // Rollenauswahl (Firma ohne Rollen, wiederkehrende Vorlagen).
   List<StaffRole> staffRoles = const [],
+  // A1-Nachtrag: Artikelgruppen der Firma für den Filter der Auswahl.
+  List<ArticleGroup> articleGroups = const [],
 }) {
   return showDialog<InvoiceItemInputResult>(
     context: context,
@@ -39,6 +42,7 @@ Future<InvoiceItemInputResult?> showInvoiceItemDialog({
       allowHours: allowHours,
       forceZeroVat: forceZeroVat,
       staffRoles: staffRoles,
+      articleGroups: articleGroups,
     ),
   );
 }
@@ -84,8 +88,10 @@ class _InvoiceItemDialog extends StatefulWidget {
     this.allowHours = true,
     this.forceZeroVat = false,
     this.staffRoles = const [],
+    this.articleGroups = const [],
   });
   final List<Article> articles;
+  final List<ArticleGroup> articleGroups;
   final List<String> existingGroupLabels;
   final InvoiceItemInputResult? existing;
 
@@ -109,6 +115,14 @@ class _InvoiceItemDialog extends StatefulWidget {
 class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
   late InvoiceItemKind _kind = widget.existing?.kind ?? InvoiceItemKind.text;
   Article? _selectedArticle;
+
+  /// A1-Nachtrag: Gruppenfilter der Artikelauswahl (nur Anzeige); der
+  /// gewählte Artikel bleibt sichtbar, auch wenn er nicht passt.
+  ArticleGroupFilter _groupFilter = const AllArticleGroups();
+  List<Article> get _articleChoices => [
+        for (final a in widget.articles)
+          if (_groupFilter.matches(a.articleGroupId) || a.id == _selectedArticle?.id) a,
+      ];
   late final _descriptionCtrl = TextEditingController(text: widget.existing?.description);
   late final _quantityCtrl =
       TextEditingController(text: widget.existing?.quantity.toString() ?? '1');
@@ -261,13 +275,21 @@ class _InvoiceItemDialogState extends State<_InvoiceItemDialog> {
                   ],
                   onChanged: _selectRole,
                 ),
+              if (_kind == InvoiceItemKind.article && widget.articleGroups.isNotEmpty)
+                ArticleGroupFilterField(
+                  groups: [for (final g in widget.articleGroups) (id: g.id, name: g.name)],
+                  hasUngrouped: widget.articles.any((a) => a.articleGroupId == null),
+                  value: _groupFilter,
+                  onChanged: (value) => setState(() => _groupFilter = value),
+                ),
               if (_kind == InvoiceItemKind.article)
                 DropdownButtonFormField<Article>(
+                  key: ValueKey('article-choice-${_groupFilter.hashCode}'),
                   isExpanded: true,
                   initialValue: _selectedArticle,
                   decoration: const InputDecoration(labelText: 'Artikel'),
                   items: [
-                    for (final article in widget.articles)
+                    for (final article in _articleChoices)
                       DropdownMenuItem(value: article, child: Text(article.name)),
                   ],
                   onChanged: (article) {

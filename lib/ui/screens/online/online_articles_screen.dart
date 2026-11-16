@@ -4,6 +4,7 @@ import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../widgets/article_group_filter.dart';
 import 'online_form.dart';
 
 /// Artikel der Online-Firma (wie offline A1): Liste mit Knopf
@@ -130,18 +131,56 @@ Future<OnlineArticle?> editOnlineArticle(BuildContext context, OnlineSession ses
   return saved;
 }
 
-class _ArticleList extends StatelessWidget {
+class _ArticleList extends StatefulWidget {
   const _ArticleList({required this.session, required this.smallBusiness});
   final OnlineSession session;
   final bool smallBusiness;
 
   @override
+  State<_ArticleList> createState() => _ArticleListState();
+}
+
+class _ArticleListState extends State<_ArticleList> {
+  /// A1-Nachtrag (Kay, 15.11.2026): Gruppenfilter wie offline — nur Anzeige.
+  ArticleGroupFilter _filter = const AllArticleGroups();
+  List<OnlineArticleGroup> _groups = const [];
+  bool _hasUngrouped = false;
+
+  Future<List<OnlineArticle>> _load(String query) async {
+    final client = widget.session.client;
+    final all = await client.articles(query: query);
+    try {
+      _groups = await client.articleGroups();
+    } on Exception {
+      // Ohne Gruppenliste bleibt der Filter verborgen.
+    }
+    _hasUngrouped = all.any((a) => a.articleGroupId == null);
+    return [for (final a in all) if (_filter.matches(a.articleGroupId)) a];
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final session = widget.session;
+    final smallBusiness = widget.smallBusiness;
     final canWrite = session.can('articles.write');
     final showStock = session.modules.contains('lagerbestand');
     return OnlineListView<OnlineArticle>(
-      load: (q) => session.client.articles(query: q),
-      emptyText: 'Noch keine Artikel angelegt.',
+      load: _load,
+      header: (context, items, reload) => _groups.isEmpty
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ArticleGroupFilterField(
+                groups: [for (final g in _groups) (id: g.id, name: g.name)],
+                hasUngrouped: _hasUngrouped,
+                value: _filter,
+                onChanged: (value) {
+                  setState(() => _filter = value);
+                  reload();
+                },
+              ),
+            ),
+      emptyText: _filter is AllArticleGroups ? 'Noch keine Artikel angelegt.' : 'Keine Artikel für diese Auswahl.',
       appBar: (context, reload) => AppBar(
         automaticallyImplyLeading: false,
         title: const Text('Artikel'),

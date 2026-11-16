@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:werkkernerp/data/database/database.dart';
+import 'package:werkkernerp/data/repositories/article_group_repository.dart';
 import 'package:werkkernerp/data/repositories/article_repository.dart';
 import 'package:werkkernerp/data/repositories/company_repository.dart';
 import 'package:werkkernerp/domain/services/active_company_service.dart';
@@ -45,6 +46,8 @@ void main() {
         MultiProvider(
           providers: [
             Provider<ArticleRepository>.value(value: articleRepo),
+            // A1-Nachtrag: die Übersicht lädt die Gruppen für den Filter.
+            Provider<ArticleGroupRepository>.value(value: ArticleGroupRepository(db)),
             ChangeNotifierProvider<ActiveCompanyService>.value(value: activeCompanyService),
             ChangeNotifierProvider<StockChangeNotifier>.value(value: stockChangeNotifier),
           ],

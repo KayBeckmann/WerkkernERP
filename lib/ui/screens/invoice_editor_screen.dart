@@ -20,6 +20,7 @@ import 'package:werkkern_core/werkkern_core.dart'
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
+import '../../data/repositories/article_group_repository.dart';
 import '../../data/repositories/article_repository.dart';
 import '../../data/repositories/customer_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
@@ -179,6 +180,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   bool _saving = false;
   bool _finalizing = false;
   List<Article> _articles = [];
+  List<ArticleGroup> _articleGroups = [];
 
   /// C3.4: Rollen für Stunden-Positionen (Auswahl im Positionsdialog,
   /// Anzeige an der Position).
@@ -297,12 +299,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final company = context.read<ActiveCompanyService>().active!;
     final companyId = company.id;
     final articleRepo = context.read<ArticleRepository>();
+    final articleGroupRepo = context.read<ArticleGroupRepository>();
     final invoiceRepo = context.read<InvoiceRepository>();
     final projectRepo = context.read<ProjectRepository>();
     final staffRoleRepo = context.read<StaffRoleRepository>();
     final contactRepo = context.read<CustomerContactRepository>();
     final customerRepo = context.read<CustomerRepository>();
     _articles = await articleRepo.listForCompany(companyId);
+    _articleGroups = await articleGroupRepo.listForCompany(companyId);
     _staffRoles = await staffRoleRepo.listForCompany(companyId);
     _contacts = await contactRepo.listForCustomer(companyId: companyId, customerId: widget.customer.id);
     _liveCustomer = await customerRepo.findById(companyId: companyId, id: widget.customer.id);
@@ -410,6 +414,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final result = await showInvoiceItemDialog(
       context: context,
       articles: _articles,
+      articleGroups: _articleGroups,
       existingGroupLabels: _existingGroupLabels,
       allowHours: _kind != DocumentKind.deliveryNote,
       forceZeroVat: _isSmallBusinessExempt,
@@ -441,6 +446,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final result = await showInvoiceItemDialog(
       context: context,
       articles: _articles,
+      articleGroups: _articleGroups,
       existingGroupLabels: _existingGroupLabels,
       existing: item.toResult(),
       allowHours: _kind != DocumentKind.deliveryNote,
