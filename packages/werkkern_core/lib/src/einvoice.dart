@@ -417,7 +417,7 @@ void _writeLine(_Xml b, EInvoiceData d, int number, EInvoiceLine line) {
     b.leaf('udt:Indicator', 'false');
     b.close('ram:ChargeIndicator');
     b.leaf('ram:ActualAmount', _decimal(unitDiscount, 4));
-    b.leaf('ram:Reason', 'Rabatt ${_percent(line.discountPercent)} %');
+    // Kein ram:Reason am Positionspreis — CII-SR-128 (KoSIT-Warnung).
     b.close('ram:AppliedTradeAllowanceCharge');
     b.close('ram:GrossPriceProductTradePrice');
   }
