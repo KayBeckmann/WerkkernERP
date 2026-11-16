@@ -186,6 +186,7 @@ class MigrationPackageBuilder {
             'stockQuantity': _dec(a.stockQuantity),
             'minimumStock': _dec(a.minimumStock),
             'barcode': a.barcode,
+            'defaultBinId': a.defaultBinId,
             'createdAt': _ts(a.createdAt),
           },
       ],
@@ -370,7 +371,32 @@ class MigrationPackageBuilder {
             'referenceLabel': m.referenceLabel,
             'note': m.note,
             'createdAt': _ts(m.createdAt),
+            'binKey': m.binKey,
           },
+      ],
+      // C5.4 Lagerorte und Plätze mit Bestand je Platz.
+      'storageLocations': [
+        for (final l in await (db.select(db.storageLocations)..where((l) => l.companyId.equals(companyId))).get())
+          {
+            'id': l.id,
+            'name': l.name,
+            'sortOrder': l.sortOrder,
+            'createdAt': _ts(l.createdAt),
+            'bins': [
+              for (final b in await (db.select(db.storageBins)..where((b) => b.locationId.equals(l.id))).get())
+                {
+                  'id': b.id,
+                  'row': b.row,
+                  'shelf': b.shelf,
+                  'compartment': b.compartment,
+                  'sortOrder': b.sortOrder,
+                },
+            ],
+          },
+      ],
+      'articleBinStocks': [
+        for (final s in await (db.select(db.articleBinStocks)..where((s) => s.companyId.equals(companyId))).get())
+          {'articleId': s.articleId, 'binKey': s.binKey, 'quantity': _dec(s.quantity)},
       ],
       'inventoryCounts': [
         for (final c in counts)
@@ -381,6 +407,7 @@ class MigrationPackageBuilder {
             'status': c.status.name,
             'completedAt': _ts(c.completedAt),
             'createdAt': _ts(c.createdAt),
+            'locationId': c.locationId,
             'items': [
               for (final i in countItems.where((i) => i.inventoryCountId == c.id))
                 {
@@ -388,6 +415,7 @@ class MigrationPackageBuilder {
                   'expectedQuantity': _dec(i.expectedQuantity),
                   'countedQuantity': _dec(i.countedQuantity),
                   'countedAt': _ts(i.countedAt),
+                  'binKey': i.binKey,
                 },
             ],
           },

@@ -7,6 +7,7 @@ import 'package:werkkern_client/werkkern_client.dart';
 import '../../../domain/services/online_session.dart';
 import 'online_articles_screen.dart';
 import 'online_form.dart';
+import 'online_storage_screen.dart';
 
 /// Inventur der Online-Firma (C5.3) — Bereich „Inventur“ wie offline.
 /// Unterbestand und das unveränderliche Bewegungsprotokoll (nur online)
@@ -90,6 +91,14 @@ class _InventoryList extends StatelessWidget {
         title: const Text('Inventur'),
         actions: [
           IconButton(
+            key: const Key('online-open-storage'),
+            tooltip: 'Lagerorte & Plätze',
+            icon: const Icon(Icons.warehouse_outlined),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(builder: (_) => OnlineStorageLocationsScreen(session: session))),
+          ),
+          IconButton(
             tooltip: 'Unterbestand',
             icon: const Icon(Icons.warning_amber_outlined),
             onPressed: () => Navigator.of(
@@ -126,6 +135,14 @@ class _InventoryList extends StatelessWidget {
               builder: (context) => FloatingActionButton.extended(
                 heroTag: 'online-inventory-fab',
                 onPressed: () async {
+                  // C5.4: Lagerorte für „Platz für Platz“ zählen.
+                  var locations = const <OnlineStorageLocation>[];
+                  try {
+                    locations = (await session.client.storageLocations()).locations;
+                  } on Exception {
+                    // Ohne Lagerorte bleibt die artikelweise Inventur.
+                  }
+                  if (!context.mounted) return;
                   final values = await showOnlineForm(
                     context,
                     title: 'Neue Inventur',
@@ -139,11 +156,22 @@ class _InventoryList extends StatelessWidget {
                         required: true,
                         initial: DateTime.now(),
                       ),
-                      const OnlineField(
+                      if (locations.isNotEmpty)
+                        OnlineField(
+                          'location',
+                          'Zählen nach',
+                          type: OnlineFieldType.choice,
+                          options: {
+                            null: 'Artikeln',
+                            for (final l in locations) l.id: 'Lagerort ${l.name} (Platz für Platz)',
+                          },
+                        ),
+                      OnlineField(
                         'all',
                         'Alle aktiven Artikel aufnehmen',
                         type: OnlineFieldType.toggle,
                         initial: true,
+                        visibleWhen: (v) => v['location'] == null,
                       ),
                     ],
                   );
@@ -153,7 +181,8 @@ class _InventoryList extends StatelessWidget {
                     created = await session.client.createInventoryCount(
                       values['label'] as String,
                       date: values['date'] as DateTime,
-                      allArticles: values['all'] as bool,
+                      allArticles: (values['all'] as bool?) ?? false,
+                      locationId: values['location'] as String?,
                     );
                   });
                   if (created != null && context.mounted) {
@@ -271,6 +300,97 @@ class _OnlineInventoryScreenState extends State<OnlineInventoryScreen> {
     });
   }
 
+  /// C5.4: Fund an einem Platz (auch leerer Platz) nachtragen.
+  Future<void> _addFound(String binKey) async {
+    final List<OnlineArticle> candidates;
+    try {
+      candidates = await widget.session.client.articles();
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+      return;
+    }
+    if (!mounted) return;
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => _AddArticlesDialog(candidates: candidates),
+    );
+    if (selected == null || selected.isEmpty || !mounted) return;
+    await runOnline(context, () async {
+      OnlineInventoryCount? updated;
+      for (final articleId in selected) {
+        updated = await widget.session.client.addInventoryFound(widget.countId, articleId: articleId, binKey: binKey);
+      }
+      if (mounted && updated != null) setState(() => _apply(updated!));
+    });
+  }
+
+  Widget _itemCard(OnlineInventoryItem i, bool editable) => Card(
+        child: ListTile(
+          title: Text(i.articleName ?? '(unbekannt)'),
+          subtitle: Text('Soll: ${formatQuantity(i.expectedQuantity)}${i.unit == null ? '' : ' ${i.unit}'}'),
+          trailing: editable
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      child: TextField(
+                        key: Key('online-inventory-counted-${i.articleName}${i.binKey == null ? '' : '-${i.binLabel}'}'),
+                        controller: _controllers[i.id],
+                        textAlign: TextAlign.right,
+                        decoration: const InputDecoration(labelText: 'Ist'),
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (text) => _countedChanged(i, text),
+                        onSubmitted: (_) => _saveCounted(i.id),
+                      ),
+                    ),
+                    // Nur online: Artikel wieder aus der Inventur nehmen.
+                    IconButton(
+                      tooltip: 'Aus Inventur entfernen',
+                      icon: const Icon(Icons.remove_circle_outline),
+                      onPressed: () async {
+                        await runOnline(context, () => widget.session.client.removeInventoryItem(widget.countId, i.id));
+                        await _load();
+                      },
+                    ),
+                  ],
+                )
+              : Text('Ist: ${i.countedQuantity == null ? '–' : formatQuantity(i.countedQuantity!)}'),
+        ),
+      );
+
+  /// Platz-Inventur: je Platz eine Überschrift (auch leere Plätze), dann
+  /// die Klärfälle ohne Platz.
+  List<Widget> _locationSections(OnlineInventoryCount count, bool editable) {
+    Widget header(String text, String binKey, {bool empty = false}) => Padding(
+          padding: const EdgeInsets.only(top: 12, bottom: 4),
+          child: Row(
+            children: [
+              Expanded(child: Text(empty ? '$text — leer' : text, style: Theme.of(context).textTheme.titleSmall)),
+              if (editable)
+                TextButton.icon(
+                  onPressed: () => _addFound(binKey),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Fund'),
+                ),
+            ],
+          ),
+        );
+    final widgets = <Widget>[];
+    for (final bin in count.bins) {
+      final here = count.items.where((i) => i.binKey == bin.id).toList();
+      widgets.add(header(bin.label, bin.id, empty: here.isEmpty));
+      widgets.addAll(here.map((i) => _itemCard(i, editable)));
+    }
+    final known = {for (final b in count.bins) b.id};
+    final rest = count.items.where((i) => !known.contains(i.binKey)).toList();
+    if (rest.isNotEmpty) {
+      widgets.add(header('Platz noch nicht zugeordnet (Klärfälle)', ''));
+      widgets.addAll(rest.map((i) => _itemCard(i, editable)));
+    }
+    return widgets;
+  }
+
   Future<void> _complete() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -320,46 +440,16 @@ class _OnlineInventoryScreenState extends State<OnlineInventoryScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Positionen', style: Theme.of(context).textTheme.titleMedium),
-                        if (editable)
+                        if (editable && count.locationId == null)
                           TextButton.icon(onPressed: _addArticles, icon: const Icon(Icons.add), label: const Text('Artikel hinzufügen')),
                       ],
                     ),
-                    if (count.items.isEmpty) const Text('Noch keine Artikel in dieser Inventur.'),
-                    for (final i in count.items)
-                      Card(
-                        child: ListTile(
-                          title: Text(i.articleName ?? '(unbekannt)'),
-                          subtitle: Text('Soll: ${formatQuantity(i.expectedQuantity)}${i.unit == null ? '' : ' ${i.unit}'}'),
-                          trailing: editable
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(
-                                      width: 120,
-                                      child: TextField(
-                                        key: Key('online-inventory-counted-${i.articleName}'),
-                                        controller: _controllers[i.id],
-                                        textAlign: TextAlign.right,
-                                        decoration: const InputDecoration(labelText: 'Ist'),
-                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                        onChanged: (text) => _countedChanged(i, text),
-                                        onSubmitted: (_) => _saveCounted(i.id),
-                                      ),
-                                    ),
-                                    // Nur online: Artikel wieder aus der Inventur nehmen.
-                                    IconButton(
-                                      tooltip: 'Aus Inventur entfernen',
-                                      icon: const Icon(Icons.remove_circle_outline),
-                                      onPressed: () async {
-                                        await runOnline(context, () => widget.session.client.removeInventoryItem(widget.countId, i.id));
-                                        await _load();
-                                      },
-                                    ),
-                                  ],
-                                )
-                              : Text('Ist: ${i.countedQuantity == null ? '–' : formatQuantity(i.countedQuantity!)}'),
-                        ),
-                      ),
+                    if (count.locationId != null)
+                      ..._locationSections(count, editable)
+                    else ...[
+                      if (count.items.isEmpty) const Text('Noch keine Artikel in dieser Inventur.'),
+                      for (final i in count.items) _itemCard(i, editable),
+                    ],
                     const SizedBox(height: 24),
                     if (editable)
                       FilledButton(

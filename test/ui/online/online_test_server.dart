@@ -43,11 +43,11 @@ class OnlineTestServer {
 
   WerkkernApiClient client() => WerkkernApiClient(baseUrl: Uri.parse('http://localhost'), httpClient: httpClient);
 
-  Future<Map<String, Object?>> _call(String method, String path, Object body, [String? token]) async {
+  Future<Map<String, Object?>> _call(String method, String path, Object? body, [String? token]) async {
     final response = await handler(shelf.Request(
       method,
       Uri.parse('http://localhost$path'),
-      body: jsonEncode(body),
+      body: body == null ? null : jsonEncode(body),
       headers: {if (token != null) 'authorization': 'Bearer $token'},
     ));
     final text = await response.readAsString();
@@ -81,6 +81,7 @@ class OnlineTestServer {
 
   Future<Map<String, Object?>> post(String path, Object body, String token) => _call('POST', path, body, token);
   Future<Map<String, Object?>> put(String path, Object body, String token) => _call('PUT', path, body, token);
+  Future<Map<String, Object?>> get(String path, String token) => _call('GET', path, null, token);
 }
 
 /// Wechselt in den Bereich [label] — schmal über die untere Leiste bzw.

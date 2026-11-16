@@ -585,7 +585,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           companyId,
           [
             for (final articleId in {...before.keys, ...after.keys})
-              StockDelta(articleId, (before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero)),
+              StockDelta(articleId, (before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero), spread: true),
           ],
           StockBookingContext(
             type: 'documentBooking',
@@ -668,6 +668,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
     required CompanySnapshot company,
     required DateTime now,
     ({StockBookingMode mode, String userId})? stockBooking,
+    Map<String, String> withdrawalBins = const {},
   }) async {
     final finalized = await _db.runTx((s) async {
       final row = await _lockDraft(s, companyId, id, expectedVersion);
@@ -773,7 +774,10 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         await _bookStockTx(
           s,
           companyId,
-          [for (final e in quantities.entries) StockDelta(e.key, e.value * sign)],
+          [
+            for (final e in quantities.entries)
+              StockDelta(e.key, e.value * sign, binKey: issue ? withdrawalBins[e.key] : null, spread: issue),
+          ],
           StockBookingContext(
             type: issue ? 'documentBooking' : 'creditNoteReturn',
             userId: stockBooking.userId,

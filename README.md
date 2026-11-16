@@ -46,7 +46,17 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   geht immer nur einen Schritt: erst eine offene Detailseite, dann die
   zuvor besuchten Bereiche, erst vom Ausgangsbereich aus die Firma.
 - Kunden, Lieferanten, Artikel/Artikelgruppen mit prozentualem Aufschlag
-  auf den Einkaufspreis des Standardlieferanten.
+  auf den Einkaufspreis des Standardlieferanten. Die Artikelliste lässt
+  sich nach Artikelgruppe (inkl. „ohne Gruppe“) und — mit Lagerorten —
+  nach Lagerort filtern.
+- **Barcode je Artikel** (EAN o. Ä., je Firma eindeutig, führende Nullen
+  bleiben erhalten). Im Auftrag/in der Rechnung fügt „Barcode scannen“
+  (Kamera, Android) die Position hinzu: Menge ist Pflicht, eine
+  Positionsgruppe (z. B. Raum) wählbar; derselbe Artikel kann in
+  mehreren Gruppen stehen, bei gleicher Gruppe wird gefragt, ob addiert
+  oder eine neue Position angelegt wird. Ein Scan bucht keinen Bestand.
+- Beim Lieferanten lässt sich **unsere Kundennummer** hinterlegen; sie
+  steht auf jeder Bestellung und wird beim Finalisieren eingefroren.
 - Kunden mit mehreren **Kontaktpersonen** (Name, Funktion, E-Mail,
   Telefon) und eigener **Rechnungs-E-Mail**; Telefonnummern lassen sich
   aus der Kundenansicht direkt anrufen. Angebote, Aufträge und Rechnungen
@@ -82,6 +92,14 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - Umwandlung Angebot → Auftrag → Lieferschein/Rechnung; Abschlags-
   rechnungen mit automatischem Abzug bereits gestellter Abschläge
   (inkl. USt.) in der Schlussrechnung.
+- **Zahlungsbedingungen und Skonto**: je Firma eine Liste (Vorgaben
+  „Sofort netto“, 7, 14, 30 Tage) mit Standard, je Kunde eine eigene
+  Bedingung und Skonto (Firmenvorgabe, kein, eigenes). Aufträge und
+  Rechnungen übernehmen die Bedingung, sie ist je Beleg änderbar und
+  wird beim Finalisieren eingefroren; das Fälligkeitsdatum ergibt sich
+  aus Belegdatum + Zahlungsziel. Skonto wird ohne § 19 auf den
+  Nettobetrag, mit § 19 auf den Rechnungsbetrag berechnet und steht im
+  PDF und in der E-Rechnung (`#SKONTO#`).
 - Eigenständig erzeugtes PDF (keine Vorlage/kein Asset aus RechnungsFee
   übernommen) mit Firmendaten, Positionsgruppen, Steueraufschlüsselung
   nach 19/7/0 % und einem bei Finalisierung eingefrorenen Text-
@@ -105,6 +123,16 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   aber noch nicht umgesetzt.
 - **Lagerbestand, Inventur, Bewegungsprotokoll und Bestellwesen**
   (Mindestbestand, Mindestbestellmenge, Wareneingang, SKR03-Beleg).
+- **Lagerorte und Lagerplätze**: frei benannte Lagerorte (Lager, Halle,
+  Fahrzeug …) mit Plätzen nach Reihe → Regal → Fach, je Artikel ein
+  Standardplatz. Der Bestand wird je Platz geführt; die Summe der
+  Plätze ist immer der Gesamtbestand. Bestand aus der Zeit davor steht
+  als „Platz noch nicht zugeordnet“ und wird per Umlagerung oder
+  Inventur zugeordnet. Beim Finalisieren wird je Artikel ein
+  Entnahmeplatz vorgeschlagen (Platz mit dem meisten Bestand, sonst
+  Standardplatz), der Wareneingang bucht auf einen wählbaren Zielplatz.
+  Die Inventur kann nach Lagerort Platz für Platz in Laufreihenfolge
+  gezählt werden — mit leeren Plätzen, Funden und Klärfällen.
 - **Fuhrpark**: Fahrzeuge, TÜV-Fälligkeit, Kostenbuchungen inkl.
   Tilgungs-/Zinsanteil, als Gemeinkosten in der EÜR.
 - **Wiederkehrende Rechnungen**: Vorlagen erzeugen bei Fälligkeit einen

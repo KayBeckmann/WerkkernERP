@@ -303,6 +303,14 @@ class PurchasingRoutes {
       if (quantity == null || Decimal.parse(quantity) < Decimal.zero) return jsonError('Mengen müssen >= 0 sein.');
       receipts[entry.key as String] = Decimal.parse(quantity);
     }
+    // C5.4: Zielplatz je Position (sonst Standardplatz des Artikels).
+    final targetBins = <String, String>{
+      if (body['targetBins'] is Map)
+        for (final e in (body['targetBins'] as Map).entries)
+          if (e.value is String) e.key as String: e.value as String,
+    };
+    final knownBins = {for (final b in await business.listStorageBins(companyId)) b.id, ''};
+    if (targetBins.values.any((b) => !knownBins.contains(b))) return jsonError('Unbekannter Lagerplatz.', status: 404);
     // Wareneingang bucht Lagerbewegungen — für Agenten nur per Freigabe.
     if (check.auth!.session.isAgent) {
       final order = await business.findPurchaseOrder(companyId, id);
@@ -320,6 +328,7 @@ class PurchasingRoutes {
         companyId,
         id,
         receipts: receipts,
+        targetBins: targetBins,
         userId: check.auth!.session.userId,
         now: DateTime.now().toUtc(),
       );

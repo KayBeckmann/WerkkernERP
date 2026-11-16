@@ -94,6 +94,17 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     expect(export['articlePrices'], hasLength(1));
     expect(export['stockMovements'], hasLength(2));
     expect(((export['inventoryCounts']! as List).single as Map)['status'], 'completed');
+    // C5.4: Lagerort, Platz, Bestand je Platz (Rest „nicht zugeordnet“), Standardplatz.
+    final location = (export['storageLocations']! as List).single as Map;
+    final bin = (location['bins']! as List).single as Map;
+    expect((location['name'], bin['label']), ('Lager', 'Reihe 1 / Regal A / Fach 3'));
+    final nym = articles.firstWhere((a) => a['name'] == 'NYM 3x1,5')['id'];
+    expect(
+      {for (final s in (export['articleBinStocks']! as List).cast<Map>()) if (s['articleId'] == nym) s['binKey']: s['quantity']},
+      {bin['id']: '5', '': '2.5'},
+    );
+    expect((export['articleDefaultBins']! as Map)[nym], bin['id']);
+    expect(((export['stockMovements']! as List).cast<Map>()).map((m) => m['binKey']).toSet(), {bin['id'], null});
     final po = (export['purchaseOrders']! as List).single as Map<String, Object?>;
     expect(po['number'], 'B-${yy}001');
     expect(po['sourceOrderId'], order['id']);

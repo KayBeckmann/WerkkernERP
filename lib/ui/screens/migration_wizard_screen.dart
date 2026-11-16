@@ -521,6 +521,7 @@ const _countLabels = {
   'bankTransactions': 'Bankumsätze',
   'purchaseOrders': 'Bestellungen',
   'stockMovements': 'Lagerbewegungen',
+  'storageLocations': 'Lagerorte',
   'inventoryCounts': 'Inventuren',
   'staffRoles': 'Rollen',
   'timeEntries': 'Zeitbuchungen',

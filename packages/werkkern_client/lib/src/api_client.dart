@@ -335,8 +335,12 @@ class WerkkernApiClient {
 
   Future<void> deleteDocument(String id) => _send('DELETE', '/documents/$id');
 
-  Future<OnlineDocument> finalizeDocument(String id, {required int version}) async =>
-      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$id/finalize', body: {'version': version})));
+  /// [withdrawalBins]: C5.4 gewählter Entnahmeplatz je Artikel-ID.
+  Future<OnlineDocument> finalizeDocument(String id, {required int version, Map<String, String>? withdrawalBins}) async =>
+      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$id/finalize', body: {
+        'version': version,
+        if (withdrawalBins != null && withdrawalBins.isNotEmpty) 'withdrawalBins': withdrawalBins,
+      })));
 
   /// Neuer Entwurf der Zielart aus einem finalisierten Dokument.
   Future<OnlineDocument> convertDocument(String id, String targetKind) async =>

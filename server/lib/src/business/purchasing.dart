@@ -147,6 +147,7 @@ abstract interface class PurchasingStore {
     String companyId,
     String id, {
     required Map<String, Decimal> receipts,
+    Map<String, String> targetBins = const {},
     required String userId,
     required DateTime now,
   });

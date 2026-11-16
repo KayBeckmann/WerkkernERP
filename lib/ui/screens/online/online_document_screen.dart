@@ -18,6 +18,7 @@ import 'online_dunning_screen.dart';
 import 'online_item_dialog.dart';
 import 'online_mail.dart';
 import 'online_purchasing_screen.dart' show createPurchaseOrdersFromDocument;
+import 'online_storage_screen.dart' show askOnlineWithdrawalBins;
 
 /// Detail/Bearbeitung eines Online-Dokuments — Aufbau wie der Offline-
 /// Editor (`invoice_editor_screen.dart`): Aktionen in der Titelleiste,
@@ -459,9 +460,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     final label = onlineDocumentKindLabels[_document!.kind] ?? 'Dokument';
     // C5.1: nicht blockierender Hinweis auf zu geringen Bestand.
     var warnings = const <OnlineStockWarning>[];
+    var withdrawals = const <OnlineWithdrawal>[];
     if (widget.session.modules.contains('lagerbestand')) {
       try {
-        warnings = (await _client.stockCheck(widget.documentId)).warnings;
+        final check = await _client.stockCheck(widget.documentId);
+        warnings = check.warnings;
+        withdrawals = check.withdrawals;
       } on Exception {
         // Hinweis ist optional — Finalisieren bleibt möglich.
       }
@@ -504,7 +508,25 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
       }
       if (!mounted || !await confirmFinalizeDespiteEInvoiceProblems(context, problems)) return;
     }
-    await _run(() => _client.finalizeDocument(widget.documentId, version: _document!.version), 'Finalisiert.');
+    // C5.4 (Kay, 16.11.2026): Entnahmeplatz vorschlagen, wenn Plätze angelegt sind.
+    Map<String, String>? withdrawalBins;
+    if (withdrawals.isNotEmpty) {
+      var locations = const <OnlineStorageLocation>[];
+      try {
+        locations = (await _client.storageLocations()).locations;
+      } on Exception {
+        // Ohne Liste bucht der Server nach seinem Vorschlag.
+      }
+      if (!mounted) return;
+      if (locations.isNotEmpty) {
+        withdrawalBins = await askOnlineWithdrawalBins(context, withdrawals, locations);
+        if (withdrawalBins == null) return;
+      }
+    }
+    await _run(
+      () => _client.finalizeDocument(widget.documentId, version: _document!.version, withdrawalBins: withdrawalBins),
+      'Finalisiert.',
+    );
   }
 
   /// C15: Modul aktiv, Rechnung/Gutschrift, Server erreichbar.

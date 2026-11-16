@@ -94,6 +94,7 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
     required CompanySnapshot company,
     required DateTime now,
     ({StockBookingMode mode, String userId})? stockBooking,
+    Map<String, String> withdrawalBins = const {},
   });
 
   /// Dokumente, die per Umwandlung aus [sourceId] entstanden sind.

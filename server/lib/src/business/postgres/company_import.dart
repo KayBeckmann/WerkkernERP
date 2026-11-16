@@ -19,6 +19,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
     'purchase_orders',
     'stock_movements',
     'inventory_counts',
+    'storage_locations',
     'recurring_templates',
     'time_sheets',
   ];
@@ -376,6 +377,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'document_id': m.documentId,
         'created_by_user_id': m.createdByUserId,
         'created_at': m.createdAt,
+        'bin_key': m.binKey,
       });
     }
     for (final c in data.inventoryCounts) {
@@ -387,6 +389,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'status': c.status,
         'completed_at': c.completedAt,
         'created_at': c.createdAt,
+        'location_id': c.locationId,
       });
     }
     for (final i in data.inventoryItems) {
@@ -397,7 +400,43 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'expected_quantity': i.expectedQuantity,
         'counted_quantity': i.countedQuantity,
         'counted_at': i.countedAt,
+        'bin_key': i.binKey,
       });
+    }
+    // C5.4 Lagerorte, Plätze, Platzbestände, Standardplätze.
+    for (final l in data.storageLocations) {
+      await insert('storage_locations', {
+        'id': l.id,
+        'company_id': companyId,
+        'name': l.name,
+        'sort_order': l.sortOrder,
+        'created_at': l.createdAt,
+      });
+    }
+    for (final b in data.storageBins) {
+      await insert('storage_bins', {
+        'id': b.id,
+        'company_id': companyId,
+        'location_id': b.locationId,
+        'row_label': b.row,
+        'shelf': b.shelf,
+        'compartment': b.compartment,
+        'sort_order': b.sortOrder,
+      });
+    }
+    for (final st in data.binStocks) {
+      await insert('article_bin_stock', {
+        'company_id': companyId,
+        'article_id': st.articleId,
+        'bin_key': st.binKey,
+        'quantity': st.quantity,
+      });
+    }
+    for (final e in data.defaultBins.entries) {
+      await s.execute(
+        Sql.named('UPDATE articles SET default_bin_id = @bin WHERE company_id = @companyId AND id = @id'),
+        parameters: {'bin': e.value, 'companyId': companyId, 'id': e.key},
+      );
     }
     for (final t in data.timeEntries) {
       await insert('time_entries', {

@@ -10,6 +10,7 @@ import '../../../domain/services/online_session.dart';
 import '../../../pdf/purchase_order_pdf_builder.dart';
 import 'online_articles_screen.dart' show formatQuantity;
 import 'online_form.dart';
+import 'online_storage_screen.dart' show onlineBinOptions;
 import 'online_mail.dart';
 
 /// Wie offline (`purchase_orders_screen.dart`).
@@ -440,24 +441,56 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
   Future<void> _receive() async {
     final order = _order!;
     String open(OnlinePurchaseOrderItem i) => (Decimal.parse(i.quantity) - Decimal.parse(i.receivedQuantity)).toString();
+    // C5.4: Zielplatz je Artikelposition, vorbelegt mit dem Standardplatz.
+    var locations = const <OnlineStorageLocation>[];
+    final defaults = <String, String>{};
+    if (widget.session.modules.contains('lagerbestand') && widget.session.can('stock.read')) {
+      try {
+        locations = (await _client.storageLocations()).locations;
+        if (locations.any((l) => l.bins.isNotEmpty)) {
+          for (final i in order.items) {
+            if (i.articleId == null) continue;
+            defaults[i.id!] = (await _client.articleBinStock(i.articleId!)).defaultBinId ?? '';
+          }
+        }
+      } on Exception {
+        locations = const [];
+      }
+    }
+    if (!mounted) return;
+    final withBins = locations.any((l) => l.bins.isNotEmpty);
+    final openItems = [for (final i in order.items) if (Decimal.parse(i.quantity) > Decimal.parse(i.receivedQuantity)) i];
     final values = await showOnlineForm(
       context,
       title: 'Wareneingang erfassen',
       submitLabel: 'Buchen',
       fields: [
-        for (final i in order.items)
-          if (Decimal.parse(i.quantity) > Decimal.parse(i.receivedQuantity))
-            OnlineField(i.id!, i.description, type: OnlineFieldType.decimal, helper: 'offen: ${formatQuantity(open(i))}'),
+        for (final i in openItems) ...[
+          OnlineField(i.id!, i.description, type: OnlineFieldType.decimal, helper: 'offen: ${formatQuantity(open(i))}'),
+          if (withBins && i.articleId != null)
+            OnlineField(
+              'bin-${i.id}',
+              'Einlagern in',
+              type: OnlineFieldType.choice,
+              required: true,
+              initial: defaults[i.id] ?? '',
+              options: onlineBinOptions(locations),
+            ),
+        ],
       ],
     );
     if (values == null || !mounted) return;
     final receipts = <String, String>{
-      for (final e in values.entries)
-        if (e.value != null && Decimal.parse(e.value as String) > Decimal.zero) e.key: e.value as String,
+      for (final i in openItems)
+        if (values[i.id] != null && Decimal.parse(values[i.id] as String) > Decimal.zero) i.id!: values[i.id] as String,
     };
     if (receipts.isEmpty) return;
+    final targetBins = <String, String>{
+      for (final id in receipts.keys)
+        if (values['bin-$id'] is String) id: values['bin-$id'] as String,
+    };
     await runOnline(context, () async {
-      await _apply(await _client.receivePurchaseOrder(order.id, receipts));
+      await _apply(await _client.receivePurchaseOrder(order.id, receipts, targetBins: targetBins));
     }, success: 'Wareneingang gebucht.');
   }
 

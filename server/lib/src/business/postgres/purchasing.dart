@@ -222,6 +222,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
     String companyId,
     String id, {
     required Map<String, Decimal> receipts,
+    Map<String, String> targetBins = const {},
     required String userId,
     required DateTime now,
   }) async {
@@ -276,7 +277,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
         if (item.purchasePriceCents != null) {
           valueCents += Money.fromCents(item.purchasePriceCents!).multiplyByQuantity(entry.value).cents;
         }
-        if (item.articleId != null) deltas.add(StockDelta(item.articleId!, entry.value));
+        if (item.articleId != null) deltas.add(StockDelta(item.articleId!, entry.value, binKey: targetBins[item.id]));
       }
       await _bookStockTx(
         s,

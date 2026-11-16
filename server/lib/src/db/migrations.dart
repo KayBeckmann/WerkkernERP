@@ -39,6 +39,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step24SupplierCustomerNumber,
   _step25ArticleBarcode,
   _step26PaymentTerms,
+  _step27StorageLocations,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -650,4 +651,58 @@ Future<void> _step26PaymentTerms(Session db) async {
   for (final column in ['payment_term_id TEXT', 'payment_term_label TEXT', 'payment_net_days INTEGER', 'skonto_percent DOUBLE PRECISION', 'skonto_days INTEGER']) {
     await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS $column');
   }
+}
+
+/// C5.4-Nachtrag (Kay, 16.11.2026): Lagerorte, Plätze (Reihe → Regal →
+/// Fach) und Bestand je Artikel und Platz. `bin_key = ''` heißt „Platz
+/// noch nicht zugeordnet“ — dorthin wandert der bisherige Bestand.
+Future<void> _step27StorageLocations(Session db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS storage_locations (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS storage_bins (
+      id TEXT PRIMARY KEY,
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      location_id TEXT NOT NULL REFERENCES storage_locations(id) ON DELETE CASCADE,
+      row_label TEXT NOT NULL DEFAULT '',
+      shelf TEXT NOT NULL DEFAULT '',
+      compartment TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS article_bin_stock (
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      article_id TEXT NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
+      bin_key TEXT NOT NULL,
+      quantity TEXT NOT NULL DEFAULT '0',
+      PRIMARY KEY (article_id, bin_key)
+    );
+  ''');
+  await db.execute('CREATE INDEX IF NOT EXISTS storage_bins_company_idx ON storage_bins (company_id, location_id)');
+  await db.execute('CREATE INDEX IF NOT EXISTS article_bin_stock_company_idx ON article_bin_stock (company_id, bin_key)');
+  await db.execute('ALTER TABLE articles ADD COLUMN IF NOT EXISTS default_bin_id TEXT');
+  await db.execute('ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS bin_key TEXT');
+  await db.execute('ALTER TABLE inventory_counts ADD COLUMN IF NOT EXISTS location_id TEXT');
+  await db.execute('ALTER TABLE inventory_count_items ADD COLUMN IF NOT EXISTS bin_key TEXT');
+  // Je Lauf jede Kombination Artikel/Platz höchstens einmal.
+  await db.execute(
+    'ALTER TABLE inventory_count_items DROP CONSTRAINT IF EXISTS inventory_count_items_inventory_count_id_article_id_key',
+  );
+  await db.execute(
+    "CREATE UNIQUE INDEX IF NOT EXISTS inventory_count_items_article_bin_idx "
+    "ON inventory_count_items (inventory_count_id, article_id, coalesce(bin_key, '*'))",
+  );
+  await db.execute(
+    "INSERT INTO article_bin_stock (company_id, article_id, bin_key, quantity) "
+    "SELECT company_id, id, '', stock_quantity FROM articles WHERE stock_quantity::numeric <> 0 "
+    'ON CONFLICT DO NOTHING',
+  );
 }

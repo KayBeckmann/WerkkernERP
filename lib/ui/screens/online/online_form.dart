@@ -210,11 +210,17 @@ class _OnlineFormDialogState extends State<_OnlineFormDialog> {
       case OnlineFieldType.choice:
         return DropdownButtonFormField<String?>(
           key: key,
+          isExpanded: true,
           initialValue: _values[f.key] as String?,
-          decoration: InputDecoration(labelText: f.required ? '${f.label} *' : f.label, helperText: f.helper),
+          decoration: InputDecoration(
+            labelText: f.required ? '${f.label} *' : f.label,
+            helperText: f.helper,
+            helperMaxLines: 3,
+          ),
           items: [
             if (!f.required && !f.options.containsKey(null)) const DropdownMenuItem<String?>(child: Text('—')),
-            for (final e in f.options.entries) DropdownMenuItem<String?>(value: e.key, child: Text(e.value)),
+            for (final e in f.options.entries)
+              DropdownMenuItem<String?>(value: e.key, child: Text(e.value, overflow: TextOverflow.ellipsis)),
           ],
           onChanged: (v) => setState(() => _values[f.key] = v),
         );

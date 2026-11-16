@@ -168,8 +168,12 @@ extension PurchasingApi on WerkkernApiClient {
         _map(await request('POST', '/purchase-orders/${order.id}/finalize', body: {'version': order.version})),
       );
 
-  Future<OnlinePurchaseOrder> receivePurchaseOrder(String id, Map<String, String> receipts) async =>
-      OnlinePurchaseOrder.fromJson(_map(await request('POST', '/purchase-orders/$id/receive', body: {'receipts': receipts})));
+  /// [targetBins]: C5.4 Zielplatz je Positions-ID (sonst Standardplatz).
+  Future<OnlinePurchaseOrder> receivePurchaseOrder(String id, Map<String, String> receipts, {Map<String, String>? targetBins}) async =>
+      OnlinePurchaseOrder.fromJson(_map(await request('POST', '/purchase-orders/$id/receive', body: {
+        'receipts': receipts,
+        if (targetBins != null && targetBins.isNotEmpty) 'targetBins': targetBins,
+      })));
 
   /// `mode`: `oneSupplier` (mit [supplierId]) oder `cheapest`.
   Future<({List<String> ids, List<String> unassignable})> purchaseOrdersFromDocument(

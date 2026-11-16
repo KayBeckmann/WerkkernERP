@@ -46,6 +46,12 @@ class CompanyImportData {
   final stockMovements = <StockMovement>[];
   final inventoryCounts = <InventoryCount>[];
   final inventoryItems = <InventoryCountItem>[];
+
+  // C5.4: Lagerorte, Plätze, Platzbestände, Standardplätze (Artikel → Platz).
+  final storageLocations = <StorageLocation>[];
+  final storageBins = <StorageBin>[];
+  final binStocks = <ArticleBinStock>[];
+  final defaultBins = <String, String>{};
   final staffRoles = <StaffRole>[];
   final paymentTerms = <PaymentTerm>[];
   final timeEntries = <TimeEntry>[];
@@ -79,6 +85,7 @@ class CompanyImportData {
     'purchaseOrders': purchaseOrders.length,
     'stockMovements': stockMovements.length,
     'inventoryCounts': inventoryCounts.length,
+    'storageLocations': storageLocations.length,
     'staffRoles': staffRoles.length,
     'timeEntries': timeEntries.length,
     'timeSheets': timeSheets.length,
@@ -408,6 +415,7 @@ class _Parser {
     _recurring(_list(p, 'recurringTemplates'));
     _accounting(_list(p, 'expenseCategories'), _list(p, 'expenses'), _list(p, 'bankTransactions'));
     _purchasing(_list(p, 'purchaseOrders'));
+    _storage(_list(p, 'storageLocations'), _list(p, 'articleBinStocks'), _list(p, 'articles'));
     _stock(_list(p, 'stockMovements'), _list(p, 'inventoryCounts'));
     _time(_list(p, 'timeEntries'), _list(p, 'timeSheets'), roleAssignments, memberUserIds);
     _checkNumbers();
@@ -768,6 +776,74 @@ class _Parser {
     }
   }
 
+  /// `''` bleibt „nicht zugeordnet“, `null` bleibt `null`, sonst Platz-ID.
+  String? _binRef(String? oldKey, String path) =>
+      oldKey == null || oldKey.isEmpty ? oldKey : _ref('storageBin', oldKey, path);
+
+  /// C5.4: Lagerorte/Plätze und Platzbestände. Ältere Pakete ohne
+  /// Platzbestände → Bestand „nicht zugeordnet“; Abweichungen zur
+  /// Artikelsumme ebenso, damit Summe der Plätze = Gesamtbestand bleibt.
+  void _storage(
+    List<(int, Map<String, Object?>)> locations,
+    List<(int, Map<String, Object?>)> stocks,
+    List<(int, Map<String, Object?>)> articles,
+  ) {
+    for (final (i, l) in locations) {
+      final r = _R(l, 'storageLocations[$i]');
+      final id = _assign('storageLocation', r.str('id'), r.path);
+      data.storageLocations.add(StorageLocation(
+        id: id,
+        companyId: companyId,
+        name: r.str('name'),
+        sortOrder: r.optInt('sortOrder') ?? i,
+        createdAt: r.optTime('createdAt') ?? DateTime.now().toUtc(),
+      ));
+      for (final (j, b) in _listOf(l['bins'], '${r.path}.bins')) {
+        final br = _R(b, '${r.path}.bins[$j]');
+        data.storageBins.add(StorageBin(
+          id: _assign('storageBin', br.str('id'), br.path),
+          companyId: companyId,
+          locationId: id,
+          row: br.optStr('row') ?? '',
+          shelf: br.optStr('shelf') ?? '',
+          compartment: br.optStr('compartment') ?? '',
+          sortOrder: br.optInt('sortOrder') ?? 0,
+        ));
+      }
+    }
+    for (final (i, a) in articles) {
+      final r = _R(a, 'articles[$i]');
+      final articleId = _ids['article']?[r.str('id')];
+      final binId = _binRef(r.optStr('defaultBinId'), r.path);
+      if (articleId != null && binId != null && binId.isNotEmpty) data.defaultBins[articleId] = binId;
+    }
+    final sums = <String, Decimal>{};
+    for (final (i, s) in stocks) {
+      final r = _R(s, 'articleBinStocks[$i]');
+      final articleId = _ref('article', r.str('articleId'), r.path);
+      final binKey = _binRef(r.optStr('binKey') ?? '', r.path);
+      if (articleId == null || binKey == null) continue;
+      final quantity = r.decimal('quantity');
+      sums[articleId] = (sums[articleId] ?? Decimal.zero) + Decimal.parse(quantity);
+      data.binStocks.add(ArticleBinStock(articleId: articleId, binKey: binKey, quantity: quantity));
+    }
+    for (final a in data.articles) {
+      final diff = Decimal.parse(a.stockQuantity) - (sums[a.id] ?? Decimal.zero);
+      if (diff == Decimal.zero) continue;
+      final index = data.binStocks.indexWhere((s) => s.articleId == a.id && s.binKey == unassignedBinKey);
+      if (index == -1) {
+        data.binStocks.add(ArticleBinStock(articleId: a.id, binKey: unassignedBinKey, quantity: diff.toString()));
+      } else {
+        final old = data.binStocks[index];
+        data.binStocks[index] = ArticleBinStock(
+          articleId: a.id,
+          binKey: unassignedBinKey,
+          quantity: (Decimal.parse(old.quantity) + diff).toString(),
+        );
+      }
+    }
+  }
+
   void _stock(List<(int, Map<String, Object?>)> movements, List<(int, Map<String, Object?>)> counts) {
     final sums = <String, Decimal>{};
     for (final (i, m) in movements) {
@@ -789,6 +865,7 @@ class _Parser {
           note: r.optStr('note'),
           createdByUserId: userId,
           createdAt: r.time('createdAt'),
+          binKey: _binRef(r.optStr('binKey'), r.path),
         ),
       );
     }
@@ -819,13 +896,15 @@ class _Parser {
           status: status,
           completedAt: r.optTime('completedAt'),
           createdAt: r.time('createdAt'),
+          locationId: r.optStr('locationId') == null ? null : _ref('storageLocation', r.optStr('locationId'), r.path),
         ),
       );
       final seen = <String>{};
       for (final (j, item) in _listOf(c['items'], '${r.path}.items')) {
         final ir = _R(item, '${r.path}.items[$j]');
         final articleId = _ref('article', ir.str('articleId'), ir.path);
-        if (articleId == null || !seen.add(articleId)) continue;
+        final binKey = _binRef(ir.optStr('binKey'), ir.path);
+        if (articleId == null || !seen.add('$articleId|${binKey ?? '*'}')) continue;
         data.inventoryItems.add(
           InventoryCountItem(
             id: newId(),
@@ -834,6 +913,7 @@ class _Parser {
             expectedQuantity: ir.decimal('expectedQuantity'),
             countedQuantity: ir.optDecimal('countedQuantity'),
             countedAt: ir.optTime('countedAt'),
+            binKey: binKey,
           ),
         );
       }

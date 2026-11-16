@@ -335,7 +335,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
         companyId,
         [
           for (final articleId in {...before.keys, ...after.keys})
-            StockDelta(articleId, (before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero)),
+            StockDelta(articleId, (before[articleId] ?? Decimal.zero) - (after[articleId] ?? Decimal.zero), spread: true),
         ],
         StockBookingContext(
           type: 'documentBooking',
@@ -373,6 +373,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     required CompanySnapshot company,
     required DateTime now,
     ({StockBookingMode mode, String userId})? stockBooking,
+    Map<String, String> withdrawalBins = const {},
   }) async {
     final index = _documents.indexWhere((d) => d.companyId == companyId && d.id == id);
     if (index == -1) return null;
@@ -427,7 +428,12 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
       );
       _bookStockSync(
         companyId,
-        [for (final e in quantities.entries) StockDelta(e.key, e.value * sign)],
+        [
+          // C5.4: Abgang vom gewählten/vorgeschlagenen Platz, Gutschrift
+          // zurück auf den Standardplatz.
+          for (final e in quantities.entries)
+            StockDelta(e.key, e.value * sign, binKey: withdrawalBins[e.key], spread: stockBooking.mode == StockBookingMode.issue),
+        ],
         StockBookingContext(
           type: stockBooking.mode == StockBookingMode.issue ? 'documentBooking' : 'creditNoteReturn',
           userId: stockBooking.userId,
@@ -506,6 +512,7 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
         any(_purchaseOrders, (o) => o.companyId) ||
         any(_stockMovements, (m) => m.companyId) ||
         any(_inventoryCounts, (c) => c.companyId) ||
+        any(_storageLocations, (l) => l.companyId) ||
         any(_recurringTemplates, (t) => t.companyId) ||
         any(_timeSheets, (t) => t.companyId);
   }
@@ -541,6 +548,12 @@ class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMem
     _stockMovements.addAll(data.stockMovements);
     _inventoryCounts.addAll(data.inventoryCounts);
     _inventoryItems.addAll(data.inventoryItems);
+    _storageLocations.addAll(data.storageLocations);
+    _storageBins.addAll(data.storageBins);
+    for (final s in data.binStocks) {
+      _stocksOf(s.articleId)[s.binKey] = Decimal.parse(s.quantity);
+    }
+    _defaultBin.addAll(data.defaultBins);
     _staffRoles.addAll(data.staffRoles);
     if (data.paymentTerms.isNotEmpty) _paymentTerms.removeWhere((t) => t.companyId == companyId);
     _paymentTerms.addAll(data.paymentTerms);

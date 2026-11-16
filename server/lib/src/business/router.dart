@@ -1060,9 +1060,20 @@ class BusinessRoutes {
         stockMode = StockBookingMode.issue;
       }
     }
+    // C5.4 (Kay, 16.11.2026): gewählte Entnahmeplätze je Artikel.
+    final withdrawalBins = <String, String>{
+      if (body['withdrawalBins'] is Map)
+        for (final e in (body['withdrawalBins'] as Map).entries)
+          if (e.value is String) e.key as String: e.value as String,
+    };
+    if (withdrawalBins.isNotEmpty) {
+      final knownBins = {for (final b in await business.listStorageBins(companyId)) b.id, ''};
+      if (withdrawalBins.values.any((b) => !knownBins.contains(b))) return jsonError('Unbekannter Lagerplatz.', status: 404);
+    }
     try {
       final finalized = await business.finalize(
         stockBooking: stockMode == null ? null : (mode: stockMode, userId: check.auth!.session.userId),
+        withdrawalBins: withdrawalBins,
         companyId: companyId,
         id: id,
         expectedVersion: version,
