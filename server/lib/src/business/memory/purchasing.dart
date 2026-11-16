@@ -4,6 +4,7 @@ mixin _InMemoryPurchasing implements PurchasingStore {
   Map<String, int> get _sequences;
   List<Supplier> get _suppliers;
   List<Expense> get _expenses;
+  Map<String, ({String companyId, ArticleSupplierPrice price})> get _prices;
   List<StockMovement> _bookStockSync(String companyId, List<StockDelta> deltas, StockBookingContext context);
 
   final List<PurchaseOrder> _purchaseOrders = [];
@@ -130,6 +131,13 @@ mixin _InMemoryPurchasing implements PurchasingStore {
       updatedAt: now,
     );
     _purchaseOrders[index] = finalized;
+    // C5.2-Nachtrag: Lieferantenartikelnummer je Position einfrieren.
+    for (var i = 0; i < _purchaseOrderItems.length; i++) {
+      final item = _purchaseOrderItems[i];
+      if (item.purchaseOrderId != id || item.articleId == null) continue;
+      final price = _prices['${item.articleId}|${order.supplierId}'];
+      _purchaseOrderItems[i] = item.withSupplierArticleNumber(price?.companyId == companyId ? price!.price.supplierArticleNumber : null);
+    }
     return finalized;
   }
 
@@ -169,6 +177,7 @@ mixin _InMemoryPurchasing implements PurchasingStore {
         purchasePriceCents: item.purchasePriceCents,
         receivedQuantity: (Decimal.parse(item.receivedQuantity) + entry.value).toString(),
         sortOrder: item.sortOrder,
+        supplierArticleNumber: item.supplierArticleNumber,
       );
       _purchaseOrderItems[_purchaseOrderItems.indexWhere((i) => i.id == item.id)] = updated;
       items[item.id] = updated;

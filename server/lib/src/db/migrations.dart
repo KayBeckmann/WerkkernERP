@@ -40,6 +40,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step25ArticleBarcode,
   _step26PaymentTerms,
   _step27StorageLocations,
+  _step28SupplierArticleNumber,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -705,4 +706,11 @@ Future<void> _step27StorageLocations(Session db) async {
     "SELECT company_id, id, '', stock_quantity FROM articles WHERE stock_quantity::numeric <> 0 "
     'ON CONFLICT DO NOTHING',
   );
+}
+
+/// C5.2-Nachtrag (Kay, 16.11.2026): Lieferantenartikelnummer je Artikel ×
+/// Lieferant und ihr Schnappschuss an der finalisierten Bestellposition.
+Future<void> _step28SupplierArticleNumber(Session db) async {
+  await db.execute('ALTER TABLE article_supplier_prices ADD COLUMN IF NOT EXISTS supplier_article_number TEXT');
+  await db.execute('ALTER TABLE purchase_order_items ADD COLUMN IF NOT EXISTS supplier_article_number TEXT');
 }

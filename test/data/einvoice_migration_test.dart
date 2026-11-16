@@ -57,6 +57,9 @@ void main() {
     // v37 -> v38 (A1-Nachtrag: Barcode je Artikel).
     raw.execute('DROP INDEX IF EXISTS articles_company_barcode_idx;');
     raw.execute('ALTER TABLE articles DROP COLUMN barcode;');
+    // v40 -> v41 (C5.2-Nachtrag: Lieferantenartikelnummer).
+    raw.execute('ALTER TABLE article_supplier_prices DROP COLUMN supplier_article_number;');
+    raw.execute('ALTER TABLE purchase_order_items DROP COLUMN supplier_article_number;');
     // v39 -> v40 (C5.4-Nachtrag: Lagerorte und Plätze).
     raw.execute('DROP TABLE IF EXISTS article_bin_stocks;');
     raw.execute('DROP TABLE IF EXISTS storage_bins;');

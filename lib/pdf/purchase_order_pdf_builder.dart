@@ -39,10 +39,22 @@ Future<Uint8List> buildPurchaseOrderPdf({
     companyPhone: company.phone,
     items: [
       for (final i in items)
-        (description: i.description, quantity: Decimal.parse(i.quantity.toString()), purchasePriceCents: i.purchasePriceCents),
+        (
+          description: i.description,
+          quantity: Decimal.parse(i.quantity.toString()),
+          purchasePriceCents: i.purchasePriceCents,
+          supplierArticleNumber: i.supplierArticleNumber,
+        ),
     ],
   ));
 }
+
+typedef PurchaseOrderPdfItem = ({
+  String description,
+  Decimal quantity,
+  int? purchasePriceCents,
+  String? supplierArticleNumber,
+});
 
 /// Neutrales Datenmodell des Bestellungs-PDFs — Offline-App und
 /// Online-Modus erzeugen damit dasselbe Layout (wie `PdfDocumentData`).
@@ -73,7 +85,9 @@ class PurchaseOrderPdfData {
   final String? companyAddress;
   final String? companyEmail;
   final String? companyPhone;
-  final List<({String description, Decimal quantity, int? purchasePriceCents})> items;
+  /// C5.2-Nachtrag: `supplierArticleNumber` = Nummer beim Lieferanten
+  /// (Schnappschuss), erscheint als „Ihre Art.-Nr.“ unter der Beschreibung.
+  final List<PurchaseOrderPdfItem> items;
 }
 
 Future<Uint8List> buildPurchaseOrderPdfFromData(PurchaseOrderPdfData data) async {
@@ -156,7 +170,21 @@ Future<Uint8List> buildPurchaseOrderPdfFromData(PurchaseOrderPdfData data) async
             for (final item in items)
               pw.TableRow(
                 children: [
-                  _cell(item.description),
+                  item.supplierArticleNumber == null || item.supplierArticleNumber!.trim().isEmpty
+                      ? _cell(item.description)
+                      : pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text(item.description, style: const pw.TextStyle(fontSize: 10)),
+                              pw.Text(
+                                'Ihre Art.-Nr.: ${item.supplierArticleNumber!.trim()}',
+                                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                              ),
+                            ],
+                          ),
+                        ),
                   _cell(_formatQuantity(item.quantity), alignRight: true),
                   _cell(
                     item.purchasePriceCents == null

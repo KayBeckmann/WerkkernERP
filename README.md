@@ -57,6 +57,11 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   oder eine neue Position angelegt wird. Ein Scan bucht keinen Bestand.
 - Beim Lieferanten lässt sich **unsere Kundennummer** hinterlegen; sie
   steht auf jeder Bestellung und wird beim Finalisieren eingefroren.
+- Je Artikel und Lieferant eine eigene **Lieferantenartikelnummer**
+  (derselbe Artikel hat bei AZ und Sonepar verschiedene Nummern). Sie
+  steht nur auf Bestellungen an genau diesen Lieferanten („Ihre
+  Art.-Nr.“), wird beim Finalisieren je Position eingefroren und
+  erscheint nie auf Angeboten, Aufträgen oder Rechnungen.
 - Kunden mit mehreren **Kontaktpersonen** (Name, Funktion, E-Mail,
   Telefon) und eigener **Rechnungs-E-Mail**; Telefonnummern lassen sich
   aus der Kundenansicht direkt anrufen. Angebote, Aufträge und Rechnungen

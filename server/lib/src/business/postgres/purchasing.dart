@@ -41,7 +41,11 @@ mixin _PostgresPurchasing implements PurchasingStore {
         purchasePriceCents: r[5] as int?,
         receivedQuantity: r[6] as String,
         sortOrder: r[7] as int,
+        supplierArticleNumber: r.length > 8 ? r[8] as String? : null,
       );
+
+  /// Spalten zum Lesen (inkl. Schnappschuss der Lieferantenartikelnummer).
+  static const _poItemSelect = '$_poItemColumns, supplier_article_number';
 
   static const _poItemColumns = 'id, purchase_order_id, article_id, description, quantity, purchase_price_cents, '
       'received_quantity, sort_order';
@@ -69,7 +73,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
   @override
   Future<List<PurchaseOrderItem>> purchaseOrderItems(String companyId, String id) async {
     final result = await _q(
-      'SELECT i.${_poItemColumns.replaceAll(', ', ', i.')} FROM purchase_order_items i '
+      'SELECT i.${_poItemSelect.replaceAll(', ', ', i.')} FROM purchase_order_items i '
       'JOIN purchase_orders o ON o.id = i.purchase_order_id WHERE o.company_id = @companyId AND o.id = @id '
       'ORDER BY i.sort_order',
       {'companyId': companyId, 'id': id},
@@ -212,6 +216,15 @@ mixin _PostgresPurchasing implements PurchasingStore {
           'id': id,
         },
       );
+      // C5.2-Nachtrag: Lieferantenartikelnummer je Position einfrieren.
+      await s.execute(
+        Sql.named(
+          'UPDATE purchase_order_items i SET supplier_article_number = p.supplier_article_number '
+          'FROM purchase_orders o, article_supplier_prices p WHERE o.id = i.purchase_order_id AND o.id = @id '
+          'AND p.company_id = o.company_id AND p.article_id = i.article_id AND p.supplier_id = o.supplier_id',
+        ),
+        parameters: {'id': id},
+      );
       return true;
     });
     return ok ? findPurchaseOrder(companyId, id) : null;
@@ -242,7 +255,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
       }
       final items = {
         for (final r in await s.execute(
-          Sql.named('SELECT $_poItemColumns FROM purchase_order_items WHERE purchase_order_id = @id FOR UPDATE'),
+          Sql.named('SELECT $_poItemSelect FROM purchase_order_items WHERE purchase_order_id = @id FOR UPDATE'),
           parameters: {'id': id},
         ))
           r[0] as String: _toPoItem(r),
@@ -273,6 +286,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
           purchasePriceCents: item.purchasePriceCents,
           receivedQuantity: received,
           sortOrder: item.sortOrder,
+          supplierArticleNumber: item.supplierArticleNumber,
         );
         if (item.purchasePriceCents != null) {
           valueCents += Money.fromCents(item.purchasePriceCents!).multiplyByQuantity(entry.value).cents;

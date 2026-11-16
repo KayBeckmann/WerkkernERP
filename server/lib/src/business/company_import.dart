@@ -404,6 +404,7 @@ class _Parser {
           articleId: articleId,
           supplierId: supplierId,
           purchasePriceCents: r.integer('purchasePriceCents'),
+          supplierArticleNumber: r.optStr('supplierArticleNumber'),
         ),
       );
     }
@@ -770,6 +771,7 @@ class _Parser {
             purchasePriceCents: ir.optInt('purchasePriceCents'),
             receivedQuantity: ir.optDecimal('receivedQuantity') ?? '0',
             sortOrder: ir.optInt('sortOrder') ?? j,
+            supplierArticleNumber: ir.optStr('supplierArticleNumber'),
           ),
         );
       }

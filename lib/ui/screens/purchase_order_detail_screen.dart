@@ -66,9 +66,11 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
       }
     }
 
+    final numbers = order == null ? const <String, String>{} : await repo.supplierArticleNumbers(order, items);
     return _DetailData(
       order: order,
       items: items,
+      supplierArticleNumbers: numbers,
       projectName: projectName,
       categoryLabel: categoryLabel,
       relatedDocumentNumber: relatedDocumentNumber,
@@ -321,10 +323,13 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                   child: ListTile(
                     title: Text(item.description),
                     subtitle: Text(
-                      isDraft
-                          ? 'Menge: ${_formatQuantity(item.quantity)}'
-                          : 'Menge: ${_formatQuantity(item.quantity)} · erhalten: '
-                              '${_formatQuantity(item.receivedQuantity)}',
+                      (isDraft
+                              ? 'Menge: ${_formatQuantity(item.quantity)}'
+                              : 'Menge: ${_formatQuantity(item.quantity)} · erhalten: '
+                                  '${_formatQuantity(item.receivedQuantity)}') +
+                          (snapshot.data!.supplierArticleNumbers[item.id] == null
+                              ? ''
+                              : ' · Art.-Nr. Lieferant: ${snapshot.data!.supplierArticleNumbers[item.id]}'),
                     ),
                   ),
                 ),
@@ -366,7 +371,11 @@ class _DetailData {
     this.projectName,
     this.categoryLabel,
     this.relatedDocumentNumber,
+    this.supplierArticleNumbers = const {},
   });
+
+  /// C5.2-Nachtrag: Positions-ID → Lieferantenartikelnummer.
+  final Map<String, String> supplierArticleNumbers;
   final PurchaseOrder? order;
   final List<PurchaseOrderItem> items;
   final String? projectName;

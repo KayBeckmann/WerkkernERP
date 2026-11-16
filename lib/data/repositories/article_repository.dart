@@ -12,6 +12,13 @@ import '../database/database.dart';
 /// sie, auch bei den Lieferantenpreisen (sonst könnte eine erratene
 /// articleId einer fremden Firma über eine andere Firmen-ID manipuliert
 /// werden).
+/// Lieferantenartikelnummer: nur Ränder kürzen (führende Nullen und
+/// Buchstaben bleiben exakt), leer = keine Nummer.
+String? normalizeSupplierArticleNumber(String? value) {
+  final trimmed = value?.trim();
+  return trimmed == null || trimmed.isEmpty ? null : trimmed;
+}
+
 class ArticleRepository {
   ArticleRepository(this._db);
 
@@ -173,7 +180,12 @@ class ArticleRepository {
     required String articleId,
     required String supplierId,
     required int purchasePriceCents,
+    // C5.2-Nachtrag: absent = unverändert, leer = entfernen.
+    Value<String?> supplierArticleNumber = const Value.absent(),
   }) async {
+    final number = supplierArticleNumber.present
+        ? Value(normalizeSupplierArticleNumber(supplierArticleNumber.value))
+        : const Value<String?>.absent();
     final article = await findById(companyId: companyId, id: articleId);
     if (article == null) {
       throw StateError('Artikel $articleId gehört nicht zu Firma $companyId');
@@ -185,7 +197,7 @@ class ArticleRepository {
 
     if (existing != null) {
       await (_db.update(_db.articleSupplierPrices)..where((p) => p.id.equals(existing.id)))
-          .write(ArticleSupplierPricesCompanion(purchasePriceCents: Value(purchasePriceCents)));
+          .write(ArticleSupplierPricesCompanion(purchasePriceCents: Value(purchasePriceCents), supplierArticleNumber: number));
     } else {
       await _db.into(_db.articleSupplierPrices).insert(
             ArticleSupplierPricesCompanion.insert(
@@ -194,6 +206,7 @@ class ArticleRepository {
               supplierId: supplierId,
               purchasePriceCents: purchasePriceCents,
               createdAt: DateTime.now(),
+              supplierArticleNumber: number,
             ),
           );
     }

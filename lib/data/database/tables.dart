@@ -460,6 +460,12 @@ class ArticleSupplierPrices extends Table {
   IntColumn get purchasePriceCents => integer()();
   DateTimeColumn get createdAt => dateTime()();
 
+  /// C5.2-Nachtrag (Kay, 16.11.2026): Bestellnummer **dieses** Lieferanten
+  /// für den Artikel (Text, führende Nullen bleiben). Je Zuordnung, weil
+  /// derselbe Artikel bei AZ und Sonepar verschiedene Nummern hat. Nur für
+  /// Bestellungen — nie auf Kundenbelegen.
+  TextColumn get supplierArticleNumber => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 
@@ -1158,6 +1164,10 @@ class PurchaseOrderItems extends Table {
   /// bestellte [quantity] übersteigen (von `receiveGoods()` durchgesetzt,
   /// nicht nur in der UI).
   RealColumn get receivedQuantity => real().withDefault(const Constant(0))();
+
+  /// C5.2-Nachtrag: Lieferantenartikelnummer, beim Finalisieren aus der
+  /// Zuordnung Artikel × Lieferant der Bestellung eingefroren.
+  TextColumn get supplierArticleNumber => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

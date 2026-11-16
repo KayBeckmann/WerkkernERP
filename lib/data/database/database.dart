@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 40;
+  int get schemaVersion => 41;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -465,6 +465,14 @@ class AppDatabase extends _$AppDatabase {
               "INSERT INTO article_bin_stocks (company_id, article_id, bin_key, quantity) "
               "SELECT company_id, id, '', stock_quantity FROM articles WHERE stock_quantity <> 0",
             );
+          }
+          if (from < 41) {
+            // C5.2-Nachtrag (Kay, 16.11.2026): Lieferantenartikelnummer je
+            // Zuordnung und als Schnappschuss an der Bestellposition.
+            await migrator.addColumn(articleSupplierPrices, articleSupplierPrices.supplierArticleNumber);
+            if (from >= 25) {
+              await migrator.addColumn(purchaseOrderItems, purchaseOrderItems.supplierArticleNumber);
+            }
           }
         },
       );

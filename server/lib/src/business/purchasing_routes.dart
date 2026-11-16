@@ -37,12 +37,26 @@ class PurchasingRoutes {
     final items = await business.purchaseOrderItems(companyId, order.id);
     final supplier = await business.findSupplier(companyId, order.supplierId);
     final source = order.sourceOrderId == null ? null : await business.findDocument(companyId, order.sourceOrderId!);
+    // C5.2-Nachtrag: Entwurf zeigt die aktuelle Lieferantenartikelnummer,
+    // finalisiert den Schnappschuss.
+    final current = order.status == 'draft'
+        ? {
+            for (final p in await business.listArticlePrices(companyId))
+              if (p.supplierId == order.supplierId && p.supplierArticleNumber != null) p.articleId: p.supplierArticleNumber!,
+          }
+        : const <String, String>{};
     return jsonOk({
       ...order.toJson(),
       'supplierName': supplier?.name,
       'sourceOrderNumber': source?.number,
       'sourceOrderKind': source?.kind,
-      'items': [for (final i in items) i.toJson()],
+      'items': [
+        for (final i in items)
+          {
+            ...i.toJson(),
+            if (order.status == 'draft') 'supplierArticleNumber': i.articleId == null ? null : current[i.articleId],
+          },
+      ],
       'totalNetCents': _totalNetCents(items),
     }, status: status);
   }

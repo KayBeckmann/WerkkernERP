@@ -508,7 +508,12 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
               companyPhone: company.phone,
               items: [
                 for (final i in order.items)
-                  (description: i.description, quantity: Decimal.parse(i.quantity), purchasePriceCents: i.purchasePriceCents),
+                  (
+                    description: i.description,
+                    quantity: Decimal.parse(i.quantity),
+                    purchasePriceCents: i.purchasePriceCents,
+                    supplierArticleNumber: i.supplierArticleNumber,
+                  ),
               ],
             ));
 
@@ -617,6 +622,7 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
                                 ? 'Menge: ${formatQuantity(i.quantity)}'
                                 : 'Menge: ${formatQuantity(i.quantity)} · erhalten: ${formatQuantity(i.receivedQuantity)}',
                             if (i.purchasePriceCents != null) 'je ${Money.fromCents(i.purchasePriceCents!)}',
+                            if (i.supplierArticleNumber != null) 'Art.-Nr. Lieferant: ${i.supplierArticleNumber}',
                           ].join(' · ')),
                           trailing: editable
                               ? IconButton(

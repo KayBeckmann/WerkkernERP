@@ -85,7 +85,7 @@ Map<String, Object?> sampleMigrationPackage() {
       {'id': 'a2', 'name': 'Alte Dose', 'active': false, 'createdAt': at},
     ],
     'articlePrices': [
-      {'articleId': 'a1', 'supplierId': 's1', 'purchasePriceCents': 120},
+      {'articleId': 'a1', 'supplierId': 's1', 'purchasePriceCents': 120, 'supplierArticleNumber': '0060903'},
     ],
     'projects': [
       {
@@ -291,6 +291,7 @@ Map<String, Object?> sampleMigrationPackage() {
             'quantity': '10',
             'purchasePriceCents': 120,
             'receivedQuantity': '10',
+            'supplierArticleNumber': '0060903',
           },
         ],
       },
