@@ -121,6 +121,7 @@ class CompanyImportRoutes {
         email: p.email,
         phone: p.phone,
         footerText: p.footerText,
+        footerColumns: p.footerColumns,
         documentTexts: p.documentTexts,
         smallBusinessExempt: p.smallBusinessExempt,
         street: p.street,

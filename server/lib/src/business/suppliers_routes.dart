@@ -29,6 +29,7 @@ class SupplierRoutes {
 
     router.get('/article-groups', _listGroups);
     router.post('/article-groups', _createGroup);
+    router.get('/article-groups/<id>/impact', _groupImpact);
     router.put('/article-groups/<id>', _updateGroup);
     router.delete('/article-groups/<id>', _deleteGroup);
 
@@ -208,11 +209,29 @@ class SupplierRoutes {
     return jsonOk(group.toJson());
   }
 
+  Future<Response> _groupImpact(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'articles.read');
+    if (check.error != null) return check.error!;
+    final count = await business.articleGroupImpact(check.auth!.session.companyId, id);
+    if (count == null) return jsonError('Artikelgruppe nicht gefunden.', status: 404);
+    return jsonOk({'articleCount': count});
+  }
+
   Future<Response> _deleteGroup(Request request, String id) async {
     final check = await auth.requirePermission(request, 'articles.write');
     if (check.error != null) return check.error!;
-    if (!await business.deleteArticleGroup(check.auth!.session.companyId, id)) {
-      return jsonError('Artikelgruppe nicht gefunden.', status: 404);
+    final mode = request.url.queryParameters['mode'];
+    final count = int.tryParse(request.url.queryParameters['expectedCount'] ?? '');
+    if ((mode != 'ungroup' && mode != 'deleteArticles') || count == null || count < 0) {
+      return jsonError('mode und expectedCount sind Pflicht.');
+    }
+    try {
+      if (!await business.deleteArticleGroup(check.auth!.session.companyId, id,
+          deleteArticles: mode == 'deleteArticles', expectedCount: count)) {
+        return jsonError('Artikelgruppe nicht gefunden.', status: 404);
+      }
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
     }
     await auth.audit(check.auth!, 'articleGroup.delete', 'articleGroup', id);
     return Response(204);

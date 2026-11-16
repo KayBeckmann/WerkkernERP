@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -835,8 +839,13 @@ class _ProfileTab extends StatefulWidget {
   State<_ProfileTab> createState() => _ProfileTabState();
 }
 
+/// Defaults apply only before columns have ever been configured.
+String footerEditorInitialText(Map<String, String?>? columns, String side, String defaultText) =>
+    columns == null ? defaultText : columns[side] ?? '';
+
 class _ProfileTabState extends State<_ProfileTab> {
   String _pdfLayout = 'classic';
+  String? _pdfLogoBase64;
   final _address = TextEditingController();
   final _taxNumber = TextEditingController();
   final _vatId = TextEditingController();
@@ -850,6 +859,10 @@ class _ProfileTabState extends State<_ProfileTab> {
   final _bic = TextEditingController();
   final _quoteValidity = TextEditingController();
   final _footer = TextEditingController();
+  final _footerLeft = TextEditingController();
+  final _footerCenter = TextEditingController();
+  final _footerRight = TextEditingController();
+  bool _footerColumnsEnabled = false;
   final Map<String, ({TextEditingController intro, TextEditingController closing})> _texts = {};
   bool _smallBusiness = false;
   // A2-Nachtrag: Skonto wird auf eigener Seite gepflegt, hier unverändert zurück.
@@ -872,7 +885,7 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   @override
   void dispose() {
-    for (final c in [_address, _taxNumber, _vatId, _iban, _email, _phone, _footer, _street, _postalCode, _city, _countryCode, _bic, _quoteValidity]) {
+    for (final c in [_address, _taxNumber, _vatId, _iban, _email, _phone, _footer, _footerLeft, _footerCenter, _footerRight, _street, _postalCode, _city, _countryCode, _bic, _quoteValidity]) {
       c.dispose();
     }
     for (final t in _texts.values) {
@@ -898,11 +911,16 @@ class _ProfileTabState extends State<_ProfileTab> {
       _countryCode.text = p.countryCode;
       _bic.text = p.bic ?? '';
       _footer.text = p.footerText ?? '';
+      _footerColumnsEnabled = p.footerColumns != null;
+      _footerLeft.text = footerEditorInitialText(p.footerColumns, 'left', '{{companyName}}\n{{address}}');
+      _footerCenter.text = footerEditorInitialText(p.footerColumns, 'center', 'IBAN: {{iban}}');
+      _footerRight.text = footerEditorInitialText(p.footerColumns, 'right', 'Steuernummer: {{taxNumber}}');
       _smallBusiness = p.smallBusinessExempt;
       _skontoPercent = p.skontoPercent;
       _skontoDays = p.skontoDays;
       _quoteValidity.text = p.quoteValidityDays?.toString() ?? '';
       _pdfLayout = p.pdfLayout;
+      _pdfLogoBase64 = p.pdfLogoBase64;
       // Auch Texte inaktiver Arten behalten (werden unverändert zurückgeschickt).
       for (final kind in {..._kinds, ...p.documentTexts.keys}) {
         _texts[kind] = (
@@ -919,6 +937,28 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   String? _v(TextEditingController c) => c.text.trim().isEmpty ? null : c.text.trim();
 
+  Future<void> _pickLogo() async {
+    try {
+      final files = await FilePicker.pickFiles(
+        dialogTitle: 'PDF-Logo wählen', type: FileType.custom,
+        allowedExtensions: ['png', 'jpg', 'jpeg'],
+      );
+      if (files.isEmpty || !mounted) return;
+      final buffer = BytesBuilder(copy: false);
+      await for (final chunk in files.first.readAsByteStream()) {
+        if (buffer.length + chunk.length > 1024 * 1024) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Logo darf höchstens 1 MiB groß sein.')));
+          return;
+        }
+        buffer.add(chunk);
+      }
+      if (!mounted) return;
+      setState(() => _pdfLogoBase64 = base64Encode(buffer.takeBytes()));
+    } on Exception catch (e) {
+      if (mounted) _showError(context, e);
+    }
+  }
+
   Future<void> _save() async {
     final validity = parseQuoteValidityDays(_quoteValidity.text);
     if (!validity.ok) {
@@ -931,6 +971,7 @@ class _ProfileTabState extends State<_ProfileTab> {
     try {
       await widget.session.client.saveCompanyProfile(OnlineCompanyProfile(
         pdfLayout: _pdfLayout,
+        pdfLogoBase64: _pdfLogoBase64,
         quoteValidityDays: validity.days,
         address: _v(_address),
         taxNumber: _v(_taxNumber),
@@ -939,6 +980,9 @@ class _ProfileTabState extends State<_ProfileTab> {
         email: _v(_email),
         phone: _v(_phone),
         footerText: _v(_footer),
+        footerColumns: _footerColumnsEnabled ? {
+          'left': _v(_footerLeft), 'center': _v(_footerCenter), 'right': _v(_footerRight),
+        } : null,
         documentTexts: {
           for (final e in _texts.entries) e.key: (intro: _v(e.value.intro), closing: _v(e.value.closing)),
         },
@@ -1043,6 +1087,21 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           ),
         if (section == OnlineAdminSection.documentTexts) ...[
+          const Text('PDF-Kopflogo (PNG/JPEG, maximal 1 MiB und 2048 × 2048 Pixel; ohne Logo bleibt der klassische Kopf erhalten).'),
+          if (_pdfLogoBase64 != null)
+            Image.memory(key: const Key('online-pdf-logo-preview'), base64Decode(_pdfLogoBase64!),
+                width: 180, height: 55, fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Text('Ungültiges Bild – anderes Logo wählen.')),
+          Wrap(spacing: 8, children: [
+            OutlinedButton.icon(key: const Key('online-pdf-logo-upload'),
+                onPressed: _busy ? null : _pickLogo,
+                icon: const Icon(Icons.image_outlined),
+                label: Text(_pdfLogoBase64 == null ? 'Logo hochladen' : 'Logo ersetzen')),
+            if (_pdfLogoBase64 != null)
+              TextButton(key: const Key('online-pdf-logo-remove'),
+                  onPressed: _busy ? null : () => setState(() => _pdfLogoBase64 = null),
+                  child: const Text('Logo entfernen')),
+          ]),
           Text(
             'Einleitungs- und Schlusstext je Dokumentart; werden beim Finalisieren in das Dokument übernommen.',
             style: Theme.of(context).textTheme.bodySmall,
@@ -1066,6 +1125,19 @@ class _ProfileTabState extends State<_ProfileTab> {
             ),
           const SizedBox(height: 12),
           TextField(controller: _footer, maxLines: 2, decoration: const InputDecoration(labelText: 'PDF-Fußzeile')),
+          SwitchListTile(
+            key: const Key('online-footer-columns-enabled'),
+            title: const Text('Dreispaltige PDF-Fußzeile'),
+            subtitle: const Text('Ersetzt die bisherige Fußzeile; im Nord-Briefbogen auch die automatisch gesetzten Firmen-/Bank-/Steuerdaten.'),
+            value: _footerColumnsEnabled,
+            onChanged: (value) => setState(() => _footerColumnsEnabled = value),
+          ),
+          if (_footerColumnsEnabled) ...[
+            const Text('Platzhalter: {{companyName}}, {{address}}, {{iban}}, {{taxNumber}}, {{vatId}}, {{customerName}}, {{customerAddress}}, {{documentNumber}}. Fehlende Werte bleiben leer.'),
+            TextField(key: const Key('online-footer-left'), controller: _footerLeft, maxLines: 3, decoration: const InputDecoration(labelText: 'Links')),
+            TextField(key: const Key('online-footer-center'), controller: _footerCenter, maxLines: 3, decoration: const InputDecoration(labelText: 'Mitte')),
+            TextField(key: const Key('online-footer-right'), controller: _footerRight, maxLines: 3, decoration: const InputDecoration(labelText: 'Rechts')),
+          ],
         ],
         const SizedBox(height: 12),
         Align(

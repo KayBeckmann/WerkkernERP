@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -123,6 +124,7 @@ class PdfDocumentData {
     this.companySnapshotTaxNumber,
     this.companySnapshotVatId,
     this.companySnapshotIban,
+    this.pdfLogoBase64,
     this.customerSnapshotName,
     this.customerSnapshotAddress,
     this.customerSnapshotVatId,
@@ -131,6 +133,7 @@ class PdfDocumentData {
     this.introText,
     this.closingText,
     this.footerText,
+    this.footerColumns,
     this.isSmallBusinessExempt = false,
     required this.lines,
     this.eInvoice,
@@ -148,6 +151,7 @@ class PdfDocumentData {
   final String? companySnapshotTaxNumber;
   final String? companySnapshotVatId;
   final String? companySnapshotIban;
+  final String? pdfLogoBase64;
   final String? customerSnapshotName;
   final String? customerSnapshotAddress;
   final String? customerSnapshotVatId;
@@ -156,6 +160,9 @@ class PdfDocumentData {
   final String? introText;
   final String? closingText;
   final String? footerText;
+  /// Null means historical/legacy footer. A present map replaces the
+  /// structured Nord footer, including when all three columns are empty.
+  final Map<String, String?>? footerColumns;
   final bool isSmallBusinessExempt;
   final List<PdfLine> lines;
 
@@ -300,6 +307,7 @@ Future<Uint8List> renderDocumentPdf(
   String? referencedDocumentNumber,
 }) async {
   final invoice = data;
+  final logo = data.pdfLogoBase64 == null ? null : pw.MemoryImage(base64Decode(data.pdfLogoBase64!));
   final items = data.lines;
   // Ein §19-Beleg darf vorhandene steuerpflichtige Positionen nicht als Bruttopreise tarnen.
   if (data.isSmallBusinessExempt &&
@@ -417,17 +425,19 @@ Future<Uint8List> renderDocumentPdf(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: layout == PdfLayout.nordLetterhead
-          ? const pw.EdgeInsets.fromLTRB(40, 34, 40, 120)
+          ? pw.EdgeInsets.fromLTRB(40, 34, 40, invoice.footerColumns == null ? 120 : 40)
           : const pw.EdgeInsets.all(32),
       header: (context) => layout == PdfLayout.nordLetterhead
-          ? _buildLetterhead(invoice, context.pageNumber == 1,
+          ? _buildLetterhead(invoice, context.pageNumber == 1, logo: logo,
               isPreview: isPreview, referencedDocumentNumber: referencedDocumentNumber)
-          : _buildHeader(invoice, isPreview: isPreview, referencedDocumentNumber: referencedDocumentNumber),
+          : _buildHeader(invoice, isPreview: isPreview, referencedDocumentNumber: referencedDocumentNumber, logo: logo),
       // Fußzeile (Kay-Nachtrag 2026-10-16: "Fußzeile ... in Dokumenten
       // anpassbar machen") — Firmentext oberhalb, Seitenzahl bleibt
       // immer zusätzlich sichtbar.
       footer: (context) => layout == PdfLayout.nordLetterhead
           ? _buildLetterFooter(invoice, footerText, context.pageNumber, context.pagesCount)
+          : invoice.footerColumns != null
+          ? _buildConfiguredFooter(invoice, context.pageNumber, context.pagesCount)
           : pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
@@ -547,7 +557,7 @@ String _dateLabel(DocumentKind kind) => switch (kind) {
 
 // All content is derived from the captured document, never a live tenant.
 pw.Widget _buildLetterhead(PdfDocumentData data, bool firstPage,
-    {required bool isPreview, String? referencedDocumentNumber}) {
+    {required bool isPreview, String? referencedDocumentNumber, pw.MemoryImage? logo}) {
   final title = data.isAdvancePayment ? 'Abschlagsrechnung' : _title(data.kind);
   return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
     if (isPreview) pw.Container(
@@ -561,6 +571,9 @@ pw.Widget _buildLetterhead(PdfDocumentData data, bool firstPage,
       'Diese Proforma-Rechnung ist keine Rechnung im umsatzsteuerrechtlichen Sinne '
       'und keine Zahlungsaufforderung mit eigenem, umsatzsteuerlich relevantem Nummernkreis.',
       style: const pw.TextStyle(fontSize: 8)),
+    if (logo != null) pw.Align(alignment: pw.Alignment.centerLeft,
+      child: pw.Container(height: 55, width: 180, alignment: pw.Alignment.centerLeft,
+        child: pw.Image(logo, fit: pw.BoxFit.contain))),
     pw.Align(alignment: pw.Alignment.centerRight,
       child: pw.SizedBox(width: 215, child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
@@ -599,9 +612,39 @@ pw.Widget _buildLetterhead(PdfDocumentData data, bool firstPage,
   ]);
 }
 
+String interpolateFooter(String template, PdfDocumentData data) {
+  final values = {
+    'companyName': data.companySnapshotName,
+    'address': data.companySnapshotAddress,
+    'taxNumber': data.companySnapshotTaxNumber,
+    'vatId': data.companySnapshotVatId,
+    'iban': data.companySnapshotIban,
+    'customerName': data.customerSnapshotName,
+    'customerAddress': data.customerSnapshotAddress,
+    'documentNumber': data.invoiceNumber,
+  };
+  // Drop a complete line when all of its dynamic values are missing, so
+  // defaults such as "IBAN: {{iban}}" never print an orphan label.
+  final token = RegExp(r'\{\{([a-zA-Z]+)\}\}');
+  return template.split('\n').where((line) {
+    final matches = token.allMatches(line).toList();
+    return matches.isEmpty || matches.any((m) =>
+        !values.containsKey(m[1]) || (values[m[1]]?.trim().isNotEmpty ?? false));
+  }).map((line) => line.replaceAllMapped(token,
+      (match) => values.containsKey(match[1]) ? (values[match[1]] ?? '') : match[0]!)).join('\n');
+}
+
+bool configuredFooterHasContent(PdfDocumentData data) =>
+    data.footerColumns?.values.any((template) =>
+        interpolateFooter(template ?? '', data).trim().isNotEmpty) ?? false;
+
 pw.Widget _buildLetterFooter(PdfDocumentData data, String? footerText, int page, int pages) =>
     pw.Column(children: [
-      pw.Divider(color: PdfColors.grey400, thickness: 0.4),
+      if (data.footerColumns == null || configuredFooterHasContent(data))
+        pw.Divider(color: PdfColors.grey400, thickness: 0.4),
+      if (data.footerColumns != null)
+        _footerRow(data)
+      else ...[
       pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
         pw.Expanded(child: pw.Text([
           data.companySnapshotName, data.companySnapshotAddress,
@@ -624,14 +667,39 @@ pw.Widget _buildLetterFooter(PdfDocumentData data, String? footerText, int page,
       if (footerText?.trim().isNotEmpty ?? false)
         pw.Text(footerText!, textAlign: pw.TextAlign.center,
             style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+      ],
       pw.SizedBox(height: 4),
       pw.Text('Seite $page von $pages', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
     ]);
+
+pw.Widget _footerRow(PdfDocumentData data) => pw.Row(
+  crossAxisAlignment: pw.CrossAxisAlignment.start,
+  children: [
+    for (final side in ['left', 'center', 'right']) ...[
+      if (side != 'left') pw.SizedBox(width: 10),
+      pw.Expanded(child: pw.Text(
+        interpolateFooter(data.footerColumns![side] ?? '', data),
+        textAlign: side == 'left' ? pw.TextAlign.left : side == 'right' ? pw.TextAlign.right : pw.TextAlign.center,
+        style: const pw.TextStyle(fontSize: 7),
+      )),
+    ],
+  ],
+);
+
+pw.Widget _buildConfiguredFooter(PdfDocumentData data, int page, int pages) => pw.Column(children: [
+  if (configuredFooterHasContent(data))
+    pw.Divider(color: PdfColors.grey400, thickness: 0.4),
+  _footerRow(data),
+  pw.SizedBox(height: 4),
+  pw.Align(alignment: pw.Alignment.centerRight,
+      child: pw.Text('Seite $page von $pages', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600))),
+]);
 
 pw.Widget _buildHeader(
   PdfDocumentData invoice, {
   required bool isPreview,
   String? referencedDocumentNumber,
+  pw.MemoryImage? logo,
 }) {
   // C13 Abschlagsrechnungen: eigener Titel statt "Rechnung", damit sie
   // optisch klar von einer regulären (Schluss-)Rechnung unterscheidbar
@@ -640,6 +708,8 @@ pw.Widget _buildHeader(
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
+      if (logo != null) pw.Container(height: 55, width: 180, alignment: pw.Alignment.centerLeft,
+        child: pw.Image(logo, fit: pw.BoxFit.contain)),
       if (isPreview)
         pw.Container(
           width: double.infinity,

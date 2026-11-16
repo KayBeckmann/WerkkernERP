@@ -8,6 +8,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models.dart';
+import 'pdf_logo.dart';
 import 'auth.dart';
 import 'business/repository.dart';
 import 'business/models.dart' show documentKindModules;
@@ -919,6 +920,12 @@ class PhaseBRouter {
     if (layout != 'classic' && layout != 'nordLetterhead') {
       return jsonError('pdfLayout muss classic oder nordLetterhead sein.');
     }
+    final rawColumns = body['footerColumns'];
+    if (rawColumns != null && (rawColumns is! Map<String, Object?> ||
+        rawColumns.keys.any((key) => !const ['left', 'center', 'right'].contains(key)) ||
+        rawColumns.values.any((value) => value != null && value is! String))) {
+      return jsonError('footerColumns muss left, center und right als Text enthalten.');
+    }
     final rawTexts = body['documentTexts'];
     final documentTexts = rawTexts is Map<String, Object?>
         ? {
@@ -930,8 +937,22 @@ class PhaseBRouter {
                 ),
           }
         : current.documentTexts;
+    String? pdfLogo = current.pdfLogoBase64;
+    if (body.containsKey('pdfLogoBase64')) {
+      final value = body['pdfLogoBase64'];
+      if (value != null && value is! String) return jsonError('Ungültiges PDF-Logo.');
+      if (value is String) {
+        try {
+          validatePdfLogo(value);
+        } on FormatException {
+          return jsonError('PDF-Logo muss ein gültiges PNG/JPEG mit maximal 1 MiB und 2048 Pixeln sein.');
+        }
+      }
+      pdfLogo = value as String?;
+    }
     final profile = CompanyProfile(
       companyId: auth.session.companyId,
+      pdfLogoBase64: pdfLogo,
       address: field('address'),
       taxNumber: field('taxNumber'),
       vatId: field('vatId'),
@@ -940,6 +961,12 @@ class PhaseBRouter {
       phone: field('phone'),
       // Felder, die im Body fehlen, bleiben unverändert (ältere Clients).
       footerText: body.containsKey('footerText') ? field('footerText') : current.footerText,
+      footerColumns: body.containsKey('footerColumns')
+          ? (body['footerColumns'] == null ? null : {
+              for (final side in ['left', 'center', 'right'])
+                side: ((body['footerColumns'] as Map<String, Object?>)[side] as String?)?.trim(),
+            })
+          : current.footerColumns,
       documentTexts: documentTexts,
       smallBusinessExempt: body['smallBusinessExempt'] as bool? ?? current.smallBusinessExempt,
       // C15: strukturierte Anschrift/BIC — ältere Clients kennen sie nicht

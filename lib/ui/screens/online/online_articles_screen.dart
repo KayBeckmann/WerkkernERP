@@ -5,6 +5,7 @@ import 'package:werkkern_core/werkkern_core.dart';
 
 import '../../../domain/services/online_session.dart';
 import '../../widgets/article_group_filter.dart';
+import '../../widgets/article_group_delete_dialog.dart';
 import '../../widgets/barcode_scanner.dart';
 import 'online_form.dart';
 import 'online_storage_screen.dart' show onlineBinOptions;
@@ -787,10 +788,15 @@ class _GroupList extends StatelessWidget {
                   tooltip: 'Gruppe löschen',
                   icon: const Icon(Icons.delete_outline),
                   onPressed: () async {
-                    if (!await confirmOnline(context, 'Artikelgruppe löschen?', 'Die Artikel bleiben erhalten, nur ohne Gruppe.')) {
-                      return;
+                    int? count;
+                    if (!await runOnline(context, () async { count = await session.client.articleGroupImpact(g.id); })) return;
+                    if (!context.mounted) return;
+                    final choice = await showArticleGroupDeleteDialog(context, g.name, count!);
+                    if (choice == null || !context.mounted) return;
+                    if (await runOnline(context, () => session.client.deleteArticleGroup(g.id,
+                        deleteArticles: choice == DeleteGroupChoice.deleteArticles, expectedCount: count!))) {
+                      reload();
                     }
-                    if (context.mounted && await runOnline(context, () => session.client.deleteArticleGroup(g.id))) reload();
                   },
                 )
             ],

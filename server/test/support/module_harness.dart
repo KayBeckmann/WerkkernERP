@@ -108,7 +108,7 @@ class CompanyClient {
       await client.request('POST', path, body: body) as Map<String, Object?>;
   Future<Map<String, Object?>> put(String path, Map<String, Object?> body) async =>
       await client.request('PUT', path, body: body) as Map<String, Object?>;
-  Future<void> delete(String path) => client.request('DELETE', path);
+  Future<void> delete(String path, {Map<String, String>? query}) => client.request('DELETE', path, query: query);
 }
 
 Matcher throwsStatus(int status) =>

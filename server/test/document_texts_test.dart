@@ -64,6 +64,20 @@ void runDocumentTextTests(Future<(PhaseBRepository, BusinessRepository)> Functio
     expect((reloaded['textSnapshot'] as Map)['footer'], 'Bankverbindung …');
   });
 
+  test('Dreispaltige Fußzeile bleibt nach Profiländerung im finalisierten Dokument erhalten', () async {
+    const columns = {'left': '{{companyName}}', 'center': 'IBAN {{iban}}', 'right': '{{taxNumber}}'};
+    await c.request('PUT', '/company/profile', body: {'footerColumns': columns});
+    await expectLater(c.request('PUT', '/company/profile', body: {'footerColumns': {'left': 42}}), throwsA(isA<ApiException>()));
+    final saved = await c.request('GET', '/company/profile') as Map;
+    expect(saved['footerColumns'], columns);
+    final draft = await c.request('POST', '/documents', body: {'customerId': customerId, 'items': [item(19)]}) as Map;
+    final issued = await c.request('POST', '/documents/${draft['id']}/finalize', body: {'version': 1}) as Map;
+    expect((issued['textSnapshot'] as Map)['footerColumns'], columns);
+    await c.request('PUT', '/company/profile', body: {'footerColumns': {'left': 'Neu'}});
+    final reloaded = await c.request('GET', '/documents/${issued['id']}') as Map;
+    expect((reloaded['textSnapshot'] as Map)['footerColumns'], columns);
+  });
+
   test('§ 19 UStG: Server erzwingt 0 % USt beim Speichern und Finalisieren, Schnappschuss im Dokument', () async {
     final oldDraft = await c.request('POST', '/documents', body: {'customerId': customerId, 'items': [item(19)]}) as Map;
     await c.request('PUT', '/company/profile', body: {'smallBusinessExempt': true});

@@ -1127,6 +1127,7 @@ class BusinessRoutes {
           introText: profile.documentTexts[existing.kind]?.intro,
           closingText: profile.documentTexts[existing.kind]?.closing,
           footerText: profile.footerText,
+          footerColumns: profile.footerColumns,
           smallBusinessExempt: profile.smallBusinessExempt,
           street: profile.street,
           postalCode: profile.postalCode,
@@ -1136,6 +1137,7 @@ class BusinessRoutes {
           email: profile.email,
           phone: profile.phone,
           pdfLayout: profile.pdfLayout,
+          pdfLogoBase64: profile.pdfLogoBase64,
         ),
         now: DateTime.now().toUtc(),
       );

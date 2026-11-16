@@ -109,6 +109,107 @@ void main() {
     }
   });
 
+  test('configured footer columns interpolate snapshots on every Nord page without moving content above footer', () async {
+    final text = await pages(await renderDocumentPdf(
+      PdfDocumentData(
+        kind: DocumentKind.quote, invoiceNumber: 'SYN-001',
+        issueDate: DateTime(2026, 1, 2), serviceDate: DateTime(2026, 1, 1),
+        companySnapshotName: 'Synthetische Elektrotechnik GmbH',
+        companySnapshotAddress: 'Teststraße 10', companySnapshotIban: 'DE00 0000',
+        customerSnapshotName: 'Beispielkunde',
+        footerColumns: const {'left': '{{companyName}}', 'center': 'IBAN: {{iban}}', 'right': '{{taxNumber}}'},
+        lines: [for (var i = 0; i < 70; i++) PdfLine(description: 'Position $i', quantity: '1', unitPriceCents: 100, vatRatePercent: 0)],
+      ), isPreview: false, layout: PdfLayout.nordLetterhead), 'configured-footer');
+    expect(text.length, greaterThan(1));
+    for (final page in text) {
+      expect(page, contains('Synthetische Elektrotechnik GmbH'));
+      expect(page, contains('IBAN: DE00 0000'));
+      expect(page, isNot(contains('{{taxNumber}}')));
+    }
+  });
+
+  test('configured Nord footer replaces legacy text and stays in reserved page box', () async {
+    final data = PdfDocumentData(
+      kind: DocumentKind.quote, invoiceNumber: 'SYN-001',
+      issueDate: DateTime(2026, 1, 2), serviceDate: DateTime(2026, 1, 1),
+      companySnapshotName: 'Synthetic Ltd', companySnapshotIban: 'DE00 0000', customerSnapshotName: 'Customer',
+      footerText: 'LEGACY-FOOTER-MARKER',
+      footerColumns: {
+        'left': 'LEFT-MARKER ${'long value ' * 12}',
+        'center': 'CENTER-MARKER {{iban}}',
+        'right': 'RIGHT-MARKER',
+      },
+      lines: [for (var i = 0; i < 90; i++) PdfLine(description: 'Position $i', quantity: '1', unitPriceCents: 100, vatRatePercent: 0)],
+    );
+    final bytes = await renderDocumentPdf(data, isPreview: false, layout: PdfLayout.nordLetterhead);
+    final directory = await Directory.systemTemp.createTemp('footer-geometry-');
+    try {
+      final file = File('${directory.path}/footer.pdf');
+      await file.writeAsBytes(bytes);
+      final result = await Process.run('pdftotext', ['-bbox-layout', file.path, '-']);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final xml = result.stdout as String;
+      final pages = xml.split('<page ').skip(1).toList();
+      expect(pages.length, greaterThan(1));
+      for (final page in pages) {
+        expect(page, isNot(contains('LEGACY-FOOTER-MARKER')));
+        for (final marker in ['LEFT-MARKER', 'CENTER-MARKER', 'RIGHT-MARKER']) {
+          final match = RegExp('<word[^>]*yMin="([0-9.]+)"[^>]*>$marker</word>').firstMatch(page);
+          expect(match, isNotNull, reason: '$marker missing on page');
+          expect(double.parse(match!.group(1)!), greaterThan(680), reason: '$marker escaped footer box');
+        }
+        final bodyBottom = RegExp('<word[^>]*yMax="([0-9.]+)"[^>]*>Position</word>')
+            .allMatches(page).map((m) => double.parse(m.group(1)!));
+        if (bodyBottom.isNotEmpty) {
+          final footerTop = double.parse(RegExp('<word[^>]*yMin="([0-9.]+)"[^>]*>LEFT-MARKER</word>').firstMatch(page)!.group(1)!);
+          expect(bodyBottom.reduce((a, b) => a > b ? a : b), lessThan(footerTop));
+        }
+      }
+    } finally {
+      await directory.delete(recursive: true);
+    }
+  });
+
+  test('missing structured footer values do not leave orphan labels', () {
+    final data = PdfDocumentData(
+      kind: DocumentKind.quote, issueDate: DateTime(2026), serviceDate: DateTime(2026),
+      companySnapshotName: 'Beispiel GmbH',
+      footerColumns: const {'left': '{{companyName}}', 'center': 'IBAN: {{iban}}', 'right': 'Kontakt'},
+      lines: const [],
+    );
+    expect(interpolateFooter('IBAN: {{iban}}', data), isEmpty);
+    expect(interpolateFooter('Firma: {{companyName}}\nIBAN: {{iban}}', data), 'Firma: Beispiel GmbH');
+    expect(configuredFooterHasContent(PdfDocumentData(
+      kind: DocumentKind.quote, issueDate: DateTime(2026), serviceDate: DateTime(2026),
+      footerColumns: const {'left': 'IBAN: {{iban}}'}, lines: const [],
+    )), isFalse);
+  });
+
+  test('footer separator activates only for rendered content, not empty placeholders', () {
+    final data = PdfDocumentData(
+      kind: DocumentKind.quote, issueDate: DateTime(2026), serviceDate: DateTime(2026),
+      footerColumns: const {'left': '{{iban}}', 'center': '  ', 'right': null}, lines: const [],
+    );
+    expect(configuredFooterHasContent(data), isFalse);
+    expect(configuredFooterHasContent(PdfDocumentData(
+      kind: DocumentKind.quote, issueDate: DateTime(2026), serviceDate: DateTime(2026),
+      companySnapshotIban: 'DE00 0000', footerColumns: data.footerColumns, lines: const [],
+    )), isTrue);
+  });
+
+  test('Classic uses configured columns when explicitly enabled, but keeps legacy default otherwise', () async {
+    final configured = PdfDocumentData(
+      kind: DocumentKind.quote, issueDate: DateTime(2026), serviceDate: DateTime(2026),
+      companySnapshotName: 'Firma Beispiel', companySnapshotIban: 'DE00 0000',
+      footerColumns: const {'left': '{{companyName}}', 'center': 'Konto {{iban}}', 'right': 'Kontakt'},
+      lines: const [],
+    );
+    final text = (await pages(await renderDocumentPdf(configured, isPreview: true), 'classic-columns')).join(' ');
+    expect(text, contains('Konto DE00 0000'));
+    expect(text, contains('Kontakt'));
+    expect(text, contains('Seite 1 von 1'));
+  });
+
   test('Nord delivery note never prints prices and keeps draft warning', () async {
     final text = (await pages(await renderDocumentPdf(
       fixture(kind: DocumentKind.deliveryNote, count: 3),

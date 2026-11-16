@@ -43,9 +43,21 @@ final List<Future<void> Function(Session db)> _steps = [
   _step28SupplierArticleNumber,
   _step29QuoteValidity,
   _step30PdfLayout,
+  _step31FooterColumns,
+  _step32PdfLogo,
 ];
 
+Future<void> _step32PdfLogo(Session db) async {
+  await db.execute('ALTER TABLE companies ADD COLUMN pdf_logo_base64 TEXT');
+  await db.execute('ALTER TABLE documents ADD COLUMN pdf_logo_snapshot TEXT');
+}
+
 int get latestSchemaVersion => _steps.length;
+
+Future<void> _step31FooterColumns(Session db) async {
+  await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS pdf_footer_columns TEXT');
+  await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS footer_columns_snapshot TEXT');
+}
 
 /// Führt alle ausstehenden Stufen in **einer** Transaktion aus. Der
 /// transaktionsgebundene Advisory-Lock verhindert, dass zwei parallel

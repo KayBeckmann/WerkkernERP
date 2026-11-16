@@ -14,14 +14,18 @@ void main() {
 
   /// Finalisiertes Dokument aus dem ECHTEN Server-Router (In-Memory) —
   /// prüft die komplette Kette Server-JSON -> Client-Modell -> PDF-Daten.
-  Future<OnlineDocument> finalizedFromServer() async {
+  Future<OnlineDocument> finalizedFromServer({Map<String, String?>? footerColumns}) async {
     final server = OnlineTestServer();
     final token = await server.seedCompany(
       email: 'kay@example.com',
       companyName: 'Elektro Beckmann',
       permissions: ['customers.read', 'customers.write', 'invoices.read', 'invoices.write', 'invoices.finalize'],
     );
-    await server.put('/company/profile', {'address': 'Musterstraße 1, 23966 Wismar', 'taxNumber': '123/456/78901'}, token);
+    await server.put('/company/profile', {
+      'address': 'Musterstraße 1, 23966 Wismar',
+      'taxNumber': '123/456/78901',
+      'footerColumns': ?footerColumns,
+    }, token);
     final customer = await server.post('/customers', {'name': 'Max Mustermann', 'address': 'Kundenweg 2'}, token);
     final draft = await server.post('/documents', {
       'customerId': customer['id'],
@@ -54,6 +58,35 @@ void main() {
     expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
     final dumpDir = Platform.environment['PDF_DUMP_DIR'];
     if (dumpDir != null) File('$dumpDir/online-final.pdf').writeAsBytesSync(bytes);
+  });
+
+  test('online finalized PDF prints snapshotted columns in real footer', () async {
+    final document = await finalizedFromServer(footerColumns: const {
+      'left': 'LEFT-ONLINE {{companyName}}',
+      'center': 'CENTER-ONLINE {{taxNumber}}',
+      'right': 'RIGHT-ONLINE {{documentNumber}}',
+    });
+    final bytes = await buildOnlineDocumentPdf(document, layout: PdfLayout.nordLetterhead,
+        liveCompany: const OnlineCompanyProfile(footerColumns: {'left': 'LIVE-CHANGE'}));
+    final dir = await Directory.systemTemp.createTemp('online-footer-');
+    try {
+      final file = File('${dir.path}/online.pdf');
+      await file.writeAsBytes(bytes);
+      final result = await Process.run('pdftotext', ['-bbox-layout', file.path, '-']);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final xml = result.stdout as String;
+      expect(xml, contains('LEFT-ONLINE'));
+      expect(xml, contains('CENTER-ONLINE'));
+      expect(xml, contains('RIGHT-ONLINE'));
+      expect(xml, isNot(contains('LIVE-CHANGE')));
+      for (final marker in ['LEFT-ONLINE', 'CENTER-ONLINE', 'RIGHT-ONLINE']) {
+        final match = RegExp('<word[^>]*yMin="([0-9.]+)"[^>]*>$marker</word>').firstMatch(xml);
+        expect(match, isNotNull);
+        expect(double.parse(match!.group(1)!), greaterThan(680));
+      }
+    } finally {
+      await dir.delete(recursive: true);
+    }
   });
 
   test('Online entry can opt into the letterhead without changing issued snapshot data', () async {
@@ -106,17 +139,19 @@ void main() {
     final finalized = OnlineDocument.fromJson({
       'id': 'd1', 'customerId': 'c1', 'kind': 'invoice', 'status': 'finalized', 'number': 'R-26001',
       'issueDate': '2026-10-24', 'serviceDate': '2026-10-24', 'version': 2, 'items': <Object>[],
-      'textSnapshot': {'intro': 'Alt', 'closing': 'Schluss alt', 'footer': 'Fuß alt', 'smallBusinessExempt': true},
+      'textSnapshot': {'intro': 'Alt', 'closing': 'Schluss alt', 'footer': 'Fuß alt', 'footerColumns': {'left': '{{companyName}}', 'center': 'Alt', 'right': ''}, 'smallBusinessExempt': true},
     });
     const live = OnlineCompanyProfile(
       name: 'Firma',
       footerText: 'Fuß neu',
+      footerColumns: {'left': 'Neu', 'center': '', 'right': ''},
       smallBusinessExempt: false,
       documentTexts: {'invoice': (intro: 'Neu', closing: null)},
     );
     final data = onlineDocumentPdfData(finalized, liveCompany: live);
     expect(data.introText, 'Alt');
     expect(data.footerText, 'Fuß alt');
+    expect(data.footerColumns, {'left': '{{companyName}}', 'center': 'Alt', 'right': ''});
     expect(data.isSmallBusinessExempt, isTrue);
 
     final draft = OnlineDocument.fromJson({
@@ -126,6 +161,7 @@ void main() {
     final preview = onlineDocumentPdfData(draft, liveCompany: live);
     expect(preview.introText, 'Neu');
     expect(preview.footerText, 'Fuß neu');
+    expect(preview.footerColumns?['left'], 'Neu');
     expect(preview.isSmallBusinessExempt, isFalse);
   });
 }

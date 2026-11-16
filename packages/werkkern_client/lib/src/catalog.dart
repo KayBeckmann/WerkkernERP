@@ -122,7 +122,14 @@ extension CatalogApi on WerkkernApiClient {
         : await request('PUT', '/article-groups/$id', body: body)));
   }
 
-  Future<void> deleteArticleGroup(String id) => request('DELETE', '/article-groups/$id');
+  Future<int> articleGroupImpact(String id) async =>
+      (_map(await request('GET', '/article-groups/$id/impact'))['articleCount'] as num).toInt();
+
+  Future<void> deleteArticleGroup(String id, {required bool deleteArticles, required int expectedCount}) =>
+      request('DELETE', '/article-groups/$id', query: {
+        'mode': deleteArticles ? 'deleteArticles' : 'ungroup',
+        'expectedCount': '$expectedCount',
+      });
 
   Future<List<OnlineArticlePrice>> articlePrices(String articleId) async {
     final j = _map(await request('GET', '/articles/$articleId/prices'));

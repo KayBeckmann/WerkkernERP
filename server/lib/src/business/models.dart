@@ -317,6 +317,7 @@ class Document {
     this.introTextSnapshot,
     this.closingTextSnapshot,
     this.footerTextSnapshot,
+    this.footerColumnsSnapshot,
     this.smallBusinessExemptSnapshot = false,
     this.stockBooked = false,
     this.contactId,
@@ -330,9 +331,11 @@ class Document {
     this.quoteValidFrom,
     this.quoteValidUntil,
     this.pdfLayoutSnapshot,
+    this.pdfLogoSnapshot,
   });
   final String id;
   final String? pdfLayoutSnapshot;
+  final String? pdfLogoSnapshot;
   final String companyId;
   final String customerId;
   final String kind;
@@ -387,6 +390,7 @@ class Document {
   final String? introTextSnapshot;
   final String? closingTextSnapshot;
   final String? footerTextSnapshot;
+  final Map<String, String?>? footerColumnsSnapshot;
   final bool smallBusinessExemptSnapshot;
 
   /// C5.1: dieses Dokument hat beim Finalisieren Bestand gebucht —
@@ -445,6 +449,7 @@ class Document {
     DocTerms? Function()? terms,
     QuoteValidity? Function()? quoteValidity,
     String? pdfLayoutSnapshot,
+    String? pdfLogoSnapshot,
   }) =>
       Document(
         id: id,
@@ -481,6 +486,7 @@ class Document {
         introTextSnapshot: company != null ? company.introText : introTextSnapshot,
         closingTextSnapshot: company != null ? company.closingText : closingTextSnapshot,
         footerTextSnapshot: company != null ? company.footerText : footerTextSnapshot,
+        footerColumnsSnapshot: company != null ? company.footerColumns : footerColumnsSnapshot,
         smallBusinessExemptSnapshot: company != null ? company.smallBusinessExempt : smallBusinessExemptSnapshot,
         stockBooked: stockBooked ?? this.stockBooked,
         contactId: contactId != null ? contactId() : this.contactId,
@@ -494,6 +500,7 @@ class Document {
         quoteValidFrom: quoteValidity != null ? quoteValidity()?.from : quoteValidFrom,
         quoteValidUntil: quoteValidity != null ? quoteValidity()?.until : quoteValidUntil,
         pdfLayoutSnapshot: pdfLayoutSnapshot ?? company?.pdfLayout ?? this.pdfLayoutSnapshot,
+        pdfLogoSnapshot: pdfLogoSnapshot ?? company?.pdfLogoBase64 ?? this.pdfLogoSnapshot,
       );
 
   Map<String, Object?> toJson() => {
@@ -524,6 +531,7 @@ class Document {
         'finalizedAt': finalizedAt?.toIso8601String(),
         'version': version,
         'pdfLayoutSnapshot': pdfLayoutSnapshot,
+        'pdfLogoSnapshot': pdfLogoSnapshot,
         'convertedFromId': convertedFromId,
         'paymentStatus': paymentStatus,
         'paidAt': paidAt?.toIso8601String(),
@@ -552,6 +560,7 @@ class Document {
                 'intro': introTextSnapshot,
                 'closing': closingTextSnapshot,
                 'footer': footerTextSnapshot,
+                'footerColumns': footerColumnsSnapshot,
                 'smallBusinessExempt': smallBusinessExemptSnapshot,
               },
       };
@@ -620,6 +629,7 @@ class CompanySnapshot {
     this.introText,
     this.closingText,
     this.footerText,
+    this.footerColumns,
     this.smallBusinessExempt = false,
     this.street,
     this.postalCode,
@@ -629,9 +639,11 @@ class CompanySnapshot {
     this.email,
     this.phone,
     this.pdfLayout = 'classic',
+    this.pdfLogoBase64,
   });
   final String name;
   final String pdfLayout;
+  final String? pdfLogoBase64;
   final String? address;
   final String? taxNumber;
   final String? vatId;
@@ -651,6 +663,7 @@ class CompanySnapshot {
   final String? introText;
   final String? closingText;
   final String? footerText;
+  final Map<String, String?>? footerColumns;
   final bool smallBusinessExempt;
 }
 

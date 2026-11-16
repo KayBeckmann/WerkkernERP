@@ -1,6 +1,7 @@
 part of '../repository_postgres.dart';
 
 mixin _PostgresSuppliers implements SupplierStore {
+  SessionExecutor get _db;
   Future<Result> _q(String sql, [Map<String, Object?> parameters = const {}]);
 
   static const _supplierColumns = 'id, company_id, name, address, email, phone, vat_id, contact_person, notes, '
@@ -139,12 +140,40 @@ mixin _PostgresSuppliers implements SupplierStore {
   }
 
   @override
-  Future<bool> deleteArticleGroup(String companyId, String id) async {
-    final result = await _q('DELETE FROM article_groups WHERE company_id = @companyId AND id = @id', {
-      'companyId': companyId,
-      'id': id,
-    });
-    return result.affectedRows > 0;
+  Future<int?> articleGroupImpact(String companyId, String id) async {
+    final result = await _q('SELECT (SELECT count(*) FROM articles WHERE company_id = @companyId AND article_group_id = @id) '
+        'FROM article_groups WHERE company_id = @companyId AND id = @id', {'companyId': companyId, 'id': id});
+    return result.isEmpty ? null : result.first[0] as int;
+  }
+
+  @override
+  Future<bool> deleteArticleGroup(String companyId, String id, {required bool deleteArticles, required int expectedCount}) async {
+    final params = {'companyId': companyId, 'id': id};
+    try {
+      return await _db.runTx((s) async {
+        // FOR UPDATE prevents a concurrent INSERT referencing this group until commit.
+        final group = await s.execute(Sql.named('SELECT id FROM article_groups '
+            'WHERE company_id = @companyId AND id = @id FOR UPDATE'), parameters: params);
+        if (group.isEmpty) return false;
+        final rows = await s.execute(Sql.named('SELECT count(*) FROM articles '
+            'WHERE company_id = @companyId AND article_group_id = @id'), parameters: params);
+        if (rows.first[0] != expectedCount) throw const BusinessConflict('Artikelanzahl geändert. Bitte erneut prüfen.');
+        if (deleteArticles) {
+          final stocked = await s.execute(Sql.named('SELECT 1 FROM articles WHERE company_id = @companyId '
+              'AND article_group_id = @id AND stock_quantity::numeric <> 0 LIMIT 1'), parameters: params);
+          if (stocked.isNotEmpty) throw const BusinessConflict('Artikel haben Bestand und können nicht gelöscht werden.');
+          await s.execute(Sql.named('DELETE FROM articles WHERE company_id = @companyId AND article_group_id = @id'), parameters: params);
+        } else {
+          await s.execute(Sql.named('UPDATE articles SET article_group_id = NULL '
+              'WHERE company_id = @companyId AND article_group_id = @id'), parameters: params);
+        }
+        await s.execute(Sql.named('DELETE FROM article_groups WHERE company_id = @companyId AND id = @id'), parameters: params);
+        return true;
+      });
+    } on ServerException catch (e) {
+      if (e.code == '23503') throw const BusinessConflict('Artikel haben historische Verweise und können nicht gelöscht werden.');
+      rethrow;
+    }
   }
 
   @override

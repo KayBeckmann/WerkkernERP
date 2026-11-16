@@ -177,6 +177,7 @@ class CompanyProfile {
     this.email,
     this.phone,
     this.footerText,
+    this.footerColumns,
     this.documentTexts = const {},
     this.smallBusinessExempt = false,
     this.street,
@@ -188,9 +189,11 @@ class CompanyProfile {
     this.skontoDays,
     this.quoteValidityDays = 14,
     this.pdfLayout = 'classic',
+    this.pdfLogoBase64,
   });
   final String companyId;
   final String pdfLayout;
+  final String? pdfLogoBase64;
 
   /// A5-Nachtrag: Standard-Bindefrist neuer Angebote in Tagen (`null` = keine).
   final int? quoteValidityDays;
@@ -214,6 +217,7 @@ class CompanyProfile {
 
   /// PDF-Fußzeile (alle Dokumentarten).
   final String? footerText;
+  final Map<String, String?>? footerColumns;
 
   /// Einleitungs-/Schlusstext je Dokumentart (`invoice`, `quote`, ...),
   /// wie offline "pro Dokument abweichend".
@@ -231,6 +235,7 @@ class CompanyProfile {
         'email': email,
         'phone': phone,
         'footerText': footerText,
+        'footerColumns': footerColumns,
         'documentTexts': {
           for (final e in documentTexts.entries) e.key: {'intro': e.value.intro, 'closing': e.value.closing},
         },
@@ -244,6 +249,7 @@ class CompanyProfile {
         'skontoDays': skontoDays,
         'quoteValidityDays': quoteValidityDays,
         'pdfLayout': pdfLayout,
+        'pdfLogoBase64': pdfLogoBase64,
       };
 }
 

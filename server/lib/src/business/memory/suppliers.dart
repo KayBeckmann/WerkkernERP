@@ -2,6 +2,11 @@ part of '../repository_memory.dart';
 
 mixin _InMemorySuppliers implements SupplierStore {
   List<Article> get _articles;
+  List<DocumentItem> get _items;
+  List<StockMovement> get _stockMovements;
+  List<InventoryCountItem> get _inventoryItems;
+  Map<String, Map<String, Decimal>> get _binStock;
+  Map<String, String> get _defaultBin;
   List<PurchaseOrder> get _purchaseOrders;
   final List<Supplier> _suppliers = [];
   final List<ArticleGroup> _articleGroups = [];
@@ -81,11 +86,48 @@ mixin _InMemorySuppliers implements SupplierStore {
   }
 
   @override
-  Future<bool> deleteArticleGroup(String companyId, String id) async {
-    final before = _articleGroups.length;
+  Future<int?> articleGroupImpact(String companyId, String id) async =>
+      _articleGroups.any((g) => g.companyId == companyId && g.id == id)
+          ? _articles.where((a) => a.companyId == companyId && a.articleGroupId == id).length : null;
+
+  @override
+  Future<bool> deleteArticleGroup(String companyId, String id, {required bool deleteArticles, required int expectedCount}) async {
+    final count = await articleGroupImpact(companyId, id);
+    if (count == null) return false;
+    if (count != expectedCount) throw const BusinessConflict('Artikelanzahl geändert. Bitte erneut prüfen.');
+    if (deleteArticles) {
+      // Historische Lagerbuchungen haben im Postgres-Schema RESTRICT.
+      // Der In-Memory-Store darf solche Artikel ebenfalls nicht entfernen.
+      if (_articles.any((a) => a.companyId == companyId && a.articleGroupId == id &&
+          (_stockMovements.any((m) => m.articleId == a.id) ||
+              _inventoryItems.any((i) => i.articleId == a.id)))) {
+        throw const BusinessConflict('Artikel haben Lagerhistorie und können nicht gelöscht werden.');
+      }
+      if (_articles.any((a) => a.companyId == companyId && a.articleGroupId == id &&
+          Decimal.parse(a.stockQuantity) != Decimal.zero)) {
+        throw const BusinessConflict('Artikel haben Bestand und können nicht gelöscht werden.');
+      }
+      final ids = _articles.where((a) => a.companyId == companyId && a.articleGroupId == id).map((a) => a.id).toSet();
+      // Postgres article FK is SET NULL; preserve all issued line snapshots.
+      for (var i = 0; i < _items.length; i++) {
+        final line = _items[i];
+        if (ids.contains(line.articleId)) {
+          _items[i] = DocumentItem(id: line.id, documentId: line.documentId, kind: line.kind,
+              description: line.description, quantity: line.quantity, unitPriceCents: line.unitPriceCents,
+              vatRatePercent: line.vatRatePercent, unit: line.unit, discountPercent: line.discountPercent,
+              groupLabel: line.groupLabel, staffRoleId: line.staffRoleId, sortOrder: line.sortOrder);
+        }
+      }
+      _articles.removeWhere((a) => ids.contains(a.id));
+      _prices.removeWhere((_, v) => v.companyId == companyId && ids.contains(v.price.articleId));
+      for (final articleId in ids) {
+        _binStock.remove(articleId);
+        _defaultBin.remove(articleId);
+      }
+    } else {
+      _detachArticles(companyId, groupId: id);
+    }
     _articleGroups.removeWhere((g) => g.companyId == companyId && g.id == id);
-    if (_articleGroups.length == before) return false;
-    _detachArticles(companyId, groupId: id);
     return true;
   }
 

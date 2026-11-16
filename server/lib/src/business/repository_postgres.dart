@@ -319,7 +319,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
       'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked, '
       'd.contact_id, d.e_invoice_snapshot, d.payment_term_id, d.payment_term_label, d.payment_net_days, '
-      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until, d.pdf_layout_snapshot';
+      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until, d.pdf_layout_snapshot, d.footer_columns_snapshot, d.pdf_logo_snapshot';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -356,6 +356,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         introTextSnapshot: r[31] as String?,
         closingTextSnapshot: r[32] as String?,
         footerTextSnapshot: r[33] as String?,
+        footerColumnsSnapshot: r[47] == null ? null : (jsonDecode(r[47] as String) as Map<String, dynamic>).cast<String, String?>(),
         smallBusinessExemptSnapshot: r[34] as bool,
         stockBooked: r[35] as bool,
         contactId: r[36] as String?,
@@ -369,6 +370,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         quoteValidFrom: r[44] as DateTime?,
         quoteValidUntil: r[45] as DateTime?,
         pdfLayoutSnapshot: r[46] as String?,
+        pdfLogoSnapshot: r[48] as String?,
       );
 
   @override
@@ -749,8 +751,8 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'updated_at = @now, version = d.version + 1, company_snapshot_name = @companyName, '
           'company_snapshot_address = @companyAddress, company_snapshot_tax_number = @companyTaxNumber, '
           'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, '
-          'intro_text_snapshot = @intro, closing_text_snapshot = @closing, footer_text_snapshot = @footer, '
-          'small_business_exempt_snapshot = @exempt, e_invoice_snapshot = @eInvoice, pdf_layout_snapshot = @pdfLayout, '
+          'intro_text_snapshot = @intro, closing_text_snapshot = @closing, footer_text_snapshot = @footer, footer_columns_snapshot = @footerColumns, '
+          'small_business_exempt_snapshot = @exempt, e_invoice_snapshot = @eInvoice, pdf_layout_snapshot = @pdfLayout, pdf_logo_snapshot = @pdfLogo, '
           "quote_valid_from = CASE WHEN d.kind = 'quote' AND d.quote_validity_days IS NOT NULL THEN @today ELSE d.quote_valid_from END, "
           "quote_valid_until = CASE WHEN d.kind = 'quote' AND d.quote_validity_days IS NOT NULL "
           'THEN @today + d.quote_validity_days ELSE d.quote_valid_until END, '
@@ -773,8 +775,10 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'intro': company.introText,
           'closing': company.closingText,
           'footer': company.footerText,
+          'footerColumns': company.footerColumns == null ? null : jsonEncode(company.footerColumns),
           'exempt': company.smallBusinessExempt,
           'pdfLayout': company.pdfLayout,
+          'pdfLogo': company.pdfLogoBase64,
           'companyId': companyId,
           'id': id,
         },

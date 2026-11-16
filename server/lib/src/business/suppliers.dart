@@ -118,8 +118,9 @@ abstract interface class SupplierStore {
   Future<void> createArticleGroup(ArticleGroup group);
   Future<bool> updateArticleGroup(ArticleGroup group);
 
-  /// Artikel der Gruppe bleiben erhalten, nur ohne Gruppe.
-  Future<bool> deleteArticleGroup(String companyId, String id);
+  Future<int?> articleGroupImpact(String companyId, String id);
+  /// Atomar mit erneuter Zählung; FK-Konflikte (Lagerhistorie) brechen alles ab.
+  Future<bool> deleteArticleGroup(String companyId, String id, {required bool deleteArticles, required int expectedCount});
 
   /// Alle Einkaufspreise der Firma, optional nur eines Artikels.
   Future<List<ArticleSupplierPrice>> listArticlePrices(String companyId, {String? articleId});

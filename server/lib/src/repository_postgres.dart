@@ -187,7 +187,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
     final result = await _db.execute(
       Sql.named(
         'SELECT address, tax_number, vat_id, iban, email, phone, pdf_footer_text, document_texts, small_business_exempt, '
-        'street, postal_code, city, country_code, bic, skonto_percent, skonto_days, quote_validity_days, pdf_layout FROM companies WHERE id = @id',
+        'street, postal_code, city, country_code, bic, skonto_percent, skonto_days, quote_validity_days, pdf_layout, pdf_footer_columns, pdf_logo_base64 FROM companies WHERE id = @id',
       ),
       parameters: {'id': companyId},
     );
@@ -202,6 +202,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
       email: r[4] as String?,
       phone: r[5] as String?,
       footerText: r[6] as String?,
+      footerColumns: r[18] == null ? null : (jsonDecode(r[18] as String) as Map<String, dynamic>).cast<String, String?>(),
       documentTexts: {
         for (final e in (jsonDecode(r[7] as String) as Map<String, Object?>).entries)
           e.key: (
@@ -219,6 +220,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
       skontoDays: r[15] as int?,
       quoteValidityDays: r[16] as int?,
       pdfLayout: r[17] as String,
+      pdfLogoBase64: r[19] as String?,
     );
   }
 
@@ -230,7 +232,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
         'email = @email, phone = @phone, pdf_footer_text = @footer, document_texts = @texts, '
         'small_business_exempt = @exempt, street = @street, postal_code = @postalCode, city = @city, '
         'country_code = @countryCode, bic = @bic, skonto_percent = @skontoPercent, skonto_days = @skontoDays, '
-        'quote_validity_days = @quoteValidityDays, pdf_layout = @pdfLayout WHERE id = @id',
+        'quote_validity_days = @quoteValidityDays, pdf_layout = @pdfLayout, pdf_footer_columns = @footerColumns, pdf_logo_base64 = @pdfLogo WHERE id = @id',
       ),
       parameters: {
         'address': p.address,
@@ -240,6 +242,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
         'email': p.email,
         'phone': p.phone,
         'footer': p.footerText,
+        'footerColumns': p.footerColumns == null ? null : jsonEncode(p.footerColumns),
         'texts': jsonEncode({
           for (final e in p.documentTexts.entries) e.key: {'intro': e.value.intro, 'closing': e.value.closing},
         }),
@@ -253,6 +256,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
         'skontoDays': p.skontoDays,
         'quoteValidityDays': TypedValue(Type.integer, p.quoteValidityDays),
         'pdfLayout': p.pdfLayout,
+        'pdfLogo': p.pdfLogoBase64,
         'id': p.companyId,
       },
     );

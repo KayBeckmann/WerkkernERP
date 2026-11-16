@@ -323,8 +323,10 @@ class OnlineDocument {
     this.introTextSnapshot,
     this.closingTextSnapshot,
     this.footerTextSnapshot,
+    this.footerColumnsSnapshot,
     this.smallBusinessExemptSnapshot = false,
     this.pdfLayoutSnapshot,
+    this.pdfLogoSnapshot,
     required this.version,
     this.items = const [],
     this.netCents,
@@ -370,8 +372,10 @@ class OnlineDocument {
       introTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['intro'] as String?,
       closingTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['closing'] as String?,
       footerTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['footer'] as String?,
+      footerColumnsSnapshot: _footerColumns((j['textSnapshot'] as Map<String, Object?>?)?['footerColumns']),
       smallBusinessExemptSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['smallBusinessExempt'] as bool? ?? false,
       pdfLayoutSnapshot: j['status'] == 'draft' ? null : j['pdfLayoutSnapshot'] as String? ?? 'classic',
+      pdfLogoSnapshot: j['status'] == 'draft' ? null : j['pdfLogoSnapshot'] as String?,
       convertedTo: [
         for (final c in (j['convertedTo'] as List? ?? const []))
           (
@@ -483,8 +487,10 @@ class OnlineDocument {
   final String? introTextSnapshot;
   final String? closingTextSnapshot;
   final String? footerTextSnapshot;
+  final Map<String, String?>? footerColumnsSnapshot;
   final bool smallBusinessExemptSnapshot;
   final String? pdfLayoutSnapshot;
+  final String? pdfLogoSnapshot;
 
   /// Rechnung: finalisierte Gutschriften dazu.
   final List<({String id, String? number, int grossCents})> creditNotes;
@@ -573,6 +579,12 @@ class OnlineInvitation {
   final bool expired;
 }
 
+Map<String, String?>? _footerColumns(Object? value) {
+  if (value == null) return null;
+  final map = value as Map<String, Object?>;
+  return {for (final side in ['left', 'center', 'right']) side: map[side] as String?};
+}
+
 class OnlineCompanyProfile {
   const OnlineCompanyProfile({
     this.name,
@@ -583,6 +595,7 @@ class OnlineCompanyProfile {
     this.email,
     this.phone,
     this.footerText,
+    this.footerColumns,
     this.documentTexts = const {},
     this.smallBusinessExempt = false,
     this.street,
@@ -594,9 +607,11 @@ class OnlineCompanyProfile {
     this.skontoDays,
     this.quoteValidityDays = 14,
     this.pdfLayout = 'classic',
+    this.pdfLogoBase64,
   });
   factory OnlineCompanyProfile.fromJson(Map<String, Object?> j) => OnlineCompanyProfile(
         pdfLayout: j['pdfLayout'] as String? ?? 'classic',
+        pdfLogoBase64: j['pdfLogoBase64'] as String?,
         quoteValidityDays: j.containsKey('quoteValidityDays') ? j['quoteValidityDays'] as int? : 14,
         name: j['name'] as String?,
         address: j['address'] as String?,
@@ -606,6 +621,7 @@ class OnlineCompanyProfile {
         email: j['email'] as String?,
         phone: j['phone'] as String?,
         footerText: j['footerText'] as String?,
+        footerColumns: _footerColumns(j['footerColumns']),
         documentTexts: {
           for (final e in ((j['documentTexts'] as Map<String, Object?>?) ?? const {}).entries)
             e.key: (
@@ -624,6 +640,7 @@ class OnlineCompanyProfile {
       );
   final String? name;
   final String pdfLayout;
+  final String? pdfLogoBase64;
 
   /// A2-Nachtrag: Skonto-Vorgabe der Firma.
   final double? skontoPercent;
@@ -645,6 +662,7 @@ class OnlineCompanyProfile {
   final String? email;
   final String? phone;
   final String? footerText;
+  final Map<String, String?>? footerColumns;
 
   /// Einleitungs-/Schlusstext je Dokumentart (`invoice`, `quote`, ...).
   final Map<String, ({String? intro, String? closing})> documentTexts;
@@ -660,6 +678,7 @@ class OnlineCompanyProfile {
         'email': email,
         'phone': phone,
         'footerText': footerText,
+        'footerColumns': footerColumns,
         'documentTexts': {
           for (final e in documentTexts.entries) e.key: {'intro': e.value.intro, 'closing': e.value.closing},
         },
@@ -673,6 +692,7 @@ class OnlineCompanyProfile {
         'skontoDays': skontoDays,
         'quoteValidityDays': quoteValidityDays,
         'pdfLayout': pdfLayout,
+        'pdfLogoBase64': pdfLogoBase64,
       };
 }
 

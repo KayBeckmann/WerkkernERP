@@ -64,6 +64,7 @@ PdfDocumentData onlineDocumentPdfData(
     companySnapshotTaxNumber: company?.taxNumber,
     companySnapshotVatId: company?.vatId,
     companySnapshotIban: company?.iban,
+    pdfLogoBase64: isPreview ? liveCompany?.pdfLogoBase64 : document.pdfLogoSnapshot,
     customerSnapshotName: isPreview
         ? (liveCustomer?.name ?? document.customerName)
         : document.customerSnapshotName,
@@ -79,6 +80,7 @@ PdfDocumentData onlineDocumentPdfData(
     introText: isPreview ? liveCompany?.documentTexts[document.kind]?.intro : document.introTextSnapshot,
     closingText: isPreview ? liveCompany?.documentTexts[document.kind]?.closing : document.closingTextSnapshot,
     footerText: isPreview ? liveCompany?.footerText : document.footerTextSnapshot,
+    footerColumns: isPreview ? liveCompany?.footerColumns : document.footerColumnsSnapshot,
     isSmallBusinessExempt: isPreview ? (liveCompany?.smallBusinessExempt ?? false) : document.smallBusinessExemptSnapshot,
     lines: [
       for (final item in document.items)

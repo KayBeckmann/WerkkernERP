@@ -14,6 +14,7 @@ dependencies:
   postgres: ^3.5.6
   bcrypt: ^1.2.0
   crypto: ^3.0.6
+  image: ^4.5.4
   uuid: ^4.6.0
   decimal: ^3.2.6
   # Mailversand über den Server (SMTP je Firma) und AES-GCM für das

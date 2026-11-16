@@ -113,6 +113,7 @@ class CompanyImportProfile {
     this.email,
     this.phone,
     this.footerText,
+    this.footerColumns,
     this.documentTexts = const {},
     this.smallBusinessExempt = false,
     this.modules = const {},
@@ -144,6 +145,7 @@ class CompanyImportProfile {
   final String? email;
   final String? phone;
   final String? footerText;
+  final Map<String, String?>? footerColumns;
   final Map<String, ({String? intro, String? closing})> documentTexts;
   final bool smallBusinessExempt;
   final Set<String> modules;
@@ -463,6 +465,7 @@ class _Parser {
         email: r.optStr('email'),
         phone: r.optStr('phone'),
         footerText: r.optStr('footerText'),
+        footerColumns: (r.m['footerColumns'] as Map?)?.cast<String, String?>(),
         documentTexts: texts,
         smallBusinessExempt: r.boolean('smallBusinessExempt', fallback: false),
         street: r.optStr('street'),
@@ -571,6 +574,8 @@ class _Parser {
           introTextSnapshot: r.optStr('introTextSnapshot'),
           closingTextSnapshot: r.optStr('closingTextSnapshot'),
           footerTextSnapshot: r.optStr('footerTextSnapshot'),
+          footerColumnsSnapshot: (r.m['footerColumnsSnapshot'] as Map? ??
+              (r.m['textSnapshot'] as Map?)?['footerColumns'] as Map?)?.cast<String, String?>(),
           smallBusinessExemptSnapshot: r.boolean('smallBusinessExemptSnapshot', fallback: false),
           stockBooked: r.boolean('stockBooked', fallback: false),
           eInvoiceSnapshot: r.optStr('eInvoiceSnapshot'),
