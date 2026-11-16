@@ -83,6 +83,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'minimum_order_quantity': x.minimumOrderQuantity,
         'delivery_terms': x.deliveryTerms,
         'created_at': x.createdAt,
+        'our_customer_number': x.ourCustomerNumber,
       });
     }
     for (final g in data.articleGroups) {
@@ -307,6 +308,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'notes': o.notes,
         'supplier_snapshot_name': o.supplierSnapshotName,
         'supplier_snapshot_address': o.supplierSnapshotAddress,
+        'supplier_snapshot_customer_number': o.supplierSnapshotCustomerNumber,
         'finalized_at': o.finalizedAt,
         'source_order_id': o.sourceOrderId,
         'project_id': o.projectId,

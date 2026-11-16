@@ -301,6 +301,8 @@ void main() {
         raw.execute('ALTER TABLE customers DROP COLUMN $column;');
       }
       raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
+      // v36 -> v37 (C5.2-Nachtrag: Kundennummer beim Lieferanten).
+      raw.execute('ALTER TABLE suppliers DROP COLUMN our_customer_number;');
       raw.execute('PRAGMA user_version = 1;');
       raw.close();
 
@@ -742,6 +744,9 @@ void main() {
       raw.execute('ALTER TABLE customers DROP COLUMN $column;');
     }
     raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
+    // v36 -> v37 (C5.2-Nachtrag: Kundennummer beim Lieferanten).
+    raw.execute('ALTER TABLE suppliers DROP COLUMN our_customer_number;');
+    raw.execute('ALTER TABLE purchase_orders DROP COLUMN supplier_snapshot_customer_number;');
     raw.execute('PRAGMA user_version = 33;');
     raw.close();
 
@@ -783,6 +788,9 @@ void main() {
       raw.execute('ALTER TABLE customers DROP COLUMN $column;');
     }
     raw.execute('ALTER TABLE invoices DROP COLUMN e_invoice_snapshot;');
+    // v36 -> v37 (C5.2-Nachtrag: Kundennummer beim Lieferanten).
+    raw.execute('ALTER TABLE suppliers DROP COLUMN our_customer_number;');
+    raw.execute('ALTER TABLE purchase_orders DROP COLUMN supplier_snapshot_customer_number;');
     raw.execute('PRAGMA user_version = 34;');
     raw.close();
 

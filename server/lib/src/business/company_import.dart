@@ -331,6 +331,7 @@ class _Parser {
           minimumOrderQuantity: r.optDecimal('minimumOrderQuantity'),
           deliveryTerms: r.optStr('deliveryTerms'),
           createdAt: r.time('createdAt'),
+          ourCustomerNumber: r.optStr('ourCustomerNumber'),
         ),
       );
     }
@@ -707,6 +708,7 @@ class _Parser {
           notes: r.optStr('notes'),
           supplierSnapshotName: r.optStr('supplierSnapshotName'),
           supplierSnapshotAddress: r.optStr('supplierSnapshotAddress'),
+          supplierSnapshotCustomerNumber: r.optStr('supplierSnapshotCustomerNumber'),
           finalizedAt: r.optTime('finalizedAt'),
           sourceOrderId: _ref('document', r.optStr('sourceOrderId'), r.path),
           projectId: _ref('project', r.optStr('projectId'), r.path),

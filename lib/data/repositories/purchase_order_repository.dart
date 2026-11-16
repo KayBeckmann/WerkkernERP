@@ -266,6 +266,7 @@ class PurchaseOrderRepository {
           updatedAt: Value(now),
           supplierSnapshotName: Value(supplier.name),
           supplierSnapshotAddress: Value(supplier.address),
+          supplierSnapshotCustomerNumber: Value(supplier.ourCustomerNumber),
         ),
       );
       return findById(companyId: companyId, id: id);

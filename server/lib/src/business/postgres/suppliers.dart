@@ -4,7 +4,7 @@ mixin _PostgresSuppliers implements SupplierStore {
   Future<Result> _q(String sql, [Map<String, Object?> parameters = const {}]);
 
   static const _supplierColumns = 'id, company_id, name, address, email, phone, vat_id, contact_person, notes, '
-      'minimum_order_quantity, delivery_terms, created_at';
+      'minimum_order_quantity, delivery_terms, created_at, our_customer_number';
 
   Supplier _toSupplier(ResultRow r) => Supplier(
         id: r[0] as String,
@@ -19,6 +19,7 @@ mixin _PostgresSuppliers implements SupplierStore {
         minimumOrderQuantity: r[9] as String?,
         deliveryTerms: r[10] as String?,
         createdAt: r[11] as DateTime,
+        ourCustomerNumber: r[12] as String?,
       );
 
   Map<String, Object?> _supplierParams(Supplier s) => {
@@ -34,6 +35,7 @@ mixin _PostgresSuppliers implements SupplierStore {
         'moq': s.minimumOrderQuantity,
         'terms': s.deliveryTerms,
         'createdAt': s.createdAt,
+        'ourNumber': s.ourCustomerNumber,
       };
 
   @override
@@ -59,7 +61,7 @@ mixin _PostgresSuppliers implements SupplierStore {
   Future<void> createSupplier(Supplier supplier) async {
     await _q(
       'INSERT INTO suppliers ($_supplierColumns) VALUES (@id, @companyId, @name, @address, @email, @phone, @vatId, '
-      '@contact, @notes, @moq, @terms, @createdAt)',
+      '@contact, @notes, @moq, @terms, @createdAt, @ourNumber)',
       _supplierParams(supplier),
     );
   }
@@ -68,8 +70,8 @@ mixin _PostgresSuppliers implements SupplierStore {
   Future<bool> updateSupplier(Supplier supplier) async {
     final result = await _q(
       'UPDATE suppliers SET name = @name, address = @address, email = @email, phone = @phone, vat_id = @vatId, '
-      'contact_person = @contact, notes = @notes, minimum_order_quantity = @moq, delivery_terms = @terms '
-      'WHERE company_id = @companyId AND id = @id',
+      'contact_person = @contact, notes = @notes, minimum_order_quantity = @moq, delivery_terms = @terms, '
+      'our_customer_number = @ourNumber WHERE company_id = @companyId AND id = @id',
       _supplierParams(supplier)..remove('createdAt'),
     );
     return result.affectedRows > 0;

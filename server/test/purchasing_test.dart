@@ -171,4 +171,30 @@ void runPurchasingTests(RepositoryFactory create) {
     await a.c.client.setModules({'lagerbestand'});
     await expectLater(a.c.get('/purchase-orders'), throwsStatus(403));
   });
+
+  test('C5.2-Nachtrag: Kundennummer beim Lieferanten mit führender Null, Schnappschuss, ältere Clients löschen nichts', () async {
+    final s = await setup('kdnr@example.com');
+    final c = s.c;
+    final zajadacz = await c.post('/suppliers', {'name': 'Zajadacz Lübeck', 'ourCustomerNumber': '060903'});
+    expect(zajadacz['ourCustomerNumber'], '060903');
+    final legacy = await c.put('/suppliers/${zajadacz['id']}', {'name': 'Zajadacz Niederlassung Lübeck'});
+    expect(legacy['ourCustomerNumber'], '060903', reason: 'nicht genannt = unverändert');
+
+    Future<Map<String, Object?>> finalized(String supplierId) async {
+      final draft = await c.post('/purchase-orders', {
+        'supplierId': supplierId,
+        'items': [{'description': 'NYM-J', 'quantity': '100', 'purchasePriceCents': 80}],
+      });
+      return c.post('/purchase-orders/${draft['id']}/finalize', {'version': draft['version']});
+    }
+
+    final order = await finalized(zajadacz['id'] as String);
+    expect((order['supplierSnapshot'] as Map)['ourCustomerNumber'], '060903');
+    final other = await finalized(s.nord);
+    expect((other['supplierSnapshot'] as Map)['ourCustomerNumber'], isNull);
+
+    await c.put('/suppliers/${zajadacz['id']}', {'name': 'Zajadacz', 'ourCustomerNumber': '999'});
+    final reread = await c.get('/purchase-orders/${order['id']}');
+    expect((reread['supplierSnapshot'] as Map)['ourCustomerNumber'], '060903');
+  });
 }

@@ -40,6 +40,7 @@ class OnlinePurchaseOrder {
     required this.supplierId,
     this.supplierName,
     this.supplierAddress,
+    this.ourCustomerNumber,
     required this.status,
     this.number,
     required this.issueDate,
@@ -60,6 +61,7 @@ class OnlinePurchaseOrder {
       supplierId: j['supplierId'] as String,
       supplierName: snapshot?['name'] as String? ?? j['supplierName'] as String?,
       supplierAddress: snapshot?['address'] as String?,
+      ourCustomerNumber: snapshot?['ourCustomerNumber'] as String?,
       status: j['status'] as String,
       number: j['number'] as String?,
       issueDate: DateTime.parse(j['issueDate'] as String),
@@ -78,6 +80,9 @@ class OnlinePurchaseOrder {
   final String supplierId;
   final String? supplierName;
   final String? supplierAddress;
+
+  /// C5.2-Nachtrag: Schnappschuss „Unsere Kundennummer bei Ihnen“.
+  final String? ourCustomerNumber;
 
   /// `draft`, `finalized`, `partiallyReceived`, `fullyReceived`.
   final String status;

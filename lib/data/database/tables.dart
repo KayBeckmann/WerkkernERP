@@ -325,6 +325,11 @@ class Suppliers extends Table {
   TextColumn get deliveryTerms => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 
+  /// C5.2-Nachtrag (Kay, 15.11.2026): „Unsere Kundennummer beim
+  /// Lieferanten“ — Text, damit führende Nullen erhalten bleiben
+  /// (z. B. `060903`). Erscheint auf jeder Bestellung an diesen Lieferanten.
+  TextColumn get ourCustomerNumber => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -1014,6 +1019,10 @@ class PurchaseOrders extends Table {
   /// `null` im Entwurf — dort wird live aus [Suppliers] gelesen.
   TextColumn get supplierSnapshotName => text().nullable()();
   TextColumn get supplierSnapshotAddress => text().nullable()();
+
+  /// C5.2-Nachtrag: beim Finalisieren eingefrorene Kundennummer beim
+  /// Lieferanten — spätere Stammdatenänderungen ändern alte Bestellungen nicht.
+  TextColumn get supplierSnapshotCustomerNumber => text().nullable()();
 
   DateTimeColumn get finalizedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();

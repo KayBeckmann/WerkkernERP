@@ -8,7 +8,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
 
   static const _poColumns = 'id, company_id, supplier_id, status, number, number_year, issue_date, notes, '
       'supplier_snapshot_name, supplier_snapshot_address, finalized_at, source_order_id, project_id, '
-      'expense_category_id, created_by_user_id, created_at, updated_at, version';
+      'expense_category_id, created_by_user_id, created_at, updated_at, version, supplier_snapshot_customer_number';
 
   PurchaseOrder _toPo(ResultRow r) => PurchaseOrder(
         id: r[0] as String,
@@ -29,6 +29,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
         createdAt: r[15] as DateTime,
         updatedAt: r[16] as DateTime,
         version: r[17] as int,
+        supplierSnapshotCustomerNumber: r[18] as String?,
       );
 
   PurchaseOrderItem _toPoItem(ResultRow r) => PurchaseOrderItem(
@@ -102,7 +103,7 @@ mixin _PostgresPurchasing implements PurchasingStore {
         await s.execute(
           Sql.named(
             'INSERT INTO purchase_orders ($_poColumns) VALUES (@id, @companyId, @supplierId, @status, NULL, NULL, @issueDate, '
-            '@notes, NULL, NULL, NULL, @source, @projectId, @categoryId, @createdBy, @createdAt, @updatedAt, @version)',
+            '@notes, NULL, NULL, NULL, @source, @projectId, @categoryId, @createdBy, @createdAt, @updatedAt, @version, NULL)',
           ),
           parameters: {
             'id': o.id,
@@ -200,7 +201,8 @@ mixin _PostgresPurchasing implements PurchasingStore {
       await s.execute(
         Sql.named(
           "UPDATE purchase_orders o SET status = 'finalized', number = @number, number_year = @year, finalized_at = @now, "
-          'updated_at = @now, version = o.version + 1, supplier_snapshot_name = s.name, supplier_snapshot_address = s.address '
+          'updated_at = @now, version = o.version + 1, supplier_snapshot_name = s.name, supplier_snapshot_address = s.address, '
+          'supplier_snapshot_customer_number = s.our_customer_number '
           'FROM suppliers s WHERE s.id = o.supplier_id AND o.id = @id',
         ),
         parameters: {

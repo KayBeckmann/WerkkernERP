@@ -468,6 +468,7 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
               notes: order.notes,
               supplierName: order.supplierName ?? '',
               supplierAddress: order.supplierAddress,
+              ourCustomerNumber: order.ourCustomerNumber,
               companyName: widget.session.companyName,
               companyAddress: company.address,
               companyEmail: company.email,

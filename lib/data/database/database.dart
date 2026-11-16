@@ -49,7 +49,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 37;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -405,6 +405,15 @@ class AppDatabase extends _$AppDatabase {
               await migrator.addColumn(customers, column);
             }
             await migrator.addColumn(invoices, invoices.eInvoiceSnapshot);
+          }
+          if (from < 37) {
+            // C5.2-Nachtrag (Kay, 15.11.2026): eigene Kundennummer beim
+            // Lieferanten, Schnappschuss an der Bestellung. `purchase_orders`
+            // gibt es erst seit v25 — davor legt `createTable` die Spalte an.
+            await migrator.addColumn(suppliers, suppliers.ourCustomerNumber);
+            if (from >= 25) {
+              await migrator.addColumn(purchaseOrders, purchaseOrders.supplierSnapshotCustomerNumber);
+            }
           }
         },
       );

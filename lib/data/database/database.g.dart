@@ -6260,6 +6260,18 @@ class $SuppliersTable extends Suppliers
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _ourCustomerNumberMeta = const VerificationMeta(
+    'ourCustomerNumber',
+  );
+  @override
+  late final GeneratedColumn<String> ourCustomerNumber =
+      GeneratedColumn<String>(
+        'our_customer_number',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -6274,6 +6286,7 @@ class $SuppliersTable extends Suppliers
     minimumOrderQuantity,
     deliveryTerms,
     createdAt,
+    ourCustomerNumber,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -6373,6 +6386,15 @@ class $SuppliersTable extends Suppliers
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('our_customer_number')) {
+      context.handle(
+        _ourCustomerNumberMeta,
+        ourCustomerNumber.isAcceptableOrUnknown(
+          data['our_customer_number']!,
+          _ourCustomerNumberMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -6430,6 +6452,10 @@ class $SuppliersTable extends Suppliers
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      ourCustomerNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}our_customer_number'],
+      ),
     );
   }
 
@@ -6462,6 +6488,11 @@ class Supplier extends DataClass implements Insertable<Supplier> {
   /// es auf der Bestellung gezielt angezeigt werden kann.
   final String? deliveryTerms;
   final DateTime createdAt;
+
+  /// C5.2-Nachtrag (Kay, 15.11.2026): „Unsere Kundennummer beim
+  /// Lieferanten“ — Text, damit führende Nullen erhalten bleiben
+  /// (z. B. `060903`). Erscheint auf jeder Bestellung an diesen Lieferanten.
+  final String? ourCustomerNumber;
   const Supplier({
     required this.id,
     required this.companyId,
@@ -6475,6 +6506,7 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     this.minimumOrderQuantity,
     this.deliveryTerms,
     required this.createdAt,
+    this.ourCustomerNumber,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -6507,6 +6539,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       map['delivery_terms'] = Variable<String>(deliveryTerms);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || ourCustomerNumber != null) {
+      map['our_customer_number'] = Variable<String>(ourCustomerNumber);
+    }
     return map;
   }
 
@@ -6540,6 +6575,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           ? const Value.absent()
           : Value(deliveryTerms),
       createdAt: Value(createdAt),
+      ourCustomerNumber: ourCustomerNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ourCustomerNumber),
     );
   }
 
@@ -6563,6 +6601,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       ),
       deliveryTerms: serializer.fromJson<String?>(json['deliveryTerms']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      ourCustomerNumber: serializer.fromJson<String?>(
+        json['ourCustomerNumber'],
+      ),
     );
   }
   @override
@@ -6581,6 +6622,7 @@ class Supplier extends DataClass implements Insertable<Supplier> {
       'minimumOrderQuantity': serializer.toJson<double?>(minimumOrderQuantity),
       'deliveryTerms': serializer.toJson<String?>(deliveryTerms),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'ourCustomerNumber': serializer.toJson<String?>(ourCustomerNumber),
     };
   }
 
@@ -6597,6 +6639,7 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     Value<double?> minimumOrderQuantity = const Value.absent(),
     Value<String?> deliveryTerms = const Value.absent(),
     DateTime? createdAt,
+    Value<String?> ourCustomerNumber = const Value.absent(),
   }) => Supplier(
     id: id ?? this.id,
     companyId: companyId ?? this.companyId,
@@ -6616,6 +6659,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
         ? deliveryTerms.value
         : this.deliveryTerms,
     createdAt: createdAt ?? this.createdAt,
+    ourCustomerNumber: ourCustomerNumber.present
+        ? ourCustomerNumber.value
+        : this.ourCustomerNumber,
   );
   Supplier copyWithCompanion(SuppliersCompanion data) {
     return Supplier(
@@ -6637,6 +6683,9 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           ? data.deliveryTerms.value
           : this.deliveryTerms,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      ourCustomerNumber: data.ourCustomerNumber.present
+          ? data.ourCustomerNumber.value
+          : this.ourCustomerNumber,
     );
   }
 
@@ -6654,7 +6703,8 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           ..write('notes: $notes, ')
           ..write('minimumOrderQuantity: $minimumOrderQuantity, ')
           ..write('deliveryTerms: $deliveryTerms, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('ourCustomerNumber: $ourCustomerNumber')
           ..write(')'))
         .toString();
   }
@@ -6673,6 +6723,7 @@ class Supplier extends DataClass implements Insertable<Supplier> {
     minimumOrderQuantity,
     deliveryTerms,
     createdAt,
+    ourCustomerNumber,
   );
   @override
   bool operator ==(Object other) =>
@@ -6689,7 +6740,8 @@ class Supplier extends DataClass implements Insertable<Supplier> {
           other.notes == this.notes &&
           other.minimumOrderQuantity == this.minimumOrderQuantity &&
           other.deliveryTerms == this.deliveryTerms &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.ourCustomerNumber == this.ourCustomerNumber);
 }
 
 class SuppliersCompanion extends UpdateCompanion<Supplier> {
@@ -6705,6 +6757,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
   final Value<double?> minimumOrderQuantity;
   final Value<String?> deliveryTerms;
   final Value<DateTime> createdAt;
+  final Value<String?> ourCustomerNumber;
   final Value<int> rowid;
   const SuppliersCompanion({
     this.id = const Value.absent(),
@@ -6719,6 +6772,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     this.minimumOrderQuantity = const Value.absent(),
     this.deliveryTerms = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.ourCustomerNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SuppliersCompanion.insert({
@@ -6734,6 +6788,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     this.minimumOrderQuantity = const Value.absent(),
     this.deliveryTerms = const Value.absent(),
     required DateTime createdAt,
+    this.ourCustomerNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        companyId = Value(companyId),
@@ -6752,6 +6807,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     Expression<double>? minimumOrderQuantity,
     Expression<String>? deliveryTerms,
     Expression<DateTime>? createdAt,
+    Expression<String>? ourCustomerNumber,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6768,6 +6824,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
         'minimum_order_quantity': minimumOrderQuantity,
       if (deliveryTerms != null) 'delivery_terms': deliveryTerms,
       if (createdAt != null) 'created_at': createdAt,
+      if (ourCustomerNumber != null) 'our_customer_number': ourCustomerNumber,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6785,6 +6842,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     Value<double?>? minimumOrderQuantity,
     Value<String?>? deliveryTerms,
     Value<DateTime>? createdAt,
+    Value<String?>? ourCustomerNumber,
     Value<int>? rowid,
   }) {
     return SuppliersCompanion(
@@ -6800,6 +6858,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
       minimumOrderQuantity: minimumOrderQuantity ?? this.minimumOrderQuantity,
       deliveryTerms: deliveryTerms ?? this.deliveryTerms,
       createdAt: createdAt ?? this.createdAt,
+      ourCustomerNumber: ourCustomerNumber ?? this.ourCustomerNumber,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6845,6 +6904,9 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (ourCustomerNumber.present) {
+      map['our_customer_number'] = Variable<String>(ourCustomerNumber.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -6866,6 +6928,7 @@ class SuppliersCompanion extends UpdateCompanion<Supplier> {
           ..write('minimumOrderQuantity: $minimumOrderQuantity, ')
           ..write('deliveryTerms: $deliveryTerms, ')
           ..write('createdAt: $createdAt, ')
+          ..write('ourCustomerNumber: $ourCustomerNumber, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -17170,6 +17233,17 @@ class $PurchaseOrdersTable extends PurchaseOrders
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _supplierSnapshotCustomerNumberMeta =
+      const VerificationMeta('supplierSnapshotCustomerNumber');
+  @override
+  late final GeneratedColumn<String> supplierSnapshotCustomerNumber =
+      GeneratedColumn<String>(
+        'supplier_snapshot_customer_number',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _finalizedAtMeta = const VerificationMeta(
     'finalizedAt',
   );
@@ -17258,6 +17332,7 @@ class $PurchaseOrdersTable extends PurchaseOrders
     notes,
     supplierSnapshotName,
     supplierSnapshotAddress,
+    supplierSnapshotCustomerNumber,
     finalizedAt,
     createdAt,
     updatedAt,
@@ -17342,6 +17417,15 @@ class $PurchaseOrdersTable extends PurchaseOrders
         supplierSnapshotAddress.isAcceptableOrUnknown(
           data['supplier_snapshot_address']!,
           _supplierSnapshotAddressMeta,
+        ),
+      );
+    }
+    if (data.containsKey('supplier_snapshot_customer_number')) {
+      context.handle(
+        _supplierSnapshotCustomerNumberMeta,
+        supplierSnapshotCustomerNumber.isAcceptableOrUnknown(
+          data['supplier_snapshot_customer_number']!,
+          _supplierSnapshotCustomerNumberMeta,
         ),
       );
     }
@@ -17445,6 +17529,10 @@ class $PurchaseOrdersTable extends PurchaseOrders
         DriftSqlType.string,
         data['${effectivePrefix}supplier_snapshot_address'],
       ),
+      supplierSnapshotCustomerNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}supplier_snapshot_customer_number'],
+      ),
       finalizedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}finalized_at'],
@@ -17503,6 +17591,10 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
   /// `null` im Entwurf — dort wird live aus [Suppliers] gelesen.
   final String? supplierSnapshotName;
   final String? supplierSnapshotAddress;
+
+  /// C5.2-Nachtrag: beim Finalisieren eingefrorene Kundennummer beim
+  /// Lieferanten — spätere Stammdatenänderungen ändern alte Bestellungen nicht.
+  final String? supplierSnapshotCustomerNumber;
   final DateTime? finalizedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -17556,6 +17648,7 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
     this.notes,
     this.supplierSnapshotName,
     this.supplierSnapshotAddress,
+    this.supplierSnapshotCustomerNumber,
     this.finalizedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -17590,6 +17683,11 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
     if (!nullToAbsent || supplierSnapshotAddress != null) {
       map['supplier_snapshot_address'] = Variable<String>(
         supplierSnapshotAddress,
+      );
+    }
+    if (!nullToAbsent || supplierSnapshotCustomerNumber != null) {
+      map['supplier_snapshot_customer_number'] = Variable<String>(
+        supplierSnapshotCustomerNumber,
       );
     }
     if (!nullToAbsent || finalizedAt != null) {
@@ -17631,6 +17729,10 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
       supplierSnapshotAddress: supplierSnapshotAddress == null && nullToAbsent
           ? const Value.absent()
           : Value(supplierSnapshotAddress),
+      supplierSnapshotCustomerNumber:
+          supplierSnapshotCustomerNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(supplierSnapshotCustomerNumber),
       finalizedAt: finalizedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(finalizedAt),
@@ -17670,6 +17772,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
       supplierSnapshotAddress: serializer.fromJson<String?>(
         json['supplierSnapshotAddress'],
       ),
+      supplierSnapshotCustomerNumber: serializer.fromJson<String?>(
+        json['supplierSnapshotCustomerNumber'],
+      ),
       finalizedAt: serializer.fromJson<DateTime?>(json['finalizedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -17698,6 +17803,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
       'supplierSnapshotAddress': serializer.toJson<String?>(
         supplierSnapshotAddress,
       ),
+      'supplierSnapshotCustomerNumber': serializer.toJson<String?>(
+        supplierSnapshotCustomerNumber,
+      ),
       'finalizedAt': serializer.toJson<DateTime?>(finalizedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -17718,6 +17826,7 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
     Value<String?> notes = const Value.absent(),
     Value<String?> supplierSnapshotName = const Value.absent(),
     Value<String?> supplierSnapshotAddress = const Value.absent(),
+    Value<String?> supplierSnapshotCustomerNumber = const Value.absent(),
     Value<DateTime?> finalizedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -17739,6 +17848,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
     supplierSnapshotAddress: supplierSnapshotAddress.present
         ? supplierSnapshotAddress.value
         : this.supplierSnapshotAddress,
+    supplierSnapshotCustomerNumber: supplierSnapshotCustomerNumber.present
+        ? supplierSnapshotCustomerNumber.value
+        : this.supplierSnapshotCustomerNumber,
     finalizedAt: finalizedAt.present ? finalizedAt.value : this.finalizedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -17772,6 +17884,10 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
       supplierSnapshotAddress: data.supplierSnapshotAddress.present
           ? data.supplierSnapshotAddress.value
           : this.supplierSnapshotAddress,
+      supplierSnapshotCustomerNumber:
+          data.supplierSnapshotCustomerNumber.present
+          ? data.supplierSnapshotCustomerNumber.value
+          : this.supplierSnapshotCustomerNumber,
       finalizedAt: data.finalizedAt.present
           ? data.finalizedAt.value
           : this.finalizedAt,
@@ -17800,6 +17916,9 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
           ..write('notes: $notes, ')
           ..write('supplierSnapshotName: $supplierSnapshotName, ')
           ..write('supplierSnapshotAddress: $supplierSnapshotAddress, ')
+          ..write(
+            'supplierSnapshotCustomerNumber: $supplierSnapshotCustomerNumber, ',
+          )
           ..write('finalizedAt: $finalizedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -17822,6 +17941,7 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
     notes,
     supplierSnapshotName,
     supplierSnapshotAddress,
+    supplierSnapshotCustomerNumber,
     finalizedAt,
     createdAt,
     updatedAt,
@@ -17843,6 +17963,8 @@ class PurchaseOrder extends DataClass implements Insertable<PurchaseOrder> {
           other.notes == this.notes &&
           other.supplierSnapshotName == this.supplierSnapshotName &&
           other.supplierSnapshotAddress == this.supplierSnapshotAddress &&
+          other.supplierSnapshotCustomerNumber ==
+              this.supplierSnapshotCustomerNumber &&
           other.finalizedAt == this.finalizedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -17862,6 +17984,7 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
   final Value<String?> notes;
   final Value<String?> supplierSnapshotName;
   final Value<String?> supplierSnapshotAddress;
+  final Value<String?> supplierSnapshotCustomerNumber;
   final Value<DateTime?> finalizedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -17880,6 +18003,7 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
     this.notes = const Value.absent(),
     this.supplierSnapshotName = const Value.absent(),
     this.supplierSnapshotAddress = const Value.absent(),
+    this.supplierSnapshotCustomerNumber = const Value.absent(),
     this.finalizedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -17899,6 +18023,7 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
     this.notes = const Value.absent(),
     this.supplierSnapshotName = const Value.absent(),
     this.supplierSnapshotAddress = const Value.absent(),
+    this.supplierSnapshotCustomerNumber = const Value.absent(),
     this.finalizedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -17923,6 +18048,7 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
     Expression<String>? notes,
     Expression<String>? supplierSnapshotName,
     Expression<String>? supplierSnapshotAddress,
+    Expression<String>? supplierSnapshotCustomerNumber,
     Expression<DateTime>? finalizedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -17944,6 +18070,8 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
         'supplier_snapshot_name': supplierSnapshotName,
       if (supplierSnapshotAddress != null)
         'supplier_snapshot_address': supplierSnapshotAddress,
+      if (supplierSnapshotCustomerNumber != null)
+        'supplier_snapshot_customer_number': supplierSnapshotCustomerNumber,
       if (finalizedAt != null) 'finalized_at': finalizedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -17965,6 +18093,7 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
     Value<String?>? notes,
     Value<String?>? supplierSnapshotName,
     Value<String?>? supplierSnapshotAddress,
+    Value<String?>? supplierSnapshotCustomerNumber,
     Value<DateTime?>? finalizedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -17985,6 +18114,8 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
       supplierSnapshotName: supplierSnapshotName ?? this.supplierSnapshotName,
       supplierSnapshotAddress:
           supplierSnapshotAddress ?? this.supplierSnapshotAddress,
+      supplierSnapshotCustomerNumber:
+          supplierSnapshotCustomerNumber ?? this.supplierSnapshotCustomerNumber,
       finalizedAt: finalizedAt ?? this.finalizedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -18034,6 +18165,11 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
         supplierSnapshotAddress.value,
       );
     }
+    if (supplierSnapshotCustomerNumber.present) {
+      map['supplier_snapshot_customer_number'] = Variable<String>(
+        supplierSnapshotCustomerNumber.value,
+      );
+    }
     if (finalizedAt.present) {
       map['finalized_at'] = Variable<DateTime>(finalizedAt.value);
     }
@@ -18071,6 +18207,9 @@ class PurchaseOrdersCompanion extends UpdateCompanion<PurchaseOrder> {
           ..write('notes: $notes, ')
           ..write('supplierSnapshotName: $supplierSnapshotName, ')
           ..write('supplierSnapshotAddress: $supplierSnapshotAddress, ')
+          ..write(
+            'supplierSnapshotCustomerNumber: $supplierSnapshotCustomerNumber, ',
+          )
           ..write('finalizedAt: $finalizedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -27040,6 +27179,7 @@ typedef $$SuppliersTableCreateCompanionBuilder =
       Value<double?> minimumOrderQuantity,
       Value<String?> deliveryTerms,
       required DateTime createdAt,
+      Value<String?> ourCustomerNumber,
       Value<int> rowid,
     });
 typedef $$SuppliersTableUpdateCompanionBuilder =
@@ -27056,6 +27196,7 @@ typedef $$SuppliersTableUpdateCompanionBuilder =
       Value<double?> minimumOrderQuantity,
       Value<String?> deliveryTerms,
       Value<DateTime> createdAt,
+      Value<String?> ourCustomerNumber,
       Value<int> rowid,
     });
 
@@ -27203,6 +27344,11 @@ class $$SuppliersTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ourCustomerNumber => $composableBuilder(
+    column: $table.ourCustomerNumber,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -27370,6 +27516,11 @@ class $$SuppliersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ourCustomerNumber => $composableBuilder(
+    column: $table.ourCustomerNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CompaniesTableOrderingComposer get companyId {
     final $$CompaniesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -27441,6 +27592,11 @@ class $$SuppliersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get ourCustomerNumber => $composableBuilder(
+    column: $table.ourCustomerNumber,
+    builder: (column) => column,
+  );
 
   $$CompaniesTableAnnotationComposer get companyId {
     final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
@@ -27587,6 +27743,7 @@ class $$SuppliersTableTableManager
                 Value<double?> minimumOrderQuantity = const Value.absent(),
                 Value<String?> deliveryTerms = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> ourCustomerNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SuppliersCompanion(
                 id: id,
@@ -27601,6 +27758,7 @@ class $$SuppliersTableTableManager
                 minimumOrderQuantity: minimumOrderQuantity,
                 deliveryTerms: deliveryTerms,
                 createdAt: createdAt,
+                ourCustomerNumber: ourCustomerNumber,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -27617,6 +27775,7 @@ class $$SuppliersTableTableManager
                 Value<double?> minimumOrderQuantity = const Value.absent(),
                 Value<String?> deliveryTerms = const Value.absent(),
                 required DateTime createdAt,
+                Value<String?> ourCustomerNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SuppliersCompanion.insert(
                 id: id,
@@ -27631,6 +27790,7 @@ class $$SuppliersTableTableManager
                 minimumOrderQuantity: minimumOrderQuantity,
                 deliveryTerms: deliveryTerms,
                 createdAt: createdAt,
+                ourCustomerNumber: ourCustomerNumber,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -38203,6 +38363,7 @@ typedef $$PurchaseOrdersTableCreateCompanionBuilder =
       Value<String?> notes,
       Value<String?> supplierSnapshotName,
       Value<String?> supplierSnapshotAddress,
+      Value<String?> supplierSnapshotCustomerNumber,
       Value<DateTime?> finalizedAt,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -38223,6 +38384,7 @@ typedef $$PurchaseOrdersTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<String?> supplierSnapshotName,
       Value<String?> supplierSnapshotAddress,
+      Value<String?> supplierSnapshotCustomerNumber,
       Value<DateTime?> finalizedAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -38406,6 +38568,12 @@ class $$PurchaseOrdersTableFilterComposer
     column: $table.supplierSnapshotAddress,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get supplierSnapshotCustomerNumber =>
+      $composableBuilder(
+        column: $table.supplierSnapshotCustomerNumber,
+        builder: (column) => ColumnFilters(column),
+      );
 
   ColumnFilters<DateTime> get finalizedAt => $composableBuilder(
     column: $table.finalizedAt,
@@ -38612,6 +38780,12 @@ class $$PurchaseOrdersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get supplierSnapshotCustomerNumber =>
+      $composableBuilder(
+        column: $table.supplierSnapshotCustomerNumber,
+        builder: (column) => ColumnOrderings(column),
+      );
+
   ColumnOrderings<DateTime> get finalizedAt => $composableBuilder(
     column: $table.finalizedAt,
     builder: (column) => ColumnOrderings(column),
@@ -38783,6 +38957,12 @@ class $$PurchaseOrdersTableAnnotationComposer
     column: $table.supplierSnapshotAddress,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get supplierSnapshotCustomerNumber =>
+      $composableBuilder(
+        column: $table.supplierSnapshotCustomerNumber,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<DateTime> get finalizedAt => $composableBuilder(
     column: $table.finalizedAt,
@@ -38985,6 +39165,8 @@ class $$PurchaseOrdersTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<String?> supplierSnapshotName = const Value.absent(),
                 Value<String?> supplierSnapshotAddress = const Value.absent(),
+                Value<String?> supplierSnapshotCustomerNumber =
+                    const Value.absent(),
                 Value<DateTime?> finalizedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -39003,6 +39185,7 @@ class $$PurchaseOrdersTableTableManager
                 notes: notes,
                 supplierSnapshotName: supplierSnapshotName,
                 supplierSnapshotAddress: supplierSnapshotAddress,
+                supplierSnapshotCustomerNumber: supplierSnapshotCustomerNumber,
                 finalizedAt: finalizedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -39023,6 +39206,8 @@ class $$PurchaseOrdersTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<String?> supplierSnapshotName = const Value.absent(),
                 Value<String?> supplierSnapshotAddress = const Value.absent(),
+                Value<String?> supplierSnapshotCustomerNumber =
+                    const Value.absent(),
                 Value<DateTime?> finalizedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -39041,6 +39226,7 @@ class $$PurchaseOrdersTableTableManager
                 notes: notes,
                 supplierSnapshotName: supplierSnapshotName,
                 supplierSnapshotAddress: supplierSnapshotAddress,
+                supplierSnapshotCustomerNumber: supplierSnapshotCustomerNumber,
                 finalizedAt: finalizedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

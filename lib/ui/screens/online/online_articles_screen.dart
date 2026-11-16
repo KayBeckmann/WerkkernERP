@@ -551,6 +551,13 @@ class _SupplierList extends StatelessWidget {
         OnlineField('vatId', 'USt-IdNr.', initial: existing?.vatId),
         OnlineField('minimumOrderQuantity', 'Mindestbestellmenge', type: OnlineFieldType.decimal, initial: existing?.minimumOrderQuantity),
         OnlineField('deliveryTerms', 'Lieferbedingungen', initial: existing?.deliveryTerms),
+        // C5.2-Nachtrag: Text, führende Nullen bleiben.
+        OnlineField(
+          'ourCustomerNumber',
+          'Unsere Kundennummer beim Lieferanten',
+          initial: existing?.ourCustomerNumber,
+          helper: 'Erscheint auf jeder Bestellung an diesen Lieferanten.',
+        ),
         OnlineField('notes', 'Notizen', type: OnlineFieldType.multiline, initial: existing?.notes),
       ],
     );
@@ -567,6 +574,7 @@ class _SupplierList extends StatelessWidget {
         vatId: values['vatId'] as String?,
         minimumOrderQuantity: values['minimumOrderQuantity'] as String?,
         deliveryTerms: values['deliveryTerms'] as String?,
+        ourCustomerNumber: values['ourCustomerNumber'] as String?,
         notes: values['notes'] as String?,
       )),
     );

@@ -22,6 +22,7 @@ class PurchaseOrder {
     this.notes,
     this.supplierSnapshotName,
     this.supplierSnapshotAddress,
+    this.supplierSnapshotCustomerNumber,
     this.finalizedAt,
     this.sourceOrderId,
     this.projectId,
@@ -43,6 +44,9 @@ class PurchaseOrder {
   final String? notes;
   final String? supplierSnapshotName;
   final String? supplierSnapshotAddress;
+
+  /// C5.2-Nachtrag: beim Finalisieren eingefrorene Kundennummer beim Lieferanten.
+  final String? supplierSnapshotCustomerNumber;
   final DateTime? finalizedAt;
 
   /// Auftrag, aus dem die Bestellung erzeugt wurde (Nachvollziehbarkeit).
@@ -68,7 +72,9 @@ class PurchaseOrder {
         'number': number,
         'issueDate': dateJson(issueDate),
         'notes': notes,
-        'supplierSnapshot': supplierSnapshotName == null ? null : {'name': supplierSnapshotName, 'address': supplierSnapshotAddress},
+        'supplierSnapshot': supplierSnapshotName == null
+            ? null
+            : {'name': supplierSnapshotName, 'address': supplierSnapshotAddress, 'ourCustomerNumber': supplierSnapshotCustomerNumber},
         'finalizedAt': finalizedAt?.toIso8601String(),
         'sourceOrderId': sourceOrderId,
         'projectId': projectId,

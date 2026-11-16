@@ -36,6 +36,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step21HoursPerRole,
   _step22CustomerContacts,
   _step23EInvoice,
+  _step24SupplierCustomerNumber,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -607,4 +608,11 @@ Future<void> _step23EInvoice(Session db) async {
   await db.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS country_code TEXT NOT NULL DEFAULT 'DE'");
   await db.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS e_invoice_format TEXT NOT NULL DEFAULT 'zugferd'");
   await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS e_invoice_snapshot TEXT');
+}
+
+/// C5.2-Nachtrag (Kay, 15.11.2026): unsere Kundennummer beim Lieferanten
+/// und ihr Schnappschuss an der finalisierten Bestellung.
+Future<void> _step24SupplierCustomerNumber(Session db) async {
+  await db.execute('ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS our_customer_number TEXT');
+  await db.execute('ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS supplier_snapshot_customer_number TEXT');
 }

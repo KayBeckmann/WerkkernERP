@@ -11,7 +11,7 @@ mixin _InMemoryPurchasing implements PurchasingStore {
   final List<PurchaseOrderItem> _purchaseOrderItems = [];
   static const _purchaseUuid = Uuid();
 
-  PurchaseOrder _copy(PurchaseOrder o, {String? status, String? number, int? numberYear, String? snapshotName, String? snapshotAddress, DateTime? finalizedAt, required DateTime updatedAt}) =>
+  PurchaseOrder _copy(PurchaseOrder o, {String? status, String? number, int? numberYear, String? snapshotName, String? snapshotAddress, String? snapshotCustomerNumber, DateTime? finalizedAt, required DateTime updatedAt}) =>
       PurchaseOrder(
         id: o.id,
         companyId: o.companyId,
@@ -23,6 +23,7 @@ mixin _InMemoryPurchasing implements PurchasingStore {
         notes: o.notes,
         supplierSnapshotName: snapshotName ?? o.supplierSnapshotName,
         supplierSnapshotAddress: snapshotAddress ?? o.supplierSnapshotAddress,
+        supplierSnapshotCustomerNumber: snapshotCustomerNumber ?? o.supplierSnapshotCustomerNumber,
         finalizedAt: finalizedAt ?? o.finalizedAt,
         sourceOrderId: o.sourceOrderId,
         projectId: o.projectId,
@@ -124,6 +125,7 @@ mixin _InMemoryPurchasing implements PurchasingStore {
       numberYear: now.year,
       snapshotName: supplier.name,
       snapshotAddress: supplier.address,
+      snapshotCustomerNumber: supplier.ourCustomerNumber,
       finalizedAt: now,
       updatedAt: now,
     );

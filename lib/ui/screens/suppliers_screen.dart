@@ -54,6 +54,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           notes: result.notes,
           minimumOrderQuantity: result.minimumOrderQuantity,
           deliveryTerms: result.deliveryTerms,
+          ourCustomerNumber: result.ourCustomerNumber,
         );
     _reload();
   }
@@ -77,6 +78,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
             notes: Value(result.notes),
             minimumOrderQuantity: Value(result.minimumOrderQuantity),
             deliveryTerms: Value(result.deliveryTerms),
+            ourCustomerNumber: Value(result.ourCustomerNumber),
           ),
         );
     _reload();
@@ -135,8 +137,12 @@ class _SupplierFormResult {
     this.notes,
     this.minimumOrderQuantity,
     this.deliveryTerms,
+    this.ourCustomerNumber,
   });
   final String name;
+
+  /// C5.2-Nachtrag: unsere Kundennummer beim Lieferanten (Text).
+  final String? ourCustomerNumber;
   final String? address;
   final String? email;
   final String? phone;
@@ -173,6 +179,7 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
         : widget.existing!.minimumOrderQuantity!.toString(),
   );
   late final _deliveryTermsCtrl = TextEditingController(text: widget.existing?.deliveryTerms);
+  late final _ourCustomerNumberCtrl = TextEditingController(text: widget.existing?.ourCustomerNumber);
 
   bool get _isEdit => widget.existing != null;
 
@@ -187,6 +194,7 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
     _notesCtrl.dispose();
     _minimumOrderQuantityCtrl.dispose();
     _deliveryTermsCtrl.dispose();
+    _ourCustomerNumberCtrl.dispose();
     super.dispose();
   }
 
@@ -245,6 +253,14 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
                 decoration: const InputDecoration(labelText: 'Lieferbedingungen'),
                 maxLines: 2,
               ),
+              TextField(
+                key: const Key('supplier-our-customer-number'),
+                controller: _ourCustomerNumberCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Unsere Kundennummer beim Lieferanten',
+                  helperText: 'Erscheint auf jeder Bestellung an diesen Lieferanten.',
+                ),
+              ),
             ],
           ),
         ),
@@ -269,6 +285,9 @@ class _SupplierFormDialogState extends State<_SupplierFormDialog> {
                 minimumOrderQuantity: moqText.isEmpty ? null : double.tryParse(moqText),
                 deliveryTerms:
                     _deliveryTermsCtrl.text.trim().isEmpty ? null : _deliveryTermsCtrl.text.trim(),
+                // Nur trimmen — führende Nullen bleiben (Text, keine Zahl).
+                ourCustomerNumber:
+                    _ourCustomerNumberCtrl.text.trim().isEmpty ? null : _ourCustomerNumberCtrl.text.trim(),
               ),
             );
           },
