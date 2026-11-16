@@ -187,7 +187,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
     final result = await _db.execute(
       Sql.named(
         'SELECT address, tax_number, vat_id, iban, email, phone, pdf_footer_text, document_texts, small_business_exempt, '
-        'street, postal_code, city, country_code, bic, skonto_percent, skonto_days FROM companies WHERE id = @id',
+        'street, postal_code, city, country_code, bic, skonto_percent, skonto_days, quote_validity_days FROM companies WHERE id = @id',
       ),
       parameters: {'id': companyId},
     );
@@ -217,6 +217,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
       bic: r[13] as String?,
       skontoPercent: (r[14] as num?)?.toDouble(),
       skontoDays: r[15] as int?,
+      quoteValidityDays: r[16] as int?,
     );
   }
 
@@ -227,7 +228,8 @@ class PostgresPhaseBRepository implements PhaseBRepository {
         'UPDATE companies SET address = @address, tax_number = @taxNumber, vat_id = @vatId, iban = @iban, '
         'email = @email, phone = @phone, pdf_footer_text = @footer, document_texts = @texts, '
         'small_business_exempt = @exempt, street = @street, postal_code = @postalCode, city = @city, '
-        'country_code = @countryCode, bic = @bic, skonto_percent = @skontoPercent, skonto_days = @skontoDays WHERE id = @id',
+        'country_code = @countryCode, bic = @bic, skonto_percent = @skontoPercent, skonto_days = @skontoDays, '
+        'quote_validity_days = @quoteValidityDays WHERE id = @id',
       ),
       parameters: {
         'address': p.address,
@@ -248,6 +250,7 @@ class PostgresPhaseBRepository implements PhaseBRepository {
         'bic': p.bic,
         'skontoPercent': p.skontoPercent,
         'skontoDays': p.skontoDays,
+        'quoteValidityDays': TypedValue(Type.integer, p.quoteValidityDays),
         'id': p.companyId,
       },
     );

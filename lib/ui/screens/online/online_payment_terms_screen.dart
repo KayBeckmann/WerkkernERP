@@ -85,6 +85,7 @@ class _OnlinePaymentTermsScreenState extends State<OnlinePaymentTermsScreen> {
         bic: p.bic,
         skontoPercent: percent,
         skontoDays: days,
+        quoteValidityDays: p.quoteValidityDays,
       )),
       success: percent == null ? 'Kein Skonto als Vorgabe.' : 'Skonto-Vorgabe gespeichert.',
     );

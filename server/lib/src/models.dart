@@ -186,8 +186,12 @@ class CompanyProfile {
     this.bic,
     this.skontoPercent,
     this.skontoDays,
+    this.quoteValidityDays = 14,
   });
   final String companyId;
+
+  /// A5-Nachtrag: Standard-Bindefrist neuer Angebote in Tagen (`null` = keine).
+  final int? quoteValidityDays;
 
   /// A2-Nachtrag: optionale Skonto-Vorgabe der Firma (beide oder keins).
   final double? skontoPercent;
@@ -236,6 +240,7 @@ class CompanyProfile {
         'bic': bic,
         'skontoPercent': skontoPercent,
         'skontoDays': skontoDays,
+        'quoteValidityDays': quoteValidityDays,
       };
 }
 

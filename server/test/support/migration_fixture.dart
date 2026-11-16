@@ -20,6 +20,7 @@ Map<String, Object?> sampleMigrationPackage() {
     'createdAt': '$year-02-01T10:00:00.000Z',
     'company': {
       'name': 'Elektro Kay (offline)',
+      'quoteValidityDays': 21,
       'address': 'Hauptstr. 1\n12345 Musterstadt',
       'taxNumber': '12/345/67890',
       'iban': 'DE02120300000000202051',

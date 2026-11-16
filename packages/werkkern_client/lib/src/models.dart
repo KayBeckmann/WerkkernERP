@@ -333,6 +333,9 @@ class OnlineDocument {
     this.rawJson = const {},
     this.eInvoiceSnapshot,
     this.paymentTerm,
+    this.quoteValidityDays,
+    this.quoteValidFrom,
+    this.quoteValidUntil,
     bool? editable,
   }) : editable = editable ?? status == 'draft';
 
@@ -399,8 +402,17 @@ class OnlineDocument {
       rawJson: j,
       eInvoiceSnapshot: j['eInvoiceSnapshot'] as Map<String, Object?>?,
       paymentTerm: j['paymentTerm'] == null ? null : OnlineDocumentTerms.fromJson(j['paymentTerm'] as Map<String, Object?>),
+      quoteValidityDays: j['quoteValidityDays'] as int?,
+      quoteValidFrom: j['quoteValidFrom'] == null ? null : DateTime.parse(j['quoteValidFrom'] as String),
+      quoteValidUntil: j['quoteValidUntil'] == null ? null : DateTime.parse(j['quoteValidUntil'] as String),
     );
   }
+
+  /// A5-Nachtrag: Bindefrist eines Angebots (Dauer; finalisiert mit
+  /// Fristbeginn und „bindend bis“).
+  final int? quoteValidityDays;
+  final DateTime? quoteValidFrom;
+  final DateTime? quoteValidUntil;
 
   /// Unveränderte Serverantwort — wird so in den Offline-Bestand gelegt.
   final Map<String, Object?> rawJson;
@@ -577,8 +589,10 @@ class OnlineCompanyProfile {
     this.bic,
     this.skontoPercent,
     this.skontoDays,
+    this.quoteValidityDays = 14,
   });
   factory OnlineCompanyProfile.fromJson(Map<String, Object?> j) => OnlineCompanyProfile(
+        quoteValidityDays: j.containsKey('quoteValidityDays') ? j['quoteValidityDays'] as int? : 14,
         name: j['name'] as String?,
         address: j['address'] as String?,
         taxNumber: j['taxNumber'] as String?,
@@ -608,6 +622,9 @@ class OnlineCompanyProfile {
   /// A2-Nachtrag: Skonto-Vorgabe der Firma.
   final double? skontoPercent;
   final int? skontoDays;
+
+  /// A5-Nachtrag: Standard-Bindefrist neuer Angebote in Tagen (`null` = keine).
+  final int? quoteValidityDays;
 
   /// C15 E-Rechnung: strukturierte Anschrift und BIC.
   final String? street;
@@ -648,6 +665,7 @@ class OnlineCompanyProfile {
         'bic': bic,
         'skontoPercent': skontoPercent,
         'skontoDays': skontoDays,
+        'quoteValidityDays': quoteValidityDays,
       };
 }
 

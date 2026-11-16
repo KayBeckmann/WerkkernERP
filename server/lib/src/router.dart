@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:shelf/shelf.dart';
+import 'package:werkkern_core/werkkern_core.dart' show isValidQuoteValidityDays;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:uuid/uuid.dart';
 
@@ -947,7 +948,12 @@ class PhaseBRouter {
       // A2-Nachtrag: Skonto-Vorgabe — beide Werte oder keiner.
       skontoPercent: body.containsKey('skontoPercent') ? (body['skontoPercent'] as num?)?.toDouble() : current.skontoPercent,
       skontoDays: body.containsKey('skontoDays') ? body['skontoDays'] as int? : current.skontoDays,
+      // A5-Nachtrag: fehlt das Feld (ältere Clients), bleibt der Wert.
+      quoteValidityDays: body.containsKey('quoteValidityDays') ? body['quoteValidityDays'] as int? : current.quoteValidityDays,
     );
+    if (!isValidQuoteValidityDays(profile.quoteValidityDays)) {
+      return jsonError('quoteValidityDays muss 0 bis 3650 Tage sein (oder leer).');
+    }
     if ((profile.skontoPercent == null) != (profile.skontoDays == null) ||
         (profile.skontoPercent != null && (profile.skontoPercent! <= 0 || profile.skontoPercent! >= 100)) ||
         (profile.skontoDays != null && profile.skontoDays! < 0)) {

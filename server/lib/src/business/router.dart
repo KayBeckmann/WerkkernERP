@@ -853,12 +853,25 @@ class BusinessRoutes {
     final contactError = await _checkContact(companyId, customerId, contactId);
     if (contactError != null) return contactError;
 
+    // A5-Nachtrag: Bindefrist eines Angebots — genannt oder Firmenstandard.
+    int? quoteValidityDays;
+    if (kind == 'quote') {
+      if (body.containsKey('quoteValidityDays')) {
+        final raw = body['quoteValidityDays'];
+        if (raw != null && raw is! int) return jsonError('quoteValidityDays muss eine Ganzzahl sein.');
+        quoteValidityDays = raw as int?;
+      } else {
+        quoteValidityDays = (await repository.getCompanyProfile(companyId)).quoteValidityDays;
+      }
+      if (!isValidQuoteValidityDays(quoteValidityDays)) return jsonError('quoteValidityDays muss 0 bis 3650 Tage sein.');
+    }
     final document = Document(
       id: id,
       companyId: companyId,
       customerId: customerId,
       kind: kind,
       status: 'draft',
+      quoteValidityDays: quoteValidityDays,
       issueDate: issueDate,
       serviceDate: serviceDate,
       paymentTerms: _trimmed(body['paymentTerms']),
@@ -937,6 +950,33 @@ class BusinessRoutes {
     if (isFixedPrice != null && !{'quote', 'order'}.contains(existing.kind)) {
       return jsonError('Festpreis-Kennzeichen gibt es nur bei Angebot/Auftrag.');
     }
+    // A5-Nachtrag: Bindefrist. Entwurf: `quoteValidityDays`. Finalisiertes,
+    // noch editierbares Angebot: nur ein ausdrücklich bestätigtes
+    // `quoteValidUntil` (Fristbeginn bleibt) — ohne Feld bleibt die Frist.
+    QuoteValidity? Function()? quoteValidity;
+    if (existing.kind == 'quote' && existing.isDraft && body.containsKey('quoteValidityDays')) {
+      final raw = body['quoteValidityDays'];
+      if ((raw != null && raw is! int) || !isValidQuoteValidityDays(raw as int?)) {
+        return jsonError('quoteValidityDays muss 0 bis 3650 Tage sein (oder leer).');
+      }
+      quoteValidity = () => (days: raw, from: null, until: null);
+    }
+    if (body.containsKey('quoteValidUntil')) {
+      if (existing.kind != 'quote' || existing.isDraft) {
+        return jsonError('quoteValidUntil nur bei einem finalisierten Angebot; im Entwurf quoteValidityDays.');
+      }
+      final raw = body['quoteValidUntil'];
+      if (raw == null) {
+        quoteValidity = () => (days: null, from: null, until: null);
+      } else {
+        final until = _parseDate(raw);
+        if (until == null) return jsonError('quoteValidUntil im Format JJJJ-MM-TT.');
+        final start = existing.quoteValidFrom ?? existing.finalizedAt ?? existing.issueDate;
+        final from = DateTime.utc(start.year, start.month, start.day);
+        if (until.isBefore(from)) return jsonError('„Bindend bis“ darf nicht vor dem Fristbeginn liegen.');
+        quoteValidity = () => (days: quoteValidityDaysBetween(from, until), from: from, until: until);
+      }
+    }
     // Fälligkeit schon im Entwurf (wie offline); finalisiert über
     // `/due-date` mit dem Zahlungsrecht.
     DateTime? Function()? dueDate;
@@ -966,6 +1006,7 @@ class BusinessRoutes {
         userId: session.session.userId,
         contactId: contactId,
         terms: termsUpdate,
+        quoteValidity: quoteValidity,
       );
       if (updated == null) return jsonError('Dokument nicht gefunden.', status: 404);
       await auth.audit(check.auth!, 'document.update', existing.kind, id);
