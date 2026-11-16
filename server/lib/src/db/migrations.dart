@@ -42,6 +42,7 @@ final List<Future<void> Function(Session db)> _steps = [
   _step27StorageLocations,
   _step28SupplierArticleNumber,
   _step29QuoteValidity,
+  _step30PdfLayout,
 ];
 
 int get latestSchemaVersion => _steps.length;
@@ -718,6 +719,11 @@ Future<void> _step28SupplierArticleNumber(Session db) async {
 
 /// A5-Nachtrag (Kay, 16.11.2026): Angebotsbindefrist — Firmenstandard
 /// (14 Tage), am Angebot Dauer, Fristbeginn und „bindend bis“.
+Future<void> _step30PdfLayout(Session db) async {
+  await db.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS pdf_layout TEXT NOT NULL DEFAULT 'classic' CHECK (pdf_layout IN ('classic', 'nordLetterhead'))");
+  await db.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS pdf_layout_snapshot TEXT NOT NULL DEFAULT 'classic' CHECK (pdf_layout_snapshot IN ('classic', 'nordLetterhead'))");
+}
+
 Future<void> _step29QuoteValidity(Session db) async {
   await db.execute('ALTER TABLE companies ADD COLUMN IF NOT EXISTS quote_validity_days INTEGER DEFAULT 14');
   await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS quote_validity_days INTEGER');

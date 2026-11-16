@@ -329,8 +329,10 @@ class Document {
     this.quoteValidityDays,
     this.quoteValidFrom,
     this.quoteValidUntil,
+    this.pdfLayoutSnapshot,
   });
   final String id;
+  final String? pdfLayoutSnapshot;
   final String companyId;
   final String customerId;
   final String kind;
@@ -442,6 +444,7 @@ class Document {
     String? eInvoiceSnapshot,
     DocTerms? Function()? terms,
     QuoteValidity? Function()? quoteValidity,
+    String? pdfLayoutSnapshot,
   }) =>
       Document(
         id: id,
@@ -490,6 +493,7 @@ class Document {
         quoteValidityDays: quoteValidity != null ? quoteValidity()?.days : quoteValidityDays,
         quoteValidFrom: quoteValidity != null ? quoteValidity()?.from : quoteValidFrom,
         quoteValidUntil: quoteValidity != null ? quoteValidity()?.until : quoteValidUntil,
+        pdfLayoutSnapshot: pdfLayoutSnapshot ?? company?.pdfLayout ?? this.pdfLayoutSnapshot,
       );
 
   Map<String, Object?> toJson() => {
@@ -519,6 +523,7 @@ class Document {
         'updatedAt': updatedAt.toIso8601String(),
         'finalizedAt': finalizedAt?.toIso8601String(),
         'version': version,
+        'pdfLayoutSnapshot': pdfLayoutSnapshot,
         'convertedFromId': convertedFromId,
         'paymentStatus': paymentStatus,
         'paidAt': paidAt?.toIso8601String(),
@@ -623,8 +628,10 @@ class CompanySnapshot {
     this.bic,
     this.email,
     this.phone,
+    this.pdfLayout = 'classic',
   });
   final String name;
+  final String pdfLayout;
   final String? address;
   final String? taxNumber;
   final String? vatId;

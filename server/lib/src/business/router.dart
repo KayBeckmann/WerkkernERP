@@ -1135,6 +1135,7 @@ class BusinessRoutes {
           bic: profile.bic,
           email: profile.email,
           phone: profile.phone,
+          pdfLayout: profile.pdfLayout,
         ),
         now: DateTime.now().toUtc(),
       );

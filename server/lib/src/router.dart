@@ -915,6 +915,10 @@ class PhaseBRouter {
     }
 
     final current = await repository.getCompanyProfile(auth.session.companyId);
+    final layout = body['pdfLayout'] ?? current.pdfLayout;
+    if (layout != 'classic' && layout != 'nordLetterhead') {
+      return jsonError('pdfLayout muss classic oder nordLetterhead sein.');
+    }
     final rawTexts = body['documentTexts'];
     final documentTexts = rawTexts is Map<String, Object?>
         ? {
@@ -950,6 +954,7 @@ class PhaseBRouter {
       skontoDays: body.containsKey('skontoDays') ? body['skontoDays'] as int? : current.skontoDays,
       // A5-Nachtrag: fehlt das Feld (ältere Clients), bleibt der Wert.
       quoteValidityDays: body.containsKey('quoteValidityDays') ? body['quoteValidityDays'] as int? : current.quoteValidityDays,
+      pdfLayout: layout as String,
     );
     if (!isValidQuoteValidityDays(profile.quoteValidityDays)) {
       return jsonError('quoteValidityDays muss 0 bis 3650 Tage sein (oder leer).');

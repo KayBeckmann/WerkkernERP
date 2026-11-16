@@ -16,6 +16,7 @@ import '../../widgets/scan_position_dialog.dart';
 import 'online_documents_screen.dart' show onlineEditorTitle;
 import 'online_dunning_screen.dart';
 import 'online_item_dialog.dart';
+import 'online_pdf_layout.dart';
 import 'online_mail.dart';
 import 'online_purchasing_screen.dart' show createPurchaseOrdersFromDocument;
 import 'online_storage_screen.dart' show askOnlineWithdrawalBins;
@@ -682,7 +683,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
         builder: (_) => Scaffold(
           appBar: AppBar(title: Text(document.isDraft ? 'Vorschau (Entwurf, nicht final)' : document.number!)),
           body: PdfPreview(
-            build: (_) => buildOnlineDocumentPdf(document, liveCompany: company, liveCustomer: customer, eInvoiceEnabled: widget.session.modules.contains('eInvoice')),
+            build: (_) => buildOnlineDocumentPdf(document, liveCompany: company, liveCustomer: customer,
+                layout: documentPdfLayout(document, liveCompany: company),
+                eInvoiceEnabled: widget.session.modules.contains('eInvoice')),
             canChangeOrientation: false,
             canChangePageFormat: false,
             allowSharing: !document.isDraft,
@@ -1204,7 +1207,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                     title: '${onlineDocumentKindLabels[document.kind] ?? 'Dokument'} ${document.number} senden',
                     defaultRecipientHint: _recipientHint(billing: billingDocumentKinds.contains(document.kind)),
                     customText: true,
-                    buildPdf: () => buildOnlineDocumentPdf(document, eInvoiceEnabled: widget.session.modules.contains('eInvoice')),
+                    buildPdf: () => buildOnlineDocumentPdf(document,
+                        layout: documentPdfLayout(document),
+                        eInvoiceEnabled: widget.session.modules.contains('eInvoice')),
                     send: (pdf, {to, subject, body}) async => _client.sendDocumentMail(
                           document.id,
                           pdf,

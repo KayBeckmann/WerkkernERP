@@ -324,6 +324,7 @@ class OnlineDocument {
     this.closingTextSnapshot,
     this.footerTextSnapshot,
     this.smallBusinessExemptSnapshot = false,
+    this.pdfLayoutSnapshot,
     required this.version,
     this.items = const [],
     this.netCents,
@@ -370,6 +371,7 @@ class OnlineDocument {
       closingTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['closing'] as String?,
       footerTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['footer'] as String?,
       smallBusinessExemptSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['smallBusinessExempt'] as bool? ?? false,
+      pdfLayoutSnapshot: j['status'] == 'draft' ? null : j['pdfLayoutSnapshot'] as String? ?? 'classic',
       convertedTo: [
         for (final c in (j['convertedTo'] as List? ?? const []))
           (
@@ -482,6 +484,7 @@ class OnlineDocument {
   final String? closingTextSnapshot;
   final String? footerTextSnapshot;
   final bool smallBusinessExemptSnapshot;
+  final String? pdfLayoutSnapshot;
 
   /// Rechnung: finalisierte Gutschriften dazu.
   final List<({String id, String? number, int grossCents})> creditNotes;
@@ -590,8 +593,10 @@ class OnlineCompanyProfile {
     this.skontoPercent,
     this.skontoDays,
     this.quoteValidityDays = 14,
+    this.pdfLayout = 'classic',
   });
   factory OnlineCompanyProfile.fromJson(Map<String, Object?> j) => OnlineCompanyProfile(
+        pdfLayout: j['pdfLayout'] as String? ?? 'classic',
         quoteValidityDays: j.containsKey('quoteValidityDays') ? j['quoteValidityDays'] as int? : 14,
         name: j['name'] as String?,
         address: j['address'] as String?,
@@ -618,6 +623,7 @@ class OnlineCompanyProfile {
         skontoDays: j['skontoDays'] as int?,
       );
   final String? name;
+  final String pdfLayout;
 
   /// A2-Nachtrag: Skonto-Vorgabe der Firma.
   final double? skontoPercent;
@@ -666,6 +672,7 @@ class OnlineCompanyProfile {
         'skontoPercent': skontoPercent,
         'skontoDays': skontoDays,
         'quoteValidityDays': quoteValidityDays,
+        'pdfLayout': pdfLayout,
       };
 }
 

@@ -319,7 +319,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
       'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked, '
       'd.contact_id, d.e_invoice_snapshot, d.payment_term_id, d.payment_term_label, d.payment_net_days, '
-      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until';
+      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until, d.pdf_layout_snapshot';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -368,6 +368,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         quoteValidityDays: r[43] as int?,
         quoteValidFrom: r[44] as DateTime?,
         quoteValidUntil: r[45] as DateTime?,
+        pdfLayoutSnapshot: r[46] as String?,
       );
 
   @override
@@ -749,7 +750,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'company_snapshot_address = @companyAddress, company_snapshot_tax_number = @companyTaxNumber, '
           'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, '
           'intro_text_snapshot = @intro, closing_text_snapshot = @closing, footer_text_snapshot = @footer, '
-          'small_business_exempt_snapshot = @exempt, e_invoice_snapshot = @eInvoice, '
+          'small_business_exempt_snapshot = @exempt, e_invoice_snapshot = @eInvoice, pdf_layout_snapshot = @pdfLayout, '
           "quote_valid_from = CASE WHEN d.kind = 'quote' AND d.quote_validity_days IS NOT NULL THEN @today ELSE d.quote_valid_from END, "
           "quote_valid_until = CASE WHEN d.kind = 'quote' AND d.quote_validity_days IS NOT NULL "
           'THEN @today + d.quote_validity_days ELSE d.quote_valid_until END, '
@@ -773,6 +774,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'closing': company.closingText,
           'footer': company.footerText,
           'exempt': company.smallBusinessExempt,
+          'pdfLayout': company.pdfLayout,
           'companyId': companyId,
           'id': id,
         },

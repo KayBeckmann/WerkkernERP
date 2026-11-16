@@ -42,6 +42,7 @@ Future<Uint8List> buildInvoicePdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
   required Company company,
+  PdfLayout layout = PdfLayout.classic,
   // C13 Abschlagsrechnungen, aufgeschlüsselt seit Nachtrag 2026-10-21
   // ("Diese müssen aufgeschlüsselt werden und die Rechnungsnummern der
   // Teilzahlungen müssen aufgelistet werden") — eine Zeile je
@@ -67,6 +68,7 @@ Future<Uint8List> buildInvoicePdf({
     items: items,
     company: company,
     isPreview: false,
+    layout: layout,
     priorAdvancePayments: priorAdvancePayments,
     referencedDocumentNumber: referencedDocumentNumber,
     referencedDocumentDate: referencedDocumentDate,
@@ -91,6 +93,7 @@ Future<Uint8List> buildDraftPreviewPdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
   required Company company,
+  PdfLayout layout = PdfLayout.classic,
   List<AdvancePaymentEntry> priorAdvancePayments = const [],
 }) {
   return _buildPdf(
@@ -98,6 +101,7 @@ Future<Uint8List> buildDraftPreviewPdf({
     items: items,
     company: company,
     isPreview: true,
+    layout: layout,
     priorAdvancePayments: priorAdvancePayments,
   );
 }
@@ -225,6 +229,7 @@ Future<Uint8List> _buildPdf({
   required List<InvoiceItem> items,
   required Company company,
   required bool isPreview,
+  PdfLayout layout = PdfLayout.classic,
   List<AdvancePaymentEntry> priorAdvancePayments = const [],
   String? referencedDocumentNumber,
   DateTime? referencedDocumentDate,
@@ -277,15 +282,20 @@ Future<Uint8List> _buildPdf({
             ),
     ),
     isPreview: isPreview,
+    layout: layout,
     priorAdvancePayments: priorAdvancePayments,
     referencedDocumentNumber: referencedDocumentNumber,
   );
 }
 
 /// Rendert [data] — gemeinsamer Kern für Offline- und Online-Dokumente.
+/// Explicit opt-in: legacy documents keep their historical renderer.
+enum PdfLayout { classic, nordLetterhead }
+
 Future<Uint8List> renderDocumentPdf(
   PdfDocumentData data, {
   required bool isPreview,
+  PdfLayout layout = PdfLayout.classic,
   List<AdvancePaymentEntry> priorAdvancePayments = const [],
   String? referencedDocumentNumber,
 }) async {
@@ -307,16 +317,32 @@ Future<Uint8List> renderDocumentPdf(
       ),
   ]);
 
-  final groups = <String?, List<PdfLine>>{};
+  // Consecutive chapters stay in document order. A repeated chapter label
+  // later in the document starts a new chapter rather than moving its lines.
+  final chapters = <({String? label, List<PdfLine> lines})>[];
   for (final item in items) {
-    groups.putIfAbsent(item.groupLabel, () => []).add(item);
+    if (chapters.isEmpty || chapters.last.label != item.groupLabel) {
+      chapters.add((label: item.groupLabel, lines: [item]));
+    } else {
+      chapters.last.lines.add(item);
+    }
   }
-  final orderedKeys = groups.keys.toList()
-    ..sort((a, b) {
+  // Preserve the previous rendering order for tenants that have not opted
+  // into the letterhead. Only the new chapter layout follows item order.
+  if (layout == PdfLayout.classic) {
+    final oldGroups = <String?, List<PdfLine>>{};
+    for (final item in items) {
+      oldGroups.putIfAbsent(item.groupLabel, () => []).add(item);
+    }
+    final keys = oldGroups.keys.toList()..sort((a, b) {
       if (a == null) return 1;
       if (b == null) return -1;
       return a.compareTo(b);
     });
+    chapters
+      ..clear()
+      ..addAll([for (final key in keys) (label: key, lines: oldGroups[key]!) ]);
+  }
 
   // Eigene Schrift statt der PDF-Basisschriften (Helvetica & Co.) laden —
   // die haben kein Eurozeichen und keine volle Umlaut-Abdeckung ("Unable
@@ -390,16 +416,19 @@ Future<Uint8List> renderDocumentPdf(
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(32),
-      header: (context) => _buildHeader(
-        invoice,
-        isPreview: isPreview,
-        referencedDocumentNumber: referencedDocumentNumber,
-      ),
+      margin: layout == PdfLayout.nordLetterhead
+          ? const pw.EdgeInsets.fromLTRB(40, 34, 40, 120)
+          : const pw.EdgeInsets.all(32),
+      header: (context) => layout == PdfLayout.nordLetterhead
+          ? _buildLetterhead(invoice, context.pageNumber == 1,
+              isPreview: isPreview, referencedDocumentNumber: referencedDocumentNumber)
+          : _buildHeader(invoice, isPreview: isPreview, referencedDocumentNumber: referencedDocumentNumber),
       // Fußzeile (Kay-Nachtrag 2026-10-16: "Fußzeile ... in Dokumenten
       // anpassbar machen") — Firmentext oberhalb, Seitenzahl bleibt
       // immer zusätzlich sichtbar.
-      footer: (context) => pw.Column(
+      footer: (context) => layout == PdfLayout.nordLetterhead
+          ? _buildLetterFooter(invoice, footerText, context.pageNumber, context.pagesCount)
+          : pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
           if (footerText != null) ...[
@@ -430,12 +459,24 @@ Future<Uint8List> renderDocumentPdf(
           pw.SizedBox(height: 12),
         ],
         pw.SizedBox(height: 16),
-        for (final key in orderedKeys)
-          ..._buildGroup(key, groups[key]!,
+        for (final chapter in chapters)
+          ..._buildGroup(chapter.label, chapter.lines,
               showPrices: invoice.kind != DocumentKind.deliveryNote,
-              isSmallBusinessExempt: data.isSmallBusinessExempt),
+              isSmallBusinessExempt: data.isSmallBusinessExempt,
+              letterhead: layout == PdfLayout.nordLetterhead),
         pw.SizedBox(height: 16),
-        if (invoice.kind != DocumentKind.deliveryNote)
+        if (invoice.kind != DocumentKind.deliveryNote && layout == PdfLayout.nordLetterhead)
+          pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            _buildTotals(totals,
+                isSmallBusinessExempt: data.isSmallBusinessExempt,
+                priorAdvancePayments: priorAdvancePayments),
+            if (data.isSmallBusinessExempt) ...[
+              pw.SizedBox(height: 8),
+              pw.Text('Gemäß § 19 Abs. 1 UStG wird keine Umsatzsteuer berechnet.',
+                  style: const pw.TextStyle(fontSize: 9)),
+            ],
+          ])),
+        if (invoice.kind != DocumentKind.deliveryNote && layout == PdfLayout.classic)
           _buildTotals(totals,
               isSmallBusinessExempt: data.isSmallBusinessExempt,
               priorAdvancePayments: priorAdvancePayments),
@@ -445,7 +486,8 @@ Future<Uint8List> renderDocumentPdf(
         // Schlusstexts nicht versehentlich verschwindet. Arbeitsvorgabe
         // (F1: keine Rechtsprüfung) — Kay bestätigt mit seinem
         // Steuerberater, dass die Regelung tatsächlich zutrifft.
-        if (data.isSmallBusinessExempt && invoice.kind != DocumentKind.deliveryNote) ...[
+        if (data.isSmallBusinessExempt && invoice.kind != DocumentKind.deliveryNote &&
+            layout == PdfLayout.classic) ...[
           pw.SizedBox(height: 8),
           pw.Text(
             'Gemäß § 19 Abs. 1 UStG wird keine Umsatzsteuer berechnet.',
@@ -502,6 +544,89 @@ String _dateLabel(DocumentKind kind) => switch (kind) {
       DocumentKind.proforma => 'Datum',
       _ => '${_title(kind)}sdatum',
     };
+
+// All content is derived from the captured document, never a live tenant.
+pw.Widget _buildLetterhead(PdfDocumentData data, bool firstPage,
+    {required bool isPreview, String? referencedDocumentNumber}) {
+  final title = data.isAdvancePayment ? 'Abschlagsrechnung' : _title(data.kind);
+  return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+    if (isPreview) pw.Container(
+      width: double.infinity,
+      color: PdfColors.red100,
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Text('ENTWURF — unverbindliche Vorschau, kein gültiges Dokument',
+          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+    ),
+    if (data.kind == DocumentKind.proforma) pw.Text(
+      'Diese Proforma-Rechnung ist keine Rechnung im umsatzsteuerrechtlichen Sinne '
+      'und keine Zahlungsaufforderung mit eigenem, umsatzsteuerlich relevantem Nummernkreis.',
+      style: const pw.TextStyle(fontSize: 8)),
+    pw.Align(alignment: pw.Alignment.centerRight,
+      child: pw.SizedBox(width: 215, child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+          pw.Text(data.companySnapshotName ?? '', textAlign: pw.TextAlign.right,
+              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+          if (data.companySnapshotAddress?.trim().isNotEmpty ?? false)
+            pw.Text(data.companySnapshotAddress!.trim(), textAlign: pw.TextAlign.right,
+                style: const pw.TextStyle(fontSize: 9)),
+        ],
+      )),
+    ),
+    if (firstPage) ...[
+      pw.SizedBox(height: 28),
+      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Text(data.customerSnapshotName ?? '', style: const pw.TextStyle(fontSize: 10)),
+          if (data.customerSnapshotAddress?.trim().isNotEmpty ?? false)
+            pw.Text(data.customerSnapshotAddress!.trim(), style: const pw.TextStyle(fontSize: 10)),
+          if (data.customerSnapshotVatId != null)
+            pw.Text('USt-IdNr.: ${data.customerSnapshotVatId}', style: const pw.TextStyle(fontSize: 9)),
+        ])),
+        pw.SizedBox(width: 175, child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+          pw.Text('${_dateLabel(data.kind)}: ${_formatDate(data.issueDate)}', textAlign: pw.TextAlign.right,
+              style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Leistungsdatum: ${_formatDate(data.serviceDate)}', textAlign: pw.TextAlign.right,
+              style: const pw.TextStyle(fontSize: 9)),
+        ])),
+      ]),
+      pw.SizedBox(height: 25),
+      pw.Text(isPreview ? '$title (Entwurf)' : '$title ${data.invoiceNumber ?? ''}',
+          style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold)),
+      if (referencedDocumentNumber != null)
+        pw.Text('Gutschrift zur Rechnung $referencedDocumentNumber', style: const pw.TextStyle(fontSize: 9)),
+      pw.SizedBox(height: 14),
+    ] else pw.SizedBox(height: 12),
+  ]);
+}
+
+pw.Widget _buildLetterFooter(PdfDocumentData data, String? footerText, int page, int pages) =>
+    pw.Column(children: [
+      pw.Divider(color: PdfColors.grey400, thickness: 0.4),
+      pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Expanded(child: pw.Text([
+          data.companySnapshotName, data.companySnapshotAddress,
+        ].whereType<String>().where((s) => s.trim().isNotEmpty).join('\n'),
+            style: const pw.TextStyle(fontSize: 7))),
+        pw.SizedBox(width: 10),
+        pw.Expanded(child: pw.Text(data.companySnapshotIban?.trim().isNotEmpty ?? false
+            ? 'IBAN: ${data.companySnapshotIban}' : '',
+            style: const pw.TextStyle(fontSize: 7))),
+        pw.SizedBox(width: 10),
+        pw.Expanded(child: pw.Text([
+          if (data.companySnapshotTaxNumber?.trim().isNotEmpty ?? false)
+            'Steuernummer: ${data.companySnapshotTaxNumber}',
+          if (data.companySnapshotVatId?.trim().isNotEmpty ?? false)
+            'USt-IdNr.: ${data.companySnapshotVatId}',
+        ].join('\n'), style: const pw.TextStyle(fontSize: 7))),
+      ]),
+      if (footerText?.trim().isNotEmpty ?? false)
+        pw.SizedBox(height: 12),
+      if (footerText?.trim().isNotEmpty ?? false)
+        pw.Text(footerText!, textAlign: pw.TextAlign.center,
+            style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
+      pw.SizedBox(height: 4),
+      pw.Text('Seite $page von $pages', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+    ]);
 
 pw.Widget _buildHeader(
   PdfDocumentData invoice, {
@@ -600,7 +725,7 @@ pw.Widget _buildHeader(
 }
 
 List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items,
-    {required bool showPrices, required bool isSmallBusinessExempt}) {
+    {required bool showPrices, required bool isSmallBusinessExempt, bool letterhead = false}) {
   return [
     if (groupLabel != null)
       pw.Padding(
@@ -631,7 +756,12 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items,
           : const {0: pw.FlexColumnWidth(5), 1: pw.FlexColumnWidth(1.2)},
       children: [
         pw.TableRow(
-          decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(width: 0.5))),
+          repeat: letterhead,
+          decoration: pw.BoxDecoration(
+            color: letterhead ? PdfColors.grey200 : null,
+            border: pw.Border(
+              top: letterhead ? const pw.BorderSide(width: 0.7) : pw.BorderSide.none,
+              bottom: const pw.BorderSide(width: 0.5))),
           children: showPrices
               ? [
                   _cell('Beschreibung', bold: true),

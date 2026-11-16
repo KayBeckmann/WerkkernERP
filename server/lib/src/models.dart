@@ -187,8 +187,10 @@ class CompanyProfile {
     this.skontoPercent,
     this.skontoDays,
     this.quoteValidityDays = 14,
+    this.pdfLayout = 'classic',
   });
   final String companyId;
+  final String pdfLayout;
 
   /// A5-Nachtrag: Standard-Bindefrist neuer Angebote in Tagen (`null` = keine).
   final int? quoteValidityDays;
@@ -241,6 +243,7 @@ class CompanyProfile {
         'skontoPercent': skontoPercent,
         'skontoDays': skontoDays,
         'quoteValidityDays': quoteValidityDays,
+        'pdfLayout': pdfLayout,
       };
 }
 

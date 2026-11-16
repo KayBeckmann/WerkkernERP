@@ -836,6 +836,7 @@ class _ProfileTab extends StatefulWidget {
 }
 
 class _ProfileTabState extends State<_ProfileTab> {
+  String _pdfLayout = 'classic';
   final _address = TextEditingController();
   final _taxNumber = TextEditingController();
   final _vatId = TextEditingController();
@@ -901,6 +902,7 @@ class _ProfileTabState extends State<_ProfileTab> {
       _skontoPercent = p.skontoPercent;
       _skontoDays = p.skontoDays;
       _quoteValidity.text = p.quoteValidityDays?.toString() ?? '';
+      _pdfLayout = p.pdfLayout;
       // Auch Texte inaktiver Arten behalten (werden unverändert zurückgeschickt).
       for (final kind in {..._kinds, ...p.documentTexts.keys}) {
         _texts[kind] = (
@@ -928,6 +930,7 @@ class _ProfileTabState extends State<_ProfileTab> {
     setState(() => _busy = true);
     try {
       await widget.session.client.saveCompanyProfile(OnlineCompanyProfile(
+        pdfLayout: _pdfLayout,
         quoteValidityDays: validity.days,
         address: _v(_address),
         taxNumber: _v(_taxNumber),
@@ -965,6 +968,16 @@ class _ProfileTabState extends State<_ProfileTab> {
       children: [
         if (section == OnlineAdminSection.company) ...[
           const Text('Wird beim Finalisieren unveränderlich in jedes Dokument übernommen.'),
+          DropdownButtonFormField<String>(
+            key: const Key('online-company-pdf-layout'),
+            initialValue: _pdfLayout,
+            decoration: const InputDecoration(labelText: 'PDF-Layout'),
+            items: const [
+              DropdownMenuItem(value: 'classic', child: Text('Klassisches Layout')),
+              DropdownMenuItem(value: 'nordLetterhead', child: Text('Nord-Impuls-Briefbogen')),
+            ],
+            onChanged: _busy ? null : (value) => setState(() => _pdfLayout = value ?? 'classic'),
+          ),
           TextField(controller: _address, maxLines: 3, decoration: const InputDecoration(labelText: 'Anschrift')),
           // C15 E-Rechnung: strukturierte Anschrift (BG-5) und BIC.
           Row(
