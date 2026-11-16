@@ -19,6 +19,7 @@ import 'invoice_pdf_builder.dart';
 /// ([liveCompany]/[liveCustomer]) — wie offline nie teilbar.
 Future<Uint8List> buildOnlineDocumentPdf(
   OnlineDocument document, {
+  PdfLayout layout = PdfLayout.classic,
   OnlineCompanyProfile? liveCompany,
   OnlineCustomer? liveCustomer,
   // C15: Firmenmodul „E-Rechnung“ aktiv → finalisierte Rechnungen/
@@ -32,6 +33,7 @@ Future<Uint8List> buildOnlineDocumentPdf(
     eInvoiceEnabled: eInvoiceEnabled,
   ),
   isPreview: document.isDraft,
+  layout: layout,
   // C13: Schlussrechnung listet jede Abschlagsrechnung einzeln (wie offline).
   priorAdvancePayments: [
     for (final a in document.advancePayments)

@@ -36,6 +36,24 @@ void main() {
     await tester.pumpAndSettle();
     // Einstellungen → Umsatzsteuer und → Dokumenttexte, je eigene Seite wie offline.
     await openTab(tester, 'Einstellungen');
+    await tester.tap(find.text('Firmendaten'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('online-company-pdf-layout')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Nord-Impuls-Briefbogen').last);
+    await tester.tap(find.text('Nord-Impuls-Briefbogen').last);
+    await tester.ensureVisible(find.text('Firmendaten speichern'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Firmendaten speichern'));
+    await tester.pumpAndSettle();
+    final selectedLayout = await tester.runAsync(() async {
+      final client = server.client()..token = token;
+      return (await client.companyProfile()).pdfLayout;
+    });
+    expect(selectedLayout, 'nordLetterhead');
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Umsatzsteuer'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('online-profile-small-business')));
@@ -92,6 +110,7 @@ void main() {
       return client.document(docs!.single.id);
     });
     expect(finalized!.smallBusinessExemptSnapshot, isTrue);
+    expect(finalized.pdfLayoutSnapshot, 'nordLetterhead');
     expect(finalized.introTextSnapshot, 'Vielen Dank für Ihren Auftrag.');
     expect(finalized.taxCents, 0);
   });

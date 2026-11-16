@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkernerp/data/database/tables.dart';
 import 'package:werkkernerp/pdf/online_document_pdf.dart';
+import 'package:werkkernerp/pdf/invoice_pdf_builder.dart' show PdfLayout;
 
 import '../ui/online/online_test_server.dart';
 
@@ -53,6 +54,22 @@ void main() {
     expect(utf8.decode(bytes.sublist(0, 5), allowMalformed: true), '%PDF-');
     final dumpDir = Platform.environment['PDF_DUMP_DIR'];
     if (dumpDir != null) File('$dumpDir/online-final.pdf').writeAsBytesSync(bytes);
+  });
+
+  test('Online entry can opt into the letterhead without changing issued snapshot data', () async {
+    final document = await finalizedFromServer();
+    final bytes = await buildOnlineDocumentPdf(document, layout: PdfLayout.nordLetterhead);
+    final dir = await Directory.systemTemp.createTemp('online-letterhead-');
+    try {
+      final file = File('${dir.path}/online.pdf');
+      await file.writeAsBytes(bytes);
+      final result = await Process.run('pdftotext', [file.path, '-']);
+      expect(result.exitCode, 0);
+      expect(result.stdout, contains('Seite 1 von 1'));
+      expect(result.stdout, contains('Elektro Beckmann'));
+    } finally {
+      await dir.delete(recursive: true);
+    }
   });
 
   test('Entwurf: Vorschau mit Live-Stammdaten (kein Schnappschuss vorhanden)', () async {

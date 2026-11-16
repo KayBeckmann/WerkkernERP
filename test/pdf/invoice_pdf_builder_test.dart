@@ -152,6 +152,16 @@ void main() {
     expect(bytes.length, greaterThan(1000));
   });
 
+  test('Offline invoice entry can select the letterhead for a new PDF', () async {
+    final bytes = await buildInvoicePdf(
+      invoice: draftInvoice(invoiceNumber: 'SYN-001'),
+      items: [item(description: 'Synthetic service', vatRatePercent: 0)],
+      company: testCompany(isSmallBusinessExempt: true),
+      layout: PdfLayout.nordLetterhead,
+    );
+    expect(utf8.decode(bytes.sublist(0, 5)), '%PDF-');
+  });
+
   test('Mehrere Positionsgruppen und Steuersätze erzeugen ohne Fehler ein PDF', () async {
     final invoice = draftInvoice(invoiceNumber: 'R-26002');
     final bytes = await buildInvoicePdf(
