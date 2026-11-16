@@ -399,12 +399,23 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
           required: true,
           initial: existing?.purchasePriceCents,
         ),
+        OnlineField(
+          'number',
+          'Lieferantenartikelnummer',
+          initial: existing?.supplierArticleNumber,
+          helper: 'Nur für Bestellungen bei diesem Lieferanten, nie auf Kundenbelegen.',
+        ),
       ],
     );
     if (values == null || !mounted) return;
     if (await runOnline(
       context,
-      () => widget.session.client.setArticlePrice(widget.articleId, values['supplierId'] as String, values['price'] as int),
+      () => widget.session.client.setArticlePrice(
+        widget.articleId,
+        values['supplierId'] as String,
+        values['price'] as int,
+        supplierArticleNumber: (values['number'] as String?) ?? '',
+      ),
     )) {
       _reload();
     }
@@ -593,7 +604,12 @@ class _OnlineArticleDetailScreenState extends State<OnlineArticleDetailScreen> {
                   color: p.supplierId == article.defaultSupplierId ? Colors.amber[700] : null,
                 ),
                 title: Text(p.supplierName ?? '(unbekannt)'),
-                subtitle: p.supplierId == article.defaultSupplierId ? const Text('Standardlieferant') : null,
+                subtitle: p.supplierId == article.defaultSupplierId || p.supplierArticleNumber != null
+                    ? Text([
+                        if (p.supplierId == article.defaultSupplierId) 'Standardlieferant',
+                        if (p.supplierArticleNumber != null) 'Art.-Nr. ${p.supplierArticleNumber}',
+                      ].join(' · '))
+                    : null,
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

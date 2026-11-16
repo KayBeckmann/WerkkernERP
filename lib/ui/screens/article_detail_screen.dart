@@ -109,10 +109,10 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
   void _reload() => setState(() { _future = _load(); });
 
-  Future<void> _setPrice(List<Supplier> suppliers, List<ArticleSupplierPrice> existing) async {
-    final result = await showDialog<({String supplierId, int cents})>(
+  Future<void> _setPrice(List<Supplier> suppliers, List<ArticleSupplierPrice> existing, {String? supplierId}) async {
+    final result = await showDialog<({String supplierId, int cents, String number})>(
       context: context,
-      builder: (context) => _SetSupplierPriceDialog(suppliers: suppliers, existing: existing),
+      builder: (context) => _SetSupplierPriceDialog(suppliers: suppliers, existing: existing, initialSupplierId: supplierId),
     );
     if (result == null || !mounted) return;
     final companyId = context.read<ActiveCompanyService>().active!.id;
@@ -121,6 +121,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
           articleId: _article.id,
           supplierId: result.supplierId,
           purchasePriceCents: result.cents,
+          supplierArticleNumber: Value(result.number),
         );
     _reload();
   }
@@ -400,7 +401,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                                 color: isDefault ? Colors.amber[700] : null,
                               ),
                               title: Text(supplierNames[price.supplierId] ?? '(unbekannt)'),
-                              subtitle: isDefault ? const Text('Standardlieferant') : null,
+                              subtitle: isDefault || price.supplierArticleNumber != null
+                                  ? Text([
+                                      if (isDefault) 'Standardlieferant',
+                                      if (price.supplierArticleNumber != null) 'Art.-Nr. ${price.supplierArticleNumber}',
+                                    ].join(' · '))
+                                  : null,
+                              onTap: () => _setPrice(data.suppliers, data.prices, supplierId: price.supplierId),
                               trailing: Text(Money.fromCents(price.purchasePriceCents).toString()),
                             ),
                           );
@@ -445,10 +452,11 @@ class _DetailData {
 }
 
 class _SetSupplierPriceDialog extends StatefulWidget {
-  const _SetSupplierPriceDialog({required this.suppliers, required this.existing});
+  const _SetSupplierPriceDialog({required this.suppliers, required this.existing, this.initialSupplierId});
 
   final List<Supplier> suppliers;
   final List<ArticleSupplierPrice> existing;
+  final String? initialSupplierId;
 
   @override
   State<_SetSupplierPriceDialog> createState() => _SetSupplierPriceDialogState();
@@ -457,10 +465,28 @@ class _SetSupplierPriceDialog extends StatefulWidget {
 class _SetSupplierPriceDialogState extends State<_SetSupplierPriceDialog> {
   String? _supplierId;
   final _priceCtrl = TextEditingController();
+  final _numberCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialSupplierId != null) _select(widget.initialSupplierId);
+  }
+
+  /// Vorhandene Zuordnung vorbelegen (Preis und Lieferantenartikelnummer).
+  void _select(String? supplierId) {
+    _supplierId = supplierId;
+    final existing = widget.existing.where((p) => p.supplierId == supplierId).firstOrNull;
+    if (existing != null) {
+      _priceCtrl.text = Money.fromCents(existing.purchasePriceCents).toString().replaceAll(RegExp(r'[^0-9,.-]'), '');
+      _numberCtrl.text = existing.supplierArticleNumber ?? '';
+    }
+  }
 
   @override
   void dispose() {
     _priceCtrl.dispose();
+    _numberCtrl.dispose();
     super.dispose();
   }
 
@@ -479,12 +505,21 @@ class _SetSupplierPriceDialogState extends State<_SetSupplierPriceDialog> {
               for (final supplier in widget.suppliers)
                 DropdownMenuItem(value: supplier.id, child: Text(supplier.name)),
             ],
-            onChanged: (value) => setState(() => _supplierId = value),
+            onChanged: (value) => setState(() => _select(value)),
           ),
           TextField(
             controller: _priceCtrl,
             decoration: const InputDecoration(labelText: 'Einkaufspreis (€)'),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          ),
+          TextField(
+            key: const Key('supplier-article-number'),
+            controller: _numberCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Lieferantenartikelnummer',
+              helperText: 'Nur für Bestellungen bei diesem Lieferanten, nie auf Kundenbelegen.',
+              helperMaxLines: 2,
+            ),
           ),
         ],
       ),
@@ -495,7 +530,7 @@ class _SetSupplierPriceDialogState extends State<_SetSupplierPriceDialog> {
             final supplierId = _supplierId;
             if (supplierId == null || _priceCtrl.text.trim().isEmpty) return;
             final cents = Money.fromEuroString(_priceCtrl.text).cents;
-            Navigator.pop(context, (supplierId: supplierId, cents: cents));
+            Navigator.pop(context, (supplierId: supplierId, cents: cents, number: _numberCtrl.text));
           },
           child: const Text('Speichern'),
         ),

@@ -242,9 +242,29 @@ class SupplierRoutes {
     if (await business.findSupplier(companyId, supplierId) == null) {
       return jsonError('Lieferant nicht gefunden.', status: 404);
     }
-    final cents = (await readJsonBody(request))['purchasePriceCents'];
+    final body = await readJsonBody(request);
+    final cents = body['purchasePriceCents'];
     if (cents is! int || cents < 0) return jsonError('purchasePriceCents (Ganzzahl >= 0) ist Pflicht.');
-    final price = ArticleSupplierPrice(articleId: id, supplierId: supplierId, purchasePriceCents: cents);
+    // C5.2-Nachtrag: fehlt das Feld (ältere Clients), bleibt die Nummer;
+    // leer/null entfernt sie.
+    final rawNumber = body['supplierArticleNumber'];
+    if (rawNumber != null && rawNumber is! String) return jsonError('supplierArticleNumber muss Text sein.');
+    final String? number;
+    if (body.containsKey('supplierArticleNumber')) {
+      final trimmed = (rawNumber as String?)?.trim();
+      number = trimmed == null || trimmed.isEmpty ? null : trimmed;
+    } else {
+      number = (await business.listArticlePrices(companyId, articleId: id))
+          .where((p) => p.supplierId == supplierId)
+          .firstOrNull
+          ?.supplierArticleNumber;
+    }
+    final price = ArticleSupplierPrice(
+      articleId: id,
+      supplierId: supplierId,
+      purchasePriceCents: cents,
+      supplierArticleNumber: number,
+    );
     await business.setArticlePrice(companyId, price);
     await auth.audit(check.auth!, 'article.price.set', 'article', id);
     return jsonOk(price.toJson());

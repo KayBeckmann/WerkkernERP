@@ -83,15 +83,21 @@ class ArticleSupplierPrice {
     required this.articleId,
     required this.supplierId,
     required this.purchasePriceCents,
+    this.supplierArticleNumber,
   });
   final String articleId;
   final String supplierId;
   final int purchasePriceCents;
 
+  /// C5.2-Nachtrag: Bestellnummer dieses Lieferanten (Text, führende
+  /// Nullen bleiben). Nur für Bestellungen, nie auf Kundenbelegen.
+  final String? supplierArticleNumber;
+
   Map<String, Object?> toJson() => {
         'articleId': articleId,
         'supplierId': supplierId,
         'purchasePriceCents': purchasePriceCents,
+        'supplierArticleNumber': supplierArticleNumber,
       };
 }
 

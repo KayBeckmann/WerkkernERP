@@ -92,6 +92,7 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     expect(articles.firstWhere((a) => a['name'] == 'NYM 3x1,5')['stockQuantity'], '7.5');
     expect(articles.firstWhere((a) => a['name'] == 'Alte Dose')['active'], false);
     expect(export['articlePrices'], hasLength(1));
+    expect(((export['articlePrices']! as List).single as Map)['supplierArticleNumber'], '0060903');
     expect(export['stockMovements'], hasLength(2));
     expect(((export['inventoryCounts']! as List).single as Map)['status'], 'completed');
     // C5.4: Lagerort, Platz, Bestand je Platz (Rest „nicht zugeordnet“), Standardplatz.
@@ -109,6 +110,7 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     expect(po['number'], 'B-${yy}001');
     expect(po['sourceOrderId'], order['id']);
     expect(((po['items']! as List).single as Map)['receivedQuantity'], '10');
+    expect(((po['items']! as List).single as Map)['supplierArticleNumber'], '0060903');
     expect(((export['bankTransactions']! as List).single as Map)['matchedDocumentId'], invoice['id']);
     expect(export['expenses'], hasLength(1));
     expect(export['vehicleCosts'], hasLength(1));

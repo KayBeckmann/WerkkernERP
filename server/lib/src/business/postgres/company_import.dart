@@ -133,6 +133,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'article_id': p.articleId,
         'supplier_id': p.supplierId,
         'purchase_price_cents': p.purchasePriceCents,
+        'supplier_article_number': p.supplierArticleNumber,
       });
     }
     for (final p in data.projects) {
@@ -362,6 +363,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'purchase_price_cents': i.purchasePriceCents,
         'received_quantity': i.receivedQuantity,
         'sort_order': i.sortOrder,
+        'supplier_article_number': i.supplierArticleNumber,
       });
     }
     for (final m in data.stockMovements) {

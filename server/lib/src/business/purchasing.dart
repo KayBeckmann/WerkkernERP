@@ -95,7 +95,24 @@ class PurchaseOrderItem {
     this.purchasePriceCents,
     this.receivedQuantity = '0',
     required this.sortOrder,
+    this.supplierArticleNumber,
   });
+
+  /// C5.2-Nachtrag: beim Finalisieren aus der Zuordnung Artikel ×
+  /// Lieferant eingefroren.
+  final String? supplierArticleNumber;
+
+  PurchaseOrderItem withSupplierArticleNumber(String? number) => PurchaseOrderItem(
+        id: id,
+        purchaseOrderId: purchaseOrderId,
+        articleId: articleId,
+        description: description,
+        quantity: quantity,
+        purchasePriceCents: purchasePriceCents,
+        receivedQuantity: receivedQuantity,
+        sortOrder: sortOrder,
+        supplierArticleNumber: number,
+      );
   final String id;
   final String purchaseOrderId;
   final String? articleId;
@@ -118,6 +135,7 @@ class PurchaseOrderItem {
         'quantity': quantity,
         'purchasePriceCents': purchasePriceCents,
         'receivedQuantity': receivedQuantity,
+        'supplierArticleNumber': supplierArticleNumber,
       };
 }
 

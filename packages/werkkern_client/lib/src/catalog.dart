@@ -70,15 +70,24 @@ class OnlineArticleGroup {
 }
 
 class OnlineArticlePrice {
-  const OnlineArticlePrice({required this.supplierId, this.supplierName, required this.purchasePriceCents});
+  const OnlineArticlePrice({
+    required this.supplierId,
+    this.supplierName,
+    required this.purchasePriceCents,
+    this.supplierArticleNumber,
+  });
   factory OnlineArticlePrice.fromJson(Map<String, Object?> j) => OnlineArticlePrice(
         supplierId: j['supplierId'] as String,
         supplierName: j['supplierName'] as String?,
         purchasePriceCents: j['purchasePriceCents'] as int,
+        supplierArticleNumber: j['supplierArticleNumber'] as String?,
       );
   final String supplierId;
   final String? supplierName;
   final int purchasePriceCents;
+
+  /// C5.2-Nachtrag: Bestellnummer dieses Lieferanten (nur Bestellungen).
+  final String? supplierArticleNumber;
 }
 
 Map<String, Object?> _map(Object? value) => value as Map<String, Object?>;
@@ -120,8 +129,12 @@ extension CatalogApi on WerkkernApiClient {
     return [for (final p in j['prices'] as List) OnlineArticlePrice.fromJson(p as Map<String, Object?>)];
   }
 
-  Future<void> setArticlePrice(String articleId, String supplierId, int purchasePriceCents) =>
-      request('PUT', '/articles/$articleId/prices/$supplierId', body: {'purchasePriceCents': purchasePriceCents});
+  /// [supplierArticleNumber]: `null` = unverändert lassen, `''` = entfernen.
+  Future<void> setArticlePrice(String articleId, String supplierId, int purchasePriceCents, {String? supplierArticleNumber}) =>
+      request('PUT', '/articles/$articleId/prices/$supplierId', body: {
+        'purchasePriceCents': purchasePriceCents,
+        'supplierArticleNumber': ?supplierArticleNumber,
+      });
 
   Future<void> removeArticlePrice(String articleId, String supplierId) =>
       request('DELETE', '/articles/$articleId/prices/$supplierId');

@@ -270,6 +270,15 @@ class PurchaseOrderRepository {
           supplierSnapshotCustomerNumber: Value(supplier.ourCustomerNumber),
         ),
       );
+      // C5.2-Nachtrag: Lieferantenartikelnummer der Zuordnung Artikel ×
+      // dieser Lieferant je Position einfrieren (fehlt sie: keine).
+      for (final item in items.where((i) => i.articleId != null)) {
+        final price = await (_db.select(_db.articleSupplierPrices)
+              ..where((p) => p.articleId.equals(item.articleId!) & p.supplierId.equals(order.supplierId)))
+            .getSingleOrNull();
+        await (_db.update(_db.purchaseOrderItems)..where((i) => i.id.equals(item.id)))
+            .write(PurchaseOrderItemsCompanion(supplierArticleNumber: Value(price?.supplierArticleNumber)));
+      }
       return findById(companyId: companyId, id: id);
     });
   }
@@ -307,6 +316,26 @@ class PurchaseOrderRepository {
   /// `purchase_order_pdf_builder.dart`) — der erzeugte Beleg ist wie
   /// jeder andere danach frei editierbar, falls eine Korrektur nötig
   /// ist (anders als eine finalisierte Rechnung).
+  /// Lieferantenartikelnummern der Positionen: finalisiert der
+  /// Schnappschuss, im Entwurf die aktuelle Zuordnung (Anzeige).
+  Future<Map<String, String>> supplierArticleNumbers(PurchaseOrder order, List<PurchaseOrderItem> items) async {
+    if (order.status != PurchaseOrderStatus.draft) {
+      return {
+        for (final i in items)
+          if (i.supplierArticleNumber != null) i.id: i.supplierArticleNumber!,
+      };
+    }
+    final prices = await (_db.select(_db.articleSupplierPrices)..where((p) => p.supplierId.equals(order.supplierId))).get();
+    final byArticle = {
+      for (final p in prices)
+        if (p.supplierArticleNumber != null) p.articleId: p.supplierArticleNumber!,
+    };
+    return {
+      for (final i in items)
+        if (i.articleId != null && byArticle[i.articleId] != null) i.id: byArticle[i.articleId]!,
+    };
+  }
+
   Future<PurchaseOrder?> receiveGoods({
     required String companyId,
     required String id,

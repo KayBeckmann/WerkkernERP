@@ -191,7 +191,13 @@ class MigrationPackageBuilder {
           },
       ],
       'articlePrices': [
-        for (final p in prices) {'articleId': p.articleId, 'supplierId': p.supplierId, 'purchasePriceCents': p.purchasePriceCents},
+        for (final p in prices)
+          {
+            'articleId': p.articleId,
+            'supplierId': p.supplierId,
+            'purchasePriceCents': p.purchasePriceCents,
+            'supplierArticleNumber': p.supplierArticleNumber,
+          },
       ],
       'projects': [
         for (final p in await (db.select(db.projects)..where((p) => p.companyId.equals(companyId))).get())
@@ -353,6 +359,7 @@ class MigrationPackageBuilder {
                   'quantity': _dec(i.quantity),
                   'purchasePriceCents': i.purchasePriceCents,
                   'receivedQuantity': _dec(i.receivedQuantity),
+                  'supplierArticleNumber': i.supplierArticleNumber,
                   'sortOrder': index,
                 },
             ],

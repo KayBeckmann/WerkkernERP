@@ -150,23 +150,35 @@ mixin _PostgresSuppliers implements SupplierStore {
   @override
   Future<List<ArticleSupplierPrice>> listArticlePrices(String companyId, {String? articleId}) async {
     final result = await _q(
-      'SELECT article_id, supplier_id, purchase_price_cents FROM article_supplier_prices '
+      'SELECT article_id, supplier_id, purchase_price_cents, supplier_article_number FROM article_supplier_prices '
       'WHERE company_id = @companyId AND (@articleId::text IS NULL OR article_id = @articleId)',
       {'companyId': companyId, 'articleId': articleId},
     );
     return [
       for (final r in result)
-        ArticleSupplierPrice(articleId: r[0] as String, supplierId: r[1] as String, purchasePriceCents: r[2] as int),
+        ArticleSupplierPrice(
+          articleId: r[0] as String,
+          supplierId: r[1] as String,
+          purchasePriceCents: r[2] as int,
+          supplierArticleNumber: r[3] as String?,
+        ),
     ];
   }
 
   @override
   Future<void> setArticlePrice(String companyId, ArticleSupplierPrice price) async {
     await _q(
-      'INSERT INTO article_supplier_prices (company_id, article_id, supplier_id, purchase_price_cents) '
-      'VALUES (@companyId, @articleId, @supplierId, @cents) '
-      'ON CONFLICT (article_id, supplier_id) DO UPDATE SET purchase_price_cents = EXCLUDED.purchase_price_cents',
-      {'companyId': companyId, 'articleId': price.articleId, 'supplierId': price.supplierId, 'cents': price.purchasePriceCents},
+      'INSERT INTO article_supplier_prices (company_id, article_id, supplier_id, purchase_price_cents, supplier_article_number) '
+      'VALUES (@companyId, @articleId, @supplierId, @cents, @number) '
+      'ON CONFLICT (article_id, supplier_id) DO UPDATE SET purchase_price_cents = EXCLUDED.purchase_price_cents, '
+      'supplier_article_number = EXCLUDED.supplier_article_number',
+      {
+        'companyId': companyId,
+        'articleId': price.articleId,
+        'supplierId': price.supplierId,
+        'cents': price.purchasePriceCents,
+        'number': price.supplierArticleNumber,
+      },
     );
   }
 

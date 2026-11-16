@@ -8953,6 +8953,17 @@ class $ArticleSupplierPricesTable extends ArticleSupplierPrices
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _supplierArticleNumberMeta =
+      const VerificationMeta('supplierArticleNumber');
+  @override
+  late final GeneratedColumn<String> supplierArticleNumber =
+      GeneratedColumn<String>(
+        'supplier_article_number',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -8960,6 +8971,7 @@ class $ArticleSupplierPricesTable extends ArticleSupplierPrices
     supplierId,
     purchasePriceCents,
     createdAt,
+    supplierArticleNumber,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -9013,6 +9025,15 @@ class $ArticleSupplierPricesTable extends ArticleSupplierPrices
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('supplier_article_number')) {
+      context.handle(
+        _supplierArticleNumberMeta,
+        supplierArticleNumber.isAcceptableOrUnknown(
+          data['supplier_article_number']!,
+          _supplierArticleNumberMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -9046,6 +9067,10 @@ class $ArticleSupplierPricesTable extends ArticleSupplierPrices
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      supplierArticleNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}supplier_article_number'],
+      ),
     );
   }
 
@@ -9062,12 +9087,19 @@ class ArticleSupplierPrice extends DataClass
   final String supplierId;
   final int purchasePriceCents;
   final DateTime createdAt;
+
+  /// C5.2-Nachtrag (Kay, 16.11.2026): Bestellnummer **dieses** Lieferanten
+  /// für den Artikel (Text, führende Nullen bleiben). Je Zuordnung, weil
+  /// derselbe Artikel bei AZ und Sonepar verschiedene Nummern hat. Nur für
+  /// Bestellungen — nie auf Kundenbelegen.
+  final String? supplierArticleNumber;
   const ArticleSupplierPrice({
     required this.id,
     required this.articleId,
     required this.supplierId,
     required this.purchasePriceCents,
     required this.createdAt,
+    this.supplierArticleNumber,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -9077,6 +9109,9 @@ class ArticleSupplierPrice extends DataClass
     map['supplier_id'] = Variable<String>(supplierId);
     map['purchase_price_cents'] = Variable<int>(purchasePriceCents);
     map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || supplierArticleNumber != null) {
+      map['supplier_article_number'] = Variable<String>(supplierArticleNumber);
+    }
     return map;
   }
 
@@ -9087,6 +9122,9 @@ class ArticleSupplierPrice extends DataClass
       supplierId: Value(supplierId),
       purchasePriceCents: Value(purchasePriceCents),
       createdAt: Value(createdAt),
+      supplierArticleNumber: supplierArticleNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(supplierArticleNumber),
     );
   }
 
@@ -9101,6 +9139,9 @@ class ArticleSupplierPrice extends DataClass
       supplierId: serializer.fromJson<String>(json['supplierId']),
       purchasePriceCents: serializer.fromJson<int>(json['purchasePriceCents']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      supplierArticleNumber: serializer.fromJson<String?>(
+        json['supplierArticleNumber'],
+      ),
     );
   }
   @override
@@ -9112,6 +9153,9 @@ class ArticleSupplierPrice extends DataClass
       'supplierId': serializer.toJson<String>(supplierId),
       'purchasePriceCents': serializer.toJson<int>(purchasePriceCents),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'supplierArticleNumber': serializer.toJson<String?>(
+        supplierArticleNumber,
+      ),
     };
   }
 
@@ -9121,12 +9165,16 @@ class ArticleSupplierPrice extends DataClass
     String? supplierId,
     int? purchasePriceCents,
     DateTime? createdAt,
+    Value<String?> supplierArticleNumber = const Value.absent(),
   }) => ArticleSupplierPrice(
     id: id ?? this.id,
     articleId: articleId ?? this.articleId,
     supplierId: supplierId ?? this.supplierId,
     purchasePriceCents: purchasePriceCents ?? this.purchasePriceCents,
     createdAt: createdAt ?? this.createdAt,
+    supplierArticleNumber: supplierArticleNumber.present
+        ? supplierArticleNumber.value
+        : this.supplierArticleNumber,
   );
   ArticleSupplierPrice copyWithCompanion(ArticleSupplierPricesCompanion data) {
     return ArticleSupplierPrice(
@@ -9139,6 +9187,9 @@ class ArticleSupplierPrice extends DataClass
           ? data.purchasePriceCents.value
           : this.purchasePriceCents,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      supplierArticleNumber: data.supplierArticleNumber.present
+          ? data.supplierArticleNumber.value
+          : this.supplierArticleNumber,
     );
   }
 
@@ -9149,14 +9200,21 @@ class ArticleSupplierPrice extends DataClass
           ..write('articleId: $articleId, ')
           ..write('supplierId: $supplierId, ')
           ..write('purchasePriceCents: $purchasePriceCents, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('supplierArticleNumber: $supplierArticleNumber')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, articleId, supplierId, purchasePriceCents, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    articleId,
+    supplierId,
+    purchasePriceCents,
+    createdAt,
+    supplierArticleNumber,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -9165,7 +9223,8 @@ class ArticleSupplierPrice extends DataClass
           other.articleId == this.articleId &&
           other.supplierId == this.supplierId &&
           other.purchasePriceCents == this.purchasePriceCents &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.supplierArticleNumber == this.supplierArticleNumber);
 }
 
 class ArticleSupplierPricesCompanion
@@ -9175,6 +9234,7 @@ class ArticleSupplierPricesCompanion
   final Value<String> supplierId;
   final Value<int> purchasePriceCents;
   final Value<DateTime> createdAt;
+  final Value<String?> supplierArticleNumber;
   final Value<int> rowid;
   const ArticleSupplierPricesCompanion({
     this.id = const Value.absent(),
@@ -9182,6 +9242,7 @@ class ArticleSupplierPricesCompanion
     this.supplierId = const Value.absent(),
     this.purchasePriceCents = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.supplierArticleNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ArticleSupplierPricesCompanion.insert({
@@ -9190,6 +9251,7 @@ class ArticleSupplierPricesCompanion
     required String supplierId,
     required int purchasePriceCents,
     required DateTime createdAt,
+    this.supplierArticleNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        articleId = Value(articleId),
@@ -9202,6 +9264,7 @@ class ArticleSupplierPricesCompanion
     Expression<String>? supplierId,
     Expression<int>? purchasePriceCents,
     Expression<DateTime>? createdAt,
+    Expression<String>? supplierArticleNumber,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -9211,6 +9274,8 @@ class ArticleSupplierPricesCompanion
       if (purchasePriceCents != null)
         'purchase_price_cents': purchasePriceCents,
       if (createdAt != null) 'created_at': createdAt,
+      if (supplierArticleNumber != null)
+        'supplier_article_number': supplierArticleNumber,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -9221,6 +9286,7 @@ class ArticleSupplierPricesCompanion
     Value<String>? supplierId,
     Value<int>? purchasePriceCents,
     Value<DateTime>? createdAt,
+    Value<String?>? supplierArticleNumber,
     Value<int>? rowid,
   }) {
     return ArticleSupplierPricesCompanion(
@@ -9229,6 +9295,8 @@ class ArticleSupplierPricesCompanion
       supplierId: supplierId ?? this.supplierId,
       purchasePriceCents: purchasePriceCents ?? this.purchasePriceCents,
       createdAt: createdAt ?? this.createdAt,
+      supplierArticleNumber:
+          supplierArticleNumber ?? this.supplierArticleNumber,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -9251,6 +9319,11 @@ class ArticleSupplierPricesCompanion
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (supplierArticleNumber.present) {
+      map['supplier_article_number'] = Variable<String>(
+        supplierArticleNumber.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -9265,6 +9338,7 @@ class ArticleSupplierPricesCompanion
           ..write('supplierId: $supplierId, ')
           ..write('purchasePriceCents: $purchasePriceCents, ')
           ..write('createdAt: $createdAt, ')
+          ..write('supplierArticleNumber: $supplierArticleNumber, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -19439,6 +19513,17 @@ class $PurchaseOrderItemsTable extends PurchaseOrderItems
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _supplierArticleNumberMeta =
+      const VerificationMeta('supplierArticleNumber');
+  @override
+  late final GeneratedColumn<String> supplierArticleNumber =
+      GeneratedColumn<String>(
+        'supplier_article_number',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -19448,6 +19533,7 @@ class $PurchaseOrderItemsTable extends PurchaseOrderItems
     quantity,
     purchasePriceCents,
     receivedQuantity,
+    supplierArticleNumber,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -19520,6 +19606,15 @@ class $PurchaseOrderItemsTable extends PurchaseOrderItems
         ),
       );
     }
+    if (data.containsKey('supplier_article_number')) {
+      context.handle(
+        _supplierArticleNumberMeta,
+        supplierArticleNumber.isAcceptableOrUnknown(
+          data['supplier_article_number']!,
+          _supplierArticleNumberMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -19557,6 +19652,10 @@ class $PurchaseOrderItemsTable extends PurchaseOrderItems
         DriftSqlType.double,
         data['${effectivePrefix}received_quantity'],
       )!,
+      supplierArticleNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}supplier_article_number'],
+      ),
     );
   }
 
@@ -19590,6 +19689,10 @@ class PurchaseOrderItem extends DataClass
   /// bestellte [quantity] übersteigen (von `receiveGoods()` durchgesetzt,
   /// nicht nur in der UI).
   final double receivedQuantity;
+
+  /// C5.2-Nachtrag: Lieferantenartikelnummer, beim Finalisieren aus der
+  /// Zuordnung Artikel × Lieferant der Bestellung eingefroren.
+  final String? supplierArticleNumber;
   const PurchaseOrderItem({
     required this.id,
     required this.purchaseOrderId,
@@ -19598,6 +19701,7 @@ class PurchaseOrderItem extends DataClass
     required this.quantity,
     this.purchasePriceCents,
     required this.receivedQuantity,
+    this.supplierArticleNumber,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -19613,6 +19717,9 @@ class PurchaseOrderItem extends DataClass
       map['purchase_price_cents'] = Variable<int>(purchasePriceCents);
     }
     map['received_quantity'] = Variable<double>(receivedQuantity);
+    if (!nullToAbsent || supplierArticleNumber != null) {
+      map['supplier_article_number'] = Variable<String>(supplierArticleNumber);
+    }
     return map;
   }
 
@@ -19629,6 +19736,9 @@ class PurchaseOrderItem extends DataClass
           ? const Value.absent()
           : Value(purchasePriceCents),
       receivedQuantity: Value(receivedQuantity),
+      supplierArticleNumber: supplierArticleNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(supplierArticleNumber),
     );
   }
 
@@ -19645,6 +19755,9 @@ class PurchaseOrderItem extends DataClass
       quantity: serializer.fromJson<double>(json['quantity']),
       purchasePriceCents: serializer.fromJson<int?>(json['purchasePriceCents']),
       receivedQuantity: serializer.fromJson<double>(json['receivedQuantity']),
+      supplierArticleNumber: serializer.fromJson<String?>(
+        json['supplierArticleNumber'],
+      ),
     );
   }
   @override
@@ -19658,6 +19771,9 @@ class PurchaseOrderItem extends DataClass
       'quantity': serializer.toJson<double>(quantity),
       'purchasePriceCents': serializer.toJson<int?>(purchasePriceCents),
       'receivedQuantity': serializer.toJson<double>(receivedQuantity),
+      'supplierArticleNumber': serializer.toJson<String?>(
+        supplierArticleNumber,
+      ),
     };
   }
 
@@ -19669,6 +19785,7 @@ class PurchaseOrderItem extends DataClass
     double? quantity,
     Value<int?> purchasePriceCents = const Value.absent(),
     double? receivedQuantity,
+    Value<String?> supplierArticleNumber = const Value.absent(),
   }) => PurchaseOrderItem(
     id: id ?? this.id,
     purchaseOrderId: purchaseOrderId ?? this.purchaseOrderId,
@@ -19679,6 +19796,9 @@ class PurchaseOrderItem extends DataClass
         ? purchasePriceCents.value
         : this.purchasePriceCents,
     receivedQuantity: receivedQuantity ?? this.receivedQuantity,
+    supplierArticleNumber: supplierArticleNumber.present
+        ? supplierArticleNumber.value
+        : this.supplierArticleNumber,
   );
   PurchaseOrderItem copyWithCompanion(PurchaseOrderItemsCompanion data) {
     return PurchaseOrderItem(
@@ -19697,6 +19817,9 @@ class PurchaseOrderItem extends DataClass
       receivedQuantity: data.receivedQuantity.present
           ? data.receivedQuantity.value
           : this.receivedQuantity,
+      supplierArticleNumber: data.supplierArticleNumber.present
+          ? data.supplierArticleNumber.value
+          : this.supplierArticleNumber,
     );
   }
 
@@ -19709,7 +19832,8 @@ class PurchaseOrderItem extends DataClass
           ..write('description: $description, ')
           ..write('quantity: $quantity, ')
           ..write('purchasePriceCents: $purchasePriceCents, ')
-          ..write('receivedQuantity: $receivedQuantity')
+          ..write('receivedQuantity: $receivedQuantity, ')
+          ..write('supplierArticleNumber: $supplierArticleNumber')
           ..write(')'))
         .toString();
   }
@@ -19723,6 +19847,7 @@ class PurchaseOrderItem extends DataClass
     quantity,
     purchasePriceCents,
     receivedQuantity,
+    supplierArticleNumber,
   );
   @override
   bool operator ==(Object other) =>
@@ -19734,7 +19859,8 @@ class PurchaseOrderItem extends DataClass
           other.description == this.description &&
           other.quantity == this.quantity &&
           other.purchasePriceCents == this.purchasePriceCents &&
-          other.receivedQuantity == this.receivedQuantity);
+          other.receivedQuantity == this.receivedQuantity &&
+          other.supplierArticleNumber == this.supplierArticleNumber);
 }
 
 class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
@@ -19745,6 +19871,7 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
   final Value<double> quantity;
   final Value<int?> purchasePriceCents;
   final Value<double> receivedQuantity;
+  final Value<String?> supplierArticleNumber;
   final Value<int> rowid;
   const PurchaseOrderItemsCompanion({
     this.id = const Value.absent(),
@@ -19754,6 +19881,7 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
     this.quantity = const Value.absent(),
     this.purchasePriceCents = const Value.absent(),
     this.receivedQuantity = const Value.absent(),
+    this.supplierArticleNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   PurchaseOrderItemsCompanion.insert({
@@ -19764,6 +19892,7 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
     required double quantity,
     this.purchasePriceCents = const Value.absent(),
     this.receivedQuantity = const Value.absent(),
+    this.supplierArticleNumber = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        purchaseOrderId = Value(purchaseOrderId),
@@ -19777,6 +19906,7 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
     Expression<double>? quantity,
     Expression<int>? purchasePriceCents,
     Expression<double>? receivedQuantity,
+    Expression<String>? supplierArticleNumber,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -19788,6 +19918,8 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
       if (purchasePriceCents != null)
         'purchase_price_cents': purchasePriceCents,
       if (receivedQuantity != null) 'received_quantity': receivedQuantity,
+      if (supplierArticleNumber != null)
+        'supplier_article_number': supplierArticleNumber,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -19800,6 +19932,7 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
     Value<double>? quantity,
     Value<int?>? purchasePriceCents,
     Value<double>? receivedQuantity,
+    Value<String?>? supplierArticleNumber,
     Value<int>? rowid,
   }) {
     return PurchaseOrderItemsCompanion(
@@ -19810,6 +19943,8 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
       quantity: quantity ?? this.quantity,
       purchasePriceCents: purchasePriceCents ?? this.purchasePriceCents,
       receivedQuantity: receivedQuantity ?? this.receivedQuantity,
+      supplierArticleNumber:
+          supplierArticleNumber ?? this.supplierArticleNumber,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -19838,6 +19973,11 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
     if (receivedQuantity.present) {
       map['received_quantity'] = Variable<double>(receivedQuantity.value);
     }
+    if (supplierArticleNumber.present) {
+      map['supplier_article_number'] = Variable<String>(
+        supplierArticleNumber.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -19854,6 +19994,7 @@ class PurchaseOrderItemsCompanion extends UpdateCompanion<PurchaseOrderItem> {
           ..write('quantity: $quantity, ')
           ..write('purchasePriceCents: $purchasePriceCents, ')
           ..write('receivedQuantity: $receivedQuantity, ')
+          ..write('supplierArticleNumber: $supplierArticleNumber, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -33043,6 +33184,7 @@ typedef $$ArticleSupplierPricesTableCreateCompanionBuilder =
       required String supplierId,
       required int purchasePriceCents,
       required DateTime createdAt,
+      Value<String?> supplierArticleNumber,
       Value<int> rowid,
     });
 typedef $$ArticleSupplierPricesTableUpdateCompanionBuilder =
@@ -33052,6 +33194,7 @@ typedef $$ArticleSupplierPricesTableUpdateCompanionBuilder =
       Value<String> supplierId,
       Value<int> purchasePriceCents,
       Value<DateTime> createdAt,
+      Value<String?> supplierArticleNumber,
       Value<int> rowid,
     });
 
@@ -33127,6 +33270,11 @@ class $$ArticleSupplierPricesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get supplierArticleNumber => $composableBuilder(
+    column: $table.supplierArticleNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ArticlesTableFilterComposer get articleId {
     final $$ArticlesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -33198,6 +33346,11 @@ class $$ArticleSupplierPricesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get supplierArticleNumber => $composableBuilder(
+    column: $table.supplierArticleNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ArticlesTableOrderingComposer get articleId {
     final $$ArticlesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -33264,6 +33417,11 @@ class $$ArticleSupplierPricesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get supplierArticleNumber => $composableBuilder(
+    column: $table.supplierArticleNumber,
+    builder: (column) => column,
+  );
 
   $$ArticlesTableAnnotationComposer get articleId {
     final $$ArticlesTableAnnotationComposer composer = $composerBuilder(
@@ -33356,6 +33514,7 @@ class $$ArticleSupplierPricesTableTableManager
                 Value<String> supplierId = const Value.absent(),
                 Value<int> purchasePriceCents = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<String?> supplierArticleNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ArticleSupplierPricesCompanion(
                 id: id,
@@ -33363,6 +33522,7 @@ class $$ArticleSupplierPricesTableTableManager
                 supplierId: supplierId,
                 purchasePriceCents: purchasePriceCents,
                 createdAt: createdAt,
+                supplierArticleNumber: supplierArticleNumber,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -33372,6 +33532,7 @@ class $$ArticleSupplierPricesTableTableManager
                 required String supplierId,
                 required int purchasePriceCents,
                 required DateTime createdAt,
+                Value<String?> supplierArticleNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ArticleSupplierPricesCompanion.insert(
                 id: id,
@@ -33379,6 +33540,7 @@ class $$ArticleSupplierPricesTableTableManager
                 supplierId: supplierId,
                 purchasePriceCents: purchasePriceCents,
                 createdAt: createdAt,
+                supplierArticleNumber: supplierArticleNumber,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -42981,6 +43143,7 @@ typedef $$PurchaseOrderItemsTableCreateCompanionBuilder =
       required double quantity,
       Value<int?> purchasePriceCents,
       Value<double> receivedQuantity,
+      Value<String?> supplierArticleNumber,
       Value<int> rowid,
     });
 typedef $$PurchaseOrderItemsTableUpdateCompanionBuilder =
@@ -42992,6 +43155,7 @@ typedef $$PurchaseOrderItemsTableUpdateCompanionBuilder =
       Value<double> quantity,
       Value<int?> purchasePriceCents,
       Value<double> receivedQuantity,
+      Value<String?> supplierArticleNumber,
       Value<int> rowid,
     });
 
@@ -43079,6 +43243,11 @@ class $$PurchaseOrderItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get supplierArticleNumber => $composableBuilder(
+    column: $table.supplierArticleNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$PurchaseOrdersTableFilterComposer get purchaseOrderId {
     final $$PurchaseOrdersTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -43160,6 +43329,11 @@ class $$PurchaseOrderItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get supplierArticleNumber => $composableBuilder(
+    column: $table.supplierArticleNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$PurchaseOrdersTableOrderingComposer get purchaseOrderId {
     final $$PurchaseOrdersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -43234,6 +43408,11 @@ class $$PurchaseOrderItemsTableAnnotationComposer
 
   GeneratedColumn<double> get receivedQuantity => $composableBuilder(
     column: $table.receivedQuantity,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get supplierArticleNumber => $composableBuilder(
+    column: $table.supplierArticleNumber,
     builder: (column) => column,
   );
 
@@ -43324,6 +43503,7 @@ class $$PurchaseOrderItemsTableTableManager
                 Value<double> quantity = const Value.absent(),
                 Value<int?> purchasePriceCents = const Value.absent(),
                 Value<double> receivedQuantity = const Value.absent(),
+                Value<String?> supplierArticleNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PurchaseOrderItemsCompanion(
                 id: id,
@@ -43333,6 +43513,7 @@ class $$PurchaseOrderItemsTableTableManager
                 quantity: quantity,
                 purchasePriceCents: purchasePriceCents,
                 receivedQuantity: receivedQuantity,
+                supplierArticleNumber: supplierArticleNumber,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -43344,6 +43525,7 @@ class $$PurchaseOrderItemsTableTableManager
                 required double quantity,
                 Value<int?> purchasePriceCents = const Value.absent(),
                 Value<double> receivedQuantity = const Value.absent(),
+                Value<String?> supplierArticleNumber = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => PurchaseOrderItemsCompanion.insert(
                 id: id,
@@ -43353,6 +43535,7 @@ class $$PurchaseOrderItemsTableTableManager
                 quantity: quantity,
                 purchasePriceCents: purchasePriceCents,
                 receivedQuantity: receivedQuantity,
+                supplierArticleNumber: supplierArticleNumber,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

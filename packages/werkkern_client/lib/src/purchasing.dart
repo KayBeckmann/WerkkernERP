@@ -10,8 +10,10 @@ class OnlinePurchaseOrderItem {
     required this.quantity,
     this.purchasePriceCents,
     this.receivedQuantity = '0',
+    this.supplierArticleNumber,
   });
   factory OnlinePurchaseOrderItem.fromJson(Map<String, Object?> j) => OnlinePurchaseOrderItem(
+        supplierArticleNumber: j['supplierArticleNumber'] as String?,
         id: j['id'] as String?,
         articleId: j['articleId'] as String?,
         description: j['description'] as String,
@@ -25,6 +27,9 @@ class OnlinePurchaseOrderItem {
   final String quantity;
   final int? purchasePriceCents;
   final String receivedQuantity;
+
+  /// C5.2-Nachtrag: Entwurf = aktuelle Zuordnung, finalisiert = Schnappschuss.
+  final String? supplierArticleNumber;
 
   Map<String, Object?> toWriteJson() => {
         'articleId': articleId,
