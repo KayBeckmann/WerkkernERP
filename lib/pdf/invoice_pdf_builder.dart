@@ -540,7 +540,7 @@ Future<Uint8List> renderDocumentPdf(
 String _title(DocumentKind kind) => switch (kind) {
       DocumentKind.invoice => 'Rechnung',
       DocumentKind.quote => 'Angebot',
-      DocumentKind.order => 'Auftrag',
+      DocumentKind.order => 'Auftragsbestätigung',
       DocumentKind.deliveryNote => 'Lieferschein',
       DocumentKind.proforma => 'Proforma-Rechnung',
       DocumentKind.creditNote => 'Gutschrift',
@@ -550,6 +550,7 @@ String _title(DocumentKind kind) => switch (kind) {
 /// — kein einheitliches Kompositum-Muster (Lieferschein nimmt kein
 /// Fugen-s), daher eine eigene Funktion statt `'${_title(kind)}sdatum'`.
 String _dateLabel(DocumentKind kind) => switch (kind) {
+      DocumentKind.order => 'Auftragsdatum',
       DocumentKind.deliveryNote => 'Lieferscheindatum',
       DocumentKind.proforma => 'Datum',
       _ => '${_title(kind)}sdatum',

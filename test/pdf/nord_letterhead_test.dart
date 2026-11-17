@@ -49,6 +49,18 @@ PdfDocumentData fixture({DocumentKind kind = DocumentKind.quote, int count = 2, 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('Order PDF says Auftragsbestätigung in both layouts while date stays Auftragsdatum', () async {
+    for (final layout in [PdfLayout.classic, PdfLayout.nordLetterhead]) {
+      final text = (await pages(
+        await renderDocumentPdf(fixture(kind: DocumentKind.order), isPreview: false, layout: layout),
+        'order-${layout.name}',
+      )).join(' ');
+      expect(text, contains('Auftragsbestätigung SYN-001'));
+      expect(text, contains('Auftragsdatum: 02.01.2026'));
+      expect(text, isNot(contains('Auftragsbestätigungsdatum')));
+    }
+  });
+
   test('Nord letterhead puts recipient and title only on page one, repeats company and table headings', () async {
     final text = await pages(await renderDocumentPdf(fixture(count: 75), isPreview: false, layout: PdfLayout.nordLetterhead), 'quote-long');
     expect(text.length, greaterThan(1));
