@@ -571,9 +571,10 @@ pw.Widget _buildLetterhead(PdfDocumentData data, bool firstPage,
       'Diese Proforma-Rechnung ist keine Rechnung im umsatzsteuerrechtlichen Sinne '
       'und keine Zahlungsaufforderung mit eigenem, umsatzsteuerlich relevantem Nummernkreis.',
       style: const pw.TextStyle(fontSize: 8)),
-    if (logo != null) pw.Align(alignment: pw.Alignment.centerLeft,
-      child: pw.Container(height: 55, width: 180, alignment: pw.Alignment.centerLeft,
+    if (logo != null) pw.Align(alignment: pw.Alignment.centerRight,
+      child: pw.Container(height: 55, width: 215, alignment: pw.Alignment.centerRight,
         child: pw.Image(logo, fit: pw.BoxFit.contain))),
+    if (logo != null) pw.SizedBox(height: 8),
     pw.Align(alignment: pw.Alignment.centerRight,
       child: pw.SizedBox(width: 215, child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end, children: [

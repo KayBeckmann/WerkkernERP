@@ -32,6 +32,35 @@ Future<int> imageCount(OnlineDocument doc, {OnlineCompanyProfile? live, PdfLayou
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('Nord logo sits right-aligned directly above the company name', () async {
+    final bytes = await buildOnlineDocumentPdf(document('draft'),
+      liveCompany: const OnlineCompanyProfile(name: 'Synthetic Company', pdfLogoBase64: syntheticPng),
+      layout: PdfLayout.nordLetterhead);
+    final temp = await Directory.systemTemp.createTemp('synthetic-logo-position-');
+    try {
+      final file = File('${temp.path}/document.pdf');
+      await file.writeAsBytes(bytes);
+      final previewDir = Platform.environment['PDF_PREVIEW_DIR'];
+      if (previewDir != null) {
+        await Directory(previewDir).create(recursive: true);
+        await File('$previewDir/nord-logo-right-aligned.pdf').writeAsBytes(bytes);
+      }
+      final result = await Process.run('pdftohtml', ['-xml', '-stdout', '-f', '1', '-l', '1', file.path]);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      final xml = result.stdout as String;
+      final image = xml.split('\n').firstWhere((line) => line.contains('<image '));
+      final company = xml.split('\n').firstWhere((line) => line.contains('Synthetic Company'));
+      int coord(String element, String name) => int.parse(RegExp('$name="([0-9]+)"').firstMatch(element)!.group(1)!);
+      final imageRight = coord(image, 'left') + coord(image, 'width');
+      final companyRight = coord(company, 'left') + coord(company, 'width');
+      expect((imageRight - companyRight).abs(), lessThan(20), reason: 'Logo and company name must share the right edge');
+      expect(coord(company, 'top') - coord(image, 'top') - coord(image, 'height'), greaterThanOrEqualTo(8),
+        reason: 'Leave a visible gap between the logo and company name');
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
   test('PDF has header image only when selected; finalized uses immutable snapshot', () async {
     const live = OnlineCompanyProfile(name: 'Synthetic Company', pdfLogoBase64: syntheticPng);
     expect(onlineDocumentPdfData(document('draft'), liveCompany: live).pdfLogoBase64, syntheticPng);
