@@ -17,13 +17,15 @@ import 'package:werkkernerp/ui/widgets/sidebar_nav_item.dart';
 class OnlineTestServer {
   /// Versendete Mails (statt SMTP) — für Versand-Tests.
   final mailTransport = RecordingMailTransport();
+  final sentCopyTransport = RecordingSentCopyTransport();
 
   final repository = InMemoryPhaseBRepository();
 
   late final handler = PhaseBRouter(
     repository: repository,
     business: InMemoryBusinessRepository(),
-    mail: MailService(transport: mailTransport, secrets: SecretSealer(List<int>.filled(32, 7))),
+    mail: MailService(transport: mailTransport, sentCopy: sentCopyTransport,
+      secrets: SecretSealer(List<int>.filled(32, 7))),
   ).handler;
 
   /// Funkloch simulieren: jede Anfrage scheitert wie ohne Netz.

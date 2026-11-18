@@ -1165,6 +1165,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           target,
     ];
     final canFinalize = document.isDraft && session.can('invoices.finalize');
+    String? sentCopyWarning;
     return [
       if (_store != null && !session.offlineOnly && !_offlineView)
         IconButton(
@@ -1210,14 +1211,14 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
                     buildPdf: () => buildOnlineDocumentPdf(document,
                         layout: documentPdfLayout(document),
                         eInvoiceEnabled: widget.session.modules.contains('eInvoice')),
-                    send: (pdf, {to, subject, body}) async => _client.sendDocumentMail(
-                          document.id,
-                          pdf,
-                          to: to,
-                          subject: subject,
-                          body: body,
-                          xml: await _xrechnungForMail(),
-                        ),
+                    sentCopyWarning: () => sentCopyWarning,
+                    send: (pdf, {to, subject, body}) async {
+                      final result = await _client.sendDocumentMailWithStatus(
+                        document.id, pdf, to: to, subject: subject, body: body,
+                        xml: await _xrechnungForMail());
+                      sentCopyWarning = result.sentCopyWarning;
+                      return result.to;
+                    },
                   ),
         ),
       if (finalized && session.can('invoices.write') && targets.isNotEmpty)

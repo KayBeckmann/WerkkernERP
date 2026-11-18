@@ -50,9 +50,14 @@ void main() {
     await tester.enterText(find.byKey(const Key('online-mail-host')), 'smtp.example.org');
     await tester.enterText(find.byKey(const Key('online-mail-password')), 'geheim-123');
     await tester.enterText(find.byKey(const Key('online-mail-from')), 'rechnung@elektro.example');
+    expect(find.byKey(const Key('online-mail-sent-imap-host')), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('online-mail-sent-imap-host')), 'imap.example.org');
+    await tester.enterText(find.byKey(const Key('online-mail-sent-imap-username')), 'rechnung@elektro.example');
+    await tester.enterText(find.byKey(const Key('online-mail-sent-imap-password')), 'imap-test-secret');
+    await tester.tap(find.byKey(const Key('online-mail-sent-imap-enabled')));
     await tester.tap(find.text('E-Mail-Einstellungen speichern'));
     await tester.pumpAndSettle();
-    expect(find.text('gespeichert — leer lassen, um es zu behalten'), findsOneWidget);
+    expect(find.text('gespeichert — leer lassen, um es zu behalten'), findsNWidgets(2));
     tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).last).removeCurrentSnackBar();
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -63,6 +68,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Per E-Mail senden'));
     await tester.pumpAndSettle();
+    server.sentCopyTransport.failWith = 'not connected';
     await tester.runAsync(() async {
       await tester.tap(find.text('Senden'));
       // PDF-Erzeugung läuft echt asynchron (Schriften, Layout).
@@ -72,7 +78,8 @@ void main() {
       }
     });
     await tester.pumpAndSettle();
-    expect(find.text('Versendet an meyer@example.com.'), findsOneWidget);
+    expect(find.textContaining('Versendet an meyer@example.com.'), findsOneWidget);
+    expect(find.textContaining('Nicht erneut senden.'), findsOneWidget);
     final sent = server.mailTransport.sent.single;
     expect(sent.password, 'geheim-123');
     expect(sent.mail.subject, startsWith('Elektro Kay: R-'));

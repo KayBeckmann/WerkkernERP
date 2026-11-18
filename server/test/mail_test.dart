@@ -113,6 +113,55 @@ void runMailTests(RepositoryFactory create) {
     expect(audit.where((a) => a.action == 'mail.document'), hasLength(3), reason: 'PDF, eigener Empfänger, PDF+XML');
   });
 
+  test('document send stores exact PDF before SMTP and retains it on failure', () async {
+    final c = await configured('archive-document@example.com');
+    final invoice = await finalizedInvoice(c);
+    final path = '/pdf-archive/document/${invoice['id']}/versions';
+    expect((await c.get(path))['versions'], isEmpty);
+
+    transport.failWith = 'SMTP down';
+    await expectLater(c.post('/documents/${invoice['id']}/send', {'pdfBase64': _pdf}), throwsStatus(502));
+    final versions = (await c.get(path))['versions'] as List;
+    expect(versions, hasLength(1));
+    expect((versions.single as Map)['version'], 1);
+    final archived = await h.business.findPdfVersion(c.companyId, 'document', invoice['id'] as String, 1);
+    expect(archived!.bytes, base64Decode(_pdf));
+    expect(transport.sent, isEmpty);
+
+    transport.failWith = null;
+    await c.post('/documents/${invoice['id']}/send', {'pdfBase64': _pdf});
+    expect(transport.sent.single.mail.attachments.single.bytes, archived.bytes);
+    expect((await c.get(path))['versions'], hasLength(1), reason: 'resend must reuse the stored version');
+
+    final differentPdf = base64Encode(utf8.encode('%PDF-1.4\n% Different rendering\n'));
+    await expectLater(c.post('/documents/${invoice['id']}/send', {'pdfBase64': differentPdf}), throwsStatus(409));
+    expect(transport.sent, hasLength(1), reason: 'a different client PDF cannot replace or bypass the archive');
+    expect((await c.get(path))['versions'], hasLength(1));
+  });
+
+  test('document send reuses a previously archived PDF without allocating a version', () async {
+    final c = await configured('prearchived-document@example.com');
+    final invoice = await finalizedInvoice(c);
+    final archive = '/pdf-archive/document/${invoice['id']}/versions';
+    await c.post(archive, {'pdfBase64': _pdf});
+    await c.post('/documents/${invoice['id']}/send', {'pdfBase64': _pdf});
+    expect(transport.sent.single.mail.attachments.single.bytes, base64Decode(_pdf));
+    expect((await c.get(archive))['versions'], hasLength(1));
+  });
+
+  test('document sender with read permission archives without gaining PDF creation permission', () async {
+    final c = await configured('read-only-document@example.com');
+    final invoice = await finalizedInvoice(c);
+    final reader = await h.member(c, 'reader-document@example.com');
+    await c.client.setGroupPermission(c.groups['Monteur']!, 'invoices.read', granted: true);
+    final archive = '/pdf-archive/document/${invoice['id']}/versions';
+    await expectLater(reader.request('POST', archive, body: {'pdfBase64': _pdf}), throwsStatus(403));
+    await reader.request('POST', '/documents/${invoice['id']}/send', body: {'pdfBase64': _pdf});
+    expect(transport.sent.single.mail.attachments.single.bytes, base64Decode(_pdf));
+    expect((await c.get(archive))['versions'], hasLength(1));
+    await expectLater(reader.request('POST', archive, body: {'pdfBase64': _pdf}), throwsStatus(403));
+  });
+
   test('signed time sheet sends archived bytes to accounting, override and failures preserve archive', () async {
     final c = await configured('sheet@example.com');
     await c.client.setModules({...modules, 'orders', 'timeTracking'});
@@ -215,6 +264,8 @@ void runMailTests(RepositoryFactory create) {
     final unconfigured = await h.company('u@example.com', permissions: permissions, modules: modules);
     final own = await finalizedInvoice(unconfigured);
     await expectLater(unconfigured.post('/documents/${own['id']}/send', {'pdfBase64': _pdf}), throwsStatus(409));
+    expect((await unconfigured.get('/pdf-archive/document/${own['id']}/versions'))['versions'], isEmpty,
+        reason: 'An unconfigured SMTP account fails validation before PDF archival');
     expect(transport.sent, isEmpty);
   });
 

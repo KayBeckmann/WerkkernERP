@@ -1,5 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:mailer/src/mime/mime.dart' as mime;
+import 'package:mailer/src/smtp/capabilities.dart' as smtp_capabilities;
 
 import 'package:cryptography/cryptography.dart';
 import 'package:mailer/mailer.dart' as mailer;
@@ -86,6 +91,215 @@ class SmtpMailTransport implements MailTransport {
   }
 }
 
+/// Explicit IMAP-over-TLS destination; independent of the SMTP credentials.
+class SentCopySettings {
+  const SentCopySettings({
+    required this.host,
+    required this.port,
+    required this.username,
+    required this.folder,
+  });
+  final String host;
+  final int port;
+  final String username;
+  final String folder;
+}
+
+/// A separate operation: call only after SMTP succeeds. A failure here must
+/// never trigger another SMTP send; callers should report copy status alone.
+abstract interface class SentCopyTransport {
+  Future<void> save(
+    SentCopySettings settings,
+    String password,
+    OutgoingMail mail, {
+    required String fromAddress,
+    String? fromName,
+  });
+}
+
+class SentCopyException implements Exception {
+  const SentCopyException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+typedef SentCopyConnector =
+    Future<Socket> Function(String host, int port, Duration timeout);
+
+/// IMAPS APPEND with a synchronizing literal. The default connector always
+/// validates the server TLS certificate; injectable connector is for local tests.
+class ImapSentCopyTransport implements SentCopyTransport {
+  ImapSentCopyTransport({
+    SentCopyConnector? connect,
+    this.timeout = const Duration(seconds: 15),
+  }) : _connect = connect ?? _tlsConnect;
+
+  final SentCopyConnector _connect;
+  final Duration timeout;
+
+  static Future<Socket> _tlsConnect(String host, int port, Duration timeout) =>
+      SecureSocket.connect(host, port, timeout: timeout);
+
+  static String _quoted(String value) {
+    if (value.contains(RegExp(r'[\x00-\x1f\x7f]')))
+      throw const SentCopyException('Ungültige IMAP-Einstellung.');
+    final escaped = value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+    return '"$escaped"';
+  }
+
+  @override
+  Future<void> save(
+    SentCopySettings settings,
+    String password,
+    OutgoingMail mail, {
+    required String fromAddress,
+    String? fromName,
+  }) async {
+    if (settings.host.isEmpty ||
+        settings.port < 1 ||
+        settings.port > 65535 ||
+        settings.username.isEmpty ||
+        settings.folder.isEmpty ||
+        password.isEmpty) {
+      throw const SentCopyException('IMAP-Konfiguration unvollständig.');
+    }
+    // Validate before opening the socket. Never interpolate server responses,
+    // credentials, message content, or socket errors into exceptions.
+    final user = _quoted(settings.username);
+    final secret = _quoted(password);
+    final folder = _quoted(settings.folder);
+    Socket? socket;
+    try {
+      final message = mailer.Message()
+        ..from = mailer.Address(fromAddress, fromName)
+        ..recipients.add(mail.to)
+        ..subject = mail.subject
+        ..text = mail.body
+        ..attachments = [
+          for (final a in mail.attachments)
+            mailer.StreamAttachment(
+              Stream.value(a.bytes),
+              a.contentType,
+              fileName: a.fileName,
+            ),
+        ];
+      final data = BytesBuilder(copy: false);
+      await for (final chunk in mime.MimeMessage(
+        message,
+      ).data(const smtp_capabilities.Capabilities()).timeout(timeout)) {
+        data.add(chunk);
+      }
+      final bytes = data.takeBytes();
+      socket = await _connect(
+        settings.host,
+        settings.port,
+        timeout,
+      ).timeout(timeout);
+      final reader = _ImapReplyReader(socket, timeout);
+      await reader.greeting();
+      socket.write('A1 LOGIN $user $secret\r\n');
+      await socket.flush().timeout(timeout);
+      await reader.tagged('A1');
+      socket.write('A2 APPEND $folder (\\Seen) {${bytes.length}}\r\n');
+      await socket.flush().timeout(timeout);
+      if (await reader.continuationOrTagged('A2')) {
+        socket.add(bytes);
+        socket.add([13, 10]);
+        await socket.flush().timeout(timeout);
+        await reader.tagged('A2');
+      }
+      socket.write('A3 LOGOUT\r\n');
+      await socket.flush().timeout(timeout);
+      await reader.tagged('A3');
+    } on SentCopyException {
+      rethrow;
+    } on Object {
+      throw const SentCopyException('IMAP-Kopie fehlgeschlagen.');
+    } finally {
+      socket?.destroy();
+    }
+  }
+}
+
+class _ImapReplyReader {
+  _ImapReplyReader(Socket socket, this.timeout)
+    : _lines = StreamIterator(
+        socket
+            .cast<List<int>>()
+            .transform(utf8.decoder)
+            .transform(const LineSplitter()),
+      );
+  final StreamIterator<String> _lines;
+  final Duration timeout;
+
+  Future<String> _line() async {
+    if (!await _lines.moveNext().timeout(timeout))
+      throw const SentCopyException('IMAP-Verbindung beendet.');
+    return _lines.current;
+  }
+
+  Future<void> greeting() async {
+    final line = await _line();
+    if (!line.startsWith('* OK '))
+      throw const SentCopyException('IMAP-Begrüßung abgelehnt.');
+  }
+
+  Future<void> tagged(String tag) async {
+    while (true) {
+      final line = await _line();
+      if (line.startsWith('$tag OK')) return;
+      if (line.startsWith('$tag ') || line.startsWith('+'))
+        throw const SentCopyException('IMAP-Befehl abgelehnt.');
+      if (!line.startsWith('* '))
+        throw const SentCopyException('Ungültige IMAP-Antwort.');
+    }
+  }
+
+  Future<bool> continuationOrTagged(String tag) async {
+    while (true) {
+      final line = await _line();
+      if (line.startsWith('+')) return true;
+      if (line.startsWith('$tag '))
+        throw const SentCopyException('IMAP APPEND abgelehnt.');
+      if (!line.startsWith('* '))
+        throw const SentCopyException('Ungültige IMAP-Antwort.');
+    }
+  }
+}
+
+class RecordingSentCopyTransport implements SentCopyTransport {
+  final saved =
+      <
+        ({
+          SentCopySettings settings,
+          String password,
+          OutgoingMail mail,
+          String fromAddress,
+          String? fromName,
+        })
+      >[];
+  String? failWith;
+
+  @override
+  Future<void> save(
+    SentCopySettings settings,
+    String password,
+    OutgoingMail mail, {
+    required String fromAddress,
+    String? fromName,
+  }) async {
+    if (failWith != null) throw SentCopyException(failWith!);
+    saved.add((
+      settings: settings,
+      password: password,
+      mail: mail,
+      fromAddress: fromAddress,
+      fromName: fromName,
+    ));
+  }
+}
+
 /// Merkt sich versendete Mails statt sie zu verschicken (Tests, lokale
 /// Vorschau ohne SMTP).
 class RecordingMailTransport implements MailTransport {
@@ -131,8 +345,10 @@ class SecretSealer {
 /// Dienst, den die Router nutzen. [secrets] fehlt, wenn der Betreiber
 /// keinen Schlüssel gesetzt hat.
 class MailService {
-  MailService({required this.transport, this.secrets});
+  MailService({required this.transport, this.secrets, SentCopyTransport? sentCopy})
+      : sentCopy = sentCopy ?? ImapSentCopyTransport();
   final MailTransport transport;
+  final SentCopyTransport sentCopy;
   final SecretSealer? secrets;
 
   bool get available => secrets != null;

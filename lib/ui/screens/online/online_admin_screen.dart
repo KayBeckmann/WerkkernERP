@@ -626,6 +626,12 @@ class _MailTabState extends State<_MailTab> {
   final _password = TextEditingController();
   final _from = TextEditingController();
   final _fromName = TextEditingController();
+  final _sentImapHost = TextEditingController();
+  final _sentImapPort = TextEditingController(text: '993');
+  final _sentImapUsername = TextEditingController();
+  final _sentImapPassword = TextEditingController();
+  final _sentImapFolder = TextEditingController(text: 'Sent');
+  bool _sentImapEnabled = false;
   final _templates = <String, TextEditingController>{};
   bool _useTls = true;
   Object? _error;
@@ -638,7 +644,9 @@ class _MailTabState extends State<_MailTab> {
 
   @override
   void dispose() {
-    for (final c in [_host, _port, _username, _password, _from, _fromName, ..._templates.values]) {
+    for (final c in [_host, _port, _username, _password, _from, _fromName,
+      _sentImapHost, _sentImapPort, _sentImapUsername, _sentImapPassword, _sentImapFolder,
+      ..._templates.values]) {
       c.dispose();
     }
     super.dispose();
@@ -653,6 +661,11 @@ class _MailTabState extends State<_MailTab> {
       _from.text = s.fromAddress ?? '';
       _fromName.text = s.fromName ?? '';
       _useTls = s.useTls;
+      _sentImapEnabled = s.sentImapEnabled;
+      _sentImapHost.text = s.sentImapHost ?? '';
+      _sentImapPort.text = '${s.sentImapPort}';
+      _sentImapUsername.text = s.sentImapUsername ?? '';
+      _sentImapFolder.text = s.sentImapFolder;
       for (final key in _templateLabels.keys) {
         (_templates[key] ??= TextEditingController()).text = s.templates[key] ?? '';
       }
@@ -666,7 +679,8 @@ class _MailTabState extends State<_MailTab> {
 
   Future<void> _save() async {
     final port = int.tryParse(_port.text.trim());
-    if (port == null) {
+    final sentPort = int.tryParse(_sentImapPort.text.trim());
+    if (port == null || sentPort == null) {
       _showError(context, const FormatException('Port ist keine Zahl.'));
       return;
     }
@@ -679,9 +693,16 @@ class _MailTabState extends State<_MailTab> {
         fromName: _value(_fromName),
         useTls: _useTls,
         password: _password.text.isEmpty ? null : _password.text,
+        sentImapEnabled: _sentImapEnabled,
+        sentImapHost: _value(_sentImapHost),
+        sentImapPort: sentPort,
+        sentImapUsername: _value(_sentImapUsername),
+        sentImapFolder: _value(_sentImapFolder) ?? 'Sent',
+        sentImapPassword: _sentImapPassword.text.isEmpty ? null : _sentImapPassword.text,
         templates: {for (final e in _templates.entries) e.key: e.value.text},
       );
       _password.clear();
+      _sentImapPassword.clear();
       if (mounted) setState(() => _settings = saved);
     }, success: 'E-Mail-Einstellungen gespeichert.');
   }
@@ -717,6 +738,27 @@ class _MailTabState extends State<_MailTab> {
         ),
         TextField(key: const Key('online-mail-from'), controller: _from, decoration: const InputDecoration(labelText: 'Absenderadresse')),
         TextField(controller: _fromName, decoration: const InputDecoration(labelText: 'Absendername')),
+        const SizedBox(height: 12),
+        Text('Kopie im Ordner „Gesendet“ (IMAP über TLS)', style: Theme.of(context).textTheme.titleSmall),
+        const Text('Nur aktivieren, wenn das Absenderpostfach per IMAP erreichbar ist. SMTP allein speichert keine Kopie.'),
+        SwitchListTile(
+          key: const Key('online-mail-sent-imap-enabled'),
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Gesendet-Kopie speichern'),
+          value: _sentImapEnabled,
+          onChanged: (v) => setState(() => _sentImapEnabled = v),
+        ),
+        TextField(key: const Key('online-mail-sent-imap-host'), controller: _sentImapHost,
+          decoration: const InputDecoration(labelText: 'IMAP-Server (z. B. mail.skaldify.com)')),
+        TextField(controller: _sentImapPort, keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'IMAP-Port (TLS: 993)')),
+        TextField(key: const Key('online-mail-sent-imap-username'), controller: _sentImapUsername,
+          decoration: const InputDecoration(labelText: 'IMAP-Benutzername')),
+        TextField(controller: _sentImapFolder, decoration: const InputDecoration(labelText: 'Ordnername „Gesendet“')),
+        TextField(key: const Key('online-mail-sent-imap-password'), controller: _sentImapPassword,
+          obscureText: true,
+          decoration: InputDecoration(labelText: 'IMAP-Passwort',
+            helperText: s.hasSentImapPassword ? 'gespeichert — leer lassen, um es zu behalten' : 'nicht gesetzt')),
         const SizedBox(height: 12),
         Text('Vorlagen — Platzhalter {{kunde}}, {{nummer}}, {{firma}}, bei Einladungen {{code}}',
             style: Theme.of(context).textTheme.titleSmall),

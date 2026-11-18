@@ -16,6 +16,7 @@ Future<void> sendPdfByMail(
   bool customText = false,
   required Future<Uint8List> Function() buildPdf,
   required Future<String> Function(Uint8List pdf, {String? to, String? subject, String? body}) send,
+  String? Function()? sentCopyWarning,
 }) async {
   final values = await showOnlineForm(
     context,
@@ -41,7 +42,11 @@ Future<void> sendPdfByMail(
     );
   });
   if (recipient != null && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Versendet an $recipient.')));
+    final warning = sentCopyWarning?.call();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Versendet an $recipient.${warning == null ? '' : ' $warning'}'),
+      duration: warning == null ? const Duration(seconds: 4) : const Duration(seconds: 12),
+    ));
   }
 }
 

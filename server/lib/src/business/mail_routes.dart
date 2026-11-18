@@ -24,7 +24,10 @@ class MailRoutes {
   final SessionAuthenticator auth;
   final MailService mail;
 
-  static const _settingsKeys = {'host', 'port', 'username', 'fromAddress', 'fromName', 'useTls'};
+  static const _settingsKeys = {
+    'host', 'port', 'username', 'fromAddress', 'fromName', 'useTls',
+    'sentImapHost', 'sentImapPort', 'sentImapUsername', 'sentImapFolder', 'sentImapEnabled',
+  };
 
   void mount(Router router) {
     router.get('/mail/settings', _getSettings);
@@ -47,6 +50,12 @@ class MailRoutes {
         'fromName': s['fromName'],
         'useTls': s['useTls'] ?? true,
         'hasPassword': s['passwordSealed'] != null,
+        'sentImapEnabled': s['sentImapEnabled'] == true,
+        'sentImapHost': s['sentImapHost'],
+        'sentImapPort': s['sentImapPort'] ?? 993,
+        'sentImapUsername': s['sentImapUsername'],
+        'sentImapFolder': s['sentImapFolder'] ?? 'Sent',
+        'hasSentImapPassword': s['sentImapPasswordSealed'] != null,
         'templates': {...defaultMailTemplates, ...?(s['templates'] as Map?)?.cast<String, String>()},
       };
 
@@ -107,14 +116,19 @@ class MailRoutes {
     for (final key in _settingsKeys) {
       if (!body.containsKey(key)) continue;
       final v = body[key];
-      if (key == 'port') {
-        if (v is! int || v < 1 || v > 65535) return jsonError('port 1–65535.');
+      if (key == 'port' || key == 'sentImapPort') {
+        if (v is! int || v < 1 || v > 65535) return jsonError('$key 1–65535.');
         stored[key] = v;
-      } else if (key == 'useTls') {
-        if (v is! bool) return jsonError('useTls (bool).');
+      } else if (key == 'useTls' || key == 'sentImapEnabled') {
+        if (v is! bool) return jsonError('$key (bool).');
         stored[key] = v;
       } else {
-        stored[key] = trimmedOrNull(v);
+        final text = trimmedOrNull(v);
+        if (key.startsWith('sentImap') && text != null &&
+            (text.contains('\r') || text.contains('\n') || text.contains('\u0000'))) {
+          return jsonError('Ungültige IMAP-Einstellung.');
+        }
+        stored[key] = text;
       }
     }
     final from = stored['fromAddress'] as String?;
@@ -130,6 +144,23 @@ class MailRoutes {
         }
         stored['passwordSealed'] = await mail.secrets!.encrypt(password);
       }
+    }
+    if (body.containsKey('sentImapPassword')) {
+      final password = body['sentImapPassword'];
+      if (password is! String) return jsonError('sentImapPassword (Text) erwartet.');
+      if (password.isEmpty) {
+        stored.remove('sentImapPasswordSealed');
+      } else {
+        if (!mail.available) return jsonError('Verschlüsselungsschlüssel fehlt.', status: 409);
+        stored['sentImapPasswordSealed'] = await mail.secrets!.encrypt(password);
+      }
+    }
+    if (stored['sentImapEnabled'] == true &&
+        ((stored['sentImapHost'] as String?)?.isEmpty != false ||
+         (stored['sentImapUsername'] as String?)?.isEmpty != false ||
+         (stored['sentImapFolder'] as String? ?? 'Sent').isEmpty ||
+         stored['sentImapPasswordSealed'] == null)) {
+      return jsonError('IMAP-Gesendet benötigt Server, Benutzername, Ordner und Passwort.');
     }
     final templates = body['templates'];
     if (templates != null) {
@@ -159,17 +190,45 @@ class MailRoutes {
   }) async {
     final resolved = await resolve(ctx.session.companyId);
     if (resolved.error != null) return resolved.error!;
+    final outgoing = OutgoingMail(to: to, subject: subject, body: body, attachments: attachments);
     try {
-      await mail.transport.send(
-        resolved.settings!,
-        resolved.password,
-        OutgoingMail(to: to, subject: subject, body: body, attachments: attachments),
-      );
+      await mail.transport.send(resolved.settings!, resolved.password, outgoing);
     } on MailDeliveryException catch (e) {
       return jsonError(e.message, status: 502);
     }
+    // SMTP has already accepted the message. IMAP failure must never look like
+    // a send failure: clients must not resend and duplicate a customer mail.
     await auth.audit(ctx, auditAction, entityType, entityId);
-    return jsonOk({'sent': true, 'to': to, 'subject': subject});
+    final copy = await _saveSentCopy(ctx.session.companyId, resolved.settings!, outgoing);
+    return jsonOk({'sent': true, 'to': to, 'subject': subject,
+      'sentCopyConfigured': copy.configured, 'sentCopySaved': copy.saved,
+      if (copy.warning != null) 'sentCopyWarning': copy.warning});
+  }
+
+  Future<({bool configured, bool saved, String? warning})> _saveSentCopy(
+    String companyId, SmtpSettings smtp, OutgoingMail outgoing) async {
+    try {
+      final settings = await _stored(companyId);
+      if (settings['sentImapEnabled'] != true) {
+        return (configured: false, saved: false, warning: null);
+      }
+      final encrypted = settings['sentImapPasswordSealed'] as String?;
+      final host = settings['sentImapHost'] as String?;
+      final username = settings['sentImapUsername'] as String?;
+      if (host == null || username == null || encrypted == null || mail.secrets == null) {
+        return (configured: true, saved: false, warning: 'SMTP erfolgreich; Gesendet-Kopie konnte nicht gespeichert werden. Nicht erneut senden.');
+      }
+      await mail.sentCopy.save(
+        SentCopySettings(host: host, port: settings['sentImapPort'] as int? ?? 993,
+          username: username, folder: settings['sentImapFolder'] as String? ?? 'Sent'),
+        await mail.secrets!.decrypt(encrypted), outgoing,
+        fromAddress: smtp.fromAddress, fromName: smtp.fromName,
+      );
+      return (configured: true, saved: true, warning: null);
+    } on Object {
+      // Never expose IMAP server replies, socket errors or secrets to clients.
+      return (configured: true, saved: false, warning: 'SMTP erfolgreich; Gesendet-Kopie konnte nicht gespeichert werden. Nicht erneut senden.');
+    }
   }
 
   /// Gemeinsame Vorprüfung: echte App-Sitzung, Recht, Modul `smtp`.
@@ -263,17 +322,20 @@ class MailRoutes {
     final text = trimmedOrNull(body['body']) ?? 'Anbei der unterschriebene Stundenzettel.';
     final resolved = await resolve(companyId);
     if (resolved.error != null) return resolved.error!;
+    final outgoing = OutgoingMail(to: to, subject: subject, body: text, attachments: [
+      MailAttachment(fileName: 'Stundenzettel-$id-v$version.pdf', contentType: 'application/pdf', bytes: pdf.bytes),
+    ]);
     try {
-      await mail.transport.send(resolved.settings!, resolved.password,
-        OutgoingMail(to: to, subject: subject, body: text, attachments: [
-          MailAttachment(fileName: 'Stundenzettel-$id-v$version.pdf', contentType: 'application/pdf', bytes: pdf.bytes),
-        ]));
+      await mail.transport.send(resolved.settings!, resolved.password, outgoing);
     } on MailDeliveryException catch (e) {
       return jsonError(e.message, status: 502);
     }
     // The audit is a dispatch record separate from the immutable archive.
     await auth.audit(ctx, 'mail.timeSheet', 'time-sheet-pdf-v$version', id);
-    return jsonOk({'sent': true, 'to': to, 'version': version});
+    final copy = await _saveSentCopy(companyId, resolved.settings!, outgoing);
+    return jsonOk({'sent': true, 'to': to, 'version': version,
+      'sentCopyConfigured': copy.configured, 'sentCopySaved': copy.saved,
+      if (copy.warning != null) 'sentCopyWarning': copy.warning});
   }
 
   /// Finalisiertes Dokument an den Kunden (Standard: dessen E-Mail).
@@ -301,16 +363,27 @@ class MailRoutes {
       xml = decodeXmlAttachment(body['xmlBase64']);
       if (xml == null) return jsonError('xmlBase64 muss eine XML-Datei bis 2 MB sein.');
     }
-    final templates = (await resolve(companyId)).templates;
-    final composed = _compose(templates, 'document', body,
+    final resolved = await resolve(companyId);
+    if (resolved.error != null) return resolved.error!;
+    final composed = _compose(resolved.templates, 'document', body,
         kunde: document.customerSnapshotName ?? customer?.name ?? '', nummer: document.number ?? '', firma: await _companyName(companyId));
+    final versions = await business.listPdfVersions(companyId, 'document', id);
+    final archived = versions.isEmpty
+        ? await business.archivePdf(
+            companyId: companyId, sourceType: 'document', sourceId: id,
+            bytes: pdf, now: DateTime.now().toUtc())
+        : versions.last;
+    if (archived.bytes.length != pdf.length ||
+        !archived.bytes.asMap().entries.every((entry) => entry.value == pdf[entry.key])) {
+      return jsonError('PDF weicht von der archivierten Fassung ab.', status: 409);
+    }
     return _send(
       ctx,
       to: to,
       subject: composed.subject,
       body: composed.body,
       attachments: [
-        MailAttachment(fileName: '${document.number}.pdf', contentType: 'application/pdf', bytes: pdf),
+        MailAttachment(fileName: '${document.number}.pdf', contentType: 'application/pdf', bytes: archived.bytes),
         if (xml != null) MailAttachment(fileName: eInvoiceXmlFileName(document.number), contentType: 'application/xml', bytes: xml),
       ],
       auditAction: 'mail.document',
