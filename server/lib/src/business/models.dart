@@ -302,6 +302,7 @@ class Document {
     this.companySnapshotTaxNumber,
     this.companySnapshotVatId,
     this.companySnapshotIban,
+    this.companySnapshotBic,
     required this.createdByUserId,
     required this.createdAt,
     required this.updatedAt,
@@ -360,6 +361,7 @@ class Document {
   final String? companySnapshotTaxNumber;
   final String? companySnapshotVatId;
   final String? companySnapshotIban;
+  final String? companySnapshotBic;
   final String createdByUserId;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -471,6 +473,7 @@ class Document {
         companySnapshotTaxNumber: company != null ? company.taxNumber : companySnapshotTaxNumber,
         companySnapshotVatId: company != null ? company.vatId : companySnapshotVatId,
         companySnapshotIban: company != null ? company.iban : companySnapshotIban,
+        companySnapshotBic: company != null ? company.bic : companySnapshotBic,
         createdByUserId: createdByUserId,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -525,6 +528,7 @@ class Document {
                 'taxNumber': companySnapshotTaxNumber,
                 'vatId': companySnapshotVatId,
                 'iban': companySnapshotIban,
+                'bic': companySnapshotBic,
               },
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),

@@ -43,6 +43,8 @@ import '../../domain/services/smtp_credential_store.dart';
 import '../../domain/services/stock_change_notifier.dart';
 import '../../pdf/dunning_letter_pdf_builder.dart';
 import '../../pdf/invoice_pdf_builder.dart';
+import '../../data/repositories/pdf_archive_repository.dart';
+import 'archived_pdf_list.dart';
 import '../../domain/services/einvoice_builder.dart';
 import '../../domain/services/einvoice_parties.dart' show isEInvoiceKind;
 import '../../domain/services/email_sender.dart' show EmailExtraAttachment;
@@ -1221,6 +1223,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final invoice = _currentInvoice;
     if (invoice == null || invoice.status != InvoiceStatus.finalized) return;
     final repo = context.read<InvoiceRepository>();
+    final archive = PdfArchiveRepository(context.read<AppDatabase>());
     try {
       final items = await repo.itemsFor(invoice.id);
       if (!mounted) return;
@@ -1233,6 +1236,13 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
         customer: _liveCustomer ?? widget.customer,
       );
+      await archive.storeGenerated(
+        companyId: company.id,
+        sourceType: PdfArchiveSource.customerDocument,
+        sourceId: invoice.id,
+        bytes: bytes,
+      );
+      if (mounted) setState(() {});
       await Printing.sharePdf(bytes: bytes, filename: '${invoice.invoiceNumber}.pdf');
     } catch (_) {
       // A3 Punkt 4: ein PDF-Fehler darf nie wie ein erfolgreich erstelltes
@@ -1304,8 +1314,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               ];
             },
       buildAttachment: () async {
+        final archive = PdfArchiveRepository(context.read<AppDatabase>());
+        final saved = await archive.list(companyId: company.id,
+          sourceType: PdfArchiveSource.customerDocument, sourceId: invoice.id);
+        if (saved.isNotEmpty) {
+          return (await archive.readBytes(companyId: company.id, artifactId: saved.first.id))!;
+        }
         final items = await repo.itemsFor(invoice.id);
-        return buildInvoicePdf(
+        final bytes = await buildInvoicePdf(
           invoice: invoice,
           items: items,
           company: company,
@@ -1313,6 +1329,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           referencedDocumentNumber: await _referencedInvoiceNumber(invoice, repo),
           customer: _liveCustomer ?? widget.customer,
         );
+        await archive.storeGenerated(companyId: company.id,
+          sourceType: PdfArchiveSource.customerDocument, sourceId: invoice.id,
+          bytes: bytes);
+        return bytes;
       },
     );
   }
@@ -1785,6 +1805,14 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
                 '${isLocked ? 'nicht mehr änderbar.' : 'noch bearbeitbar, bis daraus ein Folgedokument erzeugt wird.'}',
                 style: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
+            ),
+          if (isFinalized)
+            ArchivedPdfList(
+              archive: PdfArchiveRepository(context.read<AppDatabase>()),
+              companyId: _currentInvoice!.companyId,
+              sourceType: PdfArchiveSource.customerDocument,
+              sourceId: _currentInvoice!.id,
+              fileName: _currentInvoice!.invoiceNumber ?? 'Dokument',
             ),
           if (_kind == DocumentKind.quote) _buildQuoteValiditySection(isLocked),
           if (_usesPaymentTerms) _buildPaymentTermsSection(isLocked),

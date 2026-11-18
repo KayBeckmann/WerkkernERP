@@ -555,6 +555,7 @@ class InvoiceRepository {
           companySnapshotTaxNumber: Value(company.taxNumber),
           companySnapshotVatId: Value(company.vatId),
           companySnapshotIban: Value(company.iban),
+          companySnapshotBic: Value(company.bic),
           // A5-Nachtrag: Bindefrist ab Finalisierung festhalten.
           quoteValidFrom: invoice.kind == DocumentKind.quote && invoice.quoteValidityDays != null
               ? Value(DateTime(now.year, now.month, now.day))

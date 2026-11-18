@@ -10,13 +10,14 @@ import 'stock.dart';
 import 'suppliers.dart';
 import 'company_import.dart';
 import 'payment_terms.dart';
+import 'pdf_archive.dart';
 
 /// Fachdaten-Repository. **Jede** Methode ist zwingend firmengebunden
 /// (`companyId`-Parameter) — es gibt bewusst keine firmenübergreifende
 /// Abfrage, auch keine "nach ID global" (ADR-0001 B0.5). Eine fremde
 /// ID liefert dadurch exakt dasselbe Ergebnis wie eine nicht
 /// existierende (`null`/`false`), kein Oracle.
-abstract class BusinessRepository implements SupplierStore, FleetStore, StockStore, AccountingStore, PurchasingStore, DunningStore, RecurringStore, TimeSheetStore, StaffRoleStore, CompanyImportStore, PaymentTermStore {
+abstract class BusinessRepository implements SupplierStore, FleetStore, StockStore, AccountingStore, PurchasingStore, DunningStore, RecurringStore, TimeSheetStore, StaffRoleStore, CompanyImportStore, PaymentTermStore, PdfArchiveStore {
   // ---- Kunden -----------------------------------------------------------
   Future<List<Customer>> listCustomers(String companyId, {String? query});
   Future<Customer?> findCustomer(String companyId, String id);

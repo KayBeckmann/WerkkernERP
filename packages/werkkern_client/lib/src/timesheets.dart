@@ -59,6 +59,25 @@ class OnlineTimeSheet {
 Map<String, Object?> _map(Object? value) => value as Map<String, Object?>;
 
 extension TimeSheetApi on WerkkernApiClient {
+  /// Metadata only; the archived bytes stay on the server during delivery.
+  Future<List<int>> timeSheetPdfVersions(String id) async {
+    final response = _map(await request('GET', '/pdf-archive/time-sheet/$id/versions'));
+    return [for (final v in response['versions'] as List) (v as Map)['version'] as int];
+  }
+
+  Future<int> archiveTimeSheetPdf(String id, Uint8List bytes) async =>
+      _map(await request('POST', '/pdf-archive/time-sheet/$id/versions',
+          body: {'pdfBase64': base64Encode(bytes)}))['version'] as int;
+
+  Future<Uint8List> downloadTimeSheetPdf(String id, int version) =>
+      downloadBytes('/pdf-archive/time-sheet/$id/versions/$version');
+
+  Future<String> sendTimeSheetMail(String id, {required int version, required String to,
+      String? subject, String? body}) async =>
+      _map(await request('POST', '/time-sheets/$id/send', body: {
+        'version': version, 'to': to, 'subject': ?subject, 'body': ?body,
+      }))['to'] as String;
+
   Future<List<OnlineTimeSheet>> timeSheets() async {
     final j = _map(await request('GET', '/time-sheets'));
     return [for (final s in j['timeSheets'] as List) OnlineTimeSheet.fromJson(s as Map<String, Object?>)];

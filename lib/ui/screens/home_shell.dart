@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
+import '../../data/repositories/pdf_archive_repository.dart';
 import '../../domain/services/active_company_service.dart';
 import '../widgets/app_shell.dart';
 import 'articles_screen.dart';
@@ -10,6 +11,7 @@ import 'company_switcher_screen.dart';
 import 'customers_screen.dart';
 import 'bank_reconciliation_screen.dart';
 import 'dashboard_screen.dart';
+import 'document_archive_screen.dart';
 import 'euer_screen.dart';
 import 'expenses_screen.dart';
 import 'invoices_screen.dart';
@@ -56,6 +58,7 @@ enum _TabId {
   expenses,
   euer,
   bankReconciliation,
+  documentArchive,
   settings,
 }
 
@@ -265,6 +268,14 @@ class _HomeShellState extends State<HomeShell> {
             section: ShellSection.buchhaltung,
           ),
         ],
+        ShellTab(
+          id: _TabId.documentArchive,
+          icon: Icons.folder_copy_outlined,
+          title: 'Dokumentenablage',
+          screen: Builder(builder: (context) => DocumentArchiveScreen(
+            archive: PdfArchiveRepository(context.read<AppDatabase>()), companyId: company.id)),
+          section: ShellSection.einstellungen,
+        ),
         const ShellTab(
           id: _TabId.settings,
           icon: Icons.settings_outlined,

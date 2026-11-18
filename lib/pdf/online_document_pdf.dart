@@ -64,6 +64,7 @@ PdfDocumentData onlineDocumentPdfData(
     companySnapshotTaxNumber: company?.taxNumber,
     companySnapshotVatId: company?.vatId,
     companySnapshotIban: company?.iban,
+    companySnapshotBic: company?.bic,
     pdfLogoBase64: isPreview ? liveCompany?.pdfLogoBase64 : document.pdfLogoSnapshot,
     customerSnapshotName: isPreview
         ? (liveCustomer?.name ?? document.customerName)

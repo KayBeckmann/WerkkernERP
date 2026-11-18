@@ -506,6 +506,15 @@ class _OnlinePurchaseOrderScreenState extends State<OnlinePurchaseOrderScreen> {
               companyAddress: company.address,
               companyEmail: company.email,
               companyPhone: company.phone,
+              companyTaxNumber: company.taxNumber,
+              companyVatId: company.vatId,
+              companyIban: company.iban,
+              companyBic: company.bic,
+              pdfLogoBase64: company.pdfLogoBase64,
+              footerColumns: company.footerColumns,
+              footerText: company.footerText,
+              introText: company.documentTexts['purchaseOrder']?.intro,
+              closingText: company.documentTexts['purchaseOrder']?.closing,
               items: [
                 for (final i in order.items)
                   (

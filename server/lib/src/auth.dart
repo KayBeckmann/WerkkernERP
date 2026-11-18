@@ -109,7 +109,7 @@ class SessionAuthenticator {
     return auth;
   }
 
-  Future<bool> isGranted(AuthContext auth, String permission, {String? requiredModule}) async {
+  Future<bool> isGranted(AuthContext auth, String permission, {String? requiredModule, bool ignoreModule = false}) async {
     final company = await repository.findCompanyById(auth.session.companyId);
     if (company == null) return false;
     return PermissionResolver.hasPermission(
@@ -118,7 +118,7 @@ class SessionAuthenticator {
       permission: permission,
       groupPermissions: await repository.listGroupPermissions(auth.membership.groupId),
       overrides: await repository.listMembershipOverrides(auth.membership.id),
-      requiredModule: requiredModule ?? requiredModuleFor(permission),
+      requiredModule: ignoreModule ? null : requiredModule ?? requiredModuleFor(permission),
     );
   }
 

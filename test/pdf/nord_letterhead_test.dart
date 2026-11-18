@@ -232,12 +232,13 @@ void main() {
     expect(text, isNot(contains('Gesamtbetrag')));
   });
 
-  test('Nord invoice displays gross price but not VAT under §19', () async {
+  test('Nord invoice labels unit price neutrally, without VAT under §19', () async {
     final text = (await pages(await renderDocumentPdf(
       fixture(kind: DocumentKind.invoice, count: 24),
       isPreview: false, layout: PdfLayout.nordLetterhead), 'invoice-long')).join(' ');
     expect(text, contains('Rechnung SYN-001'));
-    expect(text, contains('Bruttopreis'));
+    expect(text, contains('Einzelpreis'));
+    expect(text, isNot(contains('Bruttopreis')));
     expect(text, contains('Gesamtbetrag'));
     expect(text, isNot(contains('Netto 0 %')));
   });

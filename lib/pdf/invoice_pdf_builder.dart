@@ -124,6 +124,7 @@ class PdfDocumentData {
     this.companySnapshotTaxNumber,
     this.companySnapshotVatId,
     this.companySnapshotIban,
+    this.companySnapshotBic,
     this.pdfLogoBase64,
     this.customerSnapshotName,
     this.customerSnapshotAddress,
@@ -151,6 +152,7 @@ class PdfDocumentData {
   final String? companySnapshotTaxNumber;
   final String? companySnapshotVatId;
   final String? companySnapshotIban;
+  final String? companySnapshotBic;
   final String? pdfLogoBase64;
   final String? customerSnapshotName;
   final String? customerSnapshotAddress;
@@ -261,6 +263,7 @@ Future<Uint8List> _buildPdf({
       companySnapshotTaxNumber: invoice.companySnapshotTaxNumber,
       companySnapshotVatId: invoice.companySnapshotVatId,
       companySnapshotIban: invoice.companySnapshotIban,
+      companySnapshotBic: isPreview ? company.bic : invoice.companySnapshotBic,
       customerSnapshotName: invoice.customerSnapshotName,
       customerSnapshotAddress: invoice.customerSnapshotAddress,
       customerSnapshotVatId: invoice.customerSnapshotVatId,
@@ -444,7 +447,7 @@ Future<Uint8List> renderDocumentPdf(
           if (footerText != null) ...[
             pw.Divider(color: PdfColors.grey400),
             pw.Text(
-              footerText,
+              interpolateFooter(footerText, invoice),
               textAlign: pw.TextAlign.center,
               style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
             ),
@@ -621,6 +624,7 @@ String interpolateFooter(String template, PdfDocumentData data) {
     'taxNumber': data.companySnapshotTaxNumber,
     'vatId': data.companySnapshotVatId,
     'iban': data.companySnapshotIban,
+    'bic': data.companySnapshotBic,
     'customerName': data.customerSnapshotName,
     'customerAddress': data.customerSnapshotAddress,
     'documentNumber': data.invoiceNumber,
@@ -667,7 +671,7 @@ pw.Widget _buildLetterFooter(PdfDocumentData data, String? footerText, int page,
       if (footerText?.trim().isNotEmpty ?? false)
         pw.SizedBox(height: 12),
       if (footerText?.trim().isNotEmpty ?? false)
-        pw.Text(footerText!, textAlign: pw.TextAlign.center,
+        pw.Text(interpolateFooter(footerText!, data), textAlign: pw.TextAlign.center,
             style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
       ],
       pw.SizedBox(height: 4),
@@ -838,7 +842,7 @@ List<pw.Widget> _buildGroup(String? groupLabel, List<PdfLine> items,
               ? [
                   _cell('Beschreibung', bold: true),
                   _cell('Menge', bold: true, alignRight: true),
-                  _cell(isSmallBusinessExempt ? 'Bruttopreis' : 'Einzelpreis', bold: true, alignRight: true),
+                  _cell('Einzelpreis', bold: true, alignRight: true),
                   if (!isSmallBusinessExempt) _cell('MwSt.', bold: true, alignRight: true),
                   _cell('Gesamt', bold: true, alignRight: true),
                 ]

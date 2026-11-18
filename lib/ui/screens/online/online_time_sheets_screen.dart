@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:werkkern_client/werkkern_client.dart';
 
 import '../../../domain/services/online_session.dart';
+import '../../../domain/services/time_sheet_billing_recipient.dart';
+import '../../../pdf/time_sheet_pdf_builder.dart';
 import '../../widgets/signature_pad.dart';
 import 'online_form.dart';
 
@@ -114,6 +117,8 @@ class OnlineTimeSheetScreen extends StatefulWidget {
 
 class _OnlineTimeSheetScreenState extends State<OnlineTimeSheetScreen> {
   OnlineTimeSheet? _sheet;
+  int? _archivedVersion;
+  bool _archiving = false;
   Object? _error;
 
   WerkkernApiClient get _client => widget.session.client;
@@ -127,7 +132,14 @@ class _OnlineTimeSheetScreenState extends State<OnlineTimeSheetScreen> {
   Future<void> _load() async {
     try {
       final sheet = await _client.timeSheet(widget.sheetId);
-      if (mounted) setState(() => _sheet = sheet);
+      final versions = sheet.isSigned && widget.session.can('timeTracking.write')
+          ? await _client.timeSheetPdfVersions(sheet.id) : <int>[];
+      if (mounted) {
+        setState(() {
+          _sheet = sheet;
+          _archivedVersion = versions.isEmpty ? null : versions.last;
+        });
+      }
     } on Exception catch (e) {
       if (mounted) setState(() => _error = e);
     }
@@ -182,6 +194,98 @@ class _OnlineTimeSheetScreenState extends State<OnlineTimeSheetScreen> {
       final signed = await _client.signTimeSheet(widget.sheetId, png, signerName: values['signerName'] as String?);
       if (mounted) setState(() => _sheet = signed);
     }, success: 'Unterschrieben.');
+  }
+
+  Future<void> _archive() async {
+    final sheet = _sheet;
+    if (_archiving || sheet == null || !sheet.isSigned || _archivedVersion != null ||
+        !widget.session.can('timeTracking.write') || widget.session.offlineOnly) {
+      return;
+    }
+    setState(() => _archiving = true);
+    try {
+      final pdf = await buildTimeSheetPdf(TimeSheetPdfData(
+        id: sheet.id,
+        date: sheet.date,
+        signedAt: sheet.signedAt,
+        signaturePng: sheet.signaturePng,
+        companyName: widget.session.companyName,
+        reference: sheet.documentId != null
+            ? sheet.documentNumber ?? 'Dokument ${sheet.documentId}'
+            : sheet.projectName ?? 'Projekt ${sheet.projectId}',
+        customerName: sheet.customerName,
+        signerName: sheet.signerName,
+        supersedesId: sheet.supersedesId,
+        entries: [
+          for (final e in sheet.entries)
+            TimeSheetPdfEntry(date: e.date, hours: double.parse(e.hours), note: e.note),
+        ],
+      ));
+      final version = await _client.archiveTimeSheetPdf(sheet.id, pdf);
+      final versions = await _client.timeSheetPdfVersions(sheet.id);
+      if (versions.isEmpty || versions.last != version ||
+          !listEquals(await _client.downloadTimeSheetPdf(sheet.id, version), pdf)) {
+        throw StateError('Archivierte PDF-Fassung konnte nicht bestätigt werden.');
+      }
+      if (mounted) setState(() => _archivedVersion = version);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF erstellt und archiviert.')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF konnte nicht archiviert werden: ${describeOnlineError(e)}')));
+      }
+    } finally {
+      if (mounted) setState(() => _archiving = false);
+    }
+  }
+
+  Future<void> _sendArchived() async {
+    final sheet = _sheet;
+    final version = _archivedVersion;
+    if (sheet == null || !sheet.isSigned || version == null) return;
+    String recipient = '';
+    try {
+      String? customerId;
+      String? contactId;
+      if (sheet.documentId != null && widget.session.can('invoices.read')) {
+        final document = await _client.document(sheet.documentId!);
+        customerId = document.customerId;
+        contactId = document.contactId;
+      } else if (sheet.projectId != null && widget.session.can('projects.read')) {
+        final project = (await _client.projects()).where((p) => p.id == sheet.projectId).firstOrNull;
+        customerId = project?.customerId;
+      }
+      if (customerId != null && widget.session.can('customers.read')) {
+        final customer = await _client.customer(customerId);
+        recipient = timeSheetBillingRecipient(
+          invoiceEmail: customer.invoiceEmail,
+          contactEmail: customer.contacts.where((c) => c.id == contactId).firstOrNull?.email,
+          customerEmail: customer.email,
+        ) ?? '';
+      }
+    } on Exception catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(describeOnlineError(e))));
+      return;
+    }
+    if (!mounted) return;
+    final values = await showOnlineForm(context,
+      title: 'Stundenzettel an Buchhaltung senden', submitLabel: 'Senden',
+      fields: [
+        OnlineField('to', 'Buchhaltung: Empfänger', required: true, initial: recipient,
+          helper: 'Adresse prüfen oder manuell ändern.'),
+        const OnlineField('subject', 'Betreff', initial: 'Unterschriebener Stundenzettel'),
+        const OnlineField('body', 'Text', type: OnlineFieldType.multiline,
+          initial: 'Anbei der unterschriebene Stundenzettel.'),
+      ],
+    );
+    if (values == null || !mounted) return;
+    await runOnline(context, () => _client.sendTimeSheetMail(sheet.id,
+      version: version, to: values['to'] as String,
+      subject: values['subject'] as String?, body: values['body'] as String?),
+      success: 'Stundenzettel an Buchhaltung versendet.');
   }
 
   Future<void> _correction() async {
@@ -282,6 +386,22 @@ class _OnlineTimeSheetScreenState extends State<OnlineTimeSheetScreen> {
                           child: Image.memory(sheet.signaturePng!, height: 120),
                         ),
                       const Text(signatureDisclaimer, style: TextStyle(fontSize: 11)),
+                      if (_archivedVersion == null)
+                        OutlinedButton.icon(
+                          onPressed: !_archiving && widget.session.can('timeTracking.write') &&
+                              !widget.session.offlineOnly ? _archive : null,
+                          icon: const Icon(Icons.picture_as_pdf_outlined),
+                          label: const Text('PDF erstellen und archivieren'),
+                        ),
+                      OutlinedButton.icon(
+                        onPressed: !_archiving && _archivedVersion != null && widget.session.modules.contains('smtp') &&
+                            widget.session.can('timeTracking.write') && !widget.session.offlineOnly
+                            ? _sendArchived : null,
+                        icon: const Icon(Icons.email_outlined),
+                        label: const Text('Per E-Mail senden'),
+                      ),
+                      if (_archivedVersion == null)
+                        const Text('Versand erst möglich, wenn das unterschriebene PDF archiviert ist.'),
                     ],
                   ],
                 ),

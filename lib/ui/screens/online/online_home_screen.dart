@@ -11,6 +11,7 @@ import 'online_articles_screen.dart';
 import 'online_customers_screen.dart';
 import 'online_dashboard_screen.dart';
 import 'online_documents_screen.dart';
+import 'online_document_archive_screen.dart';
 import 'online_dunning_screen.dart';
 import 'online_fleet_screen.dart';
 import 'online_password_dialog.dart';
@@ -261,6 +262,15 @@ class _OnlineHomeScreenState extends State<OnlineHomeScreen> {
             tab('Bankabgleich', Icons.sync_alt_outlined, ShellSection.buchhaltung, OnlineBankScreen(session: session)),
           ],
         ];
+        // Kein Modulschalter: Zugang zur Ablage auch ohne aktivierte
+        // Quellmodule; einzelne Einträge folgen den Leserechten.
+        if (online && ([
+          'invoices.read', 'purchaseOrders.read',
+          'timeTracking.read', 'timeTracking.write',
+        ].any(session.can))) {
+          tabs.add(tab('Dokumentenablage', Icons.folder_copy_outlined,
+              ShellSection.einstellungen, OnlineDocumentArchiveScreen(session: session)));
+        }
         // Ohne jedes Recht bleibt der Hinweis „keine Rechte“ statt einer
         // Navigation, die nur aus den Einstellungen besteht.
         if (online && (tabs.isNotEmpty || session.isAdmin)) {

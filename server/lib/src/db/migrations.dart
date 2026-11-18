@@ -45,7 +45,39 @@ final List<Future<void> Function(Session db)> _steps = [
   _step30PdfLayout,
   _step31FooterColumns,
   _step32PdfLogo,
+  _step33PdfArchive,
+  _step34DocumentBicSnapshot,
 ];
+
+Future<void> _step34DocumentBicSnapshot(Session db) async {
+  await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS company_snapshot_bic TEXT');
+}
+
+Future<void> _step33PdfArchive(Session db) async {
+  await db.execute('''
+    CREATE TABLE pdf_archive (
+      company_id TEXT NOT NULL REFERENCES companies(id) ON DELETE RESTRICT,
+      source_type TEXT NOT NULL CHECK (source_type IN ('document', 'purchase-order', 'time-sheet')),
+      source_id TEXT NOT NULL,
+      version INTEGER NOT NULL CHECK (version > 0),
+      created_at TIMESTAMPTZ NOT NULL,
+      sha256 TEXT NOT NULL CHECK (sha256 ~ '^[0-9a-f]{64}\$'),
+      pdf_bytes BYTEA NOT NULL,
+      PRIMARY KEY (company_id, source_type, source_id, version)
+    )
+  ''');
+  await db.execute('''
+    CREATE FUNCTION reject_pdf_archive_change() RETURNS trigger LANGUAGE plpgsql AS \$\$
+    BEGIN
+      RAISE EXCEPTION 'Archived PDFs are immutable';
+    END;
+    \$\$
+  ''');
+  await db.execute('''
+    CREATE TRIGGER pdf_archive_immutable BEFORE UPDATE OR DELETE ON pdf_archive
+    FOR EACH ROW EXECUTE FUNCTION reject_pdf_archive_change()
+  ''');
+}
 
 Future<void> _step32PdfLogo(Session db) async {
   await db.execute('ALTER TABLE companies ADD COLUMN pdf_logo_base64 TEXT');

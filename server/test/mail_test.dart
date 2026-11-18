@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:test/test.dart';
+import 'package:werkkern_client/werkkern_client.dart';
 import 'package:werkkernerp_server/src/mail.dart';
 
 import 'support/module_harness.dart';
@@ -110,6 +111,64 @@ void runMailTests(RepositoryFactory create) {
     await expectLater(c.post('/documents/${invoice['id']}/send', {'pdfBase64': _pdf}), throwsStatus(502));
     final audit = await c.client.audit();
     expect(audit.where((a) => a.action == 'mail.document'), hasLength(3), reason: 'PDF, eigener Empfänger, PDF+XML');
+  });
+
+  test('signed time sheet sends archived bytes to accounting, override and failures preserve archive', () async {
+    final c = await configured('sheet@example.com');
+    await c.client.setModules({...modules, 'orders', 'timeTracking'});
+    await c.client.setGroupPermission(c.ownGroup, 'timeTracking.write', granted: true);
+    final customer = await c.post('/customers', {
+      'name': 'Meyer', 'email': 'info@example.org',
+      'invoiceEmail': 'buchhaltung@example.org',
+      'contacts': [{'name': 'Accounting', 'email': 'contact@example.org'}],
+    });
+    final contactId = ((customer['contacts'] as List).single as Map)['id'];
+    final doc = await c.post('/documents', {
+      'kind': 'order', 'customerId': customer['id'], 'contactId': contactId, 'items': [],
+    });
+    final sheet = await c.post('/time-sheets', {'documentId': doc['id']});
+    final path = '/time-sheets/${sheet['id']}/send';
+    await expectLater(c.post(path), throwsStatus(409));
+    final entry = await c.post('/time-entries', {
+      'date': '2026-10-20', 'hours': '2', 'documentId': doc['id'],
+    });
+    await c.post('/time-sheets/${sheet['id']}/entries', {'entryIds': [entry['id']]});
+    await c.post('/time-sheets/${sheet['id']}/sign', {'signaturePng': 'iVBORw0KGgo='});
+    expect(transport.sent, isEmpty, reason: 'signing never sends');
+    await expectLater(c.post(path), throwsStatus(409));
+    final archive = '/pdf-archive/time-sheet/${sheet['id']}/versions';
+    await c.post(archive, {'pdfBase64': _pdf});
+    final sent = await c.post(path, {'pdfBase64': base64Encode(utf8.encode('%PDF-forged'))});
+    expect(sent['to'], 'buchhaltung@example.org');
+    expect(transport.sent.single.mail.attachments.single.bytes, base64Decode(_pdf));
+    await c.put('/customers/${customer['id']}', {
+      'name': 'Meyer', 'email': 'info@example.org', 'invoiceEmail': null,
+    });
+    expect((await c.post(path, {'version': 1}))['to'], 'contact@example.org');
+    await c.put('/customers/${customer['id']}', {
+      'name': 'Meyer', 'email': 'info@example.org', 'contacts': [],
+    });
+    expect((await c.post(path, {'version': 1}))['to'], 'info@example.org');
+    await expectLater(c.post(path, {'version': 99}), throwsStatus(404));
+    await expectLater(c.post(path, {'version': -1}), throwsStatus(400));
+    await c.post(path, {'to': 'override@example.org', 'version': 1});
+    expect(transport.sent.last.mail.to, 'override@example.org');
+    transport.failWith = 'SMTP down';
+    await expectLater(c.post(path), throwsStatus(502));
+    expect((await c.get(archive))['versions'], hasLength(1));
+    expect((await c.client.audit()).where((a) => a.action == 'mail.timeSheet'), hasLength(4));
+    final other = await configured('other-sheet@example.com');
+    await other.client.setModules({...modules, 'orders', 'timeTracking'});
+    await other.client.setGroupPermission(other.ownGroup, 'timeTracking.write', granted: true);
+    await expectLater(other.post(path), throwsStatus(404));
+    await c.client.setModules({'timeTracking'});
+    await expectLater(c.post(path), throwsStatus(403));
+    await c.client.setModules({...modules, 'orders', 'timeTracking', 'aiAgents'});
+    final agent = WerkkernApiClient(baseUrl: h.base)
+      ..token = (await c.client.createAgentToken('Sheet agent')).token;
+    await expectLater(agent.request('POST', path, body: {'version': 1}), throwsStatus(403));
+    await c.client.setGroupPermission(c.ownGroup, 'timeTracking.write', granted: false);
+    await expectLater(c.post(path), throwsStatus(403));
   });
 
   test('Mahnung versenden markiert sie als versendet; Bestellung geht an den Lieferanten', () async {

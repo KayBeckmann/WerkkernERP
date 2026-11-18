@@ -488,6 +488,28 @@ class $CompaniesTable extends Companies
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _pdfIntroTextPurchaseOrderMeta =
+      const VerificationMeta('pdfIntroTextPurchaseOrder');
+  @override
+  late final GeneratedColumn<String> pdfIntroTextPurchaseOrder =
+      GeneratedColumn<String>(
+        'pdf_intro_text_purchase_order',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfClosingTextPurchaseOrderMeta =
+      const VerificationMeta('pdfClosingTextPurchaseOrder');
+  @override
+  late final GeneratedColumn<String> pdfClosingTextPurchaseOrder =
+      GeneratedColumn<String>(
+        'pdf_closing_text_purchase_order',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _pdfIntroTextDeliveryNoteMeta =
       const VerificationMeta('pdfIntroTextDeliveryNote');
   @override
@@ -996,6 +1018,8 @@ class $CompaniesTable extends Companies
     pdfClosingTextQuote,
     pdfIntroTextOrder,
     pdfClosingTextOrder,
+    pdfIntroTextPurchaseOrder,
+    pdfClosingTextPurchaseOrder,
     pdfIntroTextDeliveryNote,
     pdfClosingTextDeliveryNote,
     pdfIntroTextProforma,
@@ -1375,6 +1399,24 @@ class $CompaniesTable extends Companies
         pdfClosingTextOrder.isAcceptableOrUnknown(
           data['pdf_closing_text_order']!,
           _pdfClosingTextOrderMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_intro_text_purchase_order')) {
+      context.handle(
+        _pdfIntroTextPurchaseOrderMeta,
+        pdfIntroTextPurchaseOrder.isAcceptableOrUnknown(
+          data['pdf_intro_text_purchase_order']!,
+          _pdfIntroTextPurchaseOrderMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_closing_text_purchase_order')) {
+      context.handle(
+        _pdfClosingTextPurchaseOrderMeta,
+        pdfClosingTextPurchaseOrder.isAcceptableOrUnknown(
+          data['pdf_closing_text_purchase_order']!,
+          _pdfClosingTextPurchaseOrderMeta,
         ),
       );
     }
@@ -1893,6 +1935,14 @@ class $CompaniesTable extends Companies
         DriftSqlType.string,
         data['${effectivePrefix}pdf_closing_text_order'],
       ),
+      pdfIntroTextPurchaseOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_intro_text_purchase_order'],
+      ),
+      pdfClosingTextPurchaseOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_closing_text_purchase_order'],
+      ),
       pdfIntroTextDeliveryNote: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_intro_text_delivery_note'],
@@ -2169,6 +2219,10 @@ class Company extends DataClass implements Insertable<Company> {
   final String? pdfClosingTextQuote;
   final String? pdfIntroTextOrder;
   final String? pdfClosingTextOrder;
+
+  /// Lieferantenbestellung; unabhängig vom Kundenauftrag (`Order`).
+  final String? pdfIntroTextPurchaseOrder;
+  final String? pdfClosingTextPurchaseOrder;
   final String? pdfIntroTextDeliveryNote;
   final String? pdfClosingTextDeliveryNote;
 
@@ -2339,6 +2393,8 @@ class Company extends DataClass implements Insertable<Company> {
     this.pdfClosingTextQuote,
     this.pdfIntroTextOrder,
     this.pdfClosingTextOrder,
+    this.pdfIntroTextPurchaseOrder,
+    this.pdfClosingTextPurchaseOrder,
     this.pdfIntroTextDeliveryNote,
     this.pdfClosingTextDeliveryNote,
     this.pdfIntroTextProforma,
@@ -2474,6 +2530,16 @@ class Company extends DataClass implements Insertable<Company> {
     }
     if (!nullToAbsent || pdfClosingTextOrder != null) {
       map['pdf_closing_text_order'] = Variable<String>(pdfClosingTextOrder);
+    }
+    if (!nullToAbsent || pdfIntroTextPurchaseOrder != null) {
+      map['pdf_intro_text_purchase_order'] = Variable<String>(
+        pdfIntroTextPurchaseOrder,
+      );
+    }
+    if (!nullToAbsent || pdfClosingTextPurchaseOrder != null) {
+      map['pdf_closing_text_purchase_order'] = Variable<String>(
+        pdfClosingTextPurchaseOrder,
+      );
     }
     if (!nullToAbsent || pdfIntroTextDeliveryNote != null) {
       map['pdf_intro_text_delivery_note'] = Variable<String>(
@@ -2668,6 +2734,14 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingTextOrder: pdfClosingTextOrder == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfClosingTextOrder),
+      pdfIntroTextPurchaseOrder:
+          pdfIntroTextPurchaseOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfIntroTextPurchaseOrder),
+      pdfClosingTextPurchaseOrder:
+          pdfClosingTextPurchaseOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfClosingTextPurchaseOrder),
       pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfIntroTextDeliveryNote),
@@ -2841,6 +2915,12 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingTextOrder: serializer.fromJson<String?>(
         json['pdfClosingTextOrder'],
       ),
+      pdfIntroTextPurchaseOrder: serializer.fromJson<String?>(
+        json['pdfIntroTextPurchaseOrder'],
+      ),
+      pdfClosingTextPurchaseOrder: serializer.fromJson<String?>(
+        json['pdfClosingTextPurchaseOrder'],
+      ),
       pdfIntroTextDeliveryNote: serializer.fromJson<String?>(
         json['pdfIntroTextDeliveryNote'],
       ),
@@ -2989,6 +3069,12 @@ class Company extends DataClass implements Insertable<Company> {
       'pdfClosingTextQuote': serializer.toJson<String?>(pdfClosingTextQuote),
       'pdfIntroTextOrder': serializer.toJson<String?>(pdfIntroTextOrder),
       'pdfClosingTextOrder': serializer.toJson<String?>(pdfClosingTextOrder),
+      'pdfIntroTextPurchaseOrder': serializer.toJson<String?>(
+        pdfIntroTextPurchaseOrder,
+      ),
+      'pdfClosingTextPurchaseOrder': serializer.toJson<String?>(
+        pdfClosingTextPurchaseOrder,
+      ),
       'pdfIntroTextDeliveryNote': serializer.toJson<String?>(
         pdfIntroTextDeliveryNote,
       ),
@@ -3097,6 +3183,8 @@ class Company extends DataClass implements Insertable<Company> {
     Value<String?> pdfClosingTextQuote = const Value.absent(),
     Value<String?> pdfIntroTextOrder = const Value.absent(),
     Value<String?> pdfClosingTextOrder = const Value.absent(),
+    Value<String?> pdfIntroTextPurchaseOrder = const Value.absent(),
+    Value<String?> pdfClosingTextPurchaseOrder = const Value.absent(),
     Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
     Value<String?> pdfClosingTextDeliveryNote = const Value.absent(),
     Value<String?> pdfIntroTextProforma = const Value.absent(),
@@ -3201,6 +3289,12 @@ class Company extends DataClass implements Insertable<Company> {
     pdfClosingTextOrder: pdfClosingTextOrder.present
         ? pdfClosingTextOrder.value
         : this.pdfClosingTextOrder,
+    pdfIntroTextPurchaseOrder: pdfIntroTextPurchaseOrder.present
+        ? pdfIntroTextPurchaseOrder.value
+        : this.pdfIntroTextPurchaseOrder,
+    pdfClosingTextPurchaseOrder: pdfClosingTextPurchaseOrder.present
+        ? pdfClosingTextPurchaseOrder.value
+        : this.pdfClosingTextPurchaseOrder,
     pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote.present
         ? pdfIntroTextDeliveryNote.value
         : this.pdfIntroTextDeliveryNote,
@@ -3385,6 +3479,12 @@ class Company extends DataClass implements Insertable<Company> {
       pdfClosingTextOrder: data.pdfClosingTextOrder.present
           ? data.pdfClosingTextOrder.value
           : this.pdfClosingTextOrder,
+      pdfIntroTextPurchaseOrder: data.pdfIntroTextPurchaseOrder.present
+          ? data.pdfIntroTextPurchaseOrder.value
+          : this.pdfIntroTextPurchaseOrder,
+      pdfClosingTextPurchaseOrder: data.pdfClosingTextPurchaseOrder.present
+          ? data.pdfClosingTextPurchaseOrder.value
+          : this.pdfClosingTextPurchaseOrder,
       pdfIntroTextDeliveryNote: data.pdfIntroTextDeliveryNote.present
           ? data.pdfIntroTextDeliveryNote.value
           : this.pdfIntroTextDeliveryNote,
@@ -3547,6 +3647,8 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('pdfClosingTextQuote: $pdfClosingTextQuote, ')
           ..write('pdfIntroTextOrder: $pdfIntroTextOrder, ')
           ..write('pdfClosingTextOrder: $pdfClosingTextOrder, ')
+          ..write('pdfIntroTextPurchaseOrder: $pdfIntroTextPurchaseOrder, ')
+          ..write('pdfClosingTextPurchaseOrder: $pdfClosingTextPurchaseOrder, ')
           ..write('pdfIntroTextDeliveryNote: $pdfIntroTextDeliveryNote, ')
           ..write('pdfClosingTextDeliveryNote: $pdfClosingTextDeliveryNote, ')
           ..write('pdfIntroTextProforma: $pdfIntroTextProforma, ')
@@ -3633,6 +3735,8 @@ class Company extends DataClass implements Insertable<Company> {
     pdfClosingTextQuote,
     pdfIntroTextOrder,
     pdfClosingTextOrder,
+    pdfIntroTextPurchaseOrder,
+    pdfClosingTextPurchaseOrder,
     pdfIntroTextDeliveryNote,
     pdfClosingTextDeliveryNote,
     pdfIntroTextProforma,
@@ -3719,6 +3823,9 @@ class Company extends DataClass implements Insertable<Company> {
           other.pdfClosingTextQuote == this.pdfClosingTextQuote &&
           other.pdfIntroTextOrder == this.pdfIntroTextOrder &&
           other.pdfClosingTextOrder == this.pdfClosingTextOrder &&
+          other.pdfIntroTextPurchaseOrder == this.pdfIntroTextPurchaseOrder &&
+          other.pdfClosingTextPurchaseOrder ==
+              this.pdfClosingTextPurchaseOrder &&
           other.pdfIntroTextDeliveryNote == this.pdfIntroTextDeliveryNote &&
           other.pdfClosingTextDeliveryNote == this.pdfClosingTextDeliveryNote &&
           other.pdfIntroTextProforma == this.pdfIntroTextProforma &&
@@ -3802,6 +3909,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String?> pdfClosingTextQuote;
   final Value<String?> pdfIntroTextOrder;
   final Value<String?> pdfClosingTextOrder;
+  final Value<String?> pdfIntroTextPurchaseOrder;
+  final Value<String?> pdfClosingTextPurchaseOrder;
   final Value<String?> pdfIntroTextDeliveryNote;
   final Value<String?> pdfClosingTextDeliveryNote;
   final Value<String?> pdfIntroTextProforma;
@@ -3884,6 +3993,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.pdfClosingTextQuote = const Value.absent(),
     this.pdfIntroTextOrder = const Value.absent(),
     this.pdfClosingTextOrder = const Value.absent(),
+    this.pdfIntroTextPurchaseOrder = const Value.absent(),
+    this.pdfClosingTextPurchaseOrder = const Value.absent(),
     this.pdfIntroTextDeliveryNote = const Value.absent(),
     this.pdfClosingTextDeliveryNote = const Value.absent(),
     this.pdfIntroTextProforma = const Value.absent(),
@@ -3967,6 +4078,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.pdfClosingTextQuote = const Value.absent(),
     this.pdfIntroTextOrder = const Value.absent(),
     this.pdfClosingTextOrder = const Value.absent(),
+    this.pdfIntroTextPurchaseOrder = const Value.absent(),
+    this.pdfClosingTextPurchaseOrder = const Value.absent(),
     this.pdfIntroTextDeliveryNote = const Value.absent(),
     this.pdfClosingTextDeliveryNote = const Value.absent(),
     this.pdfIntroTextProforma = const Value.absent(),
@@ -4052,6 +4165,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? pdfClosingTextQuote,
     Expression<String>? pdfIntroTextOrder,
     Expression<String>? pdfClosingTextOrder,
+    Expression<String>? pdfIntroTextPurchaseOrder,
+    Expression<String>? pdfClosingTextPurchaseOrder,
     Expression<String>? pdfIntroTextDeliveryNote,
     Expression<String>? pdfClosingTextDeliveryNote,
     Expression<String>? pdfIntroTextProforma,
@@ -4148,6 +4263,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (pdfIntroTextOrder != null) 'pdf_intro_text_order': pdfIntroTextOrder,
       if (pdfClosingTextOrder != null)
         'pdf_closing_text_order': pdfClosingTextOrder,
+      if (pdfIntroTextPurchaseOrder != null)
+        'pdf_intro_text_purchase_order': pdfIntroTextPurchaseOrder,
+      if (pdfClosingTextPurchaseOrder != null)
+        'pdf_closing_text_purchase_order': pdfClosingTextPurchaseOrder,
       if (pdfIntroTextDeliveryNote != null)
         'pdf_intro_text_delivery_note': pdfIntroTextDeliveryNote,
       if (pdfClosingTextDeliveryNote != null)
@@ -4258,6 +4377,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String?>? pdfClosingTextQuote,
     Value<String?>? pdfIntroTextOrder,
     Value<String?>? pdfClosingTextOrder,
+    Value<String?>? pdfIntroTextPurchaseOrder,
+    Value<String?>? pdfClosingTextPurchaseOrder,
     Value<String?>? pdfIntroTextDeliveryNote,
     Value<String?>? pdfClosingTextDeliveryNote,
     Value<String?>? pdfIntroTextProforma,
@@ -4350,6 +4471,10 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       pdfClosingTextQuote: pdfClosingTextQuote ?? this.pdfClosingTextQuote,
       pdfIntroTextOrder: pdfIntroTextOrder ?? this.pdfIntroTextOrder,
       pdfClosingTextOrder: pdfClosingTextOrder ?? this.pdfClosingTextOrder,
+      pdfIntroTextPurchaseOrder:
+          pdfIntroTextPurchaseOrder ?? this.pdfIntroTextPurchaseOrder,
+      pdfClosingTextPurchaseOrder:
+          pdfClosingTextPurchaseOrder ?? this.pdfClosingTextPurchaseOrder,
       pdfIntroTextDeliveryNote:
           pdfIntroTextDeliveryNote ?? this.pdfIntroTextDeliveryNote,
       pdfClosingTextDeliveryNote:
@@ -4559,6 +4684,16 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
         pdfClosingTextOrder.value,
       );
     }
+    if (pdfIntroTextPurchaseOrder.present) {
+      map['pdf_intro_text_purchase_order'] = Variable<String>(
+        pdfIntroTextPurchaseOrder.value,
+      );
+    }
+    if (pdfClosingTextPurchaseOrder.present) {
+      map['pdf_closing_text_purchase_order'] = Variable<String>(
+        pdfClosingTextPurchaseOrder.value,
+      );
+    }
     if (pdfIntroTextDeliveryNote.present) {
       map['pdf_intro_text_delivery_note'] = Variable<String>(
         pdfIntroTextDeliveryNote.value,
@@ -4766,6 +4901,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('pdfClosingTextQuote: $pdfClosingTextQuote, ')
           ..write('pdfIntroTextOrder: $pdfIntroTextOrder, ')
           ..write('pdfClosingTextOrder: $pdfClosingTextOrder, ')
+          ..write('pdfIntroTextPurchaseOrder: $pdfIntroTextPurchaseOrder, ')
+          ..write('pdfClosingTextPurchaseOrder: $pdfClosingTextPurchaseOrder, ')
           ..write('pdfIntroTextDeliveryNote: $pdfIntroTextDeliveryNote, ')
           ..write('pdfClosingTextDeliveryNote: $pdfClosingTextDeliveryNote, ')
           ..write('pdfIntroTextProforma: $pdfIntroTextProforma, ')
@@ -10268,6 +10405,17 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         type: DriftSqlType.string,
         requiredDuringInsert: false,
       );
+  static const VerificationMeta _companySnapshotBicMeta =
+      const VerificationMeta('companySnapshotBic');
+  @override
+  late final GeneratedColumn<String> companySnapshotBic =
+      GeneratedColumn<String>(
+        'company_snapshot_bic',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _finalizedAtMeta = const VerificationMeta(
     'finalizedAt',
   );
@@ -10533,6 +10681,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     pdfIntroTextSnapshot,
     pdfClosingTextSnapshot,
     pdfFooterTextSnapshot,
+    companySnapshotBic,
     finalizedAt,
     createdAt,
     updatedAt,
@@ -10741,6 +10890,15 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         pdfFooterTextSnapshot.isAcceptableOrUnknown(
           data['pdf_footer_text_snapshot']!,
           _pdfFooterTextSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('company_snapshot_bic')) {
+      context.handle(
+        _companySnapshotBicMeta,
+        companySnapshotBic.isAcceptableOrUnknown(
+          data['company_snapshot_bic']!,
+          _companySnapshotBicMeta,
         ),
       );
     }
@@ -11003,6 +11161,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.string,
         data['${effectivePrefix}pdf_footer_text_snapshot'],
       ),
+      companySnapshotBic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_snapshot_bic'],
+      ),
       finalizedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}finalized_at'],
@@ -11163,6 +11325,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final String? pdfIntroTextSnapshot;
   final String? pdfClosingTextSnapshot;
   final String? pdfFooterTextSnapshot;
+  final String? companySnapshotBic;
   final DateTime? finalizedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -11278,6 +11441,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.pdfIntroTextSnapshot,
     this.pdfClosingTextSnapshot,
     this.pdfFooterTextSnapshot,
+    this.companySnapshotBic,
     this.finalizedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -11370,6 +11534,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     }
     if (!nullToAbsent || pdfFooterTextSnapshot != null) {
       map['pdf_footer_text_snapshot'] = Variable<String>(pdfFooterTextSnapshot);
+    }
+    if (!nullToAbsent || companySnapshotBic != null) {
+      map['company_snapshot_bic'] = Variable<String>(companySnapshotBic);
     }
     if (!nullToAbsent || finalizedAt != null) {
       map['finalized_at'] = Variable<DateTime>(finalizedAt);
@@ -11483,6 +11650,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       pdfFooterTextSnapshot: pdfFooterTextSnapshot == null && nullToAbsent
           ? const Value.absent()
           : Value(pdfFooterTextSnapshot),
+      companySnapshotBic: companySnapshotBic == null && nullToAbsent
+          ? const Value.absent()
+          : Value(companySnapshotBic),
       finalizedAt: finalizedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(finalizedAt),
@@ -11589,6 +11759,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       pdfFooterTextSnapshot: serializer.fromJson<String?>(
         json['pdfFooterTextSnapshot'],
       ),
+      companySnapshotBic: serializer.fromJson<String?>(
+        json['companySnapshotBic'],
+      ),
       finalizedAt: serializer.fromJson<DateTime?>(json['finalizedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -11656,6 +11829,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'pdfFooterTextSnapshot': serializer.toJson<String?>(
         pdfFooterTextSnapshot,
       ),
+      'companySnapshotBic': serializer.toJson<String?>(companySnapshotBic),
       'finalizedAt': serializer.toJson<DateTime?>(finalizedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -11705,6 +11879,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<String?> pdfIntroTextSnapshot = const Value.absent(),
     Value<String?> pdfClosingTextSnapshot = const Value.absent(),
     Value<String?> pdfFooterTextSnapshot = const Value.absent(),
+    Value<String?> companySnapshotBic = const Value.absent(),
     Value<DateTime?> finalizedAt = const Value.absent(),
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -11775,6 +11950,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     pdfFooterTextSnapshot: pdfFooterTextSnapshot.present
         ? pdfFooterTextSnapshot.value
         : this.pdfFooterTextSnapshot,
+    companySnapshotBic: companySnapshotBic.present
+        ? companySnapshotBic.value
+        : this.companySnapshotBic,
     finalizedAt: finalizedAt.present ? finalizedAt.value : this.finalizedAt,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -11871,6 +12049,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       pdfFooterTextSnapshot: data.pdfFooterTextSnapshot.present
           ? data.pdfFooterTextSnapshot.value
           : this.pdfFooterTextSnapshot,
+      companySnapshotBic: data.companySnapshotBic.present
+          ? data.companySnapshotBic.value
+          : this.companySnapshotBic,
       finalizedAt: data.finalizedAt.present
           ? data.finalizedAt.value
           : this.finalizedAt,
@@ -11948,6 +12129,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('pdfIntroTextSnapshot: $pdfIntroTextSnapshot, ')
           ..write('pdfClosingTextSnapshot: $pdfClosingTextSnapshot, ')
           ..write('pdfFooterTextSnapshot: $pdfFooterTextSnapshot, ')
+          ..write('companySnapshotBic: $companySnapshotBic, ')
           ..write('finalizedAt: $finalizedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -11997,6 +12179,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     pdfIntroTextSnapshot,
     pdfClosingTextSnapshot,
     pdfFooterTextSnapshot,
+    companySnapshotBic,
     finalizedAt,
     createdAt,
     updatedAt,
@@ -12045,6 +12228,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.pdfIntroTextSnapshot == this.pdfIntroTextSnapshot &&
           other.pdfClosingTextSnapshot == this.pdfClosingTextSnapshot &&
           other.pdfFooterTextSnapshot == this.pdfFooterTextSnapshot &&
+          other.companySnapshotBic == this.companySnapshotBic &&
           other.finalizedAt == this.finalizedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -12091,6 +12275,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String?> pdfIntroTextSnapshot;
   final Value<String?> pdfClosingTextSnapshot;
   final Value<String?> pdfFooterTextSnapshot;
+  final Value<String?> companySnapshotBic;
   final Value<DateTime?> finalizedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -12136,6 +12321,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.pdfIntroTextSnapshot = const Value.absent(),
     this.pdfClosingTextSnapshot = const Value.absent(),
     this.pdfFooterTextSnapshot = const Value.absent(),
+    this.companySnapshotBic = const Value.absent(),
     this.finalizedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -12182,6 +12368,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.pdfIntroTextSnapshot = const Value.absent(),
     this.pdfClosingTextSnapshot = const Value.absent(),
     this.pdfFooterTextSnapshot = const Value.absent(),
+    this.companySnapshotBic = const Value.absent(),
     this.finalizedAt = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -12235,6 +12422,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? pdfIntroTextSnapshot,
     Expression<String>? pdfClosingTextSnapshot,
     Expression<String>? pdfFooterTextSnapshot,
+    Expression<String>? companySnapshotBic,
     Expression<DateTime>? finalizedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -12292,6 +12480,8 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         'pdf_closing_text_snapshot': pdfClosingTextSnapshot,
       if (pdfFooterTextSnapshot != null)
         'pdf_footer_text_snapshot': pdfFooterTextSnapshot,
+      if (companySnapshotBic != null)
+        'company_snapshot_bic': companySnapshotBic,
       if (finalizedAt != null) 'finalized_at': finalizedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -12340,6 +12530,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String?>? pdfIntroTextSnapshot,
     Value<String?>? pdfClosingTextSnapshot,
     Value<String?>? pdfFooterTextSnapshot,
+    Value<String?>? companySnapshotBic,
     Value<DateTime?>? finalizedAt,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -12392,6 +12583,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           pdfClosingTextSnapshot ?? this.pdfClosingTextSnapshot,
       pdfFooterTextSnapshot:
           pdfFooterTextSnapshot ?? this.pdfFooterTextSnapshot,
+      companySnapshotBic: companySnapshotBic ?? this.companySnapshotBic,
       finalizedAt: finalizedAt ?? this.finalizedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -12514,6 +12706,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
         pdfFooterTextSnapshot.value,
       );
     }
+    if (companySnapshotBic.present) {
+      map['company_snapshot_bic'] = Variable<String>(companySnapshotBic.value);
+    }
     if (finalizedAt.present) {
       map['finalized_at'] = Variable<DateTime>(finalizedAt.value);
     }
@@ -12608,6 +12803,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('pdfIntroTextSnapshot: $pdfIntroTextSnapshot, ')
           ..write('pdfClosingTextSnapshot: $pdfClosingTextSnapshot, ')
           ..write('pdfFooterTextSnapshot: $pdfFooterTextSnapshot, ')
+          ..write('companySnapshotBic: $companySnapshotBic, ')
           ..write('finalizedAt: $finalizedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -24937,6 +25133,8 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String?> pdfClosingTextQuote,
       Value<String?> pdfIntroTextOrder,
       Value<String?> pdfClosingTextOrder,
+      Value<String?> pdfIntroTextPurchaseOrder,
+      Value<String?> pdfClosingTextPurchaseOrder,
       Value<String?> pdfIntroTextDeliveryNote,
       Value<String?> pdfClosingTextDeliveryNote,
       Value<String?> pdfIntroTextProforma,
@@ -25021,6 +25219,8 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String?> pdfClosingTextQuote,
       Value<String?> pdfIntroTextOrder,
       Value<String?> pdfClosingTextOrder,
+      Value<String?> pdfIntroTextPurchaseOrder,
+      Value<String?> pdfClosingTextPurchaseOrder,
       Value<String?> pdfIntroTextDeliveryNote,
       Value<String?> pdfClosingTextDeliveryNote,
       Value<String?> pdfIntroTextProforma,
@@ -25741,6 +25941,16 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<String> get pdfClosingTextOrder => $composableBuilder(
     column: $table.pdfClosingTextOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfIntroTextPurchaseOrder => $composableBuilder(
+    column: $table.pdfIntroTextPurchaseOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfClosingTextPurchaseOrder => $composableBuilder(
+    column: $table.pdfClosingTextPurchaseOrder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -26756,6 +26966,16 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pdfIntroTextPurchaseOrder => $composableBuilder(
+    column: $table.pdfIntroTextPurchaseOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfClosingTextPurchaseOrder => $composableBuilder(
+    column: $table.pdfClosingTextPurchaseOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get pdfIntroTextDeliveryNote => $composableBuilder(
     column: $table.pdfIntroTextDeliveryNote,
     builder: (column) => ColumnOrderings(column),
@@ -27139,6 +27359,16 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<String> get pdfClosingTextOrder => $composableBuilder(
     column: $table.pdfClosingTextOrder,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfIntroTextPurchaseOrder => $composableBuilder(
+    column: $table.pdfIntroTextPurchaseOrder,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfClosingTextPurchaseOrder => $composableBuilder(
+    column: $table.pdfClosingTextPurchaseOrder,
     builder: (column) => column,
   );
 
@@ -28033,6 +28263,9 @@ class $$CompaniesTableTableManager
                 Value<String?> pdfClosingTextQuote = const Value.absent(),
                 Value<String?> pdfIntroTextOrder = const Value.absent(),
                 Value<String?> pdfClosingTextOrder = const Value.absent(),
+                Value<String?> pdfIntroTextPurchaseOrder = const Value.absent(),
+                Value<String?> pdfClosingTextPurchaseOrder =
+                    const Value.absent(),
                 Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
                 Value<String?> pdfClosingTextDeliveryNote =
                     const Value.absent(),
@@ -28118,6 +28351,8 @@ class $$CompaniesTableTableManager
                 pdfClosingTextQuote: pdfClosingTextQuote,
                 pdfIntroTextOrder: pdfIntroTextOrder,
                 pdfClosingTextOrder: pdfClosingTextOrder,
+                pdfIntroTextPurchaseOrder: pdfIntroTextPurchaseOrder,
+                pdfClosingTextPurchaseOrder: pdfClosingTextPurchaseOrder,
                 pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote,
                 pdfClosingTextDeliveryNote: pdfClosingTextDeliveryNote,
                 pdfIntroTextProforma: pdfIntroTextProforma,
@@ -28203,6 +28438,9 @@ class $$CompaniesTableTableManager
                 Value<String?> pdfClosingTextQuote = const Value.absent(),
                 Value<String?> pdfIntroTextOrder = const Value.absent(),
                 Value<String?> pdfClosingTextOrder = const Value.absent(),
+                Value<String?> pdfIntroTextPurchaseOrder = const Value.absent(),
+                Value<String?> pdfClosingTextPurchaseOrder =
+                    const Value.absent(),
                 Value<String?> pdfIntroTextDeliveryNote = const Value.absent(),
                 Value<String?> pdfClosingTextDeliveryNote =
                     const Value.absent(),
@@ -28288,6 +28526,8 @@ class $$CompaniesTableTableManager
                 pdfClosingTextQuote: pdfClosingTextQuote,
                 pdfIntroTextOrder: pdfIntroTextOrder,
                 pdfClosingTextOrder: pdfClosingTextOrder,
+                pdfIntroTextPurchaseOrder: pdfIntroTextPurchaseOrder,
+                pdfClosingTextPurchaseOrder: pdfClosingTextPurchaseOrder,
                 pdfIntroTextDeliveryNote: pdfIntroTextDeliveryNote,
                 pdfClosingTextDeliveryNote: pdfClosingTextDeliveryNote,
                 pdfIntroTextProforma: pdfIntroTextProforma,
@@ -34970,6 +35210,7 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       Value<String?> pdfIntroTextSnapshot,
       Value<String?> pdfClosingTextSnapshot,
       Value<String?> pdfFooterTextSnapshot,
+      Value<String?> companySnapshotBic,
       Value<DateTime?> finalizedAt,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -35017,6 +35258,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<String?> pdfIntroTextSnapshot,
       Value<String?> pdfClosingTextSnapshot,
       Value<String?> pdfFooterTextSnapshot,
+      Value<String?> companySnapshotBic,
       Value<DateTime?> finalizedAt,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -35336,6 +35578,11 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<String> get pdfFooterTextSnapshot => $composableBuilder(
     column: $table.pdfFooterTextSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get companySnapshotBic => $composableBuilder(
+    column: $table.companySnapshotBic,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -35780,6 +36027,11 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get companySnapshotBic => $composableBuilder(
+    column: $table.companySnapshotBic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get finalizedAt => $composableBuilder(
     column: $table.finalizedAt,
     builder: (column) => ColumnOrderings(column),
@@ -36082,6 +36334,11 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<String> get pdfFooterTextSnapshot => $composableBuilder(
     column: $table.pdfFooterTextSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get companySnapshotBic => $composableBuilder(
+    column: $table.companySnapshotBic,
     builder: (column) => column,
   );
 
@@ -36466,6 +36723,7 @@ class $$InvoicesTableTableManager
                 Value<String?> pdfIntroTextSnapshot = const Value.absent(),
                 Value<String?> pdfClosingTextSnapshot = const Value.absent(),
                 Value<String?> pdfFooterTextSnapshot = const Value.absent(),
+                Value<String?> companySnapshotBic = const Value.absent(),
                 Value<DateTime?> finalizedAt = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -36511,6 +36769,7 @@ class $$InvoicesTableTableManager
                 pdfIntroTextSnapshot: pdfIntroTextSnapshot,
                 pdfClosingTextSnapshot: pdfClosingTextSnapshot,
                 pdfFooterTextSnapshot: pdfFooterTextSnapshot,
+                companySnapshotBic: companySnapshotBic,
                 finalizedAt: finalizedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -36558,6 +36817,7 @@ class $$InvoicesTableTableManager
                 Value<String?> pdfIntroTextSnapshot = const Value.absent(),
                 Value<String?> pdfClosingTextSnapshot = const Value.absent(),
                 Value<String?> pdfFooterTextSnapshot = const Value.absent(),
+                Value<String?> companySnapshotBic = const Value.absent(),
                 Value<DateTime?> finalizedAt = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -36603,6 +36863,7 @@ class $$InvoicesTableTableManager
                 pdfIntroTextSnapshot: pdfIntroTextSnapshot,
                 pdfClosingTextSnapshot: pdfClosingTextSnapshot,
                 pdfFooterTextSnapshot: pdfFooterTextSnapshot,
+                companySnapshotBic: companySnapshotBic,
                 finalizedAt: finalizedAt,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

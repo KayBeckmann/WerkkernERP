@@ -197,6 +197,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'company_snapshot_tax_number': d.companySnapshotTaxNumber,
         'company_snapshot_vat_id': d.companySnapshotVatId,
         'company_snapshot_iban': d.companySnapshotIban,
+        'company_snapshot_bic': d.companySnapshotBic,
         'created_by_user_id': d.createdByUserId,
         'created_at': d.createdAt,
         'updated_at': d.updatedAt,

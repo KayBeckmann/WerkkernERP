@@ -31,6 +31,7 @@ class MailRoutes {
     router.put('/mail/settings', _setSettings);
     router.post('/mail/test', _test);
     router.post('/documents/<id>/send', _sendDocument);
+    router.post('/time-sheets/<id>/send', _sendTimeSheet);
     router.post('/dunning-notices/<id>/send', _sendDunning);
     router.post('/purchase-orders/<id>/send', _sendPurchaseOrder);
   }
@@ -221,6 +222,58 @@ class MailRoutes {
       subject: applyMailPlaceholders(subject, kunde: kunde, nummer: nummer, firma: firma),
       body: applyMailPlaceholders(text, kunde: kunde, nummer: nummer, firma: firma),
     );
+  }
+
+  /// Only an existing, signed, tenant-owned sheet and a persisted PDF may leave
+  /// the server. The client can select a version, but cannot supply PDF bytes.
+  Future<Response> _sendTimeSheet(Request request, String id) async {
+    final check = await _require(request, 'timeTracking.write');
+    if (check.error != null) return check.error!;
+    final ctx = check.ctx!;
+    final companyId = ctx.session.companyId;
+    final sheet = await business.findTimeSheet(companyId, id);
+    if (sheet == null ||
+        (sheet.createdByUserId != ctx.session.userId &&
+            !await auth.isGranted(ctx, 'timeTracking.read'))) {
+      return jsonError('Stundenzettel nicht gefunden.', status: 404);
+    }
+    if (!sheet.isSigned) return jsonError('Stundenzettel muss unterschrieben sein.', status: 409);
+    final body = await readJsonBody(request);
+    final versions = await business.listPdfVersions(companyId, 'time-sheet', id);
+    if (versions.isEmpty) return jsonError('Archiviertes PDF fehlt.', status: 409);
+    final requested = body['version'];
+    if (requested != null && (requested is! int || requested <= 0)) {
+      return jsonError('Ungültige PDF-Fassung.');
+    }
+    final version = requested as int? ?? versions.last.version;
+    final pdf = await business.findPdfVersion(companyId, 'time-sheet', id, version);
+    if (pdf == null) return jsonError('PDF-Fassung nicht gefunden.', status: 404);
+    final document = sheet.documentId == null ? null : await business.findDocument(companyId, sheet.documentId!);
+    final project = sheet.projectId == null ? null : await business.findProject(companyId, sheet.projectId!);
+    final customerId = document?.customerId ?? project?.customerId;
+    final customer = customerId == null ? null : await business.findCustomer(companyId, customerId);
+    final to = _recipient(body['to'], documentRecipient(
+      billing: true,
+      invoiceEmail: customer?.invoiceEmail,
+      contactEmail: customer?.contact(document?.contactId)?.email,
+      customerEmail: customer?.email,
+    ));
+    if (to == null) return jsonError('Buchhaltungs-Empfänger fehlt; bitte Adresse prüfen.');
+    final subject = trimmedOrNull(body['subject']) ?? 'Unterschriebener Stundenzettel';
+    final text = trimmedOrNull(body['body']) ?? 'Anbei der unterschriebene Stundenzettel.';
+    final resolved = await resolve(companyId);
+    if (resolved.error != null) return resolved.error!;
+    try {
+      await mail.transport.send(resolved.settings!, resolved.password,
+        OutgoingMail(to: to, subject: subject, body: text, attachments: [
+          MailAttachment(fileName: 'Stundenzettel-$id-v$version.pdf', contentType: 'application/pdf', bytes: pdf.bytes),
+        ]));
+    } on MailDeliveryException catch (e) {
+      return jsonError(e.message, status: 502);
+    }
+    // The audit is a dispatch record separate from the immutable archive.
+    await auth.audit(ctx, 'mail.timeSheet', 'time-sheet-pdf-v$version', id);
+    return jsonOk({'sent': true, 'to': to, 'version': version});
   }
 
   /// Finalisiertes Dokument an den Kunden (Standard: dessen E-Mail).

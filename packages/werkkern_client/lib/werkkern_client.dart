@@ -14,6 +14,7 @@ export 'src/dunning.dart';
 export 'src/recurring.dart';
 export 'src/staff_roles.dart';
 export 'src/timesheets.dart';
+export 'src/pdf_archive.dart';
 export 'src/mail.dart';
 export 'src/dashboard.dart';
 export 'src/platform.dart';

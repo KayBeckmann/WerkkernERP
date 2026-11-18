@@ -85,6 +85,11 @@ void main() {
       raw.execute('ALTER TABLE invoices DROP COLUMN $c;');
     }
     raw.execute('ALTER TABLE purchase_orders DROP COLUMN supplier_snapshot_customer_number;');
+    // v42 -> v43: Bestellungstexte existieren in der heutigen Testdatenbank,
+    // aber noch nicht im hier simulierten v35-Bestand.
+    for (final c in ['pdf_intro_text_purchase_order', 'pdf_closing_text_purchase_order']) {
+      raw.execute('ALTER TABLE companies DROP COLUMN $c;');
+    }
     raw.execute('PRAGMA user_version = 35;');
     raw.close();
 

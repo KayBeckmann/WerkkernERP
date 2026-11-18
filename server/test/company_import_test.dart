@@ -32,6 +32,17 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
   Future<String> membershipOf(CompanyClient company, String email) async =>
       (await company.client.members()).firstWhere((m) => m.email == email).id;
 
+  test('Umzug übernimmt Lieferanten-Bestelltexte getrennt vom Kundenauftrag', () async {
+    final chef = await h.company('chef@example.com', permissions: permissions, modules: const {'timeTracking'});
+    final package = sampleMigrationPackage();
+    final profile = package['company'] as Map<String, Object?>;
+    final texts = profile['documentTexts'] as Map<String, Object?>;
+    texts['purchaseOrder'] = {'intro': 'Bitte liefern', 'closing': 'Danke'};
+    final result = await dryRun(chef, {'package': package});
+    expect(result['errors'], isEmpty);
+    expect(result['warnings'], isNot(contains(contains('purchaseOrder'))));
+  });
+
   test('Probelauf zählt, nennt offene Rollen-Zuordnungen und schreibt nichts', () async {
     final chef = await h.company('chef@example.com', permissions: permissions, modules: const {'timeTracking'});
     final result = await dryRun(chef, {'package': sampleMigrationPackage()});
@@ -62,8 +73,11 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     final monteur = await membershipOf(chef, 'monteur@example.com');
     final admin = await membershipOf(chef, 'chef@example.com');
 
+    final migrationPackage = sampleMigrationPackage();
+    ((migrationPackage['company'] as Map)['documentTexts'] as Map)['purchaseOrder'] =
+        {'intro': 'Bitte liefern', 'closing': 'Danke'};
     final result = await chef.post('/company/import', {
-      'package': sampleMigrationPackage(),
+      'package': migrationPackage,
       'roleAssignments': {'r1': monteur, migrationNoRoleKey: admin},
     });
     expect(result['dryRun'], false);
@@ -143,6 +157,7 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     expect(company['footerText'], 'Danke für Ihren Auftrag.');
     expect(company['quoteValidityDays'], 21, reason: 'A5-Nachtrag: Bindefrist-Standard zieht mit um');
     expect((company['documentTexts']! as Map)['invoice'], {'intro': 'Wir berechnen:', 'closing': 'Zahlbar sofort.'});
+    expect((company['documentTexts']! as Map)['purchaseOrder'], {'intro': 'Bitte liefern', 'closing': 'Danke'});
     expect(company['modules'], containsAll(['orders', 'projects', 'timeTracking', 'lagerbestand']));
     expect(company['modules'], isNot(contains('smtp')));
     final settings = export['settings']! as Map<String, Object?>;

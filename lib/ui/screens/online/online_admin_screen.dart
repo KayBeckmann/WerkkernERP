@@ -875,6 +875,7 @@ class _ProfileTabState extends State<_ProfileTab> {
   List<String> get _kinds => [
         for (final entry in onlineDocumentKindModules.entries)
           if (entry.value == null || widget.session.modules.contains(entry.value)) entry.key,
+        if (widget.session.modules.contains('bestellwesen')) 'purchaseOrder',
       ];
 
   @override
@@ -1108,7 +1109,7 @@ class _ProfileTabState extends State<_ProfileTab> {
           ),
           for (final kind in _kinds)
             ExpansionTile(
-              title: Text(onlineDocumentKindLabels[kind] ?? kind),
+              title: Text(kind == 'purchaseOrder' ? 'Lieferantenbestellung (Bestellungen)' : onlineDocumentKindLabels[kind] ?? kind),
               children: [
                 TextField(
                   key: Key('online-profile-intro-$kind'),

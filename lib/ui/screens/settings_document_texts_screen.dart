@@ -31,6 +31,8 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
   late final Map<DocumentKind, TextEditingController> _introCtrls;
   late final Map<DocumentKind, TextEditingController> _closingCtrls;
   late final TextEditingController _footerCtrl;
+  late final TextEditingController _purchaseIntroCtrl;
+  late final TextEditingController _purchaseClosingCtrl;
 
   @override
   void initState() {
@@ -53,6 +55,8 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
       DocumentKind.creditNote: TextEditingController(text: company?.pdfClosingTextCreditNote),
     };
     _footerCtrl = TextEditingController(text: company?.pdfFooterText);
+    _purchaseIntroCtrl = TextEditingController(text: company?.pdfIntroTextPurchaseOrder);
+    _purchaseClosingCtrl = TextEditingController(text: company?.pdfClosingTextPurchaseOrder);
   }
 
   @override
@@ -64,6 +68,8 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
       c.dispose();
     }
     _footerCtrl.dispose();
+    _purchaseIntroCtrl.dispose();
+    _purchaseClosingCtrl.dispose();
     super.dispose();
   }
 
@@ -83,6 +89,8 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
               pdfClosingTextQuote: Value(_textOrNull(_closingCtrls[DocumentKind.quote]!)),
               pdfIntroTextOrder: Value(_textOrNull(_introCtrls[DocumentKind.order]!)),
               pdfClosingTextOrder: Value(_textOrNull(_closingCtrls[DocumentKind.order]!)),
+              pdfIntroTextPurchaseOrder: Value(_textOrNull(_purchaseIntroCtrl)),
+              pdfClosingTextPurchaseOrder: Value(_textOrNull(_purchaseClosingCtrl)),
               pdfIntroTextDeliveryNote: Value(_textOrNull(_introCtrls[DocumentKind.deliveryNote]!)),
               pdfClosingTextDeliveryNote: Value(_textOrNull(_closingCtrls[DocumentKind.deliveryNote]!)),
               pdfIntroTextProforma: Value(_textOrNull(_introCtrls[DocumentKind.proforma]!)),
@@ -166,6 +174,31 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
                   ),
                   const SizedBox(height: 12),
                   for (final kind in activeKinds) _textPair(kind),
+                  if (company.bestellwesenEnabled) ...[
+                    const Text('Lieferantenbestellung (Bestellungen)',
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      key: const Key('purchase-order-intro'),
+                      controller: _purchaseIntroCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Einleitungstext (Lieferantenbestellung)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      key: const Key('purchase-order-closing'),
+                      controller: _purchaseClosingCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Schlusstext (Lieferantenbestellung)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: _footerCtrl,
                     maxLines: 2,

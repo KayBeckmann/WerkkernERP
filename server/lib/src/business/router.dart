@@ -26,6 +26,7 @@ import 'fleet_routes.dart';
 import 'purchasing_routes.dart';
 import 'recurring_routes.dart';
 import 'timesheets_routes.dart';
+import 'pdf_archive_routes.dart';
 import 'staff_roles_routes.dart';
 import 'suppliers_routes.dart';
 
@@ -52,6 +53,7 @@ class BusinessRoutes {
     DashboardRoutes(repository: repository, business: business, auth: auth, dunning: dunning).mount(router);
     RecurringRoutes(repository: repository, business: business, auth: auth, parseItems: _parseItems).mount(router);
     TimeSheetRoutes(business: business, auth: auth).mount(router);
+    PdfArchiveRoutes(business: business, auth: auth).mount(router);
     StaffRoleRoutes(repository: repository, business: business, auth: auth).mount(router);
     PaymentTermRoutes(business: business, auth: auth, ensureDefaults: _paymentTermsOf).mount(router);
     ExportRoutes(repository: repository, business: business, auth: auth).mount(router);
@@ -1023,6 +1025,9 @@ class BusinessRoutes {
     if (existing == null) return jsonError('Dokument nicht gefunden.', status: 404);
     final check = await _requireDocumentPermission(request, 'invoices.write', existing.kind);
     if (check.error != null) return check.error!;
+    if ((await business.listPdfVersions(session.session.companyId, 'document', id)).isNotEmpty) {
+      return jsonError('Dokument mit archivierten PDF-Fassungen kann nicht gelöscht werden.', status: 409);
+    }
     if (check.auth!.session.isAgent) {
       return auth.requestApproval(
         check.auth!,

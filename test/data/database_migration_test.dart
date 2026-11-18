@@ -121,6 +121,9 @@ void main() {
       // da die restliche DDL drifts eigene ist).
       final raw = sqlite3.open(dbPath);
       // v1 -> v2 (A5):
+      // v42 -> v43 (Lieferantenbestellungstexte).
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_purchase_order;');
+      raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_purchase_order;');
       // v41 -> v42 (A5-Nachtrag: Angebotsbindefrist).
       raw.execute('ALTER TABLE companies DROP COLUMN quote_validity_days;');
       for (final c in ['quote_validity_days', 'quote_valid_from', 'quote_valid_until']) {
@@ -779,6 +782,9 @@ void main() {
     // v37 -> v38 (A1-Nachtrag: Barcode je Artikel).
     raw.execute('DROP INDEX IF EXISTS articles_company_barcode_idx;');
     raw.execute('ALTER TABLE articles DROP COLUMN barcode;');
+    // v42 -> v43 (Lieferantenbestellungstexte).
+    raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_purchase_order;');
+    raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_purchase_order;');
     // v41 -> v42 (A5-Nachtrag: Angebotsbindefrist).
     raw.execute('ALTER TABLE companies DROP COLUMN quote_validity_days;');
     for (final c in ['quote_validity_days', 'quote_valid_from', 'quote_valid_until']) {
@@ -853,6 +859,9 @@ void main() {
     // v37 -> v38 (A1-Nachtrag: Barcode je Artikel).
     raw.execute('DROP INDEX IF EXISTS articles_company_barcode_idx;');
     raw.execute('ALTER TABLE articles DROP COLUMN barcode;');
+    // v42 -> v43 (Lieferantenbestellungstexte).
+    raw.execute('ALTER TABLE companies DROP COLUMN pdf_intro_text_purchase_order;');
+    raw.execute('ALTER TABLE companies DROP COLUMN pdf_closing_text_purchase_order;');
     // v41 -> v42 (A5-Nachtrag: Angebotsbindefrist).
     raw.execute('ALTER TABLE companies DROP COLUMN quote_validity_days;');
     for (final c in ['quote_validity_days', 'quote_valid_from', 'quote_valid_until']) {

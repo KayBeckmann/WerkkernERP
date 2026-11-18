@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -6,11 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/data/repositories/company_repository.dart';
+import 'package:werkkernerp/data/repositories/customer_repository.dart';
+import 'package:werkkernerp/data/repositories/invoice_repository.dart';
 import 'package:werkkernerp/data/repositories/project_repository.dart';
 import 'package:werkkernerp/data/repositories/number_sequence_repository.dart';
 import 'package:werkkernerp/data/repositories/time_entry_repository.dart';
 import 'package:werkkernerp/data/repositories/time_sheet_repository.dart';
+import 'package:werkkernerp/data/repositories/pdf_archive_repository.dart';
 import 'package:werkkernerp/domain/services/active_company_service.dart';
+import 'package:werkkernerp/domain/services/smtp_credential_store.dart';
 import 'package:werkkernerp/main.dart';
 import 'package:werkkernerp/ui/screens/time_sheets_screen.dart';
 import 'package:werkkernerp/ui/widgets/sidebar_nav_item.dart';
@@ -33,6 +38,15 @@ Finder _sidebarItem(String label) => find.widgetWithText(SidebarNavItem, label);
 
 AppDatabase _inMemoryDb() =>
     AppDatabase.forTesting(NativeDatabase.memory(setup: (db) => db.execute('PRAGMA foreign_keys = ON;')));
+
+class _NoSmtpCredentials extends SmtpCredentialStore {
+  @override
+  Future<String?> readPassword(String companyId) async => null;
+  @override
+  Future<void> writePassword(String companyId, String password) async {}
+  @override
+  Future<void> deletePassword(String companyId) async {}
+}
 
 void main() {
   testWidgets(
@@ -114,6 +128,8 @@ void main() {
 
       expect(find.textContaining('4.0 Std.'), findsWidgets);
       expect(find.text('Weitere Zeitbuchungen hinzufügen'), findsNothing);
+      expect(find.text('Per E-Mail senden'), findsNothing,
+          reason: 'a draft cannot be sent');
 
       // Unterschreiben-Dialog öffnen: Bestätigen-Button startet
       // deaktiviert (noch nichts gezeichnet).
@@ -155,7 +171,14 @@ void main() {
 
       final company = await companyRepo.create(name: 'Elektro Beckmann');
       await companyRepo.update(company.copyWith(projectsEnabled: true, timeTrackingEnabled: true));
-      final project = await projectRepo.create(companyId: company.id, name: 'Testprojekt');
+      final customer = await CustomerRepository(db).create(
+        companyId: company.id,
+        name: 'Kunde Test',
+        email: 'allgemein@example.invalid',
+        invoiceEmail: 'buchhaltung@example.invalid',
+      );
+      final project = await projectRepo.create(
+        companyId: company.id, name: 'Testprojekt', customerId: customer.id);
       final entry = await timeEntryRepo.create(
         companyId: company.id,
         date: DateTime(2026, 10, 21),
@@ -189,7 +212,11 @@ void main() {
       await tester.pumpWidget(
         MultiProvider(
           providers: [
+            Provider<AppDatabase>.value(value: db),
             Provider<TimeSheetRepository>.value(value: timeSheetRepo),
+            Provider<ProjectRepository>.value(value: projectRepo),
+            Provider<InvoiceRepository>.value(value: InvoiceRepository(db, NumberSequenceRepository(db))),
+            Provider<SmtpCredentialStore>.value(value: _NoSmtpCredentials()),
             Provider<TimeEntryRepository>.value(value: timeEntryRepo),
             ChangeNotifierProvider<ActiveCompanyService>.value(value: activeCompanyService),
           ],
@@ -203,6 +230,53 @@ void main() {
       expect(find.text('Weitere Zeitbuchungen hinzufügen'), findsNothing);
       expect(find.textContaining('qualifizierte elektronische Signatur'), findsOneWidget);
       expect(find.text('Korrektur erstellen'), findsOneWidget);
+      final send = find.widgetWithText(OutlinedButton, 'Per E-Mail senden');
+      expect(send, findsOneWidget);
+      expect(tester.widget<OutlinedButton>(send).onPressed, isNull,
+          reason: 'no archived PDF bytes exist yet');
+      expect(find.textContaining('archiviert'), findsOneWidget);
+      await tester.tap(find.text('PDF erstellen und archivieren'));
+      await tester.pumpAndSettle();
+      final archiveRepo = PdfArchiveRepository(db);
+      var archived = await archiveRepo.list(
+        companyId: company.id, sourceType: PdfArchiveSource.signedTimeSheet,
+        sourceId: sheet.id,
+      );
+      for (var attempt = 0; archived.isEmpty && attempt < 20; attempt++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        archived = await archiveRepo.list(
+          companyId: company.id, sourceType: PdfArchiveSource.signedTimeSheet,
+          sourceId: sheet.id,
+        );
+      }
+      expect(archived, hasLength(1), reason: find.byType(SnackBar).evaluate().map((e) => (e.widget as SnackBar).content.toString()).join('; '));
+      final bytes = await PdfArchiveRepository(db).readBytes(
+        companyId: company.id, artifactId: archived.single.id,
+      );
+      expect(bytes, isNotNull);
+      expect(bytes!.take(4), [37, 80, 68, 70]);
+      final extracted = await tester.runAsync(() async {
+        final temp = await Directory.systemTemp.createTemp('sheet-widget-');
+        try {
+          final pdfPath = '${temp.path}/sheet.pdf';
+          await File(pdfPath).writeAsBytes(bytes);
+          return await Process.run('pdftotext', [pdfPath, '-']);
+        } finally {
+          await temp.delete(recursive: true);
+        }
+      });
+      expect(extracted?.exitCode, 0, reason: '${extracted?.stderr}');
+      expect(extracted?.stdout, contains('Testprojekt'));
+      expect(tester.widget<OutlinedButton>(send).onPressed, isNotNull);
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      expect(find.text('Per E-Mail senden'), findsWidgets);
+      expect(find.text('buchhaltung@example.invalid'), findsWidgets,
+          reason: 'signed sheet proposes the linked customer accounting address');
+      expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Senden')).onPressed, isNotNull,
+          reason: 'billing recipient is proposed, but sending still requires deliberate confirmation');
+      await tester.tap(find.text('Abbrechen'));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.text('Korrektur erstellen'));
       await tester.pumpAndSettle();

@@ -441,7 +441,7 @@ class _Parser {
     final rawTexts = c['documentTexts'];
     if (rawTexts is Map<String, Object?>) {
       for (final e in rawTexts.entries) {
-        if (!documentKindModules.containsKey(e.key)) continue;
+        if (!documentKindModules.containsKey(e.key) && e.key != 'purchaseOrder') continue;
         final t = _R(_map(e.value, 'company.documentTexts.${e.key}'), 'company.documentTexts.${e.key}');
         texts[e.key] = (intro: t.optStr('intro'), closing: t.optStr('closing'));
       }
@@ -558,6 +558,7 @@ class _Parser {
           companySnapshotTaxNumber: r.optStr('companySnapshotTaxNumber'),
           companySnapshotVatId: r.optStr('companySnapshotVatId'),
           companySnapshotIban: r.optStr('companySnapshotIban'),
+          companySnapshotBic: r.optStr('companySnapshotBic'),
           createdByUserId: userId,
           createdAt: r.time('createdAt'),
           updatedAt: r.time('updatedAt'),

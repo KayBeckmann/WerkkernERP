@@ -930,7 +930,7 @@ class PhaseBRouter {
     final documentTexts = rawTexts is Map<String, Object?>
         ? {
             for (final e in rawTexts.entries)
-              if (documentKindModules.containsKey(e.key))
+              if (documentKindModules.containsKey(e.key) || e.key == 'purchaseOrder')
                 e.key: (
                   intro: ((e.value as Map<String, Object?>)['intro'] as String?)?.trim(),
                   closing: ((e.value as Map<String, Object?>)['closing'] as String?)?.trim(),

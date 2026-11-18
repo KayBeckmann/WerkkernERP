@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'pdf_archive.dart';
 
 import 'package:decimal/decimal.dart';
 import 'package:uuid/uuid.dart';
@@ -18,6 +20,7 @@ import 'timesheets.dart';
 import 'company_import.dart';
 import 'stock.dart';
 
+part 'memory/pdf_archive.dart';
 part 'memory/suppliers.dart';
 part 'memory/fleet.dart';
 part 'memory/stock.dart';
@@ -29,7 +32,7 @@ part 'memory/timesheets.dart';
 part 'memory/staff_roles.dart';
 part 'memory/payment_terms.dart';
 
-class InMemoryBusinessRepository with _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring, _InMemoryTimeSheets, _InMemoryStaffRoles, _InMemoryPaymentTerms implements BusinessRepository {
+class InMemoryBusinessRepository with _InMemoryPdfArchive, _InMemorySuppliers, _InMemoryFleet, _InMemoryStock, _InMemoryAccounting, _InMemoryPurchasing, _InMemoryDunning, _InMemoryRecurring, _InMemoryTimeSheets, _InMemoryStaffRoles, _InMemoryPaymentTerms implements BusinessRepository {
   @override
   final List<Customer> _customers = [];
   @override

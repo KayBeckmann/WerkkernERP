@@ -10,10 +10,12 @@ import '../../data/repositories/expense_category_repository.dart';
 import '../../data/repositories/invoice_repository.dart';
 import '../../data/repositories/project_repository.dart';
 import '../../data/repositories/purchase_order_repository.dart';
+import '../../data/repositories/pdf_archive_repository.dart';
 import '../../data/repositories/stock_ledger.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/stock_change_notifier.dart';
 import '../../pdf/purchase_order_pdf_builder.dart';
+import 'archived_pdf_list.dart';
 import '../widgets/storage_bin_picker.dart';
 
 /// Bestellungsdetail (C5.2 Bestellwesen, Nachtrag 2026-10-19) —
@@ -199,9 +201,15 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
   }
 
   Future<void> _sharePdf(PurchaseOrder order, List<PurchaseOrderItem> items) async {
+    final archive = PdfArchiveRepository(context.read<AppDatabase>());
     try {
       final company = context.read<ActiveCompanyService>().active!;
       final bytes = await buildPurchaseOrderPdf(order: order, items: items, company: company);
+      await archive.storeGenerated(
+        companyId: company.id, sourceType: PdfArchiveSource.purchaseOrder,
+        sourceId: order.id, bytes: bytes,
+      );
+      if (mounted) _reload();
       await Printing.sharePdf(bytes: bytes, filename: '${order.orderNumber}.pdf');
     } catch (_) {
       if (mounted) {
@@ -344,6 +352,13 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
                   onPressed: () => _sharePdf(order, items),
                   icon: const Icon(Icons.picture_as_pdf_outlined),
                   label: const Text('PDF teilen'),
+                ),
+                ArchivedPdfList(
+                  archive: PdfArchiveRepository(context.read<AppDatabase>()),
+                  companyId: order.companyId,
+                  sourceType: PdfArchiveSource.purchaseOrder,
+                  sourceId: order.id,
+                  fileName: order.orderNumber ?? 'Bestellung',
                 ),
                 const SizedBox(height: 8),
                 if (canReceiveGoods)

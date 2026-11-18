@@ -39,10 +39,11 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test(
-    'Kleinunternehmerangebot zeigt Bruttopreise ohne separaten Steuerausweis',
+    'Kleinunternehmerangebot nennt Einzelpreis ohne separaten Steuerausweis',
     () async {
       final text = await renderedText(smallBusiness: true);
-      expect(text, contains('Bruttopreis'));
+      expect(text, contains('Einzelpreis'));
+      expect(text, isNot(contains('Bruttopreis')));
       expect(text, contains('Gesamtbetrag'));
       expect(text, contains('130,00'));
       expect(text, contains('§ 19 Abs. 1 UStG'));

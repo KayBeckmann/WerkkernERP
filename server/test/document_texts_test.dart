@@ -38,6 +38,23 @@ void runDocumentTextTests(Future<(PhaseBRepository, BusinessRepository)> Functio
   Map<String, Object?> item(num vat) =>
       {'kind': 'text', 'description': 'X', 'quantity': '1', 'unitPriceCents': 10000, 'vatRatePercent': vat};
 
+  test('Lieferanten-Bestelltexte bleiben getrennt vom Kundenauftrag und überleben Profilupdates', () async {
+    await c.request('PUT', '/company/profile', body: {
+      'documentTexts': {
+        'order': {'intro': 'Kunden-Einleitung', 'closing': 'Kunden-Schluss'},
+        'purchaseOrder': {'intro': 'Bitte liefern', 'closing': 'Mit freundlichen Grüßen'},
+      },
+    });
+    var profile = await c.request('GET', '/company/profile') as Map;
+    var texts = profile['documentTexts'] as Map;
+    expect(texts['purchaseOrder'], {'intro': 'Bitte liefern', 'closing': 'Mit freundlichen Grüßen'});
+    expect(texts['order'], {'intro': 'Kunden-Einleitung', 'closing': 'Kunden-Schluss'});
+    await c.request('PUT', '/company/profile', body: {'footerText': 'Neue Fußzeile'});
+    profile = await c.request('GET', '/company/profile') as Map;
+    texts = profile['documentTexts'] as Map;
+    expect(texts['purchaseOrder'], {'intro': 'Bitte liefern', 'closing': 'Mit freundlichen Grüßen'});
+  });
+
   test('Dokumenttexte je Art und Fußzeile werden beim Finalisieren eingefroren', () async {
     await c.request('PUT', '/company/profile', body: {
       'footerText': 'Bankverbindung …',

@@ -116,6 +116,9 @@ class Companies extends Table {
   TextColumn get pdfClosingTextQuote => text().nullable()();
   TextColumn get pdfIntroTextOrder => text().nullable()();
   TextColumn get pdfClosingTextOrder => text().nullable()();
+  /// Lieferantenbestellung; unabhängig vom Kundenauftrag (`Order`).
+  TextColumn get pdfIntroTextPurchaseOrder => text().nullable()();
+  TextColumn get pdfClosingTextPurchaseOrder => text().nullable()();
   TextColumn get pdfIntroTextDeliveryNote => text().nullable()();
   TextColumn get pdfClosingTextDeliveryNote => text().nullable()();
 
@@ -589,6 +592,7 @@ class Invoices extends Table {
   TextColumn get pdfIntroTextSnapshot => text().nullable()();
   TextColumn get pdfClosingTextSnapshot => text().nullable()();
   TextColumn get pdfFooterTextSnapshot => text().nullable()();
+  TextColumn get companySnapshotBic => text().nullable()();
 
   DateTimeColumn get finalizedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime()();

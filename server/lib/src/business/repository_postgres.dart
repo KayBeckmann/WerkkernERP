@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
+import 'pdf_archive.dart';
 
 import 'package:postgres/postgres.dart';
 import 'package:decimal/decimal.dart';
@@ -20,6 +22,7 @@ import 'timesheets.dart';
 import 'stock.dart';
 import 'company_import.dart';
 
+part 'postgres/pdf_archive.dart';
 part 'postgres/suppliers.dart';
 part 'postgres/fleet.dart';
 part 'postgres/stock.dart';
@@ -35,7 +38,7 @@ part 'postgres/company_import.dart';
 /// Postgres-Fassung. Nimmt einen [SessionExecutor] (im Betrieb ein
 /// `Pool`, in Tests eine einzelne `Connection`), damit Finalisierung
 /// und Entwurfs-Update echte Transaktionen mit Zeilensperre bekommen.
-class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets, _PostgresStaffRoles, _PostgresCompanyImport, _PostgresPaymentTerms implements BusinessRepository {
+class PostgresBusinessRepository with _PostgresPdfArchive, _PostgresSuppliers, _PostgresFleet, _PostgresStock, _PostgresAccounting, _PostgresPurchasing, _PostgresDunning, _PostgresRecurring, _PostgresTimeSheets, _PostgresStaffRoles, _PostgresCompanyImport, _PostgresPaymentTerms implements BusinessRepository {
   PostgresBusinessRepository(this._db);
   @override
   final SessionExecutor _db;
@@ -319,7 +322,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
       'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked, '
       'd.contact_id, d.e_invoice_snapshot, d.payment_term_id, d.payment_term_label, d.payment_net_days, '
-      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until, d.pdf_layout_snapshot, d.footer_columns_snapshot, d.pdf_logo_snapshot';
+      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until, d.pdf_layout_snapshot, d.footer_columns_snapshot, d.pdf_logo_snapshot, d.company_snapshot_bic';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -346,6 +349,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
         companySnapshotTaxNumber: r[21] as String?,
         companySnapshotVatId: r[22] as String?,
         companySnapshotIban: r[23] as String?,
+        companySnapshotBic: r[49] as String?,
         convertedFromId: r[24] as String?,
         paymentStatus: r[25] as String,
         paidAt: r[26] as DateTime?,
@@ -750,7 +754,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           "UPDATE documents d SET status = 'finalized', number = @number, number_year = @year, finalized_at = @now, "
           'updated_at = @now, version = d.version + 1, company_snapshot_name = @companyName, '
           'company_snapshot_address = @companyAddress, company_snapshot_tax_number = @companyTaxNumber, '
-          'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, '
+          'company_snapshot_vat_id = @companyVatId, company_snapshot_iban = @companyIban, company_snapshot_bic = @companyBic, '
           'intro_text_snapshot = @intro, closing_text_snapshot = @closing, footer_text_snapshot = @footer, footer_columns_snapshot = @footerColumns, '
           'small_business_exempt_snapshot = @exempt, e_invoice_snapshot = @eInvoice, pdf_layout_snapshot = @pdfLayout, pdf_logo_snapshot = @pdfLogo, '
           "quote_valid_from = CASE WHEN d.kind = 'quote' AND d.quote_validity_days IS NOT NULL THEN @today ELSE d.quote_valid_from END, "
@@ -772,6 +776,7 @@ class PostgresBusinessRepository with _PostgresSuppliers, _PostgresFleet, _Postg
           'companyTaxNumber': company.taxNumber,
           'companyVatId': company.vatId,
           'companyIban': company.iban,
+          'companyBic': company.bic,
           'intro': company.introText,
           'closing': company.closingText,
           'footer': company.footerText,

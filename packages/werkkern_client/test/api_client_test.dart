@@ -8,6 +8,21 @@ import 'package:werkkern_client/werkkern_client.dart';
 /// Reine Client-Tests (ohne Server) — der Vertrag gegen den echten
 /// Router steckt in `server/test/client_contract_test.dart`.
 void main() {
+  test('archive client parses metadata and forwards bounded page query', () async {
+    final client = WerkkernApiClient(baseUrl: Uri.parse('https://erp.example/api'),
+      httpClient: MockClient((request) async {
+        expect(request.url.toString(), 'https://erp.example/api/pdf-archive/versions?limit=2&offset=3');
+        return http.Response(jsonEncode({'versions': [
+          {'sourceType': 'document', 'sourceId': 'd1', 'version': 2,
+           'createdAt': '2026-01-01T00:00:00Z', 'sha256': 'abc', 'sizeBytes': 42}
+        ], 'limit': 2, 'offset': 3, 'hasMore': true}), 200);
+      }));
+    final page = await client.browsePdfArchive(limit: 2, offset: 3);
+    expect(page.versions.single.sourceId, 'd1');
+    expect(page.versions.single.sizeBytes, 42);
+    expect(page.hasMore, isTrue);
+    expect(page.offset, 3);
+  });
   test('Bearer-Token wird nach selectCompany mitgesendet, Basis-Pfad bleibt erhalten', () async {
     final seen = <http.Request>[];
     final client = WerkkernApiClient(

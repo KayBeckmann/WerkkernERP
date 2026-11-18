@@ -251,6 +251,9 @@ class PurchasingRoutes {
   Future<Response> _delete(Request request, String id) async {
     final check = await auth.requirePermission(request, 'purchaseOrders.write');
     if (check.error != null) return check.error!;
+    if ((await business.listPdfVersions(check.auth!.session.companyId, 'purchase-order', id)).isNotEmpty) {
+      return jsonError('Bestellung mit archivierten PDF-Fassungen kann nicht gelöscht werden.', status: 409);
+    }
     if (check.auth!.session.isAgent) {
       final order = await business.findPurchaseOrder(check.auth!.session.companyId, id);
       if (order == null) return jsonError('Bestellung nicht gefunden.', status: 404);
