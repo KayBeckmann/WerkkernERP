@@ -326,6 +326,10 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
   }
   List<Invoice> _creditNotes = [];
 
+  /// Storniert oder voll gutgeschrieben (`InvoiceRepository.isClosed`):
+  /// keine offene Forderung, kein Zahlstatus und keine Mahnstufe mehr.
+  bool _closed = false;
+
   // C5.2 Bestellwesen (Nachtrag 2026-10-19): nur bei kind == order
   // relevant und nur sichtbar, wenn die Firma das Modul aktiviert hat
   // (gleiches Prinzip wie die Gutschriften oben).
@@ -434,6 +438,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
         _hasBeenConverted = (await invoiceRepo.listConvertedFrom(invoice.id)).isNotEmpty;
         if (invoice.kind == DocumentKind.invoice) {
           _creditNotes = await invoiceRepo.listCreditNotesForInvoice(invoice.id);
+          _closed = await invoiceRepo.isClosed(invoice.id);
         }
       }
       // C13: eine Rechnung, die aus einem Angebot/Auftrag umgewandelt
@@ -932,8 +937,12 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       } else {
         final note = await repo.cancelInvoice(companyId: invoice.companyId, invoiceId: invoice.id);
         final credits = await repo.listCreditNotesForInvoice(invoice.id);
+        final closed = await repo.isClosed(invoice.id);
         if (!mounted) return;
-        setState(() => _creditNotes = credits);
+        setState(() {
+          _creditNotes = credits;
+          _closed = closed;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -973,7 +982,13 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       if (mounted) {
         setState(() {});
         final reloaded = await repo.listCreditNotesForInvoice(invoice.id);
-        if (mounted) setState(() => _creditNotes = reloaded);
+        final closed = await repo.isClosed(invoice.id);
+        if (mounted) {
+          setState(() {
+            _creditNotes = reloaded;
+            _closed = closed;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1849,6 +1864,9 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           if (_creditNotes.any((d) => d.isCancellation))
             const ListTile(leading: Icon(Icons.cancel_outlined), title: Text('Rechnung storniert'),
               subtitle: Text('Der Stornobeleg steht bei den Gutschriften. Mit „Rechnung kopieren“ einen neuen Entwurf erstellen.')),
+          if (_closed && !_creditNotes.any((d) => d.isCancellation))
+            const ListTile(leading: Icon(Icons.cancel_outlined), title: Text('Durch Gutschrift ausgeglichen'),
+              subtitle: Text('Die Gutschriften decken den vollen Betrag — keine offene Forderung mehr.')),
           if (_currentInvoice?.isCancellation ?? false)
             const ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('Stornobeleg')),
           if (isFinalized)
@@ -1997,7 +2015,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               trailing: const Icon(Icons.calendar_today_outlined),
               onTap: _pickDueDate,
             ),
-            if (isFinalized) ...[
+            if (isFinalized && !_closed) ...[
               Row(
                 children: [
                   Expanded(

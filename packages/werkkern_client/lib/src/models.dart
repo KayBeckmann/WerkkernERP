@@ -322,6 +322,7 @@ class OnlineDocument {
     this.creditNotes = const [],
     this.isCancellation = false,
     this.cancellationId,
+    this.isClosed = false,
     this.introTextSnapshot,
     this.closingTextSnapshot,
     this.footerTextSnapshot,
@@ -373,6 +374,7 @@ class OnlineDocument {
       creditNotes: _summaries(j['creditNotes']),
       isCancellation: j['isCancellation'] as bool? ?? false,
       cancellationId: j['cancellationId'] as String?,
+      isClosed: j['closed'] as bool? ?? false,
       introTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['intro'] as String?,
       closingTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['closing'] as String?,
       footerTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['footer'] as String?,
@@ -500,6 +502,10 @@ class OnlineDocument {
   final List<({String id, String? number, int grossCents})> creditNotes;
   final bool isCancellation;
   final String? cancellationId;
+
+  /// Rechnung storniert oder durch Gutschriften voll ausgeglichen — keine
+  /// offene Forderung, keine Mahnstufe.
+  final bool isClosed;
 
   static List<({String id, String? number, int grossCents})> _summaries(Object? raw) => [
         for (final s in (raw as List? ?? const []))

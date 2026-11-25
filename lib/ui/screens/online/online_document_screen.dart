@@ -1483,6 +1483,9 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           ListTile(leading: const Icon(Icons.cancel_outlined), title: const Text('Rechnung storniert'),
             subtitle: const Text('Mit „Rechnung kopieren“ einen neuen Entwurf erstellen.'),
             trailing: TextButton(onPressed: () => _replaceWith(document.cancellationId!), child: const Text('Stornobeleg'))),
+        if (document.isClosed && document.cancellationId == null)
+          const ListTile(leading: Icon(Icons.cancel_outlined), title: Text('Durch Gutschrift ausgeglichen'),
+            subtitle: Text('Die Gutschriften decken den vollen Betrag — keine offene Forderung mehr.')),
         if (document.isCancellation)
           const ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('Stornobeleg')),
         if (document.kind == 'creditNote' && document.convertedFromNumber != null)
@@ -1610,7 +1613,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             onTap: _busy || _offlineView || (finalized ? !session.can('invoices.payment') : !editable) ? null : _pickDueDate,
           ),
         ],
-        if (finalized && document.kind == 'invoice' && document.cancellationId == null) ...[
+        if (finalized && document.kind == 'invoice' && !document.isClosed) ...[
           // Wrap statt Row: auf schmalen Handys (~330 px) bricht der Knopf
           // unter den Text, statt über den Rand zu laufen.
           Wrap(

@@ -1,4 +1,4 @@
-import 'package:werkkern_core/werkkern_core.dart' show hasPaymentStatusKind, revenueSignForKind;
+import 'package:werkkern_core/werkkern_core.dart' show hasPaymentStatusKind, isInvoiceClosedByCredit, revenueSignForKind;
 
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
@@ -71,10 +71,20 @@ DashboardSummary computeDashboardSummary({
   var revenueMonth = Money.zero();
   var revenueYear = Money.zero();
 
-  final cancelledIds = {
-    for (final entry in finalizedInvoices)
-      if (entry.invoice.isCancellation) entry.invoice.convertedFromId,
-  };
+  // Storniert oder voll gutgeschrieben: keine offene Forderung mehr.
+  final cancelledIds = <String?>{};
+  final creditedCents = <String?, int>{};
+  for (final entry in finalizedInvoices) {
+    final invoice = entry.invoice;
+    if (invoice.kind != DocumentKind.creditNote || invoice.convertedFromId == null) continue;
+    if (invoice.isCancellation) cancelledIds.add(invoice.convertedFromId);
+    creditedCents.update(invoice.convertedFromId, (c) => c + entry.gross.cents, ifAbsent: () => entry.gross.cents);
+  }
+  bool closed(InvoiceWithGross entry) => isInvoiceClosedByCredit(
+        cancelled: cancelledIds.contains(entry.invoice.id),
+        invoiceGrossCents: entry.gross.cents,
+        creditedGrossCents: creditedCents[entry.invoice.id] ?? 0,
+      );
   for (final entry in finalizedInvoices) {
     final invoice = entry.invoice;
     final signed = Money.fromCents(entry.gross.cents * revenueSignForKind(invoice.kind.name));
@@ -84,7 +94,7 @@ DashboardSummary computeDashboardSummary({
         revenueMonth += signed;
       }
     }
-    if (!cancelledIds.contains(invoice.id) && hasPaymentStatusKind(invoice.kind.name) && invoice.paymentStatus == PaymentStatus.open) {
+    if (!closed(entry) && hasPaymentStatusKind(invoice.kind.name) && invoice.paymentStatus == PaymentStatus.open) {
       openCount++;
       openSum += entry.gross;
       if (dunningLevelFor(invoice, now, dunningConfig) != DunningLevel.none) {

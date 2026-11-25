@@ -206,6 +206,43 @@ void main() {
       expect(sum.cents, greaterThan(0));
     },
   );
+  test('isClosed(): Storno und volle Gutschrift schließen die Rechnung, Teilgutschrift nicht', () async {
+    final company = await companies.create(name: 'Abschlussfirma');
+    final customer = await customers.create(companyId: company.id, name: 'Abschlusskunde');
+
+    final cancelled = await finalizedInvoice(companyId: company.id, customerId: customer.id);
+    expect(await invoices.isClosed(cancelled.id), isFalse);
+    await invoices.cancelInvoice(companyId: company.id, invoiceId: cancelled.id);
+    expect(await invoices.isClosed(cancelled.id), isTrue);
+
+    final credited = await finalizedInvoice(companyId: company.id, customerId: customer.id);
+    final partial = await invoices.createCreditNoteDraft(companyId: company.id, invoiceId: credited.id);
+    await invoices.update(companyId: company.id, id: partial.id, items: [
+      InvoiceItemInput(
+        kind: InvoiceItemKind.text,
+        description: 'Teilgutschrift',
+        quantity: Decimal.one,
+        unitPriceCents: 4000,
+        vatRatePercent: 19,
+      ),
+    ]);
+    await invoices.finalize(companyId: company.id, id: partial.id);
+    expect(await invoices.isClosed(credited.id), isFalse);
+
+    final rest = await invoices.createCreditNoteDraft(companyId: company.id, invoiceId: credited.id);
+    await invoices.update(companyId: company.id, id: rest.id, items: [
+      InvoiceItemInput(
+        kind: InvoiceItemKind.text,
+        description: 'Restgutschrift',
+        quantity: Decimal.one,
+        unitPriceCents: 6000,
+        vatRatePercent: 19,
+      ),
+    ]);
+    await invoices.finalize(companyId: company.id, id: rest.id);
+    expect(await invoices.isClosed(credited.id), isTrue);
+  });
+
   test('Vollstorno und Kopie: Original unverändert, Gegenbeleg und neuer bearbeitbarer Entwurf', () async {
     final company = await companies.create(name: 'Originalfirma');
     final customer = await customers.create(companyId: company.id, name: 'Originalkunde');

@@ -61,7 +61,7 @@ class _BankReconciliationScreenState extends State<BankReconciliationScreen> {
 
     final openItems = <OpenItem>[];
     for (final invoice in allInvoices) {
-      if (!isOpenItem(invoice)) continue;
+      if (!isOpenItem(invoice) || await invoiceRepo.isClosed(invoice.id)) continue;
       final totals = await invoiceRepo.totalsFor(invoice.id);
       openItems.add(
         OpenItem(

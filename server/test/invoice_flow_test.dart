@@ -385,6 +385,35 @@ void runInvoiceFlowTests(Future<(PhaseBRepository, BusinessRepository)> Function
     expect((await c.request('GET', '/accounting/open-items') as Map)['totalCents'], original.grossCents);
   });
 
+  test('Volle Gutschrift schließt die Rechnung wie ein Storno, Teilgutschrift nicht', () async {
+    await c.setModules({'creditNotes', 'buchhaltung', 'dunning'});
+    final group = (await c.groups()).firstWhere((g) => g.name == 'Projektleiter').id;
+    for (final permission in ['accounting.read', 'dunning.read', 'dunning.write', 'invoices.payment']) {
+      await c.setGroupPermission(group, permission, granted: true);
+    }
+    final draft = await post('/documents', {'customerId': customerId, 'items': orderItems});
+    final original = await c.finalizeDocument(draft['id'] as String, version: draft['version'] as int);
+    await c.setDueDate(original.id, DateTime(2020, 1, 1));
+
+    // Teilgutschrift (eine Position weniger): Rechnung bleibt offen.
+    final partial = await c.createCreditNote(original.id);
+    final partialEdited = await put('/documents/${partial.id}', {'version': partial.version, 'items': orderItems.take(1).toList()});
+    await c.finalizeDocument(partial.id, version: partialEdited['version'] as int);
+    expect((await c.document(original.id)).isClosed, isFalse);
+    expect((await c.request('GET', '/dunning/overdue') as Map)['overdue'], hasLength(1));
+
+    // Rest gutschreiben: zusammen der volle Betrag, Rechnung geschlossen.
+    final rest = await c.createCreditNote(original.id);
+    final restEdited = await put('/documents/${rest.id}', {'version': rest.version, 'items': orderItems.skip(1).toList()});
+    await c.finalizeDocument(rest.id, version: restEdited['version'] as int);
+    expect((await c.document(original.id)).isClosed, isTrue);
+    expect((await c.request('GET', '/accounting/open-items') as Map)['totalCents'], 0);
+    expect((await c.request('GET', '/dunning/overdue') as Map)['overdue'], isEmpty);
+    expect((await c.documents(kind: 'invoice')).firstWhere((d) => d.id == original.id).isClosed, isTrue);
+    final tiles = ((await c.request('GET', '/dashboard') as Map)['tiles'] as List).cast<Map>();
+    expect(tiles.firstWhere((t) => t['key'] == 'openInvoices')['count'], 0);
+  });
+
   test('Storno und Kopie respektieren Firmenbindung und Schreibrechte', () async {
     final draft = await post('/documents', {'customerId': customerId, 'items': orderItems});
     final original = await c.finalizeDocument(draft['id'] as String, version: draft['version'] as int);

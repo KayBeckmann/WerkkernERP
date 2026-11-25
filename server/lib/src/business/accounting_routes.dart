@@ -259,7 +259,7 @@ class AccountingRoutes {
     final companyId = check.auth!.session.companyId;
     final byCustomer = <String, ({String name, List<Map<String, Object?>> items, int total})>{};
     for (final d in await business.listDocuments(companyId, kind: 'invoice', status: 'finalized')) {
-      if (!hasPaymentStatusKind(d.kind) || d.paymentStatus != 'open' || await isInvoiceCancelled(business, companyId, d.id)) continue;
+      if (!hasPaymentStatusKind(d.kind) || d.paymentStatus != 'open' || await isInvoiceClosed(business, companyId, d.id)) continue;
       final gross = documentGrossCents(await business.itemsFor(companyId, d.id));
       final entry = byCustomer[d.customerId] ??
           (name: d.customerSnapshotName ?? (await business.findCustomer(companyId, d.customerId))?.name ?? '', items: <Map<String, Object?>>[], total: 0);

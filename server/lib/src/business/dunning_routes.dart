@@ -61,7 +61,7 @@ class DunningRoutes {
     DateTime now,
   ) async {
     final level = hasPaymentStatusKind(d.kind)
-        ? dunningLevelForDue(isFinalized: !d.isDraft && !await isInvoiceCancelled(business, companyId, d.id), isPaid: d.paymentStatus == 'paid', dueDate: d.dueDate, now: now, config: config)
+        ? dunningLevelForDue(isFinalized: !d.isDraft && !await isInvoiceClosed(business, companyId, d.id), isPaid: d.paymentStatus == 'paid', dueDate: d.dueDate, now: now, config: config)
         : DunningLevel.none;
     final gross = documentGrossCents(await business.itemsFor(companyId, d.id));
     final overdueDays = d.dueDate == null ? 0 : now.difference(d.dueDate!).inDays;

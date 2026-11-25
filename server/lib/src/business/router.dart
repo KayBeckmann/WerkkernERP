@@ -424,6 +424,7 @@ class BusinessRoutes {
         ...d.toJson(),
         'customerName': customerNames[d.customerId],
         'totalGrossCents': _totals(items).totalGross.cents,
+        'closed': d.kind == 'invoice' && !d.isDraft && await isInvoiceClosed(business, d.companyId, d.id),
       });
     }
     return jsonOk({'documents': result});
@@ -462,7 +463,7 @@ class BusinessRoutes {
 
     Future<List<Map<String, Object?>>> finalizedSummaries(Iterable<Document> docs) async => [
           for (final d in docs.where((d) => !d.isDraft))
-            if (d.kind != 'invoice' || !await isInvoiceCancelled(business, companyId, d.id))
+            if (d.kind != 'invoice' || !await isInvoiceClosed(business, companyId, d.id))
             {'id': d.id, 'number': d.number, 'grossCents': _totals(await business.itemsFor(companyId, d.id)).totalGross.cents},
         ];
     // C13: Schlussrechnung (aus demselben Auftrag, selbst kein Abschlag)
@@ -508,6 +509,8 @@ class BusinessRoutes {
       if (advancePayments.isNotEmpty) 'remainingCents': totals.totalGross.cents - advanceSum,
       'creditNotes': creditNotes,
       'cancellationId': convertedTo.where((d) => d.isCancellation).firstOrNull?.id,
+      // Storniert oder voll gutgeschrieben: keine offene Forderung mehr.
+      'closed': document.kind == 'invoice' && !document.isDraft && await isInvoiceClosed(business, companyId, document.id),
     }, status: status);
   }
 
@@ -556,7 +559,7 @@ class BusinessRoutes {
         : const <Document>[];
     final activeAdvances = <Document>[];
     for (final advance in advances) {
-      if (!await isInvoiceCancelled(business, companyId, advance.id)) activeAdvances.add(advance);
+      if (!await isInvoiceClosed(business, companyId, advance.id)) activeAdvances.add(advance);
     }
     final referenced = document.kind == 'creditNote' && document.convertedFromId != null
         ? await business.findDocument(companyId, document.convertedFromId!)

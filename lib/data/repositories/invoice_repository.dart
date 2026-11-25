@@ -2,7 +2,7 @@ import 'package:decimal/decimal.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart'
-    show BillingRole, PlannedHoursItem, billBookedHoursByRole, documentConversionTargets, documentKindUsesPaymentTerms, resolvePaymentDefaults, isValidQuoteValidityDays, quoteValidityDaysBetween, quoteValidUntil;
+    show BillingRole, PlannedHoursItem, isInvoiceClosedByCredit, billBookedHoursByRole, documentConversionTargets, documentKindUsesPaymentTerms, resolvePaymentDefaults, isValidQuoteValidityDays, quoteValidityDaysBetween, quoteValidUntil;
 
 import '../../domain/models/money.dart';
 import '../../domain/services/document_text_resolver.dart';
@@ -953,7 +953,7 @@ class InvoiceRepository {
     for (final doc in converted) {
       if (doc.kind == DocumentKind.invoice &&
           doc.isAdvancePayment &&
-          doc.status == InvoiceStatus.finalized && !await isCancelled(doc.id)) {
+          doc.status == InvoiceStatus.finalized && !await isClosed(doc.id)) {
         final total = (await totalsFor(doc.id)).totalGross;
         entries.add(AdvancePaymentEntry(invoiceNumber: doc.invoiceNumber!, amountGross: total));
       }
@@ -1252,8 +1252,21 @@ class InvoiceRepository {
     ];
   }
 
-  Future<bool> isCancelled(String invoiceId) async =>
-      (await listCreditNotesForInvoice(invoiceId)).any((d) => d.isCancellation);
+  /// Storniert oder durch finalisierte Gutschriften voll ausgeglichen — keine
+  /// offene Forderung mehr (siehe `isInvoiceClosedByCredit` in `werkkern_core`).
+  Future<bool> isClosed(String invoiceId) async {
+    final credits = await listCreditNotesForInvoice(invoiceId);
+    if (credits.isEmpty) return false;
+    var credited = Money.zero();
+    for (final doc in credits) {
+      credited = credited + (await totalsFor(doc.id)).totalGross;
+    }
+    return isInvoiceClosedByCredit(
+      cancelled: credits.any((d) => d.isCancellation),
+      invoiceGrossCents: (await totalsFor(invoiceId)).totalGross.cents,
+      creditedGrossCents: credited.cents,
+    );
+  }
 
   Future<Money> sumCreditNotesForInvoice(String invoiceId) async {
     var sum = Money.zero();

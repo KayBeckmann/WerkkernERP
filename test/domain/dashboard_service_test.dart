@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/data/database/tables.dart';
@@ -166,5 +167,32 @@ void main() {
     expect(summary.revenueThisYear.cents, 9000);
     expect(summary.openInvoicesCount, 1, reason: 'Auftrag/Angebot/Gutschrift sind keine offenen Posten');
     expect(summary.openInvoicesSum.cents, 10000);
+  });
+
+  test('Storno oder volle Gutschrift: Rechnung weder offen noch überfällig, Teilgutschrift schon', () {
+    final now = DateTime(2026, 11, 25);
+    final invoice = invoiceWith(issueDate: DateTime(2026, 11, 1), dueDate: DateTime(2026, 11, 10));
+    InvoiceWithGross creditNote(int cents, {bool cancellation = false}) => InvoiceWithGross(
+          invoice: invoiceWith(issueDate: now, kind: DocumentKind.creditNote)
+              .copyWith(id: 'credit-$cents-$cancellation', convertedFromId: Value(invoice.id), isCancellation: cancellation),
+          gross: Money.fromCents(cents),
+        );
+    DashboardSummary summary(List<InvoiceWithGross> credits) => computeDashboardSummary(
+          finalizedInvoices: [InvoiceWithGross(invoice: invoice, gross: Money.fromCents(11900)), ...credits],
+          now: now,
+          dunningConfig: defaultConfig,
+        );
+
+    expect(summary([]).overdueInvoicesCount, 1);
+    expect(summary([creditNote(5000)]).openInvoicesCount, 1);
+    expect(summary([creditNote(5000)]).overdueInvoicesCount, 1);
+    for (final credits in [
+      [creditNote(11900)],
+      [creditNote(5000), creditNote(6900)],
+      [creditNote(11900, cancellation: true)],
+    ]) {
+      expect(summary(credits).openInvoicesCount, 0);
+      expect(summary(credits).overdueInvoicesCount, 0);
+    }
   });
 }

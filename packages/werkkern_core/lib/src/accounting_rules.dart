@@ -14,3 +14,16 @@ int revenueSignForKind(String kind) => switch (kind) {
 /// Nur Rechnungen haben einen Zahlungsstatus und sind damit offene
 /// Posten, mahnbar und im Bankabgleich zuordenbar.
 bool hasPaymentStatusKind(String kind) => kind == 'invoice';
+
+/// Eine Rechnung ist durch Gutschriften geschlossen, wenn sie storniert ist
+/// oder finalisierte Gutschriften ihren Bruttobetrag voll abdecken (Kay
+/// 2026-11-25: „Wenn die Rechnung storniert wurde, muss sie im System als
+/// geschlossen gekennzeichnet werden“). Dann ist sie keine offene Forderung
+/// mehr — weder in offenen Posten noch im Dashboard, Mahnwesen oder
+/// Bankabgleich. Teilgutschriften lassen die Rechnung offen.
+bool isInvoiceClosedByCredit({
+  required bool cancelled,
+  required int invoiceGrossCents,
+  required int creditedGrossCents,
+}) =>
+    cancelled || (invoiceGrossCents > 0 && creditedGrossCents >= invoiceGrossCents);

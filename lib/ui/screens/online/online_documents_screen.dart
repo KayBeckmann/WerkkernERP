@@ -166,7 +166,7 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
           final d = documents[index];
           final finalized = !d.isDraft;
           final pending = offline?.pendingFor(d.id).length ?? 0;
-          final level = _dunningConfig == null || d.kind != 'invoice'
+          final level = _dunningConfig == null || d.kind != 'invoice' || d.isClosed
               ? DunningLevel.none
               : dunningLevelForDue(
                   isFinalized: finalized,
@@ -175,7 +175,7 @@ class _OnlineDocumentsScreenState extends State<OnlineDocumentsScreen> {
                   now: DateTime.now(),
                   config: _dunningConfig!,
                 );
-          final status = finalized ? d.number ?? '' : 'Entwurf';
+          final status = !finalized ? 'Entwurf' : d.isClosed ? '${d.number ?? ''} · storniert' : d.number ?? '';
           final selected = _isWide && _selectedId == d.id;
           return Card(
             color: selected ? theme.colorScheme.primaryContainer : null,

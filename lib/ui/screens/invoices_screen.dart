@@ -168,13 +168,20 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     final customers = await customerRepo.listForCompany(companyId);
     final customerById = {for (final c in customers) c.id: c};
     final totalsById = <String, Money>{};
+    final closedIds = <String>{};
     for (final invoice in invoices) {
       totalsById[invoice.id] = (await invoiceRepo.totalsFor(invoice.id)).totalGross;
+      if (invoice.kind == DocumentKind.invoice &&
+          invoice.status == InvoiceStatus.finalized &&
+          await invoiceRepo.isClosed(invoice.id)) {
+        closedIds.add(invoice.id);
+      }
     }
     return _InvoicesData(
       invoices: invoices,
       customerById: customerById,
       totalsById: totalsById,
+      closedIds: closedIds,
     );
   }
 
@@ -274,13 +281,18 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         final invoice = data.invoices[index];
         final customer = data.customerById[invoice.customerId];
         final isFinalized = invoice.status == InvoiceStatus.finalized;
-        final statusLabel = isFinalized ? invoice.invoiceNumber! : 'Entwurf';
+        final closed = data.closedIds.contains(invoice.id);
+        final statusLabel = !isFinalized
+            ? 'Entwurf'
+            : closed
+                ? '${invoice.invoiceNumber!} · storniert'
+                : invoice.invoiceNumber!;
         final selected = isWide && !_creatingNew && _selectedInvoice?.id == invoice.id;
         // C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): rein
         // datumsbasierte Anzeige, siehe `dunning_service.dart` — ergibt
         // `DunningLevel.none`, solange kein Fälligkeitsdatum gesetzt ist
         // (z. B. Modul ausgeschaltet), kein zusätzlicher Flag-Check nötig.
-        final dunningLevel = dunningLevelFor(invoice, DateTime.now(), dunningConfig);
+        final dunningLevel = closed ? DunningLevel.none : dunningLevelFor(invoice, DateTime.now(), dunningConfig);
         return Card(
           color: selected ? Theme.of(context).colorScheme.primaryContainer : null,
           child: ListTile(
@@ -399,10 +411,14 @@ class _InvoicesData {
     required this.invoices,
     required this.customerById,
     required this.totalsById,
+    required this.closedIds,
   });
   final List<Invoice> invoices;
   final Map<String, Customer> customerById;
   final Map<String, Money> totalsById;
+
+  /// Storniert oder voll gutgeschrieben (`InvoiceRepository.isClosed`).
+  final Set<String> closedIds;
 }
 
 /// Kunde-wählen-Dialog mit Live-Suche (Kay-Nachtrag 2026-10-16: "beim

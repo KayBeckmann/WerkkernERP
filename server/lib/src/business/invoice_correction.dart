@@ -1,3 +1,6 @@
+import 'package:werkkern_core/werkkern_core.dart' show isInvoiceClosedByCredit;
+
+import 'accounting_routes.dart' show documentGrossCents;
 import 'models.dart';
 import 'repository.dart';
 
@@ -79,5 +82,22 @@ List<DocumentItem> copyDocumentItems(List<DocumentItem> items, String documentId
     ),
 ];
 
-Future<bool> isInvoiceCancelled(BusinessRepository business, String companyId, String invoiceId) async =>
-    (await business.listConvertedFrom(companyId, invoiceId)).any((d) => d.isCancellation && !d.isDraft);
+/// Storniert oder durch finalisierte Gutschriften voll ausgeglichen — keine
+/// offene Forderung mehr (siehe `isInvoiceClosedByCredit` in `werkkern_core`).
+Future<bool> isInvoiceClosed(BusinessRepository business, String companyId, String invoiceId) async {
+  final credits = [
+    for (final d in await business.listConvertedFrom(companyId, invoiceId))
+      if (d.kind == 'creditNote' && !d.isDraft) d,
+  ];
+  if (credits.isEmpty) return false;
+  if (credits.any((d) => d.isCancellation)) return true;
+  var credited = 0;
+  for (final c in credits) {
+    credited += documentGrossCents(await business.itemsFor(companyId, c.id));
+  }
+  return isInvoiceClosedByCredit(
+    cancelled: false,
+    invoiceGrossCents: documentGrossCents(await business.itemsFor(companyId, invoiceId)),
+    creditedGrossCents: credited,
+  );
+}
