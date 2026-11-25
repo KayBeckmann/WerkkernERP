@@ -76,6 +76,8 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  final _visits = <Object, int>{};
+
   List<ShellTab> _buildTabs(Company company) => [
         const ShellTab(
           id: _TabId.dashboard,
@@ -300,7 +302,20 @@ class _HomeShellState extends State<HomeShell> {
 
     return AppShell(
       companyName: company.name,
-      tabs: _buildTabs(company),
+      tabs: [
+        // Neuer Schlüssel je Wechsel: der Bereich lädt beim Hinwechseln
+        // frisch (wie online) — sonst zeigt z. B. das Dashboard nach einem
+        // Storno weiter den Stand vom ersten Öffnen.
+        for (final tab in _buildTabs(company))
+          ShellTab(
+            id: tab.id,
+            icon: tab.icon,
+            title: tab.title,
+            section: tab.section,
+            screen: KeyedSubtree(key: ValueKey('${tab.key}-${_visits[tab.id] ?? 0}'), child: tab.screen),
+          ),
+      ],
+      onTabSelected: (id) => setState(() => _visits.update(id, (v) => v + 1, ifAbsent: () => 1)),
       pinnedNarrowIds: _pinnedNarrowIds,
       // Schnellzugriff je Gerät und lokaler Firma (siehe `QuickAccessStore`).
       quickAccessScope: 'local:${company.id}',
