@@ -262,6 +262,7 @@ class MigrationPackageBuilder {
             'isAdvancePayment': d.isAdvancePayment,
             'isFixedPrice': d.isFixedPrice,
             'stockBooked': d.stockBooked,
+            'isCancellation': d.isCancellation,
             'paymentStatus': d.paymentStatus.name,
             'paidAt': _ts(d.paidAt),
             'items': itemsOf(invoiceItems, (InvoiceItem i) => i.invoiceId, d.id, _item),

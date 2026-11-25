@@ -58,7 +58,10 @@ class _EuerScreenState extends State<EuerScreen> {
     final categoryRepo = context.read<ExpenseCategoryRepository>();
     final vehicleRepo = context.read<VehicleRepository>();
 
-    final allInvoices = await invoiceRepo.listAllForCompany(company.id);
+    final allInvoices = [
+      ...await invoiceRepo.listAllForCompany(company.id),
+      ...await invoiceRepo.listAllForCompany(company.id, kind: DocumentKind.creditNote),
+    ];
     final finalized = allInvoices.where((i) => i.status == InvoiceStatus.finalized).toList();
     final withGross = <InvoiceWithGross>[];
     for (final invoice in finalized) {

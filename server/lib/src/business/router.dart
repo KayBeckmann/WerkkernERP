@@ -10,6 +10,7 @@ import '../auth.dart';
 import '../repository.dart';
 import '../util/responses.dart';
 import 'models.dart';
+import 'invoice_correction.dart';
 import 'payment_terms.dart';
 import 'payment_terms_routes.dart';
 import 'repository.dart';
@@ -81,6 +82,8 @@ class BusinessRoutes {
     router.post('/documents/<id>/finalize', _finalizeDocument);
     router.post('/documents/<id>/convert', _convertDocument);
     router.post('/documents/<id>/credit-note', _createCreditNote);
+    router.post('/documents/<id>/cancel', _cancelInvoice);
+    router.post('/documents/<id>/copy', _copyInvoice);
     router.post('/documents/<id>/material-advance', _createMaterialAdvance);
     router.post('/documents/<id>/payment', _setPayment);
     router.put('/documents/<id>/due-date', _setDueDate);
@@ -459,6 +462,7 @@ class BusinessRoutes {
 
     Future<List<Map<String, Object?>>> finalizedSummaries(Iterable<Document> docs) async => [
           for (final d in docs.where((d) => !d.isDraft))
+            if (d.kind != 'invoice' || !await isInvoiceCancelled(business, companyId, d.id))
             {'id': d.id, 'number': d.number, 'grossCents': _totals(await business.itemsFor(companyId, d.id)).totalGross.cents},
         ];
     // C13: Schlussrechnung (aus demselben Auftrag, selbst kein Abschlag)
@@ -503,6 +507,7 @@ class BusinessRoutes {
       'advancePayments': advancePayments,
       if (advancePayments.isNotEmpty) 'remainingCents': totals.totalGross.cents - advanceSum,
       'creditNotes': creditNotes,
+      'cancellationId': convertedTo.where((d) => d.isCancellation).firstOrNull?.id,
     }, status: status);
   }
 
@@ -549,6 +554,10 @@ class BusinessRoutes {
             .where((d) => d.kind == 'invoice' && d.isAdvancePayment && d.id != document.id && !d.isDraft)
             .toList()
         : const <Document>[];
+    final activeAdvances = <Document>[];
+    for (final advance in advances) {
+      if (!await isInvoiceCancelled(business, companyId, advance.id)) activeAdvances.add(advance);
+    }
     final referenced = document.kind == 'creditNote' && document.convertedFromId != null
         ? await business.findDocument(companyId, document.convertedFromId!)
         : null;
@@ -566,7 +575,7 @@ class BusinessRoutes {
       smallBusinessExempt: exempt && items.every((i) => i.vatRatePercent == 0),
       isAdvancePayment: document.isAdvancePayment,
       priorPayments: [
-        for (final a in advances)
+        for (final a in activeAdvances)
           EInvoicePriorPayment(
             invoiceNumber: a.number ?? '',
             grossCents: _totals(await business.itemsFor(companyId, a.id)).totalGross.cents,
@@ -1745,6 +1754,96 @@ class BusinessRoutes {
     }
   }
 
+  /// Vollstorno mit ausdrücklicher Bestätigung des geprüften Rechnungsstands.
+  Future<Response> _cancelInvoice(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'invoices.finalize', requiredModule: 'creditNotes');
+    if (check.error != null) return check.error!;
+    final write = await auth.requirePermission(request, 'invoices.write');
+    if (write.error != null) return write.error!;
+    final ctx = check.auth!;
+    final companyId = ctx.session.companyId;
+    final source = await business.findDocument(companyId, id);
+    if (source == null) return jsonError('Rechnung nicht gefunden.', status: 404);
+    final body = await _body(request);
+    final version = body['version'];
+    if (version is! int) return jsonError('version (Ganzzahl) ist Pflicht.');
+    if (source.kind != 'invoice' || source.isDraft) {
+      return jsonError('Nur finalisierte Rechnungen können storniert werden.', status: 409);
+    }
+    if (ctx.session.isAgent) {
+      return auth.requestApproval(
+        ctx,
+        method: 'POST',
+        path: '/documents/$id/cancel',
+        body: body,
+        summary: 'Rechnung ${source.number} vollständig stornieren (Version $version)',
+      );
+    }
+    try {
+      final note = await business.cancelInvoice(
+        companyId: companyId,
+        id: id,
+        expectedVersion: version,
+        userId: ctx.session.userId,
+        now: DateTime.now().toUtc(),
+      );
+      await auth.audit(ctx, 'document.cancel', 'invoice', id);
+      return await _documentResponse(companyId, note, status: 201);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
+  }
+
+  Future<Response> _copyInvoice(Request request, String id) async {
+    final check = await auth.requirePermission(request, 'invoices.write');
+    if (check.error != null) return check.error!;
+    final ctx = check.auth!;
+    final companyId = ctx.session.companyId;
+    final source = await business.findDocument(companyId, id);
+    if (source == null) return jsonError('Rechnung nicht gefunden.', status: 404);
+    if (source.kind != 'invoice' || source.isDraft) {
+      return jsonError('Nur finalisierte Rechnungen können kopiert werden.', status: 409);
+    }
+    final items = await business.itemsFor(companyId, id);
+    final credits = (await business.listConvertedFrom(
+      companyId,
+      id,
+    )).where((d) => d.kind == 'creditNote' && !d.isDraft);
+    final corrected = credits.any((d) => d.isCancellation);
+    final now = DateTime.now().toUtc();
+    final date = DateTime.utc(now.year, now.month, now.day);
+    final newId = _uuid.v4();
+    final draft = Document(
+      id: newId,
+      companyId: companyId,
+      customerId: source.customerId,
+      kind: 'invoice',
+      status: 'draft',
+      issueDate: date,
+      serviceDate: source.serviceDate,
+      paymentTerms: source.paymentTerms,
+      notes: source.notes,
+      projectId: source.projectId,
+      contactId: source.contactId,
+      isAdvancePayment: source.isAdvancePayment,
+      isFixedPrice: source.isFixedPrice,
+      convertedFromId: corrected ? (source.convertedFromId ?? source.id) : null,
+      paymentTermId: source.paymentTermId,
+      paymentTermLabel: source.paymentTermLabel,
+      paymentNetDays: source.paymentNetDays,
+      skontoPercent: source.skontoPercent,
+      skontoDays: source.skontoDays,
+      dueDate: source.paymentNetDays == null ? null : date.add(Duration(days: source.paymentNetDays!)),
+      createdByUserId: ctx.session.userId,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    );
+    await business.createDocument(draft, copyDocumentItems(items, newId, _uuid.v4));
+    await auth.audit(ctx, 'document.copy', 'invoice', newId);
+    return _documentResponse(companyId, draft, status: 201);
+  }
+
   /// Gutschrift zu einer finalisierten Rechnung (eigener Kreis "G",
   /// Modul creditNotes): kopiert alle Positionen als Entwurf, der vor dem
   /// Finalisieren auf eine Teil-Gutschrift gekürzt werden kann — wie
@@ -1794,7 +1893,11 @@ class BusinessRoutes {
       projectId: source.projectId,
       contactId: source.contactId,
     );
-    await business.createDocument(draft, items);
+    try {
+      await business.createDocument(draft, items);
+    } on BusinessConflict catch (e) {
+      return jsonError(e.message, status: 409);
+    }
     await auth.audit(ctx, 'document.creditNote', 'creditNote', newId);
     return _documentResponse(companyId, draft, status: 201);
   }

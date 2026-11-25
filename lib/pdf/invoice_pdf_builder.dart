@@ -116,6 +116,7 @@ class PdfDocumentData {
   const PdfDocumentData({
     required this.kind,
     this.isAdvancePayment = false,
+    this.isCancellation = false,
     this.invoiceNumber,
     required this.issueDate,
     required this.serviceDate,
@@ -144,6 +145,7 @@ class PdfDocumentData {
 
   final DocumentKind kind;
   final bool isAdvancePayment;
+  final bool isCancellation;
   final String? invoiceNumber;
   final DateTime issueDate;
   final DateTime serviceDate;
@@ -255,6 +257,7 @@ Future<Uint8List> _buildPdf({
     PdfDocumentData(
       kind: invoice.kind,
       isAdvancePayment: invoice.isAdvancePayment,
+      isCancellation: invoice.isCancellation,
       invoiceNumber: invoice.invoiceNumber,
       issueDate: invoice.issueDate,
       serviceDate: invoice.serviceDate,
@@ -389,7 +392,7 @@ Future<Uint8List> renderDocumentPdf(
   final eInvoice = data.eInvoice;
   final embed = pdfEmbedsEInvoice(data, isPreview: isPreview);
   final eInvoiceXml = embed ? buildEInvoiceXml(eInvoice!) : null;
-  final title = '${invoice.isAdvancePayment ? 'Abschlagsrechnung' : _title(invoice.kind)} ${invoice.invoiceNumber ?? ''}'.trim();
+  final title = '${invoice.isCancellation ? 'Stornorechnung' : invoice.isAdvancePayment ? 'Abschlagsrechnung' : _title(invoice.kind)} ${invoice.invoiceNumber ?? ''}'.trim();
   final author = invoice.companySnapshotName ?? 'WerkkernERP';
   final doc = pw.Document(
     theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
@@ -562,7 +565,7 @@ String _dateLabel(DocumentKind kind) => switch (kind) {
 // All content is derived from the captured document, never a live tenant.
 pw.Widget _buildLetterhead(PdfDocumentData data, bool firstPage,
     {required bool isPreview, String? referencedDocumentNumber, pw.MemoryImage? logo}) {
-  final title = data.isAdvancePayment ? 'Abschlagsrechnung' : _title(data.kind);
+  final title = data.isCancellation ? 'Stornorechnung' : data.isAdvancePayment ? 'Abschlagsrechnung' : _title(data.kind);
   return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
     if (isPreview) pw.Container(
       width: double.infinity,
@@ -710,7 +713,7 @@ pw.Widget _buildHeader(
   // C13 Abschlagsrechnungen: eigener Titel statt "Rechnung", damit sie
   // optisch klar von einer regulären (Schluss-)Rechnung unterscheidbar
   // ist — bleibt trotzdem derselbe DocumentKind/Nummernkreis.
-  final title = invoice.isAdvancePayment ? 'Abschlagsrechnung' : _title(invoice.kind);
+  final title = invoice.isCancellation ? 'Stornorechnung' : invoice.isAdvancePayment ? 'Abschlagsrechnung' : _title(invoice.kind);
   return pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [

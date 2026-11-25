@@ -10,6 +10,7 @@ import 'accounting_routes.dart' show documentGrossCents;
 import 'dunning_routes.dart';
 import 'models.dart';
 import 'repository.dart';
+import 'invoice_correction.dart';
 import 'request_util.dart';
 
 /// Dashboard je Nutzer (Kay-Entscheidung 2026-10-25: Kacheln ergeben sich
@@ -80,7 +81,7 @@ class DashboardRoutes {
       case 'openInvoices':
         var count = 0, sum = 0, overdue = 0;
         for (final d in await business.listDocuments(companyId, kind: 'invoice', status: 'finalized')) {
-          if (d.paymentStatus != 'open') continue;
+          if (d.paymentStatus != 'open' || await isInvoiceCancelled(business, companyId, d.id)) continue;
           count++;
           sum += documentGrossCents(await business.itemsFor(companyId, d.id));
           if (d.dueDate != null && d.dueDate!.isBefore(today)) overdue++;
@@ -116,6 +117,7 @@ class DashboardRoutes {
         );
         var count = 0;
         for (final d in await business.listDocuments(companyId, kind: 'invoice', status: 'finalized')) {
+          if (await isInvoiceCancelled(business, companyId, d.id)) continue;
           final level = dunningLevelForDue(isFinalized: true, isPaid: d.paymentStatus == 'paid', dueDate: d.dueDate, now: today, config: config);
           if (level != DunningLevel.none) count++;
         }

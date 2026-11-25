@@ -10611,6 +10611,21 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _isCancellationMeta = const VerificationMeta(
+    'isCancellation',
+  );
+  @override
+  late final GeneratedColumn<bool> isCancellation = GeneratedColumn<bool>(
+    'is_cancellation',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_cancellation" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _stockBookedMeta = const VerificationMeta(
     'stockBooked',
   );
@@ -10698,6 +10713,7 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     quoteValidUntil,
     isAdvancePayment,
     isFixedPrice,
+    isCancellation,
     stockBooked,
     dueDate,
     paymentStatus,
@@ -11035,6 +11051,15 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         ),
       );
     }
+    if (data.containsKey('is_cancellation')) {
+      context.handle(
+        _isCancellationMeta,
+        isCancellation.isAcceptableOrUnknown(
+          data['is_cancellation']!,
+          _isCancellationMeta,
+        ),
+      );
+    }
     if (data.containsKey('stock_booked')) {
       context.handle(
         _stockBookedMeta,
@@ -11229,6 +11254,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_fixed_price'],
       )!,
+      isCancellation: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_cancellation'],
+      )!,
       stockBooked: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}stock_booked'],
@@ -11400,6 +11429,8 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   /// spätere Bearbeitung (finalisierter Auftrag bis zur Umwandlung, siehe
   /// `InvoiceRepository.isEditable`) bucht dann die Mengendifferenz nach —
   /// sonst stünde der Bestand nach einer Korrektur falsch (wie online).
+  /// Vollstorno als Gegenbeleg, ohne physische Warenrückgabe.
+  final bool isCancellation;
   final bool stockBooked;
 
   /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales
@@ -11458,6 +11489,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     this.quoteValidUntil,
     required this.isAdvancePayment,
     required this.isFixedPrice,
+    required this.isCancellation,
     required this.stockBooked,
     this.dueDate,
     required this.paymentStatus,
@@ -11578,6 +11610,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     }
     map['is_advance_payment'] = Variable<bool>(isAdvancePayment);
     map['is_fixed_price'] = Variable<bool>(isFixedPrice);
+    map['is_cancellation'] = Variable<bool>(isCancellation);
     map['stock_booked'] = Variable<bool>(stockBooked);
     if (!nullToAbsent || dueDate != null) {
       map['due_date'] = Variable<DateTime>(dueDate);
@@ -11693,6 +11726,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           : Value(quoteValidUntil),
       isAdvancePayment: Value(isAdvancePayment),
       isFixedPrice: Value(isFixedPrice),
+      isCancellation: Value(isCancellation),
       stockBooked: Value(stockBooked),
       dueDate: dueDate == null && nullToAbsent
           ? const Value.absent()
@@ -11778,6 +11812,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       quoteValidUntil: serializer.fromJson<DateTime?>(json['quoteValidUntil']),
       isAdvancePayment: serializer.fromJson<bool>(json['isAdvancePayment']),
       isFixedPrice: serializer.fromJson<bool>(json['isFixedPrice']),
+      isCancellation: serializer.fromJson<bool>(json['isCancellation']),
       stockBooked: serializer.fromJson<bool>(json['stockBooked']),
       dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
       paymentStatus: $InvoicesTable.$converterpaymentStatus.fromJson(
@@ -11846,6 +11881,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'quoteValidUntil': serializer.toJson<DateTime?>(quoteValidUntil),
       'isAdvancePayment': serializer.toJson<bool>(isAdvancePayment),
       'isFixedPrice': serializer.toJson<bool>(isFixedPrice),
+      'isCancellation': serializer.toJson<bool>(isCancellation),
       'stockBooked': serializer.toJson<bool>(stockBooked),
       'dueDate': serializer.toJson<DateTime?>(dueDate),
       'paymentStatus': serializer.toJson<String>(
@@ -11896,6 +11932,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     Value<DateTime?> quoteValidUntil = const Value.absent(),
     bool? isAdvancePayment,
     bool? isFixedPrice,
+    bool? isCancellation,
     bool? stockBooked,
     Value<DateTime?> dueDate = const Value.absent(),
     PaymentStatus? paymentStatus,
@@ -11985,6 +12022,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
         : this.quoteValidUntil,
     isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
     isFixedPrice: isFixedPrice ?? this.isFixedPrice,
+    isCancellation: isCancellation ?? this.isCancellation,
     stockBooked: stockBooked ?? this.stockBooked,
     dueDate: dueDate.present ? dueDate.value : this.dueDate,
     paymentStatus: paymentStatus ?? this.paymentStatus,
@@ -12092,6 +12130,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       isFixedPrice: data.isFixedPrice.present
           ? data.isFixedPrice.value
           : this.isFixedPrice,
+      isCancellation: data.isCancellation.present
+          ? data.isCancellation.value
+          : this.isCancellation,
       stockBooked: data.stockBooked.present
           ? data.stockBooked.value
           : this.stockBooked,
@@ -12146,6 +12187,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('quoteValidUntil: $quoteValidUntil, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
+          ..write('isCancellation: $isCancellation, ')
           ..write('stockBooked: $stockBooked, ')
           ..write('dueDate: $dueDate, ')
           ..write('paymentStatus: $paymentStatus, ')
@@ -12196,6 +12238,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     quoteValidUntil,
     isAdvancePayment,
     isFixedPrice,
+    isCancellation,
     stockBooked,
     dueDate,
     paymentStatus,
@@ -12245,6 +12288,7 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.quoteValidUntil == this.quoteValidUntil &&
           other.isAdvancePayment == this.isAdvancePayment &&
           other.isFixedPrice == this.isFixedPrice &&
+          other.isCancellation == this.isCancellation &&
           other.stockBooked == this.stockBooked &&
           other.dueDate == this.dueDate &&
           other.paymentStatus == this.paymentStatus &&
@@ -12292,6 +12336,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<DateTime?> quoteValidUntil;
   final Value<bool> isAdvancePayment;
   final Value<bool> isFixedPrice;
+  final Value<bool> isCancellation;
   final Value<bool> stockBooked;
   final Value<DateTime?> dueDate;
   final Value<PaymentStatus> paymentStatus;
@@ -12338,6 +12383,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.quoteValidUntil = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
+    this.isCancellation = const Value.absent(),
     this.stockBooked = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.paymentStatus = const Value.absent(),
@@ -12385,6 +12431,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.quoteValidUntil = const Value.absent(),
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
+    this.isCancellation = const Value.absent(),
     this.stockBooked = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.paymentStatus = const Value.absent(),
@@ -12439,6 +12486,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<DateTime>? quoteValidUntil,
     Expression<bool>? isAdvancePayment,
     Expression<bool>? isFixedPrice,
+    Expression<bool>? isCancellation,
     Expression<bool>? stockBooked,
     Expression<DateTime>? dueDate,
     Expression<String>? paymentStatus,
@@ -12498,6 +12546,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (quoteValidUntil != null) 'quote_valid_until': quoteValidUntil,
       if (isAdvancePayment != null) 'is_advance_payment': isAdvancePayment,
       if (isFixedPrice != null) 'is_fixed_price': isFixedPrice,
+      if (isCancellation != null) 'is_cancellation': isCancellation,
       if (stockBooked != null) 'stock_booked': stockBooked,
       if (dueDate != null) 'due_date': dueDate,
       if (paymentStatus != null) 'payment_status': paymentStatus,
@@ -12547,6 +12596,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<DateTime?>? quoteValidUntil,
     Value<bool>? isAdvancePayment,
     Value<bool>? isFixedPrice,
+    Value<bool>? isCancellation,
     Value<bool>? stockBooked,
     Value<DateTime?>? dueDate,
     Value<PaymentStatus>? paymentStatus,
@@ -12600,6 +12650,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       quoteValidUntil: quoteValidUntil ?? this.quoteValidUntil,
       isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
       isFixedPrice: isFixedPrice ?? this.isFixedPrice,
+      isCancellation: isCancellation ?? this.isCancellation,
       stockBooked: stockBooked ?? this.stockBooked,
       dueDate: dueDate ?? this.dueDate,
       paymentStatus: paymentStatus ?? this.paymentStatus,
@@ -12757,6 +12808,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (isFixedPrice.present) {
       map['is_fixed_price'] = Variable<bool>(isFixedPrice.value);
     }
+    if (isCancellation.present) {
+      map['is_cancellation'] = Variable<bool>(isCancellation.value);
+    }
     if (stockBooked.present) {
       map['stock_booked'] = Variable<bool>(stockBooked.value);
     }
@@ -12820,6 +12874,7 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('quoteValidUntil: $quoteValidUntil, ')
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
+          ..write('isCancellation: $isCancellation, ')
           ..write('stockBooked: $stockBooked, ')
           ..write('dueDate: $dueDate, ')
           ..write('paymentStatus: $paymentStatus, ')
@@ -35227,6 +35282,7 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       Value<DateTime?> quoteValidUntil,
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
+      Value<bool> isCancellation,
       Value<bool> stockBooked,
       Value<DateTime?> dueDate,
       Value<PaymentStatus> paymentStatus,
@@ -35275,6 +35331,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<DateTime?> quoteValidUntil,
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
+      Value<bool> isCancellation,
       Value<bool> stockBooked,
       Value<DateTime?> dueDate,
       Value<PaymentStatus> paymentStatus,
@@ -35648,6 +35705,11 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<bool> get isFixedPrice => $composableBuilder(
     column: $table.isFixedPrice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCancellation => $composableBuilder(
+    column: $table.isCancellation,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -36097,6 +36159,11 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isCancellation => $composableBuilder(
+    column: $table.isCancellation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get stockBooked => $composableBuilder(
     column: $table.stockBooked,
     builder: (column) => ColumnOrderings(column),
@@ -36400,6 +36467,11 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<bool> get isFixedPrice => $composableBuilder(
     column: $table.isFixedPrice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isCancellation => $composableBuilder(
+    column: $table.isCancellation,
     builder: (column) => column,
   );
 
@@ -36740,6 +36812,7 @@ class $$InvoicesTableTableManager
                 Value<DateTime?> quoteValidUntil = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
+                Value<bool> isCancellation = const Value.absent(),
                 Value<bool> stockBooked = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<PaymentStatus> paymentStatus = const Value.absent(),
@@ -36786,6 +36859,7 @@ class $$InvoicesTableTableManager
                 quoteValidUntil: quoteValidUntil,
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
+                isCancellation: isCancellation,
                 stockBooked: stockBooked,
                 dueDate: dueDate,
                 paymentStatus: paymentStatus,
@@ -36834,6 +36908,7 @@ class $$InvoicesTableTableManager
                 Value<DateTime?> quoteValidUntil = const Value.absent(),
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
+                Value<bool> isCancellation = const Value.absent(),
                 Value<bool> stockBooked = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<PaymentStatus> paymentStatus = const Value.absent(),
@@ -36880,6 +36955,7 @@ class $$InvoicesTableTableManager
                 quoteValidUntil: quoteValidUntil,
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
+                isCancellation: isCancellation,
                 stockBooked: stockBooked,
                 dueDate: dueDate,
                 paymentStatus: paymentStatus,

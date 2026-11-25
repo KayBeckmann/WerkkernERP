@@ -56,6 +56,7 @@ PdfDocumentData onlineDocumentPdfData(
   return PdfDocumentData(
     kind: DocumentKind.values.byName(document.kind),
     isAdvancePayment: document.isAdvancePayment,
+    isCancellation: document.isCancellation,
     invoiceNumber: document.number,
     issueDate: document.issueDate,
     serviceDate: document.serviceDate,

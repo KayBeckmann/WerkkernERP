@@ -953,7 +953,7 @@ class InvoiceRepository {
     for (final doc in converted) {
       if (doc.kind == DocumentKind.invoice &&
           doc.isAdvancePayment &&
-          doc.status == InvoiceStatus.finalized) {
+          doc.status == InvoiceStatus.finalized && !await isCancelled(doc.id)) {
         final total = (await totalsFor(doc.id)).totalGross;
         entries.add(AdvancePaymentEntry(invoiceNumber: doc.invoiceNumber!, amountGross: total));
       }
@@ -1051,6 +1051,119 @@ class InvoiceRepository {
     });
   }
 
+  /// Rechnung als neuen, nummernlosen Entwurf kopieren. Die Originalrechnung
+  /// bleibt unverändert. Bei einer Korrektur bleibt die Leistungskette erhalten.
+  Future<Invoice> copyInvoiceDraft({required String companyId, required String invoiceId}) => _db.transaction(() async {
+    final source = await findById(companyId: companyId, id: invoiceId);
+    if (source == null || source.kind != DocumentKind.invoice || source.status != InvoiceStatus.finalized) {
+      throw StateError('Nur eine finalisierte Rechnung kann kopiert werden.');
+    }
+    final credits = await listCreditNotesForInvoice(invoiceId);
+    final corrected = credits.any((d) => d.isCancellation);
+    final now = DateTime.now();
+    final draft = await createDraft(
+      companyId: companyId,
+      customerId: source.customerId,
+      issueDate: DateTime(now.year, now.month, now.day),
+      serviceDate: source.serviceDate,
+      paymentTerms: source.paymentTerms,
+      notes: source.notes,
+      projectId: source.projectId,
+      contactId: source.contactId,
+      isAdvancePayment: source.isAdvancePayment,
+      isFixedPrice: source.isFixedPrice,
+      terms: source.paymentTermLabel == null || source.paymentNetDays == null
+          ? null
+          : (
+              termId: source.paymentTermId,
+              label: source.paymentTermLabel!,
+              netDays: source.paymentNetDays!,
+              skontoPercent: source.skontoPercent,
+              skontoDays: source.skontoDays,
+            ),
+      items: [
+        for (final i in await itemsFor(invoiceId))
+          InvoiceItemInput(
+            kind: i.kind,
+            articleId: i.articleId,
+            description: i.description,
+            quantity: Decimal.parse(i.quantity),
+            unitPriceCents: i.unitPriceCents,
+            vatRatePercent: i.vatRatePercent,
+            unit: i.unit,
+            discountPercent: i.discountPercent,
+            groupLabel: i.groupLabel,
+            staffRoleId: i.staffRoleId,
+          ),
+      ],
+    );
+    if (corrected) {
+      await (_db.update(_db.invoices)..where((i) => i.id.equals(draft.id))).write(
+        InvoicesCompanion(convertedFromId: Value(source.convertedFromId ?? source.id)),
+      );
+    }
+    return (await findById(companyId: companyId, id: draft.id))!;
+  });
+
+  /// Vollstorno als sofort finalisierter Gegenbeleg im Gutschriftenkreis.
+  /// Atomar mit Nummer und Original-Schnappschüssen; keine Warenrückgabe.
+  Future<Invoice> cancelInvoice({required String companyId, required String invoiceId}) => _db.transaction(() async {
+    final source = await findById(companyId: companyId, id: invoiceId);
+    if (source == null || source.kind != DocumentKind.invoice || source.status != InvoiceStatus.finalized) {
+      throw StateError('Nur eine finalisierte Rechnung kann storniert werden.');
+    }
+    if ((await listConvertedFrom(invoiceId)).any((d) => d.kind == DocumentKind.creditNote)) {
+      throw StateError('Es existiert bereits eine Gutschrift oder ein Gutschriftentwurf. Bitte zuerst prüfen.');
+    }
+    final draft = await createCreditNoteDraft(companyId: companyId, invoiceId: invoiceId);
+    final now = DateTime.now();
+    final project = source.projectId == null
+        ? null
+        : await (_db.select(_db.projects)..where((p) => p.id.equals(source.projectId!))).getSingleOrNull();
+    final year = project?.projectNumber == null ? now.year : project!.foundingYear!;
+    final sequence = await _numberSequences.allocateNext(companyId: companyId, documentType: 'creditNote', year: year);
+    final number = formatDocumentNumber(
+      kind: DocumentKind.creditNote,
+      year: year,
+      number: sequence,
+      projectNumber: project?.projectNumber,
+    );
+    // Kopiert bewusst die eingefrorenen Parteien und Darstellungsdaten,
+    // nicht zwischenzeitlich geänderte Firmen-/Kundenstammdaten.
+    await (_db.update(_db.invoices)..where((i) => i.id.equals(draft.id))).write(
+      source
+          .toCompanion(false)
+          .copyWith(
+            id: Value(draft.id),
+            kind: const Value(DocumentKind.creditNote),
+            isCancellation: const Value(true),
+            invoiceNumber: Value(number),
+            numberYear: Value(year),
+            issueDate: Value(DateTime(now.year, now.month, now.day)),
+            convertedFromId: Value(source.id),
+            notes: Value('Storno zu Rechnung ${source.invoiceNumber}.'),
+            createdAt: Value(now),
+            updatedAt: Value(now),
+            finalizedAt: Value(now),
+            paymentStatus: const Value(PaymentStatus.open),
+            paidAt: const Value(null),
+            dueDate: const Value(null),
+            paymentTerms: const Value(null),
+            paymentTermId: const Value(null),
+            paymentTermLabel: const Value(null),
+            paymentNetDays: const Value(null),
+            skontoPercent: const Value(null),
+            skontoDays: const Value(null),
+            isAdvancePayment: const Value(false),
+            isFixedPrice: const Value(false),
+            stockBooked: const Value(false),
+            pdfIntroTextSnapshot: Value('Storno zu Rechnung ${source.invoiceNumber}.'),
+            pdfClosingTextSnapshot: const Value(null),
+          ),
+    );
+    return (await findById(companyId: companyId, id: draft.id))!;
+  });
+
   /// Gutschriften (Kay-Entscheidung 2026-10-19: "Gutschriften bekommen
   /// einen eigenen Nummernkreis"). **Bewusst NICHT über [convertTo]**,
   /// obwohl die Mechanik (Positionen kopieren, Entwurf mit
@@ -1083,6 +1196,9 @@ class InvoiceRepository {
         throw StateError('Nur eine finalisierte Rechnung kann eine Gutschrift erhalten.');
       }
 
+      if ((await listConvertedFrom(invoiceId)).any((d) => d.isCancellation)) {
+        throw StateError('Diese Rechnung wurde bereits storniert.');
+      }
       final sourceItems = await itemsFor(invoiceId);
       final newItems = [
         for (final item in sourceItems)
@@ -1135,6 +1251,9 @@ class InvoiceRepository {
         if (doc.kind == DocumentKind.creditNote && doc.status == InvoiceStatus.finalized) doc,
     ];
   }
+
+  Future<bool> isCancelled(String invoiceId) async =>
+      (await listCreditNotesForInvoice(invoiceId)).any((d) => d.isCancellation);
 
   Future<Money> sumCreditNotesForInvoice(String invoiceId) async {
     var sum = Money.zero();

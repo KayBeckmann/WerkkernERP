@@ -307,4 +307,127 @@ void runInvoiceFlowTests(Future<(PhaseBRepository, BusinessRepository)> Function
     await expectLater(put('/documents/${invoice['id']}', {'version': 1, 'isAdvancePayment': true}),
         throwsA(isA<ApiException>().having((e) => e.isForbidden, '403', isTrue)));
   });
+  test('Storno, Rechnungskopie bearbeiten und neu ausstellen', () async {
+    final draft = await post('/documents', {'customerId': customerId, 'items': orderItems, 'notes': 'Original'});
+    final original = await c.finalizeDocument(draft['id'] as String, version: draft['version'] as int);
+    final note = await c.cancelInvoice(original.id, version: original.version);
+    expect(note.isCancellation, isTrue);
+    expect(note.isDraft, isFalse);
+    expect(note.number, startsWith('G-'));
+    expect(note.convertedFromId, original.id);
+    expect(note.items.map((i) => i.description), original.items.map((i) => i.description));
+    expect(note.grossCents, original.grossCents);
+    final after = await c.document(original.id);
+    expect(after.number, original.number);
+    expect(after.notes, 'Original');
+    expect(after.cancellationId, note.id);
+    final copy = await c.copyInvoice(original.id);
+    expect(copy.isDraft, isTrue);
+    expect(copy.number, isNull);
+    expect(copy.isPaid, isFalse);
+    expect(copy.isCancellation, isFalse);
+    expect(copy.cancellationId, isNull);
+    expect(copy.convertedFromId, original.id);
+    final edited = await put('/documents/${copy.id}', {'version': copy.version, 'items': orderItems, 'notes': 'Korrigiert'});
+    final issued = await c.finalizeDocument(copy.id, version: edited['version'] as int);
+    expect(issued.number, isNot(original.number));
+    expect(issued.notes, 'Korrigiert');
+    expect((await c.document(original.id)).notes, 'Original');
+    final conflict = throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409));
+    await expectLater(c.cancelInvoice(original.id, version: original.version), conflict);
+    await expectLater(c.createCreditNote(original.id), conflict);
+  });
+
+  test('Storno prüft Version, vorhandene Gutschriften und Modul', () async {
+    final draft = await post('/documents', {'customerId': customerId, 'items': orderItems});
+    final conflict = throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 409));
+    await expectLater(c.cancelInvoice(draft['id'] as String, version: draft['version'] as int), conflict);
+    await expectLater(c.copyInvoice(draft['id'] as String), conflict);
+    final original = await c.finalizeDocument(draft['id'] as String, version: draft['version'] as int);
+    await expectLater(c.cancelInvoice(original.id, version: original.version - 1), conflict);
+    expect((await c.document(original.id)).creditNotes, isEmpty);
+    final copy = await c.copyInvoice(original.id);
+    expect(copy.convertedFromId, isNull);
+    await c.createCreditNote(original.id);
+    await expectLater(c.cancelInvoice(original.id, version: original.version), conflict);
+    await c.setModules({});
+    await expectLater(c.cancelInvoice(original.id, version: original.version),
+      throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 403)));
+  });
+
+  test('Gleichzeitige Stornierungen erzeugen genau einen Gegenbeleg', () async {
+    final draft = await post('/documents', {'customerId': customerId, 'items': orderItems});
+    final original = await c.finalizeDocument(draft['id'] as String, version: draft['version'] as int);
+    final results = await Future.wait([for (var i = 0; i < 2; i++)
+      c.cancelInvoice(original.id, version: original.version).then<Object>((d) => d).catchError((Object e) => e)]);
+    expect(results.whereType<OnlineDocument>(), hasLength(1));
+    expect(results.whereType<ApiException>().single.statusCode, 409);
+    expect((await c.document(original.id)).creditNotes, hasLength(1));
+  });
+
+  test('Storno entfernt offene Posten und Mahnungen, neue Rechnung bleibt offen', () async {
+    await c.setModules({'creditNotes', 'buchhaltung', 'dunning'});
+    final group = (await c.groups()).firstWhere((g) => g.name == 'Projektleiter').id;
+    for (final permission in ['accounting.read', 'dunning.read', 'dunning.write', 'invoices.payment']) {
+      await c.setGroupPermission(group, permission, granted: true);
+    }
+    final draft = await post('/documents', {'customerId': customerId, 'items': orderItems});
+    final original = await c.finalizeDocument(draft['id'] as String, version: draft['version'] as int);
+    final due = await c.setDueDate(original.id, DateTime(2020, 1, 1));
+    final before = await c.request('GET', '/accounting/open-items') as Map;
+    expect(before['totalCents'], original.grossCents);
+    await c.cancelInvoice(original.id, version: due.version);
+    final after = await c.request('GET', '/accounting/open-items') as Map;
+    expect(after['totalCents'], 0);
+    expect((await c.request('GET', '/dunning/overdue') as Map)['overdue'], isEmpty);
+    final copy = await c.copyInvoice(original.id);
+    await c.finalizeDocument(copy.id, version: copy.version);
+    expect((await c.request('GET', '/accounting/open-items') as Map)['totalCents'], original.grossCents);
+  });
+
+  test('Storno und Kopie respektieren Firmenbindung und Schreibrechte', () async {
+    final draft = await post('/documents', {'customerId': customerId, 'items': orderItems});
+    final original = await c.finalizeDocument(draft['id'] as String, version: draft['version'] as int);
+    final notFound = throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 404));
+    final otherCompany = await c.createCompany((await c.login('chef@example.com', 'passwort-12345')).identityToken, 'Andere Firma');
+    await c.selectCompany((await c.login('chef@example.com', 'passwort-12345')).identityToken, otherCompany);
+    await c.setModules({'creditNotes'});
+    final otherGroup = (await c.groups()).firstWhere((g) => g.name == 'Projektleiter').id;
+    for (final p in ['invoices.write', 'invoices.finalize']) { await c.setGroupPermission(otherGroup, p, granted: true); }
+    await expectLater(c.copyInvoice(original.id), notFound);
+    await expectLater(c.cancelInvoice(original.id, version: original.version), notFound);
+    await c.selectCompany((await c.login('chef@example.com', 'passwort-12345')).identityToken, companyId);
+    final group = (await c.groups()).firstWhere((g) => g.name == 'Projektleiter').id;
+    await c.setGroupPermission(group, 'invoices.write', granted: false);
+    final forbidden = throwsA(isA<ApiException>().having((e) => e.statusCode, 'status', 403));
+    await expectLater(c.copyInvoice(original.id), forbidden);
+    await expectLater(c.cancelInvoice(original.id, version: original.version), forbidden);
+  });
+
+  test('Stornierte Abschläge werden nach Neuausstellung nicht doppelt abgezogen', () async {
+    final order = await finalizedOrder();
+    final advance = await post('/documents/${order['id']}/material-advance', {'includeAllArticles': true});
+    final issued = await c.finalizeDocument(advance['id'] as String, version: advance['version'] as int);
+    await c.cancelInvoice(issued.id, version: issued.version);
+    final copy = await c.copyInvoice(issued.id);
+    expect(copy.isAdvancePayment, isTrue);
+    expect(copy.convertedFromId, order['id']);
+    final replacement = await c.finalizeDocument(copy.id, version: copy.version);
+    final finalInvoice = await c.convertDocument(order['id'] as String, 'invoice');
+    expect(finalInvoice.advancePayments.map((a) => a.id), [replacement.id]);
+  });
+
+  test('Agent darf Storno nur nach Freigabe ausführen', () async {
+    await c.setModules({'creditNotes', 'aiAgents'});
+    final draft = await post('/documents', {'customerId': customerId, 'items': orderItems});
+    final original = await c.finalizeDocument(draft['id'] as String, version: draft['version'] as int);
+    final token = await c.createAgentToken('Storno-Test');
+    final agent = WerkkernApiClient(baseUrl: Uri.parse('http://127.0.0.1:${server.port}'))..token = token.token;
+    final pending = await agent.request('POST', '/documents/${original.id}/cancel', body: {'version': original.version}) as Map;
+    expect(pending['approvalId'], isA<String>());
+    expect((await c.document(original.id)).cancellationId, isNull);
+    await c.confirmApproval(pending['approvalId'] as String);
+    expect((await c.document(original.id)).cancellationId, isNotNull);
+  });
+
 }

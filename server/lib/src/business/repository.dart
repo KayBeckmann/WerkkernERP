@@ -80,6 +80,11 @@ abstract class BusinessRepository implements SupplierStore, FleetStore, StockSto
     QuoteValidity? Function()? quoteValidity,
   });
 
+  /// Vollstorno: Quellrechnung sperren, vorhandene Gutschriften ausschließen,
+  /// Gegenbeleg samt Positionen und Nummer atomar schreiben. Keine Lagerbewegung.
+  Future<Document> cancelInvoice({required String companyId, required String id,
+    required int expectedVersion, required String userId, required DateTime now});
+
   Future<bool> deleteDraft(String companyId, String id);
 
   /// Atomar: Nummer im Firmen-/Typ-/Jahreskreis ziehen, Schnappschüsse

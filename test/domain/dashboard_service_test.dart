@@ -50,6 +50,7 @@ void main() {
         isAdvancePayment: false,
         isFixedPrice: false,
         stockBooked: false,
+        isCancellation: false,
         dueDate: dueDate,
         paymentStatus: paymentStatus,
         paidAt: null,

@@ -44,6 +44,7 @@ void main() {
         isAdvancePayment: isAdvancePayment,
         isFixedPrice: false,
         stockBooked: false,
+        isCancellation: false,
         paymentStatus: PaymentStatus.open,
       );
 

@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 44;
+  int get schemaVersion => 45;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -491,6 +491,14 @@ class AppDatabase extends _$AppDatabase {
             final invoiceColumns = await customSelect('PRAGMA table_info(invoices)').get();
             if (!invoiceColumns.any((row) => row.read<String>('name') == 'company_snapshot_bic')) {
               await migrator.addColumn(invoices, invoices.companySnapshotBic);
+            }
+          }
+          if (from < 45) {
+            // Ältere TableMigration-Schritte können die aktuelle Tabellendefinition
+            // bereits aufgebaut haben. Die neue Spalte dann nicht doppelt anlegen.
+            final columns = await customSelect('PRAGMA table_info(invoices)').get();
+            if (!columns.any((row) => row.read<String>('name') == 'is_cancellation')) {
+              await migrator.addColumn(invoices, invoices.isCancellation);
             }
           }
         },

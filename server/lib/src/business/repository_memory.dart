@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import 'models.dart';
+import 'invoice_correction.dart';
 import 'repository.dart';
 import 'suppliers.dart';
 import 'accounting.dart';
@@ -284,6 +285,10 @@ class InMemoryBusinessRepository with _InMemoryPdfArchive, _InMemorySuppliers, _
         throw const BusinessConflict('Quelle wurde zwischenzeitlich geändert — bitte neu laden.');
       }
     }
+    if (document.kind == 'creditNote' && _documents.any((d) => d.companyId == document.companyId &&
+        d.convertedFromId == document.convertedFromId && d.isCancellation)) {
+      throw const BusinessConflict('Diese Rechnung wurde bereits storniert.');
+    }
     _documents.add(document);
     _items.addAll(items);
   }
@@ -368,6 +373,43 @@ class InMemoryBusinessRepository with _InMemoryPdfArchive, _InMemorySuppliers, _
     _documents.removeWhere((d) => d.id == id);
     _items.removeWhere((i) => i.documentId == id);
     return true;
+  }
+
+  @override
+  Future<Document> cancelInvoice({
+    required String companyId,
+    required String id,
+    required int expectedVersion,
+    required String userId,
+    required DateTime now,
+  }) async {
+    // Keine await-Lücke zwischen Prüfung und Schreiben.
+    final source = _documents.where((d) => d.companyId == companyId && d.id == id).firstOrNull;
+    if (source == null) throw const BusinessConflict('Rechnung nicht gefunden.');
+    validateCancellation(
+      source,
+      expectedVersion,
+      _documents.any((d) => d.companyId == companyId && d.convertedFromId == id && d.kind == 'creditNote'),
+    );
+    final project = _projects.where((p) => p.companyId == companyId && p.id == source.projectId).firstOrNull;
+    final year = project?.foundingYear ?? now.year;
+    final key = '$companyId|creditNote|$year';
+    final sequence = (_sequences[key] ?? 0) + 1;
+    final newId = const Uuid().v4();
+    final items = copyDocumentItems(_items.where((i) => i.documentId == id).toList(), newId, const Uuid().v4);
+    if (items.isEmpty) throw const BusinessConflict('Rechnung ohne Positionen kann nicht storniert werden.');
+    final note = cancellationDocument(
+      source,
+      id: newId,
+      userId: userId,
+      now: now,
+      year: year,
+      number: formatNumberWithPrefix(prefix: 'G', year: year, number: sequence, projectNumber: project?.projectNumber),
+    );
+    _sequences[key] = sequence;
+    _documents.add(note);
+    _items.addAll(items);
+    return note;
   }
 
   @override

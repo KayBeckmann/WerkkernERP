@@ -1,5 +1,7 @@
 import 'package:decimal/decimal.dart';
 import 'package:drift/native.dart';
+import 'package:drift/drift.dart' show Value;
+import 'package:werkkernerp/data/repositories/article_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:werkkernerp/data/database/database.dart';
 import 'package:werkkernerp/data/database/tables.dart';
@@ -204,4 +206,84 @@ void main() {
       expect(sum.cents, greaterThan(0));
     },
   );
+  test('Vollstorno und Kopie: Original unverändert, Gegenbeleg und neuer bearbeitbarer Entwurf', () async {
+    final company = await companies.create(name: 'Originalfirma');
+    final customer = await customers.create(companyId: company.id, name: 'Originalkunde');
+    final original = await finalizedInvoice(companyId: company.id, customerId: customer.id);
+    await invoices.markPaid(companyId: company.id, id: original.id);
+    final note = await invoices.cancelInvoice(companyId: company.id, invoiceId: original.id);
+    expect(note.isCancellation, isTrue);
+    expect(note.kind, DocumentKind.creditNote);
+    expect(note.status, InvoiceStatus.finalized);
+    expect(note.invoiceNumber, startsWith('G-'));
+    expect(note.convertedFromId, original.id);
+    expect(note.customerSnapshotName, original.customerSnapshotName);
+    expect(note.eInvoiceSnapshot, original.eInvoiceSnapshot);
+    expect((await invoices.totalsFor(note.id)).totalGross, (await invoices.totalsFor(original.id)).totalGross);
+    expect((await invoices.findById(companyId: company.id, id: original.id))!.invoiceNumber, original.invoiceNumber);
+    await expectLater(invoices.cancelInvoice(companyId: company.id, invoiceId: original.id), throwsStateError);
+    await expectLater(invoices.createCreditNoteDraft(companyId: company.id, invoiceId: original.id), throwsStateError);
+    final copy = await invoices.copyInvoiceDraft(companyId: company.id, invoiceId: original.id);
+    expect(copy.status, InvoiceStatus.draft);
+    expect(copy.invoiceNumber, isNull);
+    expect(copy.finalizedAt, isNull);
+    expect(copy.isCancellation, isFalse);
+    expect(copy.paymentStatus, PaymentStatus.open);
+    expect(copy.paidAt, isNull);
+    expect(copy.customerSnapshotName, isNull);
+    expect(copy.eInvoiceSnapshot, isNull);
+    expect(copy.convertedFromId, original.id);
+    final sourceItems = await invoices.itemsFor(original.id);
+    final copyItems = await invoices.itemsFor(copy.id);
+    expect(copyItems.single.id, isNot(sourceItems.single.id));
+    expect(copyItems.single.description, sourceItems.single.description);
+    expect(await invoices.update(companyId: company.id, id: copy.id, notes: 'Korrigiert'), isNotNull);
+    final issued = (await invoices.finalize(companyId: company.id, id: copy.id))!;
+    expect(issued.invoiceNumber, isNot(original.invoiceNumber));
+    expect(issued.notes, 'Korrigiert');
+    expect((await invoices.findById(companyId: company.id, id: original.id))!.notes, isNull);
+  });
+
+  test('Storno lehnt Entwürfe, fremde Firmen und vorhandene Gutschriftentwürfe ab', () async {
+    final company = await companies.create(name: 'Firma');
+    final other = await companies.create(name: 'Andere Firma');
+    final customer = await customers.create(companyId: company.id, name: 'Kunde');
+    final original = await finalizedInvoice(companyId: company.id, customerId: customer.id);
+    await expectLater(invoices.cancelInvoice(companyId: other.id, invoiceId: original.id), throwsStateError);
+    await expectLater(invoices.copyInvoiceDraft(companyId: other.id, invoiceId: original.id), throwsStateError);
+    final copy = await invoices.copyInvoiceDraft(companyId: company.id, invoiceId: original.id);
+    expect(copy.convertedFromId, isNull, reason: 'gewöhnliche Kopie ist eine neue Leistungskette');
+    await expectLater(invoices.cancelInvoice(companyId: company.id, invoiceId: copy.id), throwsStateError);
+    await invoices.createCreditNoteDraft(companyId: company.id, invoiceId: original.id);
+    await expectLater(invoices.cancelInvoice(companyId: company.id, invoiceId: original.id), throwsStateError);
+    expect(await invoices.listCreditNotesForInvoice(original.id), isEmpty);
+  });
+
+  test('Storno bewahrt Schnappschüsse und Lagerbestand, Korrektur bucht nicht doppelt', () async {
+    final company = await companies.create(name: 'Firma alt');
+    await (db.update(db.companies)..where((c) => c.id.equals(company.id)))
+        .write(const CompaniesCompanion(lagerbestandEnabled: Value(true)));
+    final customer = await customers.create(companyId: company.id, name: 'Kunde alt');
+    final articles = ArticleRepository(db);
+    final article = await articles.create(companyId: company.id, name: 'Steckdose');
+    await articles.setStock(companyId: company.id, id: article.id, newQuantity: 10);
+    final draft = await invoices.createDraft(companyId: company.id, customerId: customer.id,
+      issueDate: DateTime.now(), serviceDate: DateTime.now(), items: [InvoiceItemInput(
+        kind: InvoiceItemKind.article, articleId: article.id, description: 'Steckdose', quantity: Decimal.fromInt(2),
+        unitPriceCents: 1000, vatRatePercent: 19)]);
+    final original = (await invoices.finalize(companyId: company.id, id: draft.id))!;
+    expect((await articles.findById(companyId: company.id, id: article.id))!.stockQuantity, 8);
+    await (db.update(db.companies)..where((c) => c.id.equals(company.id)))
+        .write(const CompaniesCompanion(name: Value('Firma neu')));
+    await (db.update(db.customers)..where((c) => c.id.equals(customer.id)))
+        .write(const CustomersCompanion(name: Value('Kunde neu')));
+    final note = await invoices.cancelInvoice(companyId: company.id, invoiceId: original.id);
+    expect(note.companySnapshotName, 'Firma alt');
+    expect(note.customerSnapshotName, 'Kunde alt');
+    expect((await articles.findById(companyId: company.id, id: article.id))!.stockQuantity, 8);
+    final copy = await invoices.copyInvoiceDraft(companyId: company.id, invoiceId: original.id);
+    await invoices.finalize(companyId: company.id, id: copy.id);
+    expect((await articles.findById(companyId: company.id, id: article.id))!.stockQuantity, 8);
+  });
+
 }

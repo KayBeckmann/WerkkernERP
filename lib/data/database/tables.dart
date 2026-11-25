@@ -671,6 +671,9 @@ class Invoices extends Table {
   /// spätere Bearbeitung (finalisierter Auftrag bis zur Umwandlung, siehe
   /// `InvoiceRepository.isEditable`) bucht dann die Mengendifferenz nach —
   /// sonst stünde der Bestand nach einer Korrektur falsch (wie online).
+  /// Vollstorno als Gegenbeleg, ohne physische Warenrückgabe.
+  BoolColumn get isCancellation => boolean().withDefault(const Constant(false))();
+
   BoolColumn get stockBooked => boolean().withDefault(const Constant(false))();
 
   /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales

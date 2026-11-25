@@ -71,6 +71,10 @@ DashboardSummary computeDashboardSummary({
   var revenueMonth = Money.zero();
   var revenueYear = Money.zero();
 
+  final cancelledIds = {
+    for (final entry in finalizedInvoices)
+      if (entry.invoice.isCancellation) entry.invoice.convertedFromId,
+  };
   for (final entry in finalizedInvoices) {
     final invoice = entry.invoice;
     final signed = Money.fromCents(entry.gross.cents * revenueSignForKind(invoice.kind.name));
@@ -80,7 +84,7 @@ DashboardSummary computeDashboardSummary({
         revenueMonth += signed;
       }
     }
-    if (hasPaymentStatusKind(invoice.kind.name) && invoice.paymentStatus == PaymentStatus.open) {
+    if (!cancelledIds.contains(invoice.id) && hasPaymentStatusKind(invoice.kind.name) && invoice.paymentStatus == PaymentStatus.open) {
       openCount++;
       openSum += entry.gross;
       if (dunningLevelFor(invoice, now, dunningConfig) != DunningLevel.none) {

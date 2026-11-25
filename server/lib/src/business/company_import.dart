@@ -579,6 +579,7 @@ class _Parser {
               (r.m['textSnapshot'] as Map?)?['footerColumns'] as Map?)?.cast<String, String?>(),
           smallBusinessExemptSnapshot: r.boolean('smallBusinessExemptSnapshot', fallback: false),
           stockBooked: r.boolean('stockBooked', fallback: false),
+          isCancellation: r.boolean('isCancellation', fallback: false),
           eInvoiceSnapshot: r.optStr('eInvoiceSnapshot'),
           // Belegfeld ist ein Schnappschuss; die ID dient nur der Vorauswahl.
           paymentTermId: _ids['paymentTerm']?[r.optStr('paymentTermId')],

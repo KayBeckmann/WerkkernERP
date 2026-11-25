@@ -113,4 +113,90 @@ void main() {
       expect(find.byType(FloatingActionButton), findsNothing);
     },
   );
+  testWidgets('Rechnung stornieren, Kopie bearbeiten und neu finalisieren', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(WerkkernErpApp(database: _inMemoryDb()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Firma anlegen'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Elektro Beckmann');
+      await tester.tap(find.text('Anlegen'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(SidebarNavItem, 'Einstellungen'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(SidebarNavItem, 'Gutschriften'), findsNothing);
+      await tester.tap(find.text('Module'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(SwitchListTile, 'Gutschriften'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(SidebarNavItem, 'Gutschriften'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(SidebarNavItem, 'Kunden'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kunde anlegen'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Name *'), 'Testkunde');
+      await tester.tap(find.text('Anlegen'));
+      await tester.pumpAndSettle();
+
+      // Rechnung anlegen, Position hinzufügen, finalisieren.
+      await tester.tap(find.widgetWithText(SidebarNavItem, 'Rechnungen'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Neue Rechnung'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Testkunde'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Position hinzufügen'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Beschreibung *'), 'Montagearbeiten');
+      await tester.enterText(find.widgetWithText(TextField, 'Einzelpreis (€) *'), '100');
+      await tester.tap(find.text('Hinzufügen'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Entwurf speichern'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Finalisieren'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Finalisieren'));
+      await tester.pumpAndSettle();
+
+
+    await tester.tap(find.byTooltip('Rechnungsaktionen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rechnung stornieren'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Abbrechen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rechnung storniert'), findsNothing);
+    await tester.tap(find.byTooltip('Rechnungsaktionen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rechnung stornieren'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Jetzt stornieren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rechnung storniert'), findsOneWidget);
+    expect(find.byTooltip('Gutschrift erstellen'), findsNothing);
+    await tester.tap(find.byTooltip('Rechnungsaktionen'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<PopupMenuItem<String>>(find.widgetWithText(PopupMenuItem<String>, 'Rechnung stornieren')).enabled, isFalse);
+    await tester.tap(find.text('Rechnung kopieren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rechnung (Entwurf) — Testkunde'), findsOneWidget);
+    expect(find.text('Montagearbeiten'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Notizen'), 'Korrigierte Rechnung');
+    await tester.tap(find.byTooltip('Entwurf speichern'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Finalisieren'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Finalisieren'));
+    await tester.pumpAndSettle();
+    final yy = (DateTime.now().year % 100).toString().padLeft(2, '0');
+    expect(find.textContaining('Rechnung R-${yy}002'), findsOneWidget);
+  });
+
 }

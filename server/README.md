@@ -204,6 +204,22 @@ wie nicht existierende. Neue Module liegen je als eigenes Modell/Store
   Umsatzregeln) kommen aus `packages/werkkern_core` — identisch zur
   Offline-App.
 
+## Rechnungskorrektur
+
+- `POST /documents/:id/cancel` mit `{version}`: Vollstorno einer finalisierten
+  Rechnung. Benötigt `invoices.write`, `invoices.finalize` und das Modul
+  `creditNotes`; Agenten benötigen die übliche Freigabe. Antwort `201` mit
+  finalisiertem Gegenbeleg (`isCancellation: true`), am Original liefert
+  `GET /documents/:id` dessen `cancellationId`. Vorhandene Gutschriften,
+  Entwürfe oder eine veraltete Version führen zu `409`. PostgreSQL sperrt
+  die Quelle und schreibt Beleg, Positionen und Nummer in einer Transaktion.
+- `POST /documents/:id/copy`: neue bearbeitbare Rechnungskopie (`201`), benötigt
+  `invoices.write`. Keine neue Rechnungsnummer bis zur Finalisierung.
+  Nach einem Storno bleibt die ursprüngliche Leistungskette erhalten.
+- Beide Endpunkte sind firmengebunden. Storno verändert weder Zahlungen noch
+  Lagerbestände. Migration 35 ergänzt die Storno-Kennzeichnung und einen
+  eindeutigen Index gegen doppelte Stornobelege.
+
 ## Offline-Arbeit und Abgleich (B2)
 
 - Schreibaufrufe mit Header `Idempotency-Key` wirken höchstens einmal

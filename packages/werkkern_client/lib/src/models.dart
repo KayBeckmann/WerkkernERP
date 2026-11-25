@@ -320,6 +320,8 @@ class OnlineDocument {
     this.advancePayments = const [],
     this.remainingCents,
     this.creditNotes = const [],
+    this.isCancellation = false,
+    this.cancellationId,
     this.introTextSnapshot,
     this.closingTextSnapshot,
     this.footerTextSnapshot,
@@ -369,6 +371,8 @@ class OnlineDocument {
       advancePayments: _summaries(j['advancePayments']),
       remainingCents: j['remainingCents'] as int?,
       creditNotes: _summaries(j['creditNotes']),
+      isCancellation: j['isCancellation'] as bool? ?? false,
+      cancellationId: j['cancellationId'] as String?,
       introTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['intro'] as String?,
       closingTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['closing'] as String?,
       footerTextSnapshot: (j['textSnapshot'] as Map<String, Object?>?)?['footer'] as String?,
@@ -494,6 +498,8 @@ class OnlineDocument {
 
   /// Rechnung: finalisierte Gutschriften dazu.
   final List<({String id, String? number, int grossCents})> creditNotes;
+  final bool isCancellation;
+  final String? cancellationId;
 
   static List<({String id, String? number, int grossCents})> _summaries(Object? raw) => [
         for (final s in (raw as List? ?? const []))

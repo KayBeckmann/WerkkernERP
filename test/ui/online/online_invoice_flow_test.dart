@@ -84,4 +84,66 @@ void main() {
     expect(find.textContaining('Gutschrift (Entwurf)'), findsOneWidget);
     expect(find.text('Gutschrift zu R-${yy}002'), findsOneWidget);
   });
+  testWidgets('Online: Storno bestätigen, Rechnung kopieren und neu ausstellen', (tester) async {
+    tester.view.physicalSize = const Size(1200, 2200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final server = OnlineTestServer();
+    await tester.runAsync(() async {
+      final token = await server.seedCompany(
+        email: 'kay@example.com',
+        companyName: 'Elektro Kay',
+        permissions: ['customers.read', 'customers.write', 'invoices.read', 'invoices.write', 'invoices.finalize'],
+      );
+      await server.put('/company/modules', {'modules': ['orders', 'advancePaymentInvoices', 'creditNotes']}, token);
+      final customer = await server.post('/customers', {'name': 'Meyer'}, token);
+      final order = await server.post('/documents', {
+        'kind': 'invoice',
+        'customerId': customer['id'],
+        'items': [
+          {'kind': 'text', 'description': 'Elektroinstallation', 'quantity': '1', 'unitPriceCents': 100000, 'vatRatePercent': 19},
+        ],
+      }, token);
+      await server.post('/documents/${order['id']}/finalize', {'version': 1}, token);
+    });
+    final yy = (DateTime.now().toUtc().year % 100).toString().padLeft(2, '0');
+
+    await tester.pumpWidget(MaterialApp(
+      home: OnlineLoginScreen(clientFactory: (_) => server.client(), offlineStoreFactory: () => null),
+    ));
+    await tester.enterText(find.byKey(const Key('online-server')), 'erp.example.org');
+    await tester.enterText(find.byKey(const Key('online-email')), 'kay@example.com');
+    await tester.enterText(find.byKey(const Key('online-password')), 'passwort-12345');
+    await tester.tap(find.text('Anmelden'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Elektro Kay'));
+    await tester.pumpAndSettle();
+    await openTab(tester, 'Rechnungen');
+
+
+    await tester.tap(find.textContaining('R-${yy}001').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Rechnungsaktionen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rechnung stornieren'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Jetzt stornieren'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rechnung storniert'), findsOneWidget);
+    await tester.tap(find.byTooltip('Rechnungsaktionen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rechnung kopieren'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Rechnung (Entwurf)'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Notizen'), 'Korrigierte Online-Rechnung');
+    await tester.pump();
+    await tester.tap(find.byTooltip('Entwurf speichern'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Finalisieren'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Finalisieren').last);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Rechnung R-${yy}002'), findsOneWidget);
+  });
+
 }

@@ -226,6 +226,7 @@ mixin _PostgresCompanyImport implements CompanyImportStore {
         'footer_columns_snapshot': d.footerColumnsSnapshot == null ? null : jsonEncode(d.footerColumnsSnapshot),
         'small_business_exempt_snapshot': d.smallBusinessExemptSnapshot,
         'stock_booked': d.stockBooked,
+        'is_cancellation': d.isCancellation,
       });
     }
 

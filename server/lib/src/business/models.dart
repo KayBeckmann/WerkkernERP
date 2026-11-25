@@ -321,6 +321,7 @@ class Document {
     this.footerColumnsSnapshot,
     this.smallBusinessExemptSnapshot = false,
     this.stockBooked = false,
+    this.isCancellation = false,
     this.contactId,
     this.eInvoiceSnapshot,
     this.paymentTermId,
@@ -399,6 +400,7 @@ class Document {
   /// spätere Bearbeitungen (Auftrag bis zur Umwandlung) buchen die
   /// Mengendifferenz nach.
   final bool stockBooked;
+  final bool isCancellation;
 
   /// Kontaktperson des Kunden (optional, Kay 2026-11-09) — Empfänger beim
   /// Versand, sofern keine Rechnungs-E-Mail Vorrang hat.
@@ -492,6 +494,7 @@ class Document {
         footerColumnsSnapshot: company != null ? company.footerColumns : footerColumnsSnapshot,
         smallBusinessExemptSnapshot: company != null ? company.smallBusinessExempt : smallBusinessExemptSnapshot,
         stockBooked: stockBooked ?? this.stockBooked,
+        isCancellation: isCancellation,
         contactId: contactId != null ? contactId() : this.contactId,
         eInvoiceSnapshot: eInvoiceSnapshot ?? this.eInvoiceSnapshot,
         paymentTermId: terms != null ? terms()?.termId : paymentTermId,
@@ -537,6 +540,7 @@ class Document {
         'pdfLayoutSnapshot': pdfLayoutSnapshot,
         'pdfLogoSnapshot': pdfLogoSnapshot,
         'convertedFromId': convertedFromId,
+        'isCancellation': isCancellation,
         'paymentStatus': paymentStatus,
         'paidAt': paidAt?.toIso8601String(),
         'dueDate': dueDate == null ? null : _date(dueDate!),

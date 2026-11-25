@@ -22,6 +22,7 @@ import 'package:werkkern_core/werkkern_core.dart'
         eInvoiceXmlFileName,
         formatHours;
 
+import '../widgets/invoice_cancellation_dialog.dart';
 import '../../data/database/database.dart';
 import '../../data/database/tables.dart';
 import '../../data/repositories/article_group_repository.dart';
@@ -431,7 +432,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       _dueDate = invoice.dueDate;
       if (invoice.status == InvoiceStatus.finalized) {
         _hasBeenConverted = (await invoiceRepo.listConvertedFrom(invoice.id)).isNotEmpty;
-        if (invoice.kind == DocumentKind.invoice && _creditNotesEnabled) {
+        if (invoice.kind == DocumentKind.invoice) {
           _creditNotes = await invoiceRepo.listCreditNotesForInvoice(invoice.id);
         }
       }
@@ -912,6 +913,42 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     }
   }
 
+  Future<void> _invoiceAction(String action) async {
+    final invoice = _currentInvoice;
+    if (invoice == null || _saving) return;
+    if (action == 'cancel' && !await confirmInvoiceCancellation(context, invoice.invoiceNumber ?? '')) return;
+    if (!mounted) return;
+    final repo = context.read<InvoiceRepository>();
+    setState(() => _saving = true);
+    try {
+      if (action == 'copy') {
+        final draft = await repo.copyInvoiceDraft(companyId: invoice.companyId, invoiceId: invoice.id);
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => InvoiceEditorScreen(customer: widget.customer, invoice: draft),
+          ),
+        );
+      } else {
+        final note = await repo.cancelInvoice(companyId: invoice.companyId, invoiceId: invoice.id);
+        final credits = await repo.listCreditNotesForInvoice(invoice.id);
+        if (!mounted) return;
+        setState(() => _creditNotes = credits);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Rechnung storniert. Stornobeleg ${note.invoiceNumber} erstellt. Über „Rechnung kopieren“ kannst du sie neu ausstellen.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Aktion nicht möglich: $e')));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   /// Gutschriften (Kay-Entscheidung 2026-10-19: "Gutschriften bekommen
   /// einen eigenen Nummernkreis"). Anders als [_convertTo] setzt dies
   /// **keine** `_hasBeenConverted`-Sperre auf DIESEM Dokument — eine
@@ -1377,6 +1414,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       dueDate: _dueDate,
       isFixedPrice: _isFixedPrice,
       stockBooked: false,
+      isCancellation: false,
       paymentStatus: PaymentStatus.open,
       paidAt: null,
     );
@@ -1739,7 +1777,18 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
               ],
               onSelected: _convertTo,
             ),
-          if (isFinalized && _kind == DocumentKind.invoice && _creditNotesEnabled)
+          if (isFinalized && _kind == DocumentKind.invoice)
+            PopupMenuButton<String>(
+              tooltip: 'Rechnungsaktionen', icon: const Icon(Icons.more_vert), enabled: !_saving,
+              onSelected: _invoiceAction,
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'copy', child: Text('Rechnung kopieren')),
+                if (_creditNotesEnabled)
+                  PopupMenuItem(value: 'cancel', enabled: !_creditNotes.any((d) => d.isCancellation),
+                    child: const Text('Rechnung stornieren')),
+              ],
+            ),
+          if (isFinalized && _kind == DocumentKind.invoice && _creditNotesEnabled && !_creditNotes.any((d) => d.isCancellation))
             IconButton(
               icon: const Icon(Icons.receipt_long_outlined),
               tooltip: 'Gutschrift erstellen',
@@ -1797,6 +1846,11 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_creditNotes.any((d) => d.isCancellation))
+            const ListTile(leading: Icon(Icons.cancel_outlined), title: Text('Rechnung storniert'),
+              subtitle: Text('Der Stornobeleg steht bei den Gutschriften. Mit „Rechnung kopieren“ einen neuen Entwurf erstellen.')),
+          if (_currentInvoice?.isCancellation ?? false)
+            const ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('Stornobeleg')),
           if (isFinalized)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -1931,7 +1985,7 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
           // änderbar (auch nach Finalisierung, siehe `_pickDueDate`);
           // Zahlungsstatus/Mahnstufe nur bei finalisierten Dokumenten
           // (ein Entwurf hat fachlich keinen Zahlungsstatus).
-          if (_dunningEnabled && _kind == DocumentKind.invoice) ...[
+          if (_dunningEnabled && _kind == DocumentKind.invoice && !_creditNotes.any((d) => d.isCancellation)) ...[
             const SizedBox(height: 8),
             ListTile(
               contentPadding: EdgeInsets.zero,

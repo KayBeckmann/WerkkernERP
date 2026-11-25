@@ -322,6 +322,12 @@ class WerkkernApiClient {
   static String _isoDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  Future<OnlineDocument> copyInvoice(String invoiceId) async =>
+      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$invoiceId/copy')));
+
+  Future<OnlineDocument> cancelInvoice(String invoiceId, {required int version}) async =>
+      OnlineDocument.fromJson(_map(await _send('POST', '/documents/$invoiceId/cancel', body: {'version': version})));
+
   /// Gutschrift-Entwurf zu einer finalisierten Rechnung (Modul creditNotes).
   Future<OnlineDocument> createCreditNote(String invoiceId) async =>
       OnlineDocument.fromJson(_map(await _send('POST', '/documents/$invoiceId/credit-note')));

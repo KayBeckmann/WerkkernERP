@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import 'package:werkkern_core/werkkern_core.dart';
 
 import 'models.dart';
+import 'invoice_correction.dart';
 import 'repository.dart';
 import 'suppliers.dart';
 import 'accounting.dart';
@@ -322,7 +323,7 @@ class PostgresBusinessRepository with _PostgresPdfArchive, _PostgresSuppliers, _
       'd.converted_from_id, d.payment_status, d.paid_at, d.due_date, d.project_id, d.is_advance_payment, d.is_fixed_price, '
       'd.intro_text_snapshot, d.closing_text_snapshot, d.footer_text_snapshot, d.small_business_exempt_snapshot, d.stock_booked, '
       'd.contact_id, d.e_invoice_snapshot, d.payment_term_id, d.payment_term_label, d.payment_net_days, '
-      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until, d.pdf_layout_snapshot, d.footer_columns_snapshot, d.pdf_logo_snapshot, d.company_snapshot_bic';
+      'd.skonto_percent, d.skonto_days, d.quote_validity_days, d.quote_valid_from, d.quote_valid_until, d.pdf_layout_snapshot, d.footer_columns_snapshot, d.pdf_logo_snapshot, d.company_snapshot_bic, d.is_cancellation';
 
   Document _toDocument(ResultRow r) => Document(
         id: r[0] as String,
@@ -350,6 +351,7 @@ class PostgresBusinessRepository with _PostgresPdfArchive, _PostgresSuppliers, _
         companySnapshotVatId: r[22] as String?,
         companySnapshotIban: r[23] as String?,
         companySnapshotBic: r[49] as String?,
+        isCancellation: r[50] as bool,
         convertedFromId: r[24] as String?,
         paymentStatus: r[25] as String,
         paidAt: r[26] as DateTime?,
@@ -468,6 +470,13 @@ class PostgresBusinessRepository with _PostgresPdfArchive, _PostgresSuppliers, _
           throw const BusinessConflict('Quelle wurde zwischenzeitlich geändert — bitte neu laden.');
         }
       }
+      if (d.kind == 'creditNote' && d.convertedFromId != null) {
+        await s.execute(Sql.named('SELECT id FROM documents WHERE company_id = @company AND id = @id FOR UPDATE'),
+          parameters: {'company': d.companyId, 'id': d.convertedFromId});
+        final cancellations = await s.execute(Sql.named('SELECT id FROM documents WHERE company_id = @company '
+          'AND converted_from_id = @id AND is_cancellation'), parameters: {'company': d.companyId, 'id': d.convertedFromId});
+        if (cancellations.isNotEmpty) throw const BusinessConflict('Diese Rechnung wurde bereits storniert.');
+      }
       await _insertDocumentTx(s, d, items);
     });
   }
@@ -481,10 +490,10 @@ class PostgresBusinessRepository with _PostgresPdfArchive, _PostgresSuppliers, _
         'INSERT INTO documents (id, company_id, customer_id, kind, status, issue_date, service_date, payment_terms, '
         'notes, created_by_user_id, created_at, updated_at, version, converted_from_id, project_id, '
         'is_advance_payment, is_fixed_price, contact_id, due_date, payment_term_id, payment_term_label, payment_net_days, '
-        'skonto_percent, skonto_days, quote_validity_days) VALUES (@id, @companyId, @customerId, @kind, @status, '
+        'skonto_percent, skonto_days, quote_validity_days, is_cancellation) VALUES (@id, @companyId, @customerId, @kind, @status, '
         '@issueDate, @serviceDate, @paymentTerms, @notes, @createdBy, @createdAt, @updatedAt, @version, '
         '@convertedFromId, @projectId, @advance, @fixed, @contactId, @due, @termId, @termLabel, @termDays, '
-        '@skontoPercent, @skontoDays, @quoteValidityDays)',
+        '@skontoPercent, @skontoDays, @quoteValidityDays, @cancellation)',
       ),
       parameters: {
         'id': d.id,
@@ -512,6 +521,7 @@ class PostgresBusinessRepository with _PostgresPdfArchive, _PostgresSuppliers, _
         'skontoPercent': TypedValue(Type.double, d.skontoPercent),
         'skontoDays': TypedValue(Type.integer, d.skontoDays),
         'quoteValidityDays': TypedValue(Type.integer, d.quoteValidityDays),
+        'cancellation': d.isCancellation,
       },
     );
     await _insertItems(s, items);
@@ -677,6 +687,103 @@ class PostgresBusinessRepository with _PostgresPdfArchive, _PostgresSuppliers, _
     });
     if (result.affectedRows == 0) throw const BusinessConflict('Finalisierte Dokumente können nicht gelöscht werden.');
     return true;
+  }
+
+  @override
+  Future<Document> cancelInvoice({
+    required String companyId,
+    required String id,
+    required int expectedVersion,
+    required String userId,
+    required DateTime now,
+  }) async {
+    final newId = const Uuid().v4();
+    await _db.runTx((s) async {
+      final rows = await s.execute(
+        Sql.named(
+          'SELECT $_documentColumns FROM documents d '
+          'WHERE d.company_id = @company AND d.id = @id FOR UPDATE',
+        ),
+        parameters: {'company': companyId, 'id': id},
+      );
+      if (rows.isEmpty) throw const BusinessConflict('Rechnung nicht gefunden.');
+      final source = _toDocument(rows.first);
+      final credits = await s.execute(
+        Sql.named(
+          "SELECT id FROM documents WHERE company_id = @company "
+          "AND converted_from_id = @id AND kind = 'creditNote'",
+        ),
+        parameters: {'company': companyId, 'id': id},
+      );
+      validateCancellation(source, expectedVersion, credits.isNotEmpty);
+      final itemRows = await s.execute(
+        Sql.named(
+          'SELECT $_itemColumns FROM document_items i '
+          'WHERE i.document_id = @id ORDER BY i.sort_order',
+        ),
+        parameters: {'id': id},
+      );
+      if (itemRows.isEmpty) throw const BusinessConflict('Rechnung ohne Positionen kann nicht storniert werden.');
+      final project = await s.execute(
+        Sql.named(
+          'SELECT founding_year, project_number FROM projects '
+          'WHERE company_id = @company AND id = @id',
+        ),
+        parameters: {'company': companyId, 'id': source.projectId},
+      );
+      final year = project.isEmpty ? now.year : project.first[0] as int;
+      final sequence = await s.execute(
+        Sql.named(
+          "INSERT INTO number_sequences (company_id, document_type, year, last_number) "
+          "VALUES (@company, 'creditNote', @year, 1) ON CONFLICT (company_id, document_type, year) "
+          'DO UPDATE SET last_number = number_sequences.last_number + 1 RETURNING last_number',
+        ),
+        parameters: {'company': companyId, 'year': year},
+      );
+      final number = formatNumberWithPrefix(
+        prefix: 'G',
+        year: year,
+        number: sequence.first.first as int,
+        projectNumber: project.isEmpty ? null : project.first[1] as int,
+      );
+      final note = cancellationDocument(source, id: newId, userId: userId, now: now, number: number, year: year);
+      await _insertDocumentTx(s, note, copyDocumentItems(itemRows.map(_toItem).toList(), newId, const Uuid().v4));
+      const snapshots = [
+        'customer_snapshot_name',
+        'customer_snapshot_address',
+        'customer_snapshot_vat_id',
+        'company_snapshot_name',
+        'company_snapshot_address',
+        'company_snapshot_tax_number',
+        'company_snapshot_vat_id',
+        'company_snapshot_iban',
+        'company_snapshot_bic',
+        'footer_text_snapshot',
+        'footer_columns_snapshot',
+        'small_business_exempt_snapshot',
+        'e_invoice_snapshot',
+        'pdf_layout_snapshot',
+        'pdf_logo_snapshot',
+      ];
+      await s.execute(
+        Sql.named(
+          'UPDATE documents d SET number = @number, number_year = @year, finalized_at = @now, '
+          'intro_text_snapshot = @intro, '
+          '${snapshots.map((c) => '$c = src.$c').join(', ')} '
+          'FROM documents src WHERE d.id = @newId AND src.id = @id AND src.company_id = @company',
+        ),
+        parameters: {
+          'number': number,
+          'year': year,
+          'now': now,
+          'intro': note.introTextSnapshot,
+          'newId': newId,
+          'id': id,
+          'company': companyId,
+        },
+      );
+    });
+    return (await findDocument(companyId, newId))!;
   }
 
   @override

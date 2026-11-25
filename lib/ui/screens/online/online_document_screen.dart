@@ -10,6 +10,7 @@ import 'package:werkkern_core/werkkern_core.dart';
 import '../../../domain/services/online_session.dart';
 import '../../../pdf/dunning_letter_pdf_builder.dart';
 import '../../../pdf/online_document_pdf.dart';
+import '../../widgets/invoice_cancellation_dialog.dart';
 import '../../widgets/barcode_scanner.dart';
 import '../../widgets/einvoice_actions.dart';
 import '../../widgets/scan_position_dialog.dart';
@@ -712,6 +713,29 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
     }
   }
 
+  Future<void> _invoiceAction(String action) async {
+    if (_busy) return;
+    if (action == 'cancel' && !await confirmInvoiceCancellation(context, _document!.number ?? '')) return;
+    if (!mounted) return;
+    setState(() => _busy = true);
+    try {
+      if (action == 'copy') {
+        final draft = await _client.copyInvoice(widget.documentId);
+        if (!mounted) return;
+        _snack('Rechnung als bearbeitbaren Entwurf kopiert.');
+        await _replaceWith(draft.id);
+      } else {
+        final note = await _client.cancelInvoice(widget.documentId, version: _document!.version);
+        await _reload();
+        if (mounted) _snack('Rechnung storniert. Stornobeleg ${note.number} erstellt.');
+      }
+    } on Exception catch (e) {
+      if (mounted) _snack(describeOnlineError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _createCreditNote() async {
     setState(() => _busy = true);
     try {
@@ -1232,7 +1256,18 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
           ],
           onSelected: _convert,
         ),
-      if (finalized && document.kind == 'invoice' && session.modules.contains('creditNotes') && session.can('invoices.write'))
+      if (finalized && document.kind == 'invoice' && session.can('invoices.write'))
+        PopupMenuButton<String>(
+          tooltip: 'Rechnungsaktionen', icon: const Icon(Icons.more_vert), enabled: followUps,
+          onSelected: _invoiceAction,
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'copy', child: Text('Rechnung kopieren')),
+            if (session.modules.contains('creditNotes') && session.can('invoices.finalize'))
+              PopupMenuItem(value: 'cancel', enabled: document.cancellationId == null,
+                child: const Text('Rechnung stornieren')),
+          ],
+        ),
+      if (finalized && document.kind == 'invoice' && document.cancellationId == null && session.modules.contains('creditNotes') && session.can('invoices.write'))
         IconButton(
           icon: const Icon(Icons.receipt_long_outlined),
           tooltip: 'Gutschrift erstellen',
@@ -1444,6 +1479,12 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
               style: TextStyle(color: theme.colorScheme.primary),
             ),
           ),
+        if (document.cancellationId != null)
+          ListTile(leading: const Icon(Icons.cancel_outlined), title: const Text('Rechnung storniert'),
+            subtitle: const Text('Mit „Rechnung kopieren“ einen neuen Entwurf erstellen.'),
+            trailing: TextButton(onPressed: () => _replaceWith(document.cancellationId!), child: const Text('Stornobeleg'))),
+        if (document.isCancellation)
+          const ListTile(leading: Icon(Icons.receipt_long_outlined), title: Text('Stornobeleg')),
         if (document.kind == 'creditNote' && document.convertedFromNumber != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -1569,7 +1610,7 @@ class _OnlineDocumentScreenState extends State<OnlineDocumentScreen> {
             onTap: _busy || _offlineView || (finalized ? !session.can('invoices.payment') : !editable) ? null : _pickDueDate,
           ),
         ],
-        if (finalized && document.kind == 'invoice') ...[
+        if (finalized && document.kind == 'invoice' && document.cancellationId == null) ...[
           // Wrap statt Row: auf schmalen Handys (~330 px) bricht der Knopf
           // unter den Text, statt über den Rand zu laufen.
           Wrap(

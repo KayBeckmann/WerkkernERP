@@ -47,7 +47,13 @@ final List<Future<void> Function(Session db)> _steps = [
   _step32PdfLogo,
   _step33PdfArchive,
   _step34DocumentBicSnapshot,
+  _step35InvoiceCancellation,
 ];
+
+Future<void> _step35InvoiceCancellation(Session db) async {
+  await db.execute('ALTER TABLE documents ADD COLUMN is_cancellation BOOLEAN NOT NULL DEFAULT FALSE');
+  await db.execute("CREATE UNIQUE INDEX documents_one_cancellation ON documents (company_id, converted_from_id) WHERE is_cancellation");
+}
 
 Future<void> _step34DocumentBicSnapshot(Session db) async {
   await db.execute('ALTER TABLE documents ADD COLUMN IF NOT EXISTS company_snapshot_bic TEXT');

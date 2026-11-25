@@ -105,6 +105,21 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
 - Umwandlung Angebot → Auftrag → Lieferschein/Rechnung; Abschlags-
   rechnungen mit automatischem Abzug bereits gestellter Abschläge
   (inkl. USt.) in der Schlussrechnung.
+- **Rechnungen stornieren und neu ausstellen:** Im Menü „Rechnungsaktionen“
+  einer finalisierten Rechnung „Rechnung stornieren“ wählen (Modul
+  **Gutschriften**, online Schreib- und Finalisierungsrecht). Nach Bestätigung
+  entsteht atomar eine endgültige **Stornorechnung im G-Nummernkreis** mit
+  den ursprünglichen Positionen, Steuerbeträgen und Partei-Schnappschüssen.
+  Das Original bleibt erhalten; offene Posten und Mahnwesen berücksichtigen
+  das Storno. Bestehende Gutschriften oder Gutschriftentwürfe verhindern ein
+  zusätzliches Vollstorno und müssen zuerst geprüft werden.
+  „Rechnung kopieren“ erstellt einen neuen Entwurf mit Positionen, Rabatten,
+  Gruppen, Rollen, Projekt, Kontakt und Zahlungsbedingungen. Nummer, Zahlstatus,
+  PDF-Archiv und alte Fälligkeit werden nicht übernommen; die Fälligkeit folgt
+  dem neuen Belegdatum. Den Entwurf bearbeiten und wie gewohnt finalisieren.
+  Bei Kopie nach Storno bleibt die Leistungskette erhalten: keine doppelte
+  Lagerabbuchung, stornierte Abschläge werden nicht nochmals abgezogen.
+  Das Storno selbst ist eine Belegkorrektur, keine Warenrückgabe oder Erstattung.
 - **Zahlungsbedingungen und Skonto**: je Firma eine Liste (Vorgaben
   „Sofort netto“, 7, 14, 30 Tage) mit Standard, je Kunde eine eigene
   Bedingung und Skonto (Firmenvorgabe, kein, eigenes). Aufträge und
