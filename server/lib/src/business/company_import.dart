@@ -125,8 +125,14 @@ class CompanyImportProfile {
     this.skontoPercent,
     this.skontoDays,
     this.quoteValidityDays = 14,
+    this.pdfLayout = 'classic',
+    this.pdfLogoBase64,
   });
   final String? address;
+
+  /// Parität offline/online: Layout und geprüftes Kopflogo der Firma.
+  final String pdfLayout;
+  final String? pdfLogoBase64;
   final double? skontoPercent;
   final int? skontoDays;
 
@@ -435,6 +441,27 @@ class _Parser {
     };
   }
 
+  /// Ältere Pakete ohne Layout: `classic`; unbekannte Namen weist das Paket ab.
+  String _pdfLayout(_R r, [String key = 'pdfLayout']) {
+    final name = r.optStr(key);
+    if (name != null && !pdfLayoutNames.contains(name)) {
+      result.errors.add('${r.path}.$key: unbekanntes PDF-Layout $name.');
+    }
+    return normalizePdfLayout(name);
+  }
+
+  /// Logos durchlaufen dieselbe Prüfung wie beim Speichern des Profils.
+  String? _pdfLogo(_R r, String key) {
+    final logo = r.optStr(key);
+    if (logo == null) return null;
+    try {
+      validatePdfLogo(logo);
+    } on FormatException {
+      result.errors.add('${r.path}.$key: kein gültiges PNG/JPEG (maximal 1 MiB und 2048 Pixel).');
+    }
+    return logo;
+  }
+
   void _company(Map<String, Object?> c) {
     final r = _R(c, 'company');
     final texts = <String, ({String? intro, String? closing})>{};
@@ -476,9 +503,13 @@ class _Parser {
         skontoPercent: r.optNumber('skontoPercent'),
         skontoDays: r.optInt('skontoDays'),
         quoteValidityDays: r.m.containsKey('quoteValidityDays') ? r.optInt('quoteValidityDays') : 14,
+        pdfLayout: _pdfLayout(r),
+        pdfLogoBase64: _pdfLogo(r, 'pdfLogoBase64'),
         modules: modules,
       ),
-    )..warnings.addAll(result.warnings);
+    )
+      ..warnings.addAll(result.warnings)
+      ..errors.addAll(result.errors);
   }
 
   void _settings(Map<String, Object?> s) {
@@ -575,6 +606,8 @@ class _Parser {
           introTextSnapshot: r.optStr('introTextSnapshot'),
           closingTextSnapshot: r.optStr('closingTextSnapshot'),
           footerTextSnapshot: r.optStr('footerTextSnapshot'),
+          pdfLayoutSnapshot: _pdfLayout(r, 'pdfLayoutSnapshot'),
+          pdfLogoSnapshot: _pdfLogo(r, 'pdfLogoSnapshot'),
           footerColumnsSnapshot: (r.m['footerColumnsSnapshot'] as Map? ??
               (r.m['textSnapshot'] as Map?)?['footerColumns'] as Map?)?.cast<String, String?>(),
           smallBusinessExemptSnapshot: r.boolean('smallBusinessExemptSnapshot', fallback: false),

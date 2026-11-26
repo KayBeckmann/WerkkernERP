@@ -127,6 +127,13 @@ DunningLetterPdfData onlineDunningLetterData({
       introText: notice.introText,
       closingText: notice.closingText,
       footerText: document.footerTextSnapshot ?? company.footerText,
+      // Parität offline/online: Logo und Fußzeilenspalten wie offline.
+      pdfLogoBase64: company.pdfLogoBase64,
+      footerColumns: company.footerColumns,
+      companyTaxNumber: document.companySnapshot?.taxNumber,
+      companyVatId: document.companySnapshot?.vatId,
+      companyIban: document.companySnapshot?.iban,
+      companyBic: document.companySnapshot?.bic,
     );
 
 /// Mahnschreiben aus Rechnungs-Schnappschuss und protokollierter Mahnung.

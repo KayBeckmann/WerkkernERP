@@ -56,6 +56,7 @@ void main() {
   }) =>
       Company(
         id: 'company-1',
+        pdfLayout: 'classic',
         name: 'Elektro Beckmann',
         address: 'Musterstraße 1, 23966 Wismar',
         taxNumber: '123/456/78901',

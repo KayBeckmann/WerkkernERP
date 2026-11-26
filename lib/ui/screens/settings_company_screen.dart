@@ -1,9 +1,10 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:werkkern_core/werkkern_core.dart' show parsePostalAddress;
+import 'package:werkkern_core/werkkern_core.dart' show normalizePdfLayout, parsePostalAddress;
 
 import '../../data/repositories/company_repository.dart';
+import '../widgets/pdf_branding_fields.dart' show pdfLayoutLabels;
 import '../widgets/quote_validity_dialog.dart' show parseQuoteValidityDays;
 import '../../domain/services/active_company_service.dart';
 
@@ -36,6 +37,9 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
 
   /// A5-Nachtrag: Standard-Bindefrist neuer Angebote (Tage).
   final _quoteValidity = TextEditingController();
+
+  /// Parität offline/online (26.11.2026): Beleglayout wie online.
+  String _pdfLayout = 'classic';
   bool _busy = false;
   bool _loaded = false;
 
@@ -61,6 +65,7 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
     _email.text = company.email ?? '';
     _phone.text = company.phone ?? '';
     _quoteValidity.text = company.quoteValidityDays?.toString() ?? '';
+    _pdfLayout = normalizePdfLayout(company.pdfLayout);
     _loaded = true;
   }
 
@@ -113,6 +118,7 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
               email: Value(_v(_email)),
               phone: Value(_v(_phone)),
               quoteValidityDays: Value(validity.days),
+              pdfLayout: _pdfLayout,
             ),
           );
       await service.refreshActive();
@@ -138,6 +144,18 @@ class _SettingsCompanyScreenState extends State<SettingsCompanyScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            key: const Key('company-pdf-layout'),
+            initialValue: _pdfLayout,
+            decoration: const InputDecoration(
+              labelText: 'PDF-Layout',
+              helperText: 'Gilt für Entwürfe und neu finalisierte Belege; Logo und Fußzeile unter Dokumenttexte.',
+            ),
+            items: [
+              for (final e in pdfLayoutLabels.entries) DropdownMenuItem(value: e.key, child: Text(e.value)),
+            ],
+            onChanged: _busy ? null : (value) => setState(() => _pdfLayout = value ?? 'classic'),
+          ),
           TextField(controller: _name, decoration: const InputDecoration(labelText: 'Firmenname *')),
           TextField(
             controller: _address,

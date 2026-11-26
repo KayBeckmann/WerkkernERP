@@ -3,12 +3,11 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:shelf/shelf.dart';
-import 'package:werkkern_core/werkkern_core.dart' show isValidQuoteValidityDays;
+import 'package:werkkern_core/werkkern_core.dart' show isValidQuoteValidityDays, validatePdfLogo;
 import 'package:shelf_router/shelf_router.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models.dart';
-import 'pdf_logo.dart';
 import 'auth.dart';
 import 'business/repository.dart';
 import 'business/models.dart' show documentKindModules;

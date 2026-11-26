@@ -12,6 +12,8 @@ import 'package:werkkern_core/werkkern_core.dart'
         EInvoiceData,
         EInvoiceProfile,
         buildEInvoiceXml,
+        decodeFooterColumns,
+        normalizePdfLayout,
         eInvoiceProblems,
         facturXAttachmentName,
         paymentTermsText,
@@ -43,7 +45,8 @@ Future<Uint8List> buildInvoicePdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
   required Company company,
-  PdfLayout layout = PdfLayout.classic,
+  // `null` = Layout aus dem Schnappschuss des Belegs (Altbelege: classic).
+  PdfLayout? layout,
   // C13 Abschlagsrechnungen, aufgeschlüsselt seit Nachtrag 2026-10-21
   // ("Diese müssen aufgeschlüsselt werden und die Rechnungsnummern der
   // Teilzahlungen müssen aufgelistet werden") — eine Zeile je
@@ -94,7 +97,8 @@ Future<Uint8List> buildDraftPreviewPdf({
   required Invoice invoice,
   required List<InvoiceItem> items,
   required Company company,
-  PdfLayout layout = PdfLayout.classic,
+  // `null` = aktuell gewähltes Layout der Firma.
+  PdfLayout? layout,
   List<AdvancePaymentEntry> priorAdvancePayments = const [],
 }) {
   return _buildPdf(
@@ -240,7 +244,7 @@ Future<Uint8List> _buildPdf({
   required List<InvoiceItem> items,
   required Company company,
   required bool isPreview,
-  PdfLayout layout = PdfLayout.classic,
+  PdfLayout? layout,
   List<AdvancePaymentEntry> priorAdvancePayments = const [],
   String? referencedDocumentNumber,
   DateTime? referencedDocumentDate,
@@ -275,6 +279,10 @@ Future<Uint8List> _buildPdf({
       introText: isPreview ? introTextFor(company, invoice.kind) : invoice.pdfIntroTextSnapshot,
       closingText: isPreview ? closingTextFor(company, invoice.kind) : invoice.pdfClosingTextSnapshot,
       footerText: isPreview ? company.pdfFooterText : invoice.pdfFooterTextSnapshot,
+      // Parität offline/online (26.11.2026): Logo und dreispaltige
+      // Fußzeile wie die Texte — Entwurf live, finalisiert eingefroren.
+      pdfLogoBase64: isPreview ? company.pdfLogoBase64 : invoice.pdfLogoSnapshot,
+      footerColumns: decodeFooterColumns(isPreview ? company.pdfFooterColumns : invoice.pdfFooterColumnsSnapshot),
       isSmallBusinessExempt: company.isSmallBusinessExempt,
       lines: [for (final item in items) PdfLine.fromItem(item)],
       terms: documentTermsOf(invoice),
@@ -295,11 +303,16 @@ Future<Uint8List> _buildPdf({
             ),
     ),
     isPreview: isPreview,
-    layout: layout,
+    layout: layout ?? pdfLayoutFromName(isPreview ? company.pdfLayout : invoice.pdfLayoutSnapshot),
     priorAdvancePayments: priorAdvancePayments,
     referencedDocumentNumber: referencedDocumentNumber,
   );
 }
+
+/// Gespeicherter Layoutname (Firma oder Belegschnappschuss) → [PdfLayout];
+/// fehlend/unbekannt = [PdfLayout.classic].
+PdfLayout pdfLayoutFromName(String? name) =>
+    normalizePdfLayout(name) == 'nordLetterhead' ? PdfLayout.nordLetterhead : PdfLayout.classic;
 
 /// Rendert [data] — gemeinsamer Kern für Offline- und Online-Dokumente.
 /// Explicit opt-in: legacy documents keep their historical renderer.
@@ -443,7 +456,7 @@ Future<Uint8List> renderDocumentPdf(
       footer: (context) => layout == PdfLayout.nordLetterhead
           ? _buildLetterFooter(invoice, footerText, context.pageNumber, context.pagesCount)
           : invoice.footerColumns != null
-          ? _buildConfiguredFooter(invoice, context.pageNumber, context.pagesCount)
+          ? buildConfiguredFooter(invoice, context.pageNumber, context.pagesCount)
           : pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
@@ -695,7 +708,8 @@ pw.Widget _footerRow(PdfDocumentData data) => pw.Row(
   ],
 );
 
-pw.Widget _buildConfiguredFooter(PdfDocumentData data, int page, int pages) => pw.Column(children: [
+/// Dreispaltige Fußzeile samt Seitenzahl — auch für Mahnschreiben.
+pw.Widget buildConfiguredFooter(PdfDocumentData data, int page, int pages) => pw.Column(children: [
   if (configuredFooterHasContent(data))
     pw.Divider(color: PdfColors.grey400, thickness: 0.4),
   _footerRow(data),

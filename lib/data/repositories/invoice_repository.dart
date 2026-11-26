@@ -580,6 +580,11 @@ class InvoiceRepository {
           pdfIntroTextSnapshot: Value(introTextFor(company, invoice.kind)),
           pdfClosingTextSnapshot: Value(closingTextFor(company, invoice.kind)),
           pdfFooterTextSnapshot: Value(company.pdfFooterText),
+          // Parität offline/online: Layout, Logo und Fußzeilenspalten
+          // ebenso einfrieren — spätere Änderungen lassen den Beleg gleich.
+          pdfLayoutSnapshot: Value(company.pdfLayout),
+          pdfLogoSnapshot: Value(company.pdfLogoBase64),
+          pdfFooterColumnsSnapshot: Value(company.pdfFooterColumns),
         ),
       );
 

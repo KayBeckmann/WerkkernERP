@@ -1,10 +1,12 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:werkkern_core/werkkern_core.dart' show decodeFooterColumns, encodeFooterColumns;
 
 import '../../data/database/tables.dart';
 import '../../data/repositories/company_repository.dart';
 import '../../domain/services/active_company_service.dart';
+import '../widgets/pdf_branding_fields.dart';
 import 'invoices_screen.dart' show DocumentLabels;
 
 /// "Dokumenttexte" als eigene Unterseite (Nachtrag 2026-10-18: "Die
@@ -34,6 +36,12 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
   late final TextEditingController _purchaseIntroCtrl;
   late final TextEditingController _purchaseClosingCtrl;
 
+  /// Parität offline/online (26.11.2026): Logo und dreispaltige Fußzeile
+  /// wie unter Online → Einstellungen → Dokumenttexte.
+  String? _logoBase64;
+  late bool _footerColumnsEnabled;
+  late final Map<String, TextEditingController> _footerColumnCtrls;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +65,13 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
     _footerCtrl = TextEditingController(text: company?.pdfFooterText);
     _purchaseIntroCtrl = TextEditingController(text: company?.pdfIntroTextPurchaseOrder);
     _purchaseClosingCtrl = TextEditingController(text: company?.pdfClosingTextPurchaseOrder);
+    _logoBase64 = company?.pdfLogoBase64;
+    final columns = decodeFooterColumns(company?.pdfFooterColumns);
+    _footerColumnsEnabled = columns != null;
+    _footerColumnCtrls = {
+      for (final e in footerColumnDefaults.entries)
+        e.key: TextEditingController(text: footerEditorInitialText(columns, e.key, e.value)),
+    };
   }
 
   @override
@@ -70,6 +85,9 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
     _footerCtrl.dispose();
     _purchaseIntroCtrl.dispose();
     _purchaseClosingCtrl.dispose();
+    for (final c in _footerColumnCtrls.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -98,6 +116,10 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
               pdfIntroTextCreditNote: Value(_textOrNull(_introCtrls[DocumentKind.creditNote]!)),
               pdfClosingTextCreditNote: Value(_textOrNull(_closingCtrls[DocumentKind.creditNote]!)),
               pdfFooterText: Value(_textOrNull(_footerCtrl)),
+              pdfLogoBase64: Value(_logoBase64),
+              pdfFooterColumns: Value(encodeFooterColumns(_footerColumnsEnabled
+                  ? {for (final e in _footerColumnCtrls.entries) e.key: _textOrNull(e.value)}
+                  : null)),
             ),
           );
       await service.refreshActive();
@@ -167,6 +189,12 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  PdfLogoField(
+                    logoBase64: _logoBase64,
+                    enabled: !_textsSaving,
+                    onChanged: (logo) => setState(() => _logoBase64 = logo),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     'Einleitung/Schluss je Dokumentart (z. B. Bindefrist im Angebot, '
                     'Zahlungsziel in der Rechnung). Nur aktive Module werden angezeigt.',
@@ -200,6 +228,7 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
                     const SizedBox(height: 12),
                   ],
                   TextField(
+                    key: const Key('document-texts-footer'),
                     controller: _footerCtrl,
                     maxLines: 2,
                     decoration: const InputDecoration(
@@ -208,10 +237,16 @@ class _SettingsDocumentTextsScreenState extends State<SettingsDocumentTextsScree
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  FooterColumnsEditor(
+                    enabled: _footerColumnsEnabled,
+                    onEnabledChanged: (value) => setState(() => _footerColumnsEnabled = value),
+                    controllers: _footerColumnCtrls,
+                  ),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton(
+                      key: const Key('document-texts-save'),
                       onPressed: _textsSaving ? null : _saveTexts,
                       child: _textsSaving
                           ? const SizedBox(

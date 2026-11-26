@@ -36,6 +36,15 @@ class Companies extends Table {
   /// Tagen (Vorbelegung, `null` = keine). Ändert bestehende Angebote nie.
   IntColumn get quoteValidityDays => integer().nullable().withDefault(const Constant(14))();
 
+  /// Parität offline/online (Nachtrag 26.11.2026): PDF-Layout (`classic`
+  /// oder `nordLetterhead`), optionales Kopflogo (PNG/JPEG, Base64, siehe
+  /// `validatePdfLogo`) und dreispaltige Fußzeile als JSON
+  /// `{"left":…,"center":…,"right":…}` — `null` = bisherige Fußzeile.
+  /// Dieselben Felder wie im Online-Firmenprofil.
+  TextColumn get pdfLayout => text().withDefault(const Constant('classic'))();
+  TextColumn get pdfLogoBase64 => text().nullable()();
+  TextColumn get pdfFooterColumns => text().nullable()();
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -673,6 +682,13 @@ class Invoices extends Table {
   /// sonst stünde der Bestand nach einer Korrektur falsch (wie online).
   /// Vollstorno als Gegenbeleg, ohne physische Warenrückgabe.
   BoolColumn get isCancellation => boolean().withDefault(const Constant(false))();
+
+  /// Layout, Logo und dreispaltige Fußzeile zum Finalisierungszeitpunkt
+  /// (wie `pdfFooterTextSnapshot`). `null` bei Altbelegen = klassisches
+  /// Layout ohne Logo und mit der bisherigen Fußzeile.
+  TextColumn get pdfLayoutSnapshot => text().nullable()();
+  TextColumn get pdfLogoSnapshot => text().nullable()();
+  TextColumn get pdfFooterColumnsSnapshot => text().nullable()();
 
   BoolColumn get stockBooked => boolean().withDefault(const Constant(false))();
 
