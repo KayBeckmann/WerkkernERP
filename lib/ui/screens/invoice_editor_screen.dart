@@ -36,6 +36,7 @@ import '../../data/repositories/staff_role_repository.dart';
 import '../../data/repositories/supplier_repository.dart';
 import '../../data/repositories/time_entry_repository.dart';
 import '../../domain/models/money.dart';
+import '../../domain/services/draft_preview.dart';
 import '../../domain/services/active_company_service.dart';
 import '../../domain/services/dunning_service.dart';
 import '../../domain/services/invoice_totals_service.dart';
@@ -1402,36 +1403,22 @@ class _InvoiceEditorScreenState extends State<InvoiceEditorScreen> {
     final company = service.active!;
     final now = DateTime.now();
     final previewInvoiceId = _currentInvoice?.id ?? 'preview';
-    final previewInvoice = Invoice(
+    final previewInvoice = draftPreviewInvoice(
       id: previewInvoiceId,
-      companyId: company.id,
-      customerId: widget.customer.id,
+      company: company,
+      customer: widget.customer,
       kind: _kind,
-      status: InvoiceStatus.draft,
-      invoiceNumber: null,
-      numberYear: null,
       issueDate: _issueDate,
       serviceDate: _serviceDate,
       paymentTerms: _paymentTermsCtrl.text.trim().isEmpty ? null : _paymentTermsCtrl.text.trim(),
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-      customerSnapshotName: widget.customer.name,
-      customerSnapshotAddress: widget.customer.address,
-      customerSnapshotVatId: widget.customer.vatId,
-      companySnapshotName: company.name,
-      companySnapshotAddress: company.address,
-      companySnapshotTaxNumber: company.taxNumber,
-      companySnapshotVatId: company.vatId,
-      companySnapshotIban: company.iban,
-      finalizedAt: null,
-      createdAt: now,
-      updatedAt: now,
       isAdvancePayment: _isAdvancePayment,
       dueDate: _dueDate,
       isFixedPrice: _isFixedPrice,
-      stockBooked: false,
-      isCancellation: false,
-      paymentStatus: PaymentStatus.open,
-      paidAt: null,
+      terms: _usesPaymentTerms ? _termSelection : null,
+      quoteValidityDays: _kind == DocumentKind.quote ? parseQuoteValidityDays(_quoteValidityCtrl.text).days : null,
+      quoteValidUntil: _kind == DocumentKind.quote ? _currentInvoice?.quoteValidUntil : null,
+      now: now,
     );
     final previewItems = [
       for (var i = 0; i < _items.length; i++)
