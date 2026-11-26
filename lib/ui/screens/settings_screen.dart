@@ -43,7 +43,7 @@ class SettingsScreen extends StatelessWidget {
         _MenuTile(
           icon: Icons.business_outlined,
           title: 'Firmendaten',
-          subtitle: 'Anschrift, Steuernummer, USt-IdNr., Bankverbindung',
+          subtitle: 'Anschrift, Steuer, Bankverbindung, PDF-Layout',
           onTap: () => _push(context, const SettingsCompanyScreen()),
         ),
         _MenuTile(
@@ -67,7 +67,7 @@ class SettingsScreen extends StatelessWidget {
         _MenuTile(
           icon: Icons.description_outlined,
           title: 'Dokumenttexte',
-          subtitle: 'Einleitung/Schluss je Dokumentart, Fußzeile',
+          subtitle: 'Logo, Einleitung/Schluss je Dokumentart, Fußzeile',
           onTap: () => _push(context, const SettingsDocumentTextsScreen()),
         ),
         if (company.dunningEnabled)

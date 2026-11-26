@@ -269,6 +269,12 @@ beschriebenen Umfang und durchgängig automatisiert getestet, aber:
   Rolle einem Mitglied zugeordnet. Probelauf vorab, Sicherung vor dem
   Umzug; die lokale Firma bleibt danach als schreibgeschütztes Archiv
   (PDFs, Sicherung). SMTP wird online neu eingerichtet.
+- **Parität lokale Firma ↔ Online-Firma** (Nachtrag 26.11.2026): PDF-Layout,
+  Kopflogo und dreispaltige Fußzeile sind auch in der rein lokalen Firma
+  einstellbar (Firmendaten bzw. Dokumenttexte). Entwürfe nutzen die
+  aktuellen Einstellungen, finalisierte Belege ihren Schnappschuss.
+  Mahnschreiben tragen in beiden Modi Logo und Fußzeile. Stand und offene
+  Punkte: [`docs/PARITAET.md`](docs/PARITAET.md).
 - Gemeinsame reine Dart-Pakete: `packages/werkkern_core` (Geld, Summen,
   Nummernformat, Umwandlungsregeln — App und Server rechnen identisch)
   und `packages/werkkern_client` (API-Client, Offline-Abgleich).

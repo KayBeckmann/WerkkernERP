@@ -195,6 +195,40 @@ class $CompaniesTable extends Companies
     requiredDuringInsert: false,
     defaultValue: const Constant(14),
   );
+  static const VerificationMeta _pdfLayoutMeta = const VerificationMeta(
+    'pdfLayout',
+  );
+  @override
+  late final GeneratedColumn<String> pdfLayout = GeneratedColumn<String>(
+    'pdf_layout',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('classic'),
+  );
+  static const VerificationMeta _pdfLogoBase64Meta = const VerificationMeta(
+    'pdfLogoBase64',
+  );
+  @override
+  late final GeneratedColumn<String> pdfLogoBase64 = GeneratedColumn<String>(
+    'pdf_logo_base64',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pdfFooterColumnsMeta = const VerificationMeta(
+    'pdfFooterColumns',
+  );
+  @override
+  late final GeneratedColumn<String> pdfFooterColumns = GeneratedColumn<String>(
+    'pdf_footer_columns',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _quotesEnabledMeta = const VerificationMeta(
     'quotesEnabled',
   );
@@ -995,6 +1029,9 @@ class $CompaniesTable extends Companies
     skontoPercent,
     skontoDays,
     quoteValidityDays,
+    pdfLayout,
+    pdfLogoBase64,
+    pdfFooterColumns,
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
@@ -1192,6 +1229,30 @@ class $CompaniesTable extends Companies
         quoteValidityDays.isAcceptableOrUnknown(
           data['quote_validity_days']!,
           _quoteValidityDaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_layout')) {
+      context.handle(
+        _pdfLayoutMeta,
+        pdfLayout.isAcceptableOrUnknown(data['pdf_layout']!, _pdfLayoutMeta),
+      );
+    }
+    if (data.containsKey('pdf_logo_base64')) {
+      context.handle(
+        _pdfLogoBase64Meta,
+        pdfLogoBase64.isAcceptableOrUnknown(
+          data['pdf_logo_base64']!,
+          _pdfLogoBase64Meta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_footer_columns')) {
+      context.handle(
+        _pdfFooterColumnsMeta,
+        pdfFooterColumns.isAcceptableOrUnknown(
+          data['pdf_footer_columns']!,
+          _pdfFooterColumnsMeta,
         ),
       );
     }
@@ -1843,6 +1904,18 @@ class $CompaniesTable extends Companies
         DriftSqlType.int,
         data['${effectivePrefix}quote_validity_days'],
       ),
+      pdfLayout: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_layout'],
+      )!,
+      pdfLogoBase64: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_logo_base64'],
+      ),
+      pdfFooterColumns: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_footer_columns'],
+      ),
       quotesEnabled: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}quotes_enabled'],
@@ -2139,6 +2212,15 @@ class Company extends DataClass implements Insertable<Company> {
   /// Tagen (Vorbelegung, `null` = keine). Ändert bestehende Angebote nie.
   final int? quoteValidityDays;
 
+  /// Parität offline/online (Nachtrag 26.11.2026): PDF-Layout (`classic`
+  /// oder `nordLetterhead`), optionales Kopflogo (PNG/JPEG, Base64, siehe
+  /// `validatePdfLogo`) und dreispaltige Fußzeile als JSON
+  /// `{"left":…,"center":…,"right":…}` — `null` = bisherige Fußzeile.
+  /// Dieselben Felder wie im Online-Firmenprofil.
+  final String pdfLayout;
+  final String? pdfLogoBase64;
+  final String? pdfFooterColumns;
+
   /// A5: Angebot/Auftrag sind pro Firma ein-/ausblendbare Module (nicht
   /// pro Nutzer — WerkkernERP hat bewusst kein Nutzerkonto/Login, Firma
   /// ist die einzige vorhandene Mandantengrenze). Default aus: Rechnung
@@ -2370,6 +2452,9 @@ class Company extends DataClass implements Insertable<Company> {
     this.skontoPercent,
     this.skontoDays,
     this.quoteValidityDays,
+    required this.pdfLayout,
+    this.pdfLogoBase64,
+    this.pdfFooterColumns,
     required this.quotesEnabled,
     required this.ordersEnabled,
     required this.deliveryNotesEnabled,
@@ -2481,6 +2566,13 @@ class Company extends DataClass implements Insertable<Company> {
     }
     if (!nullToAbsent || quoteValidityDays != null) {
       map['quote_validity_days'] = Variable<int>(quoteValidityDays);
+    }
+    map['pdf_layout'] = Variable<String>(pdfLayout);
+    if (!nullToAbsent || pdfLogoBase64 != null) {
+      map['pdf_logo_base64'] = Variable<String>(pdfLogoBase64);
+    }
+    if (!nullToAbsent || pdfFooterColumns != null) {
+      map['pdf_footer_columns'] = Variable<String>(pdfFooterColumns);
     }
     map['quotes_enabled'] = Variable<bool>(quotesEnabled);
     map['orders_enabled'] = Variable<bool>(ordersEnabled);
@@ -2695,6 +2787,13 @@ class Company extends DataClass implements Insertable<Company> {
       quoteValidityDays: quoteValidityDays == null && nullToAbsent
           ? const Value.absent()
           : Value(quoteValidityDays),
+      pdfLayout: Value(pdfLayout),
+      pdfLogoBase64: pdfLogoBase64 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfLogoBase64),
+      pdfFooterColumns: pdfFooterColumns == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfFooterColumns),
       quotesEnabled: Value(quotesEnabled),
       ordersEnabled: Value(ordersEnabled),
       deliveryNotesEnabled: Value(deliveryNotesEnabled),
@@ -2862,6 +2961,9 @@ class Company extends DataClass implements Insertable<Company> {
       skontoPercent: serializer.fromJson<double?>(json['skontoPercent']),
       skontoDays: serializer.fromJson<int?>(json['skontoDays']),
       quoteValidityDays: serializer.fromJson<int?>(json['quoteValidityDays']),
+      pdfLayout: serializer.fromJson<String>(json['pdfLayout']),
+      pdfLogoBase64: serializer.fromJson<String?>(json['pdfLogoBase64']),
+      pdfFooterColumns: serializer.fromJson<String?>(json['pdfFooterColumns']),
       quotesEnabled: serializer.fromJson<bool>(json['quotesEnabled']),
       ordersEnabled: serializer.fromJson<bool>(json['ordersEnabled']),
       deliveryNotesEnabled: serializer.fromJson<bool>(
@@ -3034,6 +3136,9 @@ class Company extends DataClass implements Insertable<Company> {
       'skontoPercent': serializer.toJson<double?>(skontoPercent),
       'skontoDays': serializer.toJson<int?>(skontoDays),
       'quoteValidityDays': serializer.toJson<int?>(quoteValidityDays),
+      'pdfLayout': serializer.toJson<String>(pdfLayout),
+      'pdfLogoBase64': serializer.toJson<String?>(pdfLogoBase64),
+      'pdfFooterColumns': serializer.toJson<String?>(pdfFooterColumns),
       'quotesEnabled': serializer.toJson<bool>(quotesEnabled),
       'ordersEnabled': serializer.toJson<bool>(ordersEnabled),
       'deliveryNotesEnabled': serializer.toJson<bool>(deliveryNotesEnabled),
@@ -3160,6 +3265,9 @@ class Company extends DataClass implements Insertable<Company> {
     Value<double?> skontoPercent = const Value.absent(),
     Value<int?> skontoDays = const Value.absent(),
     Value<int?> quoteValidityDays = const Value.absent(),
+    String? pdfLayout,
+    Value<String?> pdfLogoBase64 = const Value.absent(),
+    Value<String?> pdfFooterColumns = const Value.absent(),
     bool? quotesEnabled,
     bool? ordersEnabled,
     bool? deliveryNotesEnabled,
@@ -3247,6 +3355,13 @@ class Company extends DataClass implements Insertable<Company> {
     quoteValidityDays: quoteValidityDays.present
         ? quoteValidityDays.value
         : this.quoteValidityDays,
+    pdfLayout: pdfLayout ?? this.pdfLayout,
+    pdfLogoBase64: pdfLogoBase64.present
+        ? pdfLogoBase64.value
+        : this.pdfLogoBase64,
+    pdfFooterColumns: pdfFooterColumns.present
+        ? pdfFooterColumns.value
+        : this.pdfFooterColumns,
     quotesEnabled: quotesEnabled ?? this.quotesEnabled,
     ordersEnabled: ordersEnabled ?? this.ordersEnabled,
     deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
@@ -3410,6 +3525,13 @@ class Company extends DataClass implements Insertable<Company> {
       quoteValidityDays: data.quoteValidityDays.present
           ? data.quoteValidityDays.value
           : this.quoteValidityDays,
+      pdfLayout: data.pdfLayout.present ? data.pdfLayout.value : this.pdfLayout,
+      pdfLogoBase64: data.pdfLogoBase64.present
+          ? data.pdfLogoBase64.value
+          : this.pdfLogoBase64,
+      pdfFooterColumns: data.pdfFooterColumns.present
+          ? data.pdfFooterColumns.value
+          : this.pdfFooterColumns,
       quotesEnabled: data.quotesEnabled.present
           ? data.quotesEnabled.value
           : this.quotesEnabled,
@@ -3622,6 +3744,9 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('skontoPercent: $skontoPercent, ')
           ..write('skontoDays: $skontoDays, ')
           ..write('quoteValidityDays: $quoteValidityDays, ')
+          ..write('pdfLayout: $pdfLayout, ')
+          ..write('pdfLogoBase64: $pdfLogoBase64, ')
+          ..write('pdfFooterColumns: $pdfFooterColumns, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
@@ -3712,6 +3837,9 @@ class Company extends DataClass implements Insertable<Company> {
     skontoPercent,
     skontoDays,
     quoteValidityDays,
+    pdfLayout,
+    pdfLogoBase64,
+    pdfFooterColumns,
     quotesEnabled,
     ordersEnabled,
     deliveryNotesEnabled,
@@ -3799,6 +3927,9 @@ class Company extends DataClass implements Insertable<Company> {
           other.skontoPercent == this.skontoPercent &&
           other.skontoDays == this.skontoDays &&
           other.quoteValidityDays == this.quoteValidityDays &&
+          other.pdfLayout == this.pdfLayout &&
+          other.pdfLogoBase64 == this.pdfLogoBase64 &&
+          other.pdfFooterColumns == this.pdfFooterColumns &&
           other.quotesEnabled == this.quotesEnabled &&
           other.ordersEnabled == this.ordersEnabled &&
           other.deliveryNotesEnabled == this.deliveryNotesEnabled &&
@@ -3886,6 +4017,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<double?> skontoPercent;
   final Value<int?> skontoDays;
   final Value<int?> quoteValidityDays;
+  final Value<String> pdfLayout;
+  final Value<String?> pdfLogoBase64;
+  final Value<String?> pdfFooterColumns;
   final Value<bool> quotesEnabled;
   final Value<bool> ordersEnabled;
   final Value<bool> deliveryNotesEnabled;
@@ -3970,6 +4104,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.skontoPercent = const Value.absent(),
     this.skontoDays = const Value.absent(),
     this.quoteValidityDays = const Value.absent(),
+    this.pdfLayout = const Value.absent(),
+    this.pdfLogoBase64 = const Value.absent(),
+    this.pdfFooterColumns = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
@@ -4055,6 +4192,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.skontoPercent = const Value.absent(),
     this.skontoDays = const Value.absent(),
     this.quoteValidityDays = const Value.absent(),
+    this.pdfLayout = const Value.absent(),
+    this.pdfLogoBase64 = const Value.absent(),
+    this.pdfFooterColumns = const Value.absent(),
     this.quotesEnabled = const Value.absent(),
     this.ordersEnabled = const Value.absent(),
     this.deliveryNotesEnabled = const Value.absent(),
@@ -4142,6 +4282,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<double>? skontoPercent,
     Expression<int>? skontoDays,
     Expression<int>? quoteValidityDays,
+    Expression<String>? pdfLayout,
+    Expression<String>? pdfLogoBase64,
+    Expression<String>? pdfFooterColumns,
     Expression<bool>? quotesEnabled,
     Expression<bool>? ordersEnabled,
     Expression<bool>? deliveryNotesEnabled,
@@ -4227,6 +4370,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (skontoPercent != null) 'skonto_percent': skontoPercent,
       if (skontoDays != null) 'skonto_days': skontoDays,
       if (quoteValidityDays != null) 'quote_validity_days': quoteValidityDays,
+      if (pdfLayout != null) 'pdf_layout': pdfLayout,
+      if (pdfLogoBase64 != null) 'pdf_logo_base64': pdfLogoBase64,
+      if (pdfFooterColumns != null) 'pdf_footer_columns': pdfFooterColumns,
       if (quotesEnabled != null) 'quotes_enabled': quotesEnabled,
       if (ordersEnabled != null) 'orders_enabled': ordersEnabled,
       if (deliveryNotesEnabled != null)
@@ -4354,6 +4500,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<double?>? skontoPercent,
     Value<int?>? skontoDays,
     Value<int?>? quoteValidityDays,
+    Value<String>? pdfLayout,
+    Value<String?>? pdfLogoBase64,
+    Value<String?>? pdfFooterColumns,
     Value<bool>? quotesEnabled,
     Value<bool>? ordersEnabled,
     Value<bool>? deliveryNotesEnabled,
@@ -4439,6 +4588,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       skontoPercent: skontoPercent ?? this.skontoPercent,
       skontoDays: skontoDays ?? this.skontoDays,
       quoteValidityDays: quoteValidityDays ?? this.quoteValidityDays,
+      pdfLayout: pdfLayout ?? this.pdfLayout,
+      pdfLogoBase64: pdfLogoBase64 ?? this.pdfLogoBase64,
+      pdfFooterColumns: pdfFooterColumns ?? this.pdfFooterColumns,
       quotesEnabled: quotesEnabled ?? this.quotesEnabled,
       ordersEnabled: ordersEnabled ?? this.ordersEnabled,
       deliveryNotesEnabled: deliveryNotesEnabled ?? this.deliveryNotesEnabled,
@@ -4588,6 +4740,15 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     }
     if (quoteValidityDays.present) {
       map['quote_validity_days'] = Variable<int>(quoteValidityDays.value);
+    }
+    if (pdfLayout.present) {
+      map['pdf_layout'] = Variable<String>(pdfLayout.value);
+    }
+    if (pdfLogoBase64.present) {
+      map['pdf_logo_base64'] = Variable<String>(pdfLogoBase64.value);
+    }
+    if (pdfFooterColumns.present) {
+      map['pdf_footer_columns'] = Variable<String>(pdfFooterColumns.value);
     }
     if (quotesEnabled.present) {
       map['quotes_enabled'] = Variable<bool>(quotesEnabled.value);
@@ -4876,6 +5037,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('skontoPercent: $skontoPercent, ')
           ..write('skontoDays: $skontoDays, ')
           ..write('quoteValidityDays: $quoteValidityDays, ')
+          ..write('pdfLayout: $pdfLayout, ')
+          ..write('pdfLogoBase64: $pdfLogoBase64, ')
+          ..write('pdfFooterColumns: $pdfFooterColumns, ')
           ..write('quotesEnabled: $quotesEnabled, ')
           ..write('ordersEnabled: $ordersEnabled, ')
           ..write('deliveryNotesEnabled: $deliveryNotesEnabled, ')
@@ -10626,6 +10790,40 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _pdfLayoutSnapshotMeta = const VerificationMeta(
+    'pdfLayoutSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> pdfLayoutSnapshot =
+      GeneratedColumn<String>(
+        'pdf_layout_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pdfLogoSnapshotMeta = const VerificationMeta(
+    'pdfLogoSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> pdfLogoSnapshot = GeneratedColumn<String>(
+    'pdf_logo_snapshot',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pdfFooterColumnsSnapshotMeta =
+      const VerificationMeta('pdfFooterColumnsSnapshot');
+  @override
+  late final GeneratedColumn<String> pdfFooterColumnsSnapshot =
+      GeneratedColumn<String>(
+        'pdf_footer_columns_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _stockBookedMeta = const VerificationMeta(
     'stockBooked',
   );
@@ -10714,6 +10912,9 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     isAdvancePayment,
     isFixedPrice,
     isCancellation,
+    pdfLayoutSnapshot,
+    pdfLogoSnapshot,
+    pdfFooterColumnsSnapshot,
     stockBooked,
     dueDate,
     paymentStatus,
@@ -11060,6 +11261,33 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         ),
       );
     }
+    if (data.containsKey('pdf_layout_snapshot')) {
+      context.handle(
+        _pdfLayoutSnapshotMeta,
+        pdfLayoutSnapshot.isAcceptableOrUnknown(
+          data['pdf_layout_snapshot']!,
+          _pdfLayoutSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_logo_snapshot')) {
+      context.handle(
+        _pdfLogoSnapshotMeta,
+        pdfLogoSnapshot.isAcceptableOrUnknown(
+          data['pdf_logo_snapshot']!,
+          _pdfLogoSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_footer_columns_snapshot')) {
+      context.handle(
+        _pdfFooterColumnsSnapshotMeta,
+        pdfFooterColumnsSnapshot.isAcceptableOrUnknown(
+          data['pdf_footer_columns_snapshot']!,
+          _pdfFooterColumnsSnapshotMeta,
+        ),
+      );
+    }
     if (data.containsKey('stock_booked')) {
       context.handle(
         _stockBookedMeta,
@@ -11258,6 +11486,18 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_cancellation'],
       )!,
+      pdfLayoutSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_layout_snapshot'],
+      ),
+      pdfLogoSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_logo_snapshot'],
+      ),
+      pdfFooterColumnsSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_footer_columns_snapshot'],
+      ),
       stockBooked: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}stock_booked'],
@@ -11431,6 +11671,13 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   /// sonst stünde der Bestand nach einer Korrektur falsch (wie online).
   /// Vollstorno als Gegenbeleg, ohne physische Warenrückgabe.
   final bool isCancellation;
+
+  /// Layout, Logo und dreispaltige Fußzeile zum Finalisierungszeitpunkt
+  /// (wie `pdfFooterTextSnapshot`). `null` bei Altbelegen = klassisches
+  /// Layout ohne Logo und mit der bisherigen Fußzeile.
+  final String? pdfLayoutSnapshot;
+  final String? pdfLogoSnapshot;
+  final String? pdfFooterColumnsSnapshot;
   final bool stockBooked;
 
   /// C12 Mahnwesen (Kay-Priorisierungsentscheidung 2026-10-17): optionales
@@ -11490,6 +11737,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     required this.isAdvancePayment,
     required this.isFixedPrice,
     required this.isCancellation,
+    this.pdfLayoutSnapshot,
+    this.pdfLogoSnapshot,
+    this.pdfFooterColumnsSnapshot,
     required this.stockBooked,
     this.dueDate,
     required this.paymentStatus,
@@ -11611,6 +11861,17 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     map['is_advance_payment'] = Variable<bool>(isAdvancePayment);
     map['is_fixed_price'] = Variable<bool>(isFixedPrice);
     map['is_cancellation'] = Variable<bool>(isCancellation);
+    if (!nullToAbsent || pdfLayoutSnapshot != null) {
+      map['pdf_layout_snapshot'] = Variable<String>(pdfLayoutSnapshot);
+    }
+    if (!nullToAbsent || pdfLogoSnapshot != null) {
+      map['pdf_logo_snapshot'] = Variable<String>(pdfLogoSnapshot);
+    }
+    if (!nullToAbsent || pdfFooterColumnsSnapshot != null) {
+      map['pdf_footer_columns_snapshot'] = Variable<String>(
+        pdfFooterColumnsSnapshot,
+      );
+    }
     map['stock_booked'] = Variable<bool>(stockBooked);
     if (!nullToAbsent || dueDate != null) {
       map['due_date'] = Variable<DateTime>(dueDate);
@@ -11727,6 +11988,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       isAdvancePayment: Value(isAdvancePayment),
       isFixedPrice: Value(isFixedPrice),
       isCancellation: Value(isCancellation),
+      pdfLayoutSnapshot: pdfLayoutSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfLayoutSnapshot),
+      pdfLogoSnapshot: pdfLogoSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfLogoSnapshot),
+      pdfFooterColumnsSnapshot: pdfFooterColumnsSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfFooterColumnsSnapshot),
       stockBooked: Value(stockBooked),
       dueDate: dueDate == null && nullToAbsent
           ? const Value.absent()
@@ -11813,6 +12083,13 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       isAdvancePayment: serializer.fromJson<bool>(json['isAdvancePayment']),
       isFixedPrice: serializer.fromJson<bool>(json['isFixedPrice']),
       isCancellation: serializer.fromJson<bool>(json['isCancellation']),
+      pdfLayoutSnapshot: serializer.fromJson<String?>(
+        json['pdfLayoutSnapshot'],
+      ),
+      pdfLogoSnapshot: serializer.fromJson<String?>(json['pdfLogoSnapshot']),
+      pdfFooterColumnsSnapshot: serializer.fromJson<String?>(
+        json['pdfFooterColumnsSnapshot'],
+      ),
       stockBooked: serializer.fromJson<bool>(json['stockBooked']),
       dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
       paymentStatus: $InvoicesTable.$converterpaymentStatus.fromJson(
@@ -11882,6 +12159,11 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'isAdvancePayment': serializer.toJson<bool>(isAdvancePayment),
       'isFixedPrice': serializer.toJson<bool>(isFixedPrice),
       'isCancellation': serializer.toJson<bool>(isCancellation),
+      'pdfLayoutSnapshot': serializer.toJson<String?>(pdfLayoutSnapshot),
+      'pdfLogoSnapshot': serializer.toJson<String?>(pdfLogoSnapshot),
+      'pdfFooterColumnsSnapshot': serializer.toJson<String?>(
+        pdfFooterColumnsSnapshot,
+      ),
       'stockBooked': serializer.toJson<bool>(stockBooked),
       'dueDate': serializer.toJson<DateTime?>(dueDate),
       'paymentStatus': serializer.toJson<String>(
@@ -11933,6 +12215,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     bool? isAdvancePayment,
     bool? isFixedPrice,
     bool? isCancellation,
+    Value<String?> pdfLayoutSnapshot = const Value.absent(),
+    Value<String?> pdfLogoSnapshot = const Value.absent(),
+    Value<String?> pdfFooterColumnsSnapshot = const Value.absent(),
     bool? stockBooked,
     Value<DateTime?> dueDate = const Value.absent(),
     PaymentStatus? paymentStatus,
@@ -12023,6 +12308,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
     isFixedPrice: isFixedPrice ?? this.isFixedPrice,
     isCancellation: isCancellation ?? this.isCancellation,
+    pdfLayoutSnapshot: pdfLayoutSnapshot.present
+        ? pdfLayoutSnapshot.value
+        : this.pdfLayoutSnapshot,
+    pdfLogoSnapshot: pdfLogoSnapshot.present
+        ? pdfLogoSnapshot.value
+        : this.pdfLogoSnapshot,
+    pdfFooterColumnsSnapshot: pdfFooterColumnsSnapshot.present
+        ? pdfFooterColumnsSnapshot.value
+        : this.pdfFooterColumnsSnapshot,
     stockBooked: stockBooked ?? this.stockBooked,
     dueDate: dueDate.present ? dueDate.value : this.dueDate,
     paymentStatus: paymentStatus ?? this.paymentStatus,
@@ -12133,6 +12427,15 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       isCancellation: data.isCancellation.present
           ? data.isCancellation.value
           : this.isCancellation,
+      pdfLayoutSnapshot: data.pdfLayoutSnapshot.present
+          ? data.pdfLayoutSnapshot.value
+          : this.pdfLayoutSnapshot,
+      pdfLogoSnapshot: data.pdfLogoSnapshot.present
+          ? data.pdfLogoSnapshot.value
+          : this.pdfLogoSnapshot,
+      pdfFooterColumnsSnapshot: data.pdfFooterColumnsSnapshot.present
+          ? data.pdfFooterColumnsSnapshot.value
+          : this.pdfFooterColumnsSnapshot,
       stockBooked: data.stockBooked.present
           ? data.stockBooked.value
           : this.stockBooked,
@@ -12188,6 +12491,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
           ..write('isCancellation: $isCancellation, ')
+          ..write('pdfLayoutSnapshot: $pdfLayoutSnapshot, ')
+          ..write('pdfLogoSnapshot: $pdfLogoSnapshot, ')
+          ..write('pdfFooterColumnsSnapshot: $pdfFooterColumnsSnapshot, ')
           ..write('stockBooked: $stockBooked, ')
           ..write('dueDate: $dueDate, ')
           ..write('paymentStatus: $paymentStatus, ')
@@ -12239,6 +12545,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     isAdvancePayment,
     isFixedPrice,
     isCancellation,
+    pdfLayoutSnapshot,
+    pdfLogoSnapshot,
+    pdfFooterColumnsSnapshot,
     stockBooked,
     dueDate,
     paymentStatus,
@@ -12289,6 +12598,9 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.isAdvancePayment == this.isAdvancePayment &&
           other.isFixedPrice == this.isFixedPrice &&
           other.isCancellation == this.isCancellation &&
+          other.pdfLayoutSnapshot == this.pdfLayoutSnapshot &&
+          other.pdfLogoSnapshot == this.pdfLogoSnapshot &&
+          other.pdfFooterColumnsSnapshot == this.pdfFooterColumnsSnapshot &&
           other.stockBooked == this.stockBooked &&
           other.dueDate == this.dueDate &&
           other.paymentStatus == this.paymentStatus &&
@@ -12337,6 +12649,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<bool> isAdvancePayment;
   final Value<bool> isFixedPrice;
   final Value<bool> isCancellation;
+  final Value<String?> pdfLayoutSnapshot;
+  final Value<String?> pdfLogoSnapshot;
+  final Value<String?> pdfFooterColumnsSnapshot;
   final Value<bool> stockBooked;
   final Value<DateTime?> dueDate;
   final Value<PaymentStatus> paymentStatus;
@@ -12384,6 +12699,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
     this.isCancellation = const Value.absent(),
+    this.pdfLayoutSnapshot = const Value.absent(),
+    this.pdfLogoSnapshot = const Value.absent(),
+    this.pdfFooterColumnsSnapshot = const Value.absent(),
     this.stockBooked = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.paymentStatus = const Value.absent(),
@@ -12432,6 +12750,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.isAdvancePayment = const Value.absent(),
     this.isFixedPrice = const Value.absent(),
     this.isCancellation = const Value.absent(),
+    this.pdfLayoutSnapshot = const Value.absent(),
+    this.pdfLogoSnapshot = const Value.absent(),
+    this.pdfFooterColumnsSnapshot = const Value.absent(),
     this.stockBooked = const Value.absent(),
     this.dueDate = const Value.absent(),
     this.paymentStatus = const Value.absent(),
@@ -12487,6 +12808,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<bool>? isAdvancePayment,
     Expression<bool>? isFixedPrice,
     Expression<bool>? isCancellation,
+    Expression<String>? pdfLayoutSnapshot,
+    Expression<String>? pdfLogoSnapshot,
+    Expression<String>? pdfFooterColumnsSnapshot,
     Expression<bool>? stockBooked,
     Expression<DateTime>? dueDate,
     Expression<String>? paymentStatus,
@@ -12547,6 +12871,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (isAdvancePayment != null) 'is_advance_payment': isAdvancePayment,
       if (isFixedPrice != null) 'is_fixed_price': isFixedPrice,
       if (isCancellation != null) 'is_cancellation': isCancellation,
+      if (pdfLayoutSnapshot != null) 'pdf_layout_snapshot': pdfLayoutSnapshot,
+      if (pdfLogoSnapshot != null) 'pdf_logo_snapshot': pdfLogoSnapshot,
+      if (pdfFooterColumnsSnapshot != null)
+        'pdf_footer_columns_snapshot': pdfFooterColumnsSnapshot,
       if (stockBooked != null) 'stock_booked': stockBooked,
       if (dueDate != null) 'due_date': dueDate,
       if (paymentStatus != null) 'payment_status': paymentStatus,
@@ -12597,6 +12925,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<bool>? isAdvancePayment,
     Value<bool>? isFixedPrice,
     Value<bool>? isCancellation,
+    Value<String?>? pdfLayoutSnapshot,
+    Value<String?>? pdfLogoSnapshot,
+    Value<String?>? pdfFooterColumnsSnapshot,
     Value<bool>? stockBooked,
     Value<DateTime?>? dueDate,
     Value<PaymentStatus>? paymentStatus,
@@ -12651,6 +12982,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       isAdvancePayment: isAdvancePayment ?? this.isAdvancePayment,
       isFixedPrice: isFixedPrice ?? this.isFixedPrice,
       isCancellation: isCancellation ?? this.isCancellation,
+      pdfLayoutSnapshot: pdfLayoutSnapshot ?? this.pdfLayoutSnapshot,
+      pdfLogoSnapshot: pdfLogoSnapshot ?? this.pdfLogoSnapshot,
+      pdfFooterColumnsSnapshot:
+          pdfFooterColumnsSnapshot ?? this.pdfFooterColumnsSnapshot,
       stockBooked: stockBooked ?? this.stockBooked,
       dueDate: dueDate ?? this.dueDate,
       paymentStatus: paymentStatus ?? this.paymentStatus,
@@ -12811,6 +13146,17 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (isCancellation.present) {
       map['is_cancellation'] = Variable<bool>(isCancellation.value);
     }
+    if (pdfLayoutSnapshot.present) {
+      map['pdf_layout_snapshot'] = Variable<String>(pdfLayoutSnapshot.value);
+    }
+    if (pdfLogoSnapshot.present) {
+      map['pdf_logo_snapshot'] = Variable<String>(pdfLogoSnapshot.value);
+    }
+    if (pdfFooterColumnsSnapshot.present) {
+      map['pdf_footer_columns_snapshot'] = Variable<String>(
+        pdfFooterColumnsSnapshot.value,
+      );
+    }
     if (stockBooked.present) {
       map['stock_booked'] = Variable<bool>(stockBooked.value);
     }
@@ -12875,6 +13221,9 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('isAdvancePayment: $isAdvancePayment, ')
           ..write('isFixedPrice: $isFixedPrice, ')
           ..write('isCancellation: $isCancellation, ')
+          ..write('pdfLayoutSnapshot: $pdfLayoutSnapshot, ')
+          ..write('pdfLogoSnapshot: $pdfLogoSnapshot, ')
+          ..write('pdfFooterColumnsSnapshot: $pdfFooterColumnsSnapshot, ')
           ..write('stockBooked: $stockBooked, ')
           ..write('dueDate: $dueDate, ')
           ..write('paymentStatus: $paymentStatus, ')
@@ -25165,6 +25514,9 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<double?> skontoPercent,
       Value<int?> skontoDays,
       Value<int?> quoteValidityDays,
+      Value<String> pdfLayout,
+      Value<String?> pdfLogoBase64,
+      Value<String?> pdfFooterColumns,
       Value<bool> quotesEnabled,
       Value<bool> ordersEnabled,
       Value<bool> deliveryNotesEnabled,
@@ -25251,6 +25603,9 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<double?> skontoPercent,
       Value<int?> skontoDays,
       Value<int?> quoteValidityDays,
+      Value<String> pdfLayout,
+      Value<String?> pdfLogoBase64,
+      Value<String?> pdfFooterColumns,
       Value<bool> quotesEnabled,
       Value<bool> ordersEnabled,
       Value<bool> deliveryNotesEnabled,
@@ -25881,6 +26236,21 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<int> get quoteValidityDays => $composableBuilder(
     column: $table.quoteValidityDays,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfLayout => $composableBuilder(
+    column: $table.pdfLayout,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfLogoBase64 => $composableBuilder(
+    column: $table.pdfLogoBase64,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfFooterColumns => $composableBuilder(
+    column: $table.pdfFooterColumns,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -26906,6 +27276,21 @@ class $$CompaniesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pdfLayout => $composableBuilder(
+    column: $table.pdfLayout,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfLogoBase64 => $composableBuilder(
+    column: $table.pdfLogoBase64,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfFooterColumns => $composableBuilder(
+    column: $table.pdfFooterColumns,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get quotesEnabled => $composableBuilder(
     column: $table.quotesEnabled,
     builder: (column) => ColumnOrderings(column),
@@ -27299,6 +27684,19 @@ class $$CompaniesTableAnnotationComposer
 
   GeneratedColumn<int> get quoteValidityDays => $composableBuilder(
     column: $table.quoteValidityDays,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfLayout =>
+      $composableBuilder(column: $table.pdfLayout, builder: (column) => column);
+
+  GeneratedColumn<String> get pdfLogoBase64 => $composableBuilder(
+    column: $table.pdfLogoBase64,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfFooterColumns => $composableBuilder(
+    column: $table.pdfFooterColumns,
     builder: (column) => column,
   );
 
@@ -28294,6 +28692,9 @@ class $$CompaniesTableTableManager
                 Value<double?> skontoPercent = const Value.absent(),
                 Value<int?> skontoDays = const Value.absent(),
                 Value<int?> quoteValidityDays = const Value.absent(),
+                Value<String> pdfLayout = const Value.absent(),
+                Value<String?> pdfLogoBase64 = const Value.absent(),
+                Value<String?> pdfFooterColumns = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
@@ -28383,6 +28784,9 @@ class $$CompaniesTableTableManager
                 skontoPercent: skontoPercent,
                 skontoDays: skontoDays,
                 quoteValidityDays: quoteValidityDays,
+                pdfLayout: pdfLayout,
+                pdfLogoBase64: pdfLogoBase64,
+                pdfFooterColumns: pdfFooterColumns,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
@@ -28469,6 +28873,9 @@ class $$CompaniesTableTableManager
                 Value<double?> skontoPercent = const Value.absent(),
                 Value<int?> skontoDays = const Value.absent(),
                 Value<int?> quoteValidityDays = const Value.absent(),
+                Value<String> pdfLayout = const Value.absent(),
+                Value<String?> pdfLogoBase64 = const Value.absent(),
+                Value<String?> pdfFooterColumns = const Value.absent(),
                 Value<bool> quotesEnabled = const Value.absent(),
                 Value<bool> ordersEnabled = const Value.absent(),
                 Value<bool> deliveryNotesEnabled = const Value.absent(),
@@ -28558,6 +28965,9 @@ class $$CompaniesTableTableManager
                 skontoPercent: skontoPercent,
                 skontoDays: skontoDays,
                 quoteValidityDays: quoteValidityDays,
+                pdfLayout: pdfLayout,
+                pdfLogoBase64: pdfLogoBase64,
+                pdfFooterColumns: pdfFooterColumns,
                 quotesEnabled: quotesEnabled,
                 ordersEnabled: ordersEnabled,
                 deliveryNotesEnabled: deliveryNotesEnabled,
@@ -35283,6 +35693,9 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
       Value<bool> isCancellation,
+      Value<String?> pdfLayoutSnapshot,
+      Value<String?> pdfLogoSnapshot,
+      Value<String?> pdfFooterColumnsSnapshot,
       Value<bool> stockBooked,
       Value<DateTime?> dueDate,
       Value<PaymentStatus> paymentStatus,
@@ -35332,6 +35745,9 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<bool> isAdvancePayment,
       Value<bool> isFixedPrice,
       Value<bool> isCancellation,
+      Value<String?> pdfLayoutSnapshot,
+      Value<String?> pdfLogoSnapshot,
+      Value<String?> pdfFooterColumnsSnapshot,
       Value<bool> stockBooked,
       Value<DateTime?> dueDate,
       Value<PaymentStatus> paymentStatus,
@@ -35710,6 +36126,21 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<bool> get isCancellation => $composableBuilder(
     column: $table.isCancellation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfLayoutSnapshot => $composableBuilder(
+    column: $table.pdfLayoutSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfLogoSnapshot => $composableBuilder(
+    column: $table.pdfLogoSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfFooterColumnsSnapshot => $composableBuilder(
+    column: $table.pdfFooterColumnsSnapshot,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -36164,6 +36595,21 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get pdfLayoutSnapshot => $composableBuilder(
+    column: $table.pdfLayoutSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfLogoSnapshot => $composableBuilder(
+    column: $table.pdfLogoSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfFooterColumnsSnapshot => $composableBuilder(
+    column: $table.pdfFooterColumnsSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get stockBooked => $composableBuilder(
     column: $table.stockBooked,
     builder: (column) => ColumnOrderings(column),
@@ -36472,6 +36918,21 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<bool> get isCancellation => $composableBuilder(
     column: $table.isCancellation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfLayoutSnapshot => $composableBuilder(
+    column: $table.pdfLayoutSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfLogoSnapshot => $composableBuilder(
+    column: $table.pdfLogoSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfFooterColumnsSnapshot => $composableBuilder(
+    column: $table.pdfFooterColumnsSnapshot,
     builder: (column) => column,
   );
 
@@ -36813,6 +37274,9 @@ class $$InvoicesTableTableManager
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
                 Value<bool> isCancellation = const Value.absent(),
+                Value<String?> pdfLayoutSnapshot = const Value.absent(),
+                Value<String?> pdfLogoSnapshot = const Value.absent(),
+                Value<String?> pdfFooterColumnsSnapshot = const Value.absent(),
                 Value<bool> stockBooked = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<PaymentStatus> paymentStatus = const Value.absent(),
@@ -36860,6 +37324,9 @@ class $$InvoicesTableTableManager
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
                 isCancellation: isCancellation,
+                pdfLayoutSnapshot: pdfLayoutSnapshot,
+                pdfLogoSnapshot: pdfLogoSnapshot,
+                pdfFooterColumnsSnapshot: pdfFooterColumnsSnapshot,
                 stockBooked: stockBooked,
                 dueDate: dueDate,
                 paymentStatus: paymentStatus,
@@ -36909,6 +37376,9 @@ class $$InvoicesTableTableManager
                 Value<bool> isAdvancePayment = const Value.absent(),
                 Value<bool> isFixedPrice = const Value.absent(),
                 Value<bool> isCancellation = const Value.absent(),
+                Value<String?> pdfLayoutSnapshot = const Value.absent(),
+                Value<String?> pdfLogoSnapshot = const Value.absent(),
+                Value<String?> pdfFooterColumnsSnapshot = const Value.absent(),
                 Value<bool> stockBooked = const Value.absent(),
                 Value<DateTime?> dueDate = const Value.absent(),
                 Value<PaymentStatus> paymentStatus = const Value.absent(),
@@ -36956,6 +37426,9 @@ class $$InvoicesTableTableManager
                 isAdvancePayment: isAdvancePayment,
                 isFixedPrice: isFixedPrice,
                 isCancellation: isCancellation,
+                pdfLayoutSnapshot: pdfLayoutSnapshot,
+                pdfLogoSnapshot: pdfLogoSnapshot,
+                pdfFooterColumnsSnapshot: pdfFooterColumnsSnapshot,
                 stockBooked: stockBooked,
                 dueDate: dueDate,
                 paymentStatus: paymentStatus,

@@ -11,6 +11,8 @@ environment:
 
 dependencies:
   decimal: ^3.2.6
+  # Logo-Prüfung (PNG/JPEG tatsächlich dekodieren), siehe pdf_logo.dart.
+  image: ^4.5.4
 
 dev_dependencies:
   test: ^1.26.2

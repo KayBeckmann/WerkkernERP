@@ -73,6 +73,10 @@ class MigrationPackageBuilder {
         'countryCode': company.countryCode,
         'bic': company.bic,
         'footerText': company.pdfFooterText,
+        // Parität offline/online: Layout, Logo, dreispaltige Fußzeile.
+        'footerColumns': decodeFooterColumns(company.pdfFooterColumns),
+        'pdfLayout': normalizePdfLayout(company.pdfLayout),
+        'pdfLogoBase64': company.pdfLogoBase64,
         'smallBusinessExempt': exempt,
         'documentTexts': {
           'invoice': {'intro': company.pdfIntroText, 'closing': company.pdfClosingText},
@@ -240,6 +244,9 @@ class MigrationPackageBuilder {
             'introTextSnapshot': d.pdfIntroTextSnapshot,
             'closingTextSnapshot': d.pdfClosingTextSnapshot,
             'footerTextSnapshot': d.pdfFooterTextSnapshot,
+            'footerColumnsSnapshot': decodeFooterColumns(d.pdfFooterColumnsSnapshot),
+            'pdfLayoutSnapshot': d.pdfLayoutSnapshot,
+            'pdfLogoSnapshot': d.pdfLogoSnapshot,
             // Offline gilt § 19 zur Anzeige aus der Firma — online wird
             // er beim Finalisieren eingefroren; hier den heutigen Stand.
             'smallBusinessExemptSnapshot': d.status == InvoiceStatus.finalized && exempt,

@@ -43,6 +43,60 @@ void runCompanyImportTests(RepositoryFactory create, {bool transactional = false
     expect(result['warnings'], isNot(contains(contains('purchaseOrder'))));
   });
 
+  // Parität offline/online (26.11.2026): Logo, Layout und dreispaltige
+  // Fußzeile der lokalen Firma ziehen samt Belegschnappschüssen mit um.
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==';
+
+  Map<String, Object?> brandedPackage() {
+    final package = sampleMigrationPackage();
+    (package['company'] as Map<String, Object?>)
+      ..['pdfLayout'] = 'nordLetterhead'
+      ..['pdfLogoBase64'] = png
+      ..['footerColumns'] = {'left': '{{companyName}}', 'center': null, 'right': 'StNr {{taxNumber}}'};
+    final invoice = (package['documents']! as List).cast<Map<String, Object?>>().firstWhere((d) => d['number'] == 'R-${yy}003');
+    invoice
+      ..['pdfLayoutSnapshot'] = 'nordLetterhead'
+      ..['pdfLogoSnapshot'] = png
+      ..['footerColumnsSnapshot'] = {'left': 'Alt', 'center': null, 'right': null};
+    return package;
+  }
+
+  test('Umzug übernimmt Logo, Layout und Fußzeilenspalten samt Belegschnappschüssen', () async {
+    final chef = await h.company('chef@example.com', permissions: permissions, modules: const {'timeTracking'});
+    await h.member(chef, 'monteur@example.com');
+    await chef.post('/company/import', {
+      'package': brandedPackage(),
+      'roleAssignments': {
+        'r1': await membershipOf(chef, 'monteur@example.com'),
+        migrationNoRoleKey: await membershipOf(chef, 'chef@example.com'),
+      },
+    });
+    final profile = await chef.get('/company/profile');
+    expect(profile['pdfLayout'], 'nordLetterhead');
+    expect(profile['pdfLogoBase64'], png);
+    expect(profile['footerColumns'], {'left': '{{companyName}}', 'center': null, 'right': 'StNr {{taxNumber}}'});
+    final documents = ((await chef.get('/company/export'))['documents']! as List).cast<Map<String, Object?>>();
+    final invoice = documents.firstWhere((d) => d['number'] == 'R-${yy}003');
+    expect(invoice['pdfLayoutSnapshot'], 'nordLetterhead');
+    expect(invoice['pdfLogoSnapshot'], png);
+    expect((invoice['textSnapshot']! as Map)['footerColumns'], {'left': 'Alt', 'center': null, 'right': null});
+    // Altbelege ohne Schnappschuss bleiben klassisch.
+    final order = documents.firstWhere((d) => d['number'] == 'A-${yy}001');
+    expect(order['pdfLayoutSnapshot'], 'classic');
+    expect(order['pdfLogoSnapshot'], isNull);
+  });
+
+  test('Umzug weist kaputtes Logo und unbekanntes Layout ab', () async {
+    final chef = await h.company('chef@example.com', permissions: permissions, modules: const {'timeTracking'});
+    final package = brandedPackage();
+    (package['company'] as Map<String, Object?>)['pdfLayout'] = 'fancy';
+    final invoice = (package['documents']! as List).cast<Map<String, Object?>>().firstWhere((d) => d['number'] == 'R-${yy}003');
+    invoice['pdfLogoSnapshot'] = 'R0lGODlhAQABAAAAACw=';
+    final result = await dryRun(chef, {'package': package});
+    expect(result['errors'], contains(contains('unbekanntes PDF-Layout fancy')));
+    expect(result['errors'], contains(contains('pdfLogoSnapshot: kein gültiges PNG/JPEG')));
+  });
+
   test('Probelauf zählt, nennt offene Rollen-Zuordnungen und schreibt nichts', () async {
     final chef = await h.company('chef@example.com', permissions: permissions, modules: const {'timeTracking'});
     final result = await dryRun(chef, {'package': sampleMigrationPackage()});

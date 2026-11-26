@@ -132,6 +132,8 @@ class CompanyImportRoutes {
         skontoPercent: p.skontoPercent,
         skontoDays: p.skontoDays,
         quoteValidityDays: p.quoteValidityDays,
+        pdfLayout: p.pdfLayout,
+        pdfLogoBase64: p.pdfLogoBase64,
       ),
     );
     await repository.setCompanyModules(

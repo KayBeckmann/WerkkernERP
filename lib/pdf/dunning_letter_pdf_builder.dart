@@ -1,13 +1,16 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:werkkern_core/werkkern_core.dart' show decodeFooterColumns;
 
 import '../data/database/database.dart';
 import '../data/database/tables.dart';
 import '../domain/models/money.dart';
 import '../domain/services/dunning_service.dart';
+import 'invoice_pdf_builder.dart' show PdfDocumentData, buildConfiguredFooter;
 
 /// Eigenständig gestaltetes Mahnschreiben (C12, Kay-Feedback 2026-10-17:
 /// "Mahngebühren und Mahnschreiben-PDF bitte umsetzen"). Bezieht sich
@@ -57,7 +60,16 @@ Future<Uint8List> buildDunningLetterPdf({
     interestRatePercent: config.interestRatePercent,
     introText: company.pdfIntroTextDunning,
     closingText: company.pdfClosingTextDunning,
-    footerText: company.pdfFooterText,
+    // Wie online: Fußzeilentext der Rechnung, sonst der aktuelle.
+    footerText: invoice.pdfFooterTextSnapshot ?? company.pdfFooterText,
+    // Parität offline/online (26.11.2026): Logo und dreispaltige Fußzeile
+    // aus den aktuellen Firmendaten — das Mahnschreiben entsteht jetzt.
+    pdfLogoBase64: company.pdfLogoBase64,
+    footerColumns: decodeFooterColumns(company.pdfFooterColumns),
+    companyTaxNumber: invoice.companySnapshotTaxNumber,
+    companyVatId: invoice.companySnapshotVatId,
+    companyIban: invoice.companySnapshotIban,
+    companyBic: invoice.companySnapshotBic,
   ));
 }
 
@@ -82,6 +94,12 @@ class DunningLetterPdfData {
     this.introText,
     this.closingText,
     this.footerText,
+    this.pdfLogoBase64,
+    this.footerColumns,
+    this.companyTaxNumber,
+    this.companyVatId,
+    this.companyIban,
+    this.companyBic,
   });
   final DunningLevel level;
   final DateTime date;
@@ -101,6 +119,15 @@ class DunningLetterPdfData {
   final String? closingText;
   final String? footerText;
 
+  /// Kopflogo und dreispaltige Fußzeile wie bei den übrigen Belegen;
+  /// Steuer-/Bankdaten nur für die Platzhalter der Fußzeile.
+  final String? pdfLogoBase64;
+  final Map<String, String?>? footerColumns;
+  final String? companyTaxNumber;
+  final String? companyVatId;
+  final String? companyIban;
+  final String? companyBic;
+
   Money get totalDue => invoiceGross + fee + interest;
 }
 
@@ -116,12 +143,32 @@ Future<Uint8List> buildDunningLetterPdfFromData(DunningLetterPdfData data) async
   final regularFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans.ttf'));
   final boldFont = pw.Font.ttf(await rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'));
 
+  final logo = data.pdfLogoBase64 == null ? null : pw.MemoryImage(base64Decode(data.pdfLogoBase64!));
+  final footerData = PdfDocumentData(
+    kind: DocumentKind.invoice,
+    invoiceNumber: data.invoiceNumber,
+    issueDate: data.date,
+    serviceDate: data.date,
+    companySnapshotName: data.companyName,
+    companySnapshotAddress: data.companyAddress,
+    companySnapshotTaxNumber: data.companyTaxNumber,
+    companySnapshotVatId: data.companyVatId,
+    companySnapshotIban: data.companyIban,
+    companySnapshotBic: data.companyBic,
+    customerSnapshotName: data.customerName,
+    customerSnapshotAddress: data.customerAddress,
+    footerColumns: data.footerColumns,
+    lines: const [],
+  );
+
   final doc = pw.Document(theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont));
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(32),
-      footer: (context) => pw.Column(
+      footer: (context) => data.footerColumns != null
+          ? buildConfiguredFooter(footerData, context.pageNumber, context.pagesCount)
+          : pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
         children: [
           if (data.footerText != null) ...[
@@ -146,6 +193,11 @@ Future<Uint8List> buildDunningLetterPdfFromData(DunningLetterPdfData data) async
         pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
+            if (logo != null) ...[
+              pw.Container(height: 55, width: 180, alignment: pw.Alignment.centerLeft,
+                  child: pw.Image(logo, fit: pw.BoxFit.contain)),
+              pw.SizedBox(height: 8),
+            ],
             pw.Text(
               data.companyName,
               style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),

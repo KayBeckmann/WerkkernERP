@@ -5,6 +5,7 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:werkkern_core/werkkern_core.dart' show decodeFooterColumns;
 
 import '../data/database/database.dart';
 import '../data/database/tables.dart';
@@ -48,6 +49,9 @@ Future<Uint8List> buildPurchaseOrderPdf({
       companyIban: company.iban,
       companyBic: company.bic,
       footerText: company.pdfFooterText,
+      // Parität offline/online: wie online aus den aktuellen Firmendaten.
+      pdfLogoBase64: company.pdfLogoBase64,
+      footerColumns: decodeFooterColumns(company.pdfFooterColumns),
       introText: company.pdfIntroTextPurchaseOrder,
       closingText: company.pdfClosingTextPurchaseOrder,
       items: [

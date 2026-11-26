@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 45;
+  int get schemaVersion => 46;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -501,8 +501,24 @@ class AppDatabase extends _$AppDatabase {
               await migrator.addColumn(invoices, invoices.isCancellation);
             }
           }
+          if (from < 46) {
+            // Parität offline/online: Layout, Logo, dreispaltige Fußzeile.
+            // Altbelege behalten `null` und damit ihre bisherige Darstellung.
+            final companyColumns = await _columnNames('companies');
+            for (final column in [companies.pdfLayout, companies.pdfLogoBase64, companies.pdfFooterColumns]) {
+              if (!companyColumns.contains(column.name)) await migrator.addColumn(companies, column);
+            }
+            final invoiceColumns = await _columnNames('invoices');
+            for (final column in [invoices.pdfLayoutSnapshot, invoices.pdfLogoSnapshot, invoices.pdfFooterColumnsSnapshot]) {
+              if (!invoiceColumns.contains(column.name)) await migrator.addColumn(invoices, column);
+            }
+          }
         },
       );
+
+  Future<Set<String>> _columnNames(String table) async => {
+        for (final row in await customSelect('PRAGMA table_info($table)').get()) row.read<String>('name'),
+      };
 
   /// Barcode je Firma eindeutig; leere Barcodes (NULL) beliebig oft.
   Future<void> _createArticleBarcodeIndex() => customStatement(

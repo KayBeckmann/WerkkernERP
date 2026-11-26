@@ -17,3 +17,5 @@ export 'src/einvoice_party.dart';
 export 'src/einvoice.dart';
 export 'src/payment_terms.dart';
 export 'src/quote_validity.dart';
+export 'src/pdf_logo.dart';
+export 'src/pdf_branding.dart';
